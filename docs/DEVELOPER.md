@@ -78,4 +78,6 @@ or set `spawn-protection=0` in `server/server.properties` and restart Paper.
 
 ## LLM
 
-Cognition is optional. This machine already has Ollama with `qwen3.5:4b`. Set `LLM_ENABLED=true` in `.env` to use it for occasional high-level decisions. The deterministic planner still runs if the model is down.
+Cognition is optional. Intended local routine model: `qwen3.5:9b` via `OLLAMA_ROUTINE_MODEL`. `qwen3.5:4b` remains a faster bring-up option. Deep reflection (`OLLAMA_REFLECTION_MODEL=gpt-oss:20b`) is off unless `OLLAMA_REFLECTION_ENABLED=true` and the model is actually available.
+
+Set `LLM_ENABLED=true` (or `OLLAMA_ENABLED=true`) in `.env` for occasional high-level decisions. The deterministic planner still runs if the model is down. See [COGNITION.md](./COGNITION.md).

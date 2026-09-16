@@ -1,28 +1,29 @@
 import { z } from "zod";
+import { GOALS, type Goal } from "./goals.js";
+import { normalizeDecisionInput } from "./normalize.js";
 
-export const GOALS = [
-  "gather_food",
-  "gather_wood",
-  "mine_stone",
-  "craft_tools",
-  "build_shelter",
-  "help_citizen",
-  "deposit",
-  "rest",
-  "explore",
-  "defend",
-] as const;
-
-export type Goal = (typeof GOALS)[number];
+export { GOALS, type Goal };
 
 export const DecisionSchema = z.object({
   goal: z.enum(GOALS),
-  priority: z.coerce.number().min(0).max(1),
+  priority: z.number().min(0).max(1),
   reason: z.string().min(1).max(280),
   targetCitizenId: z.string().optional(),
 });
 
 export type HighLevelDecision = z.infer<typeof DecisionSchema>;
+
+export const CognitionDecisionSchema = z.object({
+  goal: z.enum(GOALS),
+  priority: z.number().min(0).max(1),
+  reason: z.string().min(1).max(280),
+  targetCitizenId: z.string().min(1).optional(),
+  targetProjectId: z.string().min(1).optional(),
+  targetResource: z.string().min(1).optional(),
+  uncertainty: z.number().min(0).max(1).optional(),
+});
+
+export type CognitionDecision = z.infer<typeof CognitionDecisionSchema>;
 
 export type CognitionPrompt = {
   citizenName: string;
@@ -33,6 +34,7 @@ export type CognitionPrompt = {
   settlementNeeds: string[];
   memories: string[];
   nearbyCitizens: string[];
+  gameFacts?: string[];
 };
 
 export type CognitionProvider = {
@@ -40,34 +42,19 @@ export type CognitionProvider = {
   decide(prompt: CognitionPrompt, timeoutMs?: number): Promise<HighLevelDecision>;
 };
 
-const GOAL_SET = new Set<string>(GOALS);
-
-export function normalizeGoal(raw: unknown): Goal | undefined {
-  if (typeof raw !== "string") return undefined;
-  const key = raw.trim().toLowerCase().replaceAll(/[\s-]+/g, "_");
-  if (GOAL_SET.has(key)) return key as Goal;
-  return undefined;
-}
-
-export function normalizeDecisionInput(input: unknown): unknown {
-  if (!input || typeof input !== "object" || Array.isArray(input)) return input;
-  const source = input as Record<string, unknown>;
-  const next: Record<string, unknown> = { ...source };
-  const goal = normalizeGoal(source.goal);
-  if (goal) next.goal = goal;
-  if (typeof source.priority === "string") {
-    const trimmed = source.priority.trim();
-    if (/^-?\d+(\.\d+)?$/.test(trimmed)) {
-      next.priority = Number(trimmed);
-    }
-  } else if (typeof source.priority === "number" && !Number.isFinite(source.priority)) {
-    delete next.priority;
-  }
-  return next;
-}
-
 export function validateDecision(input: unknown): HighLevelDecision {
   return DecisionSchema.parse(normalizeDecisionInput(input));
+}
+
+export function validateCognitionDecision(input: unknown): CognitionDecision {
+  const parsed = CognitionDecisionSchema.parse(normalizeDecisionInput(input));
+  if (
+    (parsed.goal === "socialize" || parsed.goal === "assist_citizen" || parsed.goal === "help_citizen") &&
+    !parsed.targetCitizenId
+  ) {
+    throw new Error("Social goals require targetCitizenId");
+  }
+  return parsed;
 }
 
 export function extractJson(text: string): unknown {
@@ -76,5 +63,12 @@ export function extractJson(text: string): unknown {
   if (start < 0 || end < 0) {
     throw new Error("No JSON object in model output");
   }
-  return JSON.parse(text.slice(start, end + 1)) as unknown;
+  const raw = text.slice(start, end + 1);
+  try {
+    return JSON.parse(raw) as unknown;
+  } catch {
+    throw new Error("Garbage JSON in model output");
+  }
 }
+
+export { normalizeDecisionInput, normalizeGoal } from "./normalize.js";

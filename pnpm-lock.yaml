@@ -90,6 +90,12 @@ importers:
 
   packages/cognition:
     dependencies:
+      '@civ/memory':
+        specifier: workspace:*
+        version: link:../memory
+      '@civ/psychology':
+        specifier: workspace:*
+        version: link:../psychology
       '@civ/shared':
         specifier: workspace:*
         version: link:../shared

@@ -72,6 +72,9 @@ describe("cognition context and reflection", () => {
     expect(ctx.relevantMemories.length).toBeLessThanOrEqual(8);
     expect(ctx.mood.citizenId).toBe("citizen_atlas");
     expect(ctx.uncertainty).toBeGreaterThanOrEqual(0);
+    expect(ctx.inventorySummary).toEqual([]);
+    expect(Array.isArray(ctx.uncertainties)).toBe(true);
+    expect(ctx.habits.length).toBeLessThanOrEqual(6);
   });
 
   it("detects rare reflection triggers without calling a model", () => {

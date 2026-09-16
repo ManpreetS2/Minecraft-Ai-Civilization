@@ -10,8 +10,10 @@ export type ContextInput = {
   citizenId: string;
   name?: string;
   currentGoal?: string;
+  currentTask?: string;
   health?: number;
   hunger?: number;
+  inventory?: string[];
   settlementNeeds?: string[];
   snapshot?: WorldSnapshot;
   query?: string;
@@ -44,6 +46,11 @@ export function buildCognitionContext(store: CognitiveStore, input: ContextInput
   const associations = store.listAssociations(input.citizenId).map(associationFromRow);
   const activities = Object.fromEntries(store.listActivities(input.citizenId).map((row) => [row.activity, activityFromRow(row)]));
   const beliefs = store.listBeliefs(input.citizenId).map(beliefFromRow);
+  const habits = store.listHabits(input.citizenId).map((row) => ({
+    contextKey: row.contextKey,
+    action: row.action,
+    strength: row.strength,
+  }));
   const affect = dominantAffect(psych);
   const important = [...memories]
     .filter((m) => m.importance >= 0.45)
@@ -53,6 +60,13 @@ export function buildCognitionContext(store: CognitiveStore, input: ContextInput
   const memoryConfidence =
     retrieved.length === 0 ? 0.2 : retrieved.reduce((sum, item) => sum + item.memory.confidence, 0) / retrieved.length;
   const uncertainty = clampUncertainty(1 - memoryConfidence, associations.length, retrieved.length, psych.confidence);
+  const uncertainties = deriveUncertainties({
+    uncertainty,
+    hunger: input.hunger,
+    retrievedCount: retrieved.length,
+    rumorCount: beliefs.reduce((sum, b) => sum + b.rumors.length, 0),
+    hasGoal: Boolean(input.currentGoal),
+  });
 
   return {
     citizen: { id: input.citizenId, name: input.name ?? identity?.name, deceased: identity?.deceased },
@@ -62,6 +76,8 @@ export function buildCognitionContext(store: CognitiveStore, input: ContextInput
       concerns: psych.currentConcerns.map((c) => c.description),
     },
     currentGoal: input.currentGoal,
+    currentTask: input.currentTask,
+    inventorySummary: (input.inventory ?? []).slice(0, 12),
     nearbyWorldState: { entities: nearby, location: self?.position },
     mood: psych,
     activeAffect: affect,
@@ -82,9 +98,11 @@ export function buildCognitionContext(store: CognitiveStore, input: ContextInput
     })),
     activityFamiliarity: activities,
     learnedAssociations: associations.filter((a) => a.strength >= 0.2).slice(0, 8),
+    habits: habits.filter((h) => h.strength >= 0.2).slice(0, 6),
     recentImportantEvents: important.map((m) => ({ summary: m.summary, timestamp: m.timestamp })),
     settlementNeeds: input.settlementNeeds ?? [],
     uncertainty,
+    uncertainties,
   };
 }
 
@@ -92,6 +110,22 @@ function summarizeBelief(belief: ReturnType<typeof beliefFromRow>): string {
   const latest = belief.knownFacts.at(-1)?.text ?? belief.rumors.at(-1)?.text;
   if (latest) return latest;
   return `familiarity ${belief.familiarity.toFixed(2)}`;
+}
+
+function deriveUncertainties(args: {
+  uncertainty: number;
+  hunger?: number;
+  retrievedCount: number;
+  rumorCount: number;
+  hasGoal: boolean;
+}): string[] {
+  const items: string[] = [];
+  if (args.retrievedCount === 0) items.push("few_relevant_memories");
+  if (args.rumorCount > 0) items.push("unverified_rumors");
+  if (!args.hasGoal) items.push("no_current_goal");
+  if ((args.hunger ?? 20) <= 10) items.push("food_status");
+  if (args.uncertainty >= 0.6) items.push("high_uncertainty");
+  return items;
 }
 
 function clampUncertainty(base: number, associationCount: number, retrievedCount: number, confidence: number): number {
@@ -112,6 +146,8 @@ export function formatCognitionContext(ctx: CognitionContext): string {
     `Needs: health=${ctx.immediateNeeds.health ?? "?"} hunger=${ctx.immediateNeeds.hunger ?? "?"}`,
     `Mood: valence=${ctx.mood.moodValence.toFixed(2)} stress=${ctx.mood.stress.toFixed(2)} fear=${ctx.mood.fear.toFixed(2)} (${ctx.activeAffect.dominant})`,
     `Goal: ${ctx.currentGoal ?? "unspecified"}`,
+    `Task: ${ctx.currentTask ?? "none"}`,
+    `Inventory: ${ctx.inventorySummary.join(", ") || "empty"}`,
     `Nearby: ${ctx.nearbyWorldState.entities.join(", ") || "none"}`,
     `Concerns: ${ctx.immediateNeeds.concerns.join("; ") || "none"}`,
     `Memories: ${ctx.relevantMemories.map((m) => m.summary).join(" | ") || "none"}`,

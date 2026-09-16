@@ -46,8 +46,9 @@ describe("LLM decision validation", () => {
     expect(() => validateDecision({ goal: "take over the server", priority: 1, reason: "nope" })).toThrow();
   });
 
-  it("rejects non-numeric priority instead of coercing it to NaN success", () => {
-    expect(() => validateDecision({ goal: "gather_wood", priority: "high", reason: "Need logs" })).toThrow();
+  it("maps related priority labels but still rejects unrelated garbage", () => {
+    expect(validateDecision({ goal: "gather_wood", priority: "high", reason: "Need logs" }).priority).toBe(0.85);
+    expect(() => validateDecision({ goal: "gather_wood", priority: "banana", reason: "Need logs" })).toThrow();
   });
 });
 

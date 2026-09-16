@@ -223,6 +223,7 @@ export type CognitionContext = {
   citizen: { id: string; name?: string; deceased?: boolean };
   immediateNeeds: { health?: number; hunger?: number; concerns: string[] };
   currentGoal?: string;
+  currentTask?: string;
   nearbyWorldState: { entities: string[]; location?: { x: number; y: number; z: number } };
   mood: CitizenPsychState;
   activeAffect: { dominant: string; intensity: number };
@@ -240,9 +241,12 @@ export type CognitionContext = {
   }>;
   activityFamiliarity: Record<string, ActivityExperience>;
   learnedAssociations: LearnedAssociation[];
+  habits: Array<{ contextKey: string; action: string; strength: number }>;
   recentImportantEvents: Array<{ summary: string; timestamp: string }>;
   settlementNeeds: string[];
+  inventorySummary: string[];
   uncertainty: number;
+  uncertainties: string[];
 };
 
 export type ReflectionKind =

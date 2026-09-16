@@ -57,6 +57,9 @@ export function formatPrompt(prompt: CognitionPrompt): string {
     `Settlement needs: ${prompt.settlementNeeds.join(", ") || "none"}`,
     `Nearby citizens: ${prompt.nearbyCitizens.join(", ") || "none"}`,
     `Relevant memories: ${prompt.memories.slice(0, 5).join(" | ") || "none"}`,
+    prompt.gameFacts?.length ? `Relevant Minecraft facts:\n- ${prompt.gameFacts.slice(0, 8).join("\n- ")}` : "",
     "Choose the single most useful high-level goal.",
-  ].join("\n");
+  ]
+    .filter(Boolean)
+    .join("\n");
 }

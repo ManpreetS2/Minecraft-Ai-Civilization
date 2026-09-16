@@ -82,3 +82,6 @@ coverage/
 # Optional local model caches
 models/
 .ollama/
+
+# Generated cognition benchmark output
+artifacts/

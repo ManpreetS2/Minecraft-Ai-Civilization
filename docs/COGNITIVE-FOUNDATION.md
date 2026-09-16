@@ -147,7 +147,7 @@ Insertion never waits on embeddings. SQLite can store vectors later; basic tests
 
 ## Cognition context
 
-`CognitionContext` is the intended replacement for dumping health, hunger, inventory, and a few strings into the model. Use `toLegacyPromptMemories(ctx)` after merge to fill the existing `CognitionPrompt.memories` field without rewriting the Ollama provider in this branch.
+`CognitionContext` is the intended replacement for dumping health, hunger, inventory, and a few strings into the model. This branch also adds `CognitionService`, `ModelRouter`, and `CognitionContextBuilder` in `@civ/cognition` (see [COGNITION.md](./COGNITION.md)). They are not wired into AgentManager yet.
 
 ## Deep reflection
 

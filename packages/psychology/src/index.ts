@@ -1,5 +1,5 @@
 export { activityFromRow, normalizeActivity, recordActivityAttempt } from "./activity.js";
-export { applyAssociationProposal, associationFromRow, decayAssociation } from "./associations.js";
+export { applyAssociationProposal, associationFromRow, associationToRow, decayAssociation } from "./associations.js";
 export {
   AppraisalResultSchema,
   DeterministicAppraisal,

@@ -20,8 +20,21 @@ const envSchema = z.object({
     .enum(["true", "false"])
     .default("false")
     .transform((v) => v === "true"),
+  OLLAMA_ENABLED: z
+    .enum(["true", "false"])
+    .default("false")
+    .transform((v) => v === "true"),
   OLLAMA_HOST: z.string().default("http://127.0.0.1:11434"),
-  OLLAMA_MODEL: z.string().default("llama3.1:8b"),
+  OLLAMA_MODEL: z.string().default("qwen3.5:9b"),
+  OLLAMA_ROUTINE_MODEL: z.string().default("qwen3.5:9b"),
+  OLLAMA_REFLECTION_MODEL: z.string().default("gpt-oss:20b"),
+  OLLAMA_CONTEXT_SIZE: z.coerce.number().int().positive().default(8192),
+  OLLAMA_MAX_CONCURRENCY: z.coerce.number().int().min(1).max(4).default(1),
+  OLLAMA_TIMEOUT_MS: z.coerce.number().int().positive().default(45_000),
+  OLLAMA_REFLECTION_ENABLED: z
+    .enum(["true", "false"])
+    .default("false")
+    .transform((v) => v === "true"),
   LLM_COOLDOWN_MS: z.coerce.number().int().default(60_000),
 });
 
