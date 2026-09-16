@@ -9,7 +9,7 @@ Minecraft bodies, citizen identities, and cognition are separate. A disconnected
 - Paper **1.21.11** build 132 (`server/paper.jar`)
 - Connect the human client to **`127.0.0.1:25565`** (avoid `localhost` on this machine)
 - `online-mode=false` so Mineflayer development bots can use offline usernames
-- Stay on 1.21.11 until we deliberately upgrade
+- Stay on 1.21.11 until we deliberately upgrade. The Paper jar and world are **not** in git — see [server/README.md](server/README.md) to download Paper and recreate the local server after cloning.
 
 ## Quick start
 

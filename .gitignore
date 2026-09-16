@@ -1,56 +1,83 @@
 # Dependencies
 node_modules/
 
-# Build
+# Build output
 dist/
+build/
+out/
 *.tsbuildinfo
 
-# Secrets and local env
+# Secrets and local environment
 .env
-.env.local
+.env.*
+!.env.example
 *.pem
+*.key
+credentials.json
+**/secrets/
 
-# Simulation data
+# Simulation local-only runtime
 data/*.sqlite
 data/*.sqlite-journal
 data/*.sqlite-wal
 data/*.sqlite-shm
 data/locks/
 data/*.jsonl
+*.sqlite
+*.sqlite-journal
+*.sqlite-wal
+*.sqlite-shm
 
-# Logs
+# Logs and crash dumps
 *.log
 logs/
+**/crash-reports/
+hs_err_pid*.log
 
-# Paper server runtime (preserve locally, do not commit)
-server/logs/
-server/cache/
-server/libraries/
-server/versions/
+# Paper / Minecraft runtime — keep locally, never commit
+server/**/*.jar
+server/*.jar
+server/paper.jar
 server/world/
 server/world_nether/
 server/world_the_end/
+server/logs/
+server/cache/
+server/crash-reports/
+server/libraries/
+server/versions/
 server/plugins/
 server/config/
-server/paper.jar
+server/.console_history
+server/usercache.json
+server/session.lock
 server/*.json
 server/*.yml
 server/*.properties
 server/*.txt
-server/.console_history
-!server/start.bat
-!server/README.md
 
-# OS / editor
+# Recreate-from-docs files that MUST stay tracked
+!server/README.md
+!server/start.bat
+!server/*.example
+
+# Temporary / OS / editor
+*.tmp
+*.temp
+*.swp
+*~
 .DS_Store
 Thumbs.db
+Desktop.ini
 .idea/
 .vscode/*
 !.vscode/extensions.json
+!.vscode/settings.json.example
 
 # Test artifacts
 coverage/
 .vitest/
+.nyc_output/
 
 # Optional local model caches
 models/

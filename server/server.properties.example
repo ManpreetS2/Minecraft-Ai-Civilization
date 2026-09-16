@@ -1,0 +1,31 @@
+# Minecraft AI Civilization — local Paper 1.21.11 development properties
+# Copy to server.properties after cloning:
+#   copy server.properties.example server.properties
+#
+# Do NOT commit a live server.properties. It can contain generated secrets.
+#
+# online-mode=false is required so Mineflayer bots can use offline usernames.
+# This is private/local only. Do not expose this server to the public internet.
+
+difficulty=easy
+enable-rcon=false
+enforce-whitelist=false
+gamemode=survival
+generate-structures=true
+hardcore=false
+level-name=world
+level-type=minecraft\:normal
+max-players=20
+motd=Minecraft AI Civilization (local)
+online-mode=false
+player-idle-timeout=0
+pvp=true
+query.port=25565
+server-ip=
+server-port=25565
+simulation-distance=10
+# Non-ops cannot place/break within this radius of world spawn.
+# If citizens cannot mine near spawn, op them from the Paper console or set this to 0 and restart.
+spawn-protection=16
+view-distance=10
+white-list=false
