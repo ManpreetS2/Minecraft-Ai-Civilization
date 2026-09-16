@@ -61,14 +61,26 @@ describe("planCitizen", () => {
     expect(planned.action).toBe("eatFood");
   });
 
-  it("gathers wood at night when shelter is missing and inventory is empty", () => {
+  it("does not send everyone to gather wood just because it is night", () => {
     const planned = planCitizen({
       citizenId: "citizen_atlas",
       observation: obs({ isNight: true }),
       settlement: emptySettlement(),
       assignedNeeds: ["NEED_HOUSING"],
+      workRole: "build",
     });
-    expect(planned.task).toBe("gather_wood");
+    expect(planned.task).not.toBe("gather_wood");
+    expect(planned.action).toBe("buildShelter");
+  });
+
+  it("prefers existing shelter at night once it is verified", () => {
+    const planned = planCitizen({
+      citizenId: "citizen_maya",
+      observation: obs({ isNight: true }),
+      settlement: { ...emptySettlement(), shelterComplete: true, needs: [] },
+      assignedNeeds: [],
+    });
+    expect(planned.action).toBe("seekSafety");
   });
 });
 

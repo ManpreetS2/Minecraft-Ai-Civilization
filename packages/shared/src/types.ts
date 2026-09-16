@@ -116,6 +116,13 @@ export type SettlementState = {
   storage?: { x: number; y: number; z: number };
   origin?: { x: number; y: number; z: number };
   construction?: ConstructionState;
+  workstations?: {
+    craftingTables: { x: number; y: number; z: number }[];
+    chests: { x: number; y: number; z: number }[];
+    furnaces: { x: number; y: number; z: number }[];
+  };
+  storageContents?: Record<string, number>;
+  projectJson?: string;
   needs: SettlementNeed[];
 };
 
@@ -173,6 +180,12 @@ export const FOOD_ITEM_NAMES = new Set([
   "pumpkin_pie",
   "mushroom_stew",
   "rabbit_stew",
+  "dried_kelp",
+  "cod",
+  "salmon",
+  "tropical_fish",
+  "rotten_flesh",
+  "spider_eye",
 ]);
 
 export const LOG_BLOCK_NAMES = [

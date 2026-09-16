@@ -1,4 +1,5 @@
-import { fail, ok, type ActionResult, FOOD_ITEM_NAMES } from "@civ/shared";
+import { fail, ok, type ActionResult, FOOD_ITEM_NAMES, type Vec3 } from "@civ/shared";
+import { Vec3 as Vec3Class } from "vec3";
 import type { SkillContext } from "./context.js";
 import { moveTo } from "./movement.js";
 import { findBlock } from "./observe.js";
@@ -8,6 +9,10 @@ function countItem(ctx: SkillContext, name: string): number {
     .items()
     .filter((item) => item.name === name)
     .reduce((sum, item) => sum + item.count, 0);
+}
+
+export function inventoryCount(ctx: SkillContext, name: string): number {
+  return countItem(ctx, name);
 }
 
 export async function equipItem(
@@ -47,10 +52,35 @@ export async function eatFood(ctx: SkillContext): Promise<ActionResult<{ item: s
   return ok({ item: food.name, food: ctx.bot.food }, Date.now() - started);
 }
 
+export type ContainerTarget = Vec3;
+
+async function resolveContainer(
+  ctx: SkillContext,
+  preferred?: ContainerTarget,
+  names: string[] = ["chest", "barrel", "trapped_chest"],
+): Promise<ActionResult<{ position: Vec3 }>> {
+  const started = Date.now();
+  if (preferred) {
+    const block = ctx.bot.blockAt(new Vec3Class(Math.floor(preferred.x), Math.floor(preferred.y), Math.floor(preferred.z)));
+    if (!block || !names.includes(block.name)) {
+      return fail("CONTAINER_NOT_FOUND", "Preferred container is missing", Date.now() - started, true);
+    }
+    const move = await moveTo(ctx, preferred, 3);
+    if (!move.success) return move;
+    return ok({ position: preferred }, Date.now() - started);
+  }
+  const found = await findBlock(ctx, names, 16);
+  if (!found.success) return found;
+  const move = await moveTo(ctx, found.data.position, 3);
+  if (!move.success) return move;
+  return ok({ position: found.data.position }, Date.now() - started);
+}
+
 export async function craftItem(
   ctx: SkillContext,
   itemName: string,
   count = 1,
+  table?: ContainerTarget,
 ): Promise<ActionResult<{ item: string; count: number }>> {
   const started = Date.now();
   const bot = ctx.bot;
@@ -66,17 +96,23 @@ export async function craftItem(
   }
   let craftingTable = null;
   if (inventoryRecipes.length === 0) {
-    const found = await findBlock(ctx, ["crafting_table"], 16);
+    const found = table
+      ? { success: true as const, data: { position: table } }
+      : await findBlock(ctx, ["crafting_table"], 24);
     if (!found.success) {
       return fail("NO_CRAFTING_TABLE", "Need a crafting table nearby", Date.now() - started, true);
     }
-    const move = await moveTo(ctx, found.data.position, 3);
+    const tablePos = found.data.position;
+    const move = await moveTo(ctx, tablePos, 3);
     if (!move.success) return move;
-    craftingTable = bot.findBlock({
-      matching: bot.registry.blocksByName.crafting_table?.id ?? -1,
-      maxDistance: 6,
-    });
-    if (!craftingTable) {
+    craftingTable = bot.blockAt(new Vec3Class(Math.floor(tablePos.x), Math.floor(tablePos.y), Math.floor(tablePos.z)));
+    if (!craftingTable || craftingTable.name !== "crafting_table") {
+      craftingTable = bot.findBlock({
+        matching: bot.registry.blocksByName.crafting_table?.id ?? -1,
+        maxDistance: 6,
+      });
+    }
+    if (!craftingTable || craftingTable.name !== "crafting_table") {
       return fail("NO_CRAFTING_TABLE", "Crafting table vanished", Date.now() - started, true);
     }
   }
@@ -95,26 +131,22 @@ export async function craftItem(
 export async function depositItems(
   ctx: SkillContext,
   itemName?: string,
-): Promise<ActionResult<{ deposited: number }>> {
+  container?: ContainerTarget,
+): Promise<ActionResult<{ deposited: number; contents: Record<string, number>; position: Vec3 }>> {
   const started = Date.now();
   const bot = ctx.bot;
-  const found = await findBlock(ctx, ["chest", "barrel", "trapped_chest"], 16);
-  if (!found.success) {
-    return fail("CONTAINER_NOT_FOUND", "No chest/barrel nearby", Date.now() - started, true);
-  }
-  const move = await moveTo(ctx, found.data.position, 3);
-  if (!move.success) return move;
-  const block = bot.findBlock({
-    matching: (b) => ["chest", "barrel", "trapped_chest"].includes(b.name),
-    maxDistance: 6,
-  });
-  if (!block) {
+  const found = await resolveContainer(ctx, container);
+  if (!found.success) return found;
+  const block = bot.blockAt(
+    new Vec3Class(Math.floor(found.data.position.x), Math.floor(found.data.position.y), Math.floor(found.data.position.z)),
+  );
+  if (!block || !["chest", "barrel", "trapped_chest"].includes(block.name)) {
     return fail("CONTAINER_NOT_FOUND", "Container vanished", Date.now() - started, true);
   }
   try {
     const chest = await bot.openContainer(block);
     const before = chest.containerItems().reduce((sum, i) => sum + i.count, 0);
-    const items = bot.inventory.items().filter((i) => (itemName ? i.name === itemName : true));
+    const items = bot.inventory.items().filter((i) => (itemName ? i.name === itemName : keepForStorage(i.name)));
     let deposited = 0;
     for (const item of items) {
       try {
@@ -124,12 +156,19 @@ export async function depositItems(
         // slot conflict; continue
       }
     }
+    const contents: Record<string, number> = {};
+    for (const item of chest.containerItems()) {
+      contents[item.name] = (contents[item.name] ?? 0) + item.count;
+    }
     const after = chest.containerItems().reduce((sum, i) => sum + i.count, 0);
     chest.close();
     if (deposited === 0 && after <= before) {
       return fail("DEPOSIT_FAILED", "No items moved into container", Date.now() - started, true);
     }
-    return ok({ deposited: Math.max(deposited, after - before) }, Date.now() - started);
+    return ok(
+      { deposited: Math.max(deposited, after - before), contents, position: found.data.position },
+      Date.now() - started,
+    );
   } catch (error) {
     return fail("CONTAINER_BUSY", error instanceof Error ? error.message : String(error), Date.now() - started, true);
   }
@@ -139,17 +178,15 @@ export async function withdrawItems(
   ctx: SkillContext,
   itemName: string,
   count = 1,
-): Promise<ActionResult<{ item: string; count: number }>> {
+  container?: ContainerTarget,
+): Promise<ActionResult<{ item: string; count: number; contents: Record<string, number> }>> {
   const started = Date.now();
   const bot = ctx.bot;
-  const found = await findBlock(ctx, ["chest", "barrel", "trapped_chest"], 16);
+  const found = await resolveContainer(ctx, container);
   if (!found.success) return found;
-  const move = await moveTo(ctx, found.data.position, 3);
-  if (!move.success) return move;
-  const block = bot.findBlock({
-    matching: (b) => ["chest", "barrel", "trapped_chest"].includes(b.name),
-    maxDistance: 6,
-  });
+  const block = bot.blockAt(
+    new Vec3Class(Math.floor(found.data.position.x), Math.floor(found.data.position.y), Math.floor(found.data.position.z)),
+  );
   if (!block) {
     return fail("CONTAINER_NOT_FOUND", "Container vanished", Date.now() - started, true);
   }
@@ -162,13 +199,23 @@ export async function withdrawItems(
       return fail("ITEM_NOT_FOUND", `Container has no ${itemName}`, Date.now() - started, true);
     }
     await chest.withdraw(stack.type, null, Math.min(count, stack.count));
+    const contents: Record<string, number> = {};
+    for (const item of chest.containerItems()) {
+      contents[item.name] = (contents[item.name] ?? 0) + item.count;
+    }
     chest.close();
+    const after = countItem(ctx, itemName);
+    if (after <= before) {
+      return fail("VERIFY_FAILED", `Withdraw of ${itemName} did not increase inventory`, Date.now() - started, true);
+    }
+    return ok({ item: itemName, count: after - before, contents }, Date.now() - started);
   } catch (error) {
     return fail("WITHDRAW_FAILED", error instanceof Error ? error.message : String(error), Date.now() - started, true);
   }
-  const after = countItem(ctx, itemName);
-  if (after <= before) {
-    return fail("VERIFY_FAILED", `Withdraw of ${itemName} did not increase inventory`, Date.now() - started, true);
-  }
-  return ok({ item: itemName, count: after - before }, Date.now() - started);
+}
+
+function keepForStorage(name: string): boolean {
+  if (name.endsWith("_sword") || name.endsWith("_helmet") || name.endsWith("_chestplate")) return false;
+  if (name === "crafting_table") return false;
+  return true;
 }

@@ -11,6 +11,7 @@
     "dev": "pnpm --filter @civ/orchestrator dev",
     "atlas": "pnpm --filter @civ/orchestrator atlas",
     "sim:start": "pnpm --filter @civ/orchestrator start",
+    "sim:reset-dev": "pnpm --filter @civ/orchestrator reset-dev",
     "build": "pnpm -r --if-present build",
     "typecheck": "pnpm -r --if-present typecheck",
     "lint": "eslint .",

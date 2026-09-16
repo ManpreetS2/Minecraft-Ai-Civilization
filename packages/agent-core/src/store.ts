@@ -85,7 +85,10 @@ CREATE TABLE IF NOT EXISTS settlement (
   origin_x REAL,
   origin_y REAL,
   origin_z REAL,
-  construction_json TEXT
+  construction_json TEXT,
+  project_json TEXT,
+  workstations_json TEXT,
+  storage_contents_json TEXT
 );
 
 CREATE TABLE IF NOT EXISTS reservations (
@@ -127,6 +130,11 @@ export class CivilizationStore {
     if (!names.has("death_x")) this.db.exec(`ALTER TABLE citizens ADD COLUMN death_x REAL`);
     if (!names.has("death_y")) this.db.exec(`ALTER TABLE citizens ADD COLUMN death_y REAL`);
     if (!names.has("death_z")) this.db.exec(`ALTER TABLE citizens ADD COLUMN death_z REAL`);
+    const settlementCols = this.db.prepare(`PRAGMA table_info(settlement)`).all() as Array<{ name: string }>;
+    const settlementNames = new Set(settlementCols.map((col) => col.name));
+    if (!settlementNames.has("project_json")) this.db.exec(`ALTER TABLE settlement ADD COLUMN project_json TEXT`);
+    if (!settlementNames.has("workstations_json")) this.db.exec(`ALTER TABLE settlement ADD COLUMN workstations_json TEXT`);
+    if (!settlementNames.has("storage_contents_json")) this.db.exec(`ALTER TABLE settlement ADD COLUMN storage_contents_json TEXT`);
   }
 
   markDeceased(id: string, at = new Date().toISOString(), position?: Vec3): boolean {
@@ -372,6 +380,13 @@ export class CivilizationStore {
           ? { x: row.origin_x, y: row.origin_y, z: row.origin_z }
           : undefined,
       construction,
+      workstations: row.workstations_json
+        ? (JSON.parse(row.workstations_json) as SettlementState["workstations"])
+        : undefined,
+      storageContents: row.storage_contents_json
+        ? (JSON.parse(row.storage_contents_json) as Record<string, number>)
+        : undefined,
+      projectJson: row.project_json ?? undefined,
       needs,
     };
   }
@@ -385,7 +400,10 @@ export class CivilizationStore {
           shelter_complete = @shelterComplete,
           storage_x = @storageX, storage_y = @storageY, storage_z = @storageZ,
           origin_x = @originX, origin_y = @originY, origin_z = @originZ,
-          construction_json = @constructionJson
+          construction_json = @constructionJson,
+          project_json = @projectJson,
+          workstations_json = @workstationsJson,
+          storage_contents_json = @storageContentsJson
         WHERE id = @id`,
       )
       .run({
@@ -404,6 +422,9 @@ export class CivilizationStore {
         originY: state.origin?.y ?? null,
         originZ: state.origin?.z ?? null,
         constructionJson: state.construction ? JSON.stringify(state.construction) : null,
+        projectJson: state.projectJson ?? null,
+        workstationsJson: state.workstations ? JSON.stringify(state.workstations) : null,
+        storageContentsJson: state.storageContents ? JSON.stringify(state.storageContents) : null,
       });
   }
 
@@ -486,7 +507,7 @@ export function computeNeeds(row: {
   if (row.stone < 16) needs.push("NEED_STONE");
   if (row.tools < 5) needs.push("NEED_TOOLS");
   if (row.beds < 5) needs.push("NEED_BEDS");
-  if (!row.shelter_complete || row.housing_capacity < 5) needs.push("NEED_HOUSING");
+  if (!row.shelter_complete) needs.push("NEED_HOUSING");
   return needs;
 }
 
@@ -559,6 +580,9 @@ type SettlementRow = {
   origin_y: number | null;
   origin_z: number | null;
   construction_json: string | null;
+  project_json: string | null;
+  workstations_json: string | null;
+  storage_contents_json: string | null;
 };
 
 function mapCitizen(row: CitizenRow): CitizenRecord {

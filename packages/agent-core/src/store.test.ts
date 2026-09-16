@@ -53,4 +53,22 @@ describe("CivilizationStore", () => {
     expect(restored.markDeceased("citizen_ava")).toBe(false);
     restored.close();
   });
+
+  it("persists settlement project, workstations, and storage contents", () => {
+    const dir = mkdtempSync(join(tmpdir(), "civ-"));
+    const path = join(dir, "project.sqlite");
+    const store = new CivilizationStore(path);
+    const settlement = store.getSettlement();
+    settlement.projectJson = JSON.stringify({ id: "project_starter_shelter", status: "BUILDING" });
+    settlement.workstations = { craftingTables: [{ x: 1, y: 64, z: 1 }], chests: [{ x: 2, y: 64, z: 2 }], furnaces: [] };
+    settlement.storageContents = { oak_log: 4 };
+    store.saveSettlement(settlement);
+    store.close();
+    const restored = new CivilizationStore(path);
+    const again = restored.getSettlement();
+    expect(again.projectJson).toContain("BUILDING");
+    expect(again.workstations?.craftingTables[0]).toEqual({ x: 1, y: 64, z: 1 });
+    expect(again.storageContents).toEqual({ oak_log: 4 });
+    restored.close();
+  });
 });

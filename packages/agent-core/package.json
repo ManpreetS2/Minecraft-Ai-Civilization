@@ -16,6 +16,7 @@
     "@civ/cognition": "workspace:*",
     "@civ/memory": "workspace:*",
     "@civ/minecraft-adapter": "workspace:*",
+    "@civ/minecraft-knowledge": "workspace:*",
     "@civ/shared": "workspace:*",
     "@civ/skills": "workspace:*",
     "@civ/society": "workspace:*",

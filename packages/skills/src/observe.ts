@@ -19,6 +19,7 @@ export async function findBlock(
   ctx: SkillContext,
   names: string[],
   maxDistance = 32,
+  skip?: (position: Vec3) => boolean,
 ): Promise<ActionResult<{ name: string; position: Vec3 }>> {
   const started = Date.now();
   const bot = ctx.bot;
@@ -31,11 +32,10 @@ export async function findBlock(
   const positions = bot.findBlocks({
     matching: (block) => {
       if (!block?.position || !ids.includes(block.type)) return false;
-      return !ctx.body.unreachable.has({
-        x: block.position.x,
-        y: block.position.y,
-        z: block.position.z,
-      });
+      const position = { x: block.position.x, y: block.position.y, z: block.position.z };
+      if (ctx.body.unreachable.has(position)) return false;
+      if (skip?.(position) || ctx.skipBlock?.(position)) return false;
+      return true;
     },
     maxDistance,
     count: 24,
@@ -43,10 +43,9 @@ export async function findBlock(
   for (const pos of positions) {
     const block = bot.blockAt(pos);
     if (!block) continue;
-    return ok(
-      { name: block.name, position: { x: block.position.x, y: block.position.y, z: block.position.z } },
-      Date.now() - started,
-    );
+    const position = { x: block.position.x, y: block.position.y, z: block.position.z };
+    if (skip?.(position) || ctx.skipBlock?.(position)) continue;
+    return ok({ name: block.name, position }, Date.now() - started);
   }
   return fail("BLOCK_NOT_FOUND", `No ${names.join("/")} within ${maxDistance} blocks`, Date.now() - started, true);
 }

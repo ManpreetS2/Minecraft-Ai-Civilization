@@ -2,21 +2,13 @@ import { MinecraftBody, activePathCount, lastPathDurationMs } from "@civ/minecra
 import { createCognition, type CognitionProvider, type HighLevelDecision } from "@civ/cognition";
 import { createMemory, retrieveRelevant } from "@civ/memory";
 import { applySocialEvent, sameWorkFamily, SocialDirector } from "@civ/society";
-import {
-  createEvent,
-  DEFAULT_CITIZENS,
-  EventBus,
-  formatSimEvent,
-  resolveFromRoot,
-  type AppConfig,
-  type CitizenRecord,
-  type PresentedEvent,
-  type SettlementState,
-  type SimEvent,
-  type Vec3,
-} from "@civ/shared";
-import { assignSettlementNeeds, planCitizen, type PlannedTask } from "./planner.js";
-import { bodyContext, executePlan } from "./executor.js";
+import { createEvent, DEFAULT_CITIZENS, EventBus, formatSimEvent, resolveFromRoot, type AppConfig, type CitizenRecord, type PresentedEvent, type SettlementState, type SimEvent, type Vec3 } from "@civ/shared";
+import { minecraftKnowledge } from "@civ/minecraft-knowledge";
+import { assignSettlementNeeds, assignWorkRoles, planCitizen, type PlannedTask } from "./planner.js";
+import { bodyContext, completeVerifiedTransfer, executePlan } from "./executor.js";
+import { deriveSettlementInventory, type SettlementInventoryView } from "./inventory-view.js";
+import { SettlementRuntime } from "./settlement-runtime.js";
+import type { SettlementProject } from "./projects.js";
 import { CivilizationStore } from "./store.js";
 
 type RuntimeCitizen = {
@@ -61,6 +53,8 @@ export class AgentManager {
   private running = false;
   private snapshot: DashboardSnapshot;
   private lastTickMs = 0;
+  private readonly runtime = new SettlementRuntime();
+  private readonly pendingDrops = new Map<string, { item: string; count: number; giverId: string; giverBefore: number }>();
 
   constructor(config: AppConfig, store?: CivilizationStore) {
     this.config = config;
@@ -71,6 +65,7 @@ export class AgentManager {
       this.eventTimes.push(Date.now());
       this.store.appendEvent(event);
       if (event.type === "CitizenDied") this.handleDeathEvent(event);
+      if (event.type === "ItemTransferred") this.notePendingDrop(event);
     });
   }
 
@@ -155,14 +150,22 @@ export class AgentManager {
     const started = Date.now();
     const online = [...this.citizens.values()].filter((c) => c.body.connected && !c.body.isDeceased());
     const settlement = this.store.getSettlement();
+    if (settlement.projectJson && !this.runtime.project) {
+      try {
+        this.runtime.project = JSON.parse(settlement.projectJson) as SettlementProject;
+      } catch {
+        this.runtime.project = undefined;
+      }
+    }
     const assignments = assignSettlementNeeds(
       online.map((c) => c.record.id),
       settlement.needs,
     );
+    const roles = assignWorkRoles(online.map((c) => c.record.id));
 
     for (const citizen of this.citizens.values()) {
       try {
-        await this.tickCitizen(citizen, settlement, assignments.get(citizen.record.id) ?? []);
+        await this.tickCitizen(citizen, settlement, assignments.get(citizen.record.id) ?? [], roles.get(citizen.record.id));
       } catch (error) {
         this.events.emit(
           createEvent(
@@ -188,6 +191,7 @@ export class AgentManager {
     citizen: RuntimeCitizen,
     settlement: SettlementState,
     assignedNeeds: ReturnType<typeof assignSettlementNeeds> extends Map<string, infer V> ? V : never,
+    workRole?: ReturnType<typeof assignWorkRoles> extends Map<string, infer V> ? V : never,
   ): Promise<void> {
     if (citizen.record.status === "dead" || citizen.body.isDeceased()) {
       citizen.record.status = "dead";
@@ -219,6 +223,14 @@ export class AgentManager {
       llmInFlight += 1;
       const started = Date.now();
       const memories = retrieveRelevant(this.store.getMemories(citizen.record.id), assignedNeeds.join(" "), 5);
+      const gameFacts = minecraftKnowledge().getRelevantRules({
+        goal: assignedNeeds[0] ?? citizen.record.currentGoal,
+        inventory: observation.inventory,
+        nearbyEntities: observation.nearby.map((entity) => entity.name),
+        hunger: observation.food,
+        hasPickaxe: observation.inventory.some((item) => item.name.includes("pickaxe")),
+        hasCraftingTableNearby: Boolean(settlement.workstations?.craftingTables.length),
+      }).facts;
       void this.cognition
         .decide({
           citizenName: citizen.record.name,
@@ -229,6 +241,7 @@ export class AgentManager {
           settlementNeeds: settlement.needs,
           memories: memories.map((m) => m.content),
           nearbyCitizens: observation.players.map((p) => p.username),
+          gameFacts,
         })
         .then((decision) => {
           lastLlmMs = Date.now() - started;
@@ -274,8 +287,10 @@ export class AgentManager {
       observation,
       settlement,
       assignedNeeds,
+      workRole,
       llmGoal: llmDecision?.goal,
       llmReason: llmDecision?.reason,
+      projectStatus: this.runtime.project?.status,
     });
     citizen.lastPlan = plan;
     citizen.record.currentGoal = plan.goal;
@@ -304,7 +319,7 @@ export class AgentManager {
     ctx.signal = citizen.abort.signal;
 
     const taskStarted = Date.now();
-    void executePlan(ctx, plan, this.store, this.events)
+    void executePlan(ctx, plan, this.store, this.events, this.runtime)
       .then((result) => {
         lastTaskMs = Date.now() - taskStarted;
         if (plan.task !== "observe") {
@@ -328,6 +343,7 @@ export class AgentManager {
         } else if (plan.task === "gather_wood" || plan.task === "gather_food" || plan.task === "build_shelter") {
           this.store.addMemory(createMemory(citizen.record.id, "episodic", `Completed ${plan.task}`, 0.4));
         }
+        this.maybeCollectDropped(citizen);
         this.maybeSocial(citizen, result.success);
       })
       .catch((error: unknown) => {
@@ -450,8 +466,49 @@ export class AgentManager {
       citizen.record.currentAction = undefined;
       citizen.record.reason = "deceased";
     }
+    this.runtime.releaseCitizen(id);
+    this.store.clearReservations(id);
     if (!first) {
       return;
+    }
+  }
+
+  private notePendingDrop(event: SimEvent): void {
+    if (!event.citizenId) return;
+    const item = typeof event.payload.item === "string" ? event.payload.item : undefined;
+    const count = typeof event.payload.count === "number" ? event.payload.count : 1;
+    if (!item) return;
+    const giver = this.citizens.get(event.citizenId);
+    const after = giver?.body.inventory().find((i) => i.name === item)?.count ?? 0;
+    this.pendingDrops.set(event.citizenId, {
+      item,
+      count,
+      giverId: event.citizenId,
+      giverBefore: after + count,
+    });
+  }
+
+  private maybeCollectDropped(citizen: RuntimeCitizen): void {
+    for (const [giverId, pending] of this.pendingDrops) {
+      if (giverId === citizen.record.id) continue;
+      const giver = this.citizens.get(giverId);
+      if (!giver) continue;
+      const receiverItem = citizen.body.inventory().find((i) => i.name === pending.item)?.count ?? 0;
+      const giverItem = giver.body.inventory().find((i) => i.name === pending.item)?.count ?? 0;
+      void completeVerifiedTransfer({
+        giverBefore: pending.giverBefore,
+        giverAfter: giverItem,
+        receiverBefore: Math.max(0, receiverItem - pending.count),
+        receiverAfter: receiverItem,
+        item: pending.item,
+        count: pending.count,
+        giverId,
+        receiverId: citizen.record.id,
+        purpose: "food_share",
+        events: this.events,
+      }).then((ok) => {
+        if (ok) this.pendingDrops.delete(giverId);
+      });
     }
   }
 
@@ -499,12 +556,20 @@ export class AgentManager {
       };
     });
     const rawEvents = this.events.getRecent(80);
+    const settlement = this.store.getSettlement();
+    const inventories = citizens.map((c) => c.inventory);
+    const inventoryView = deriveSettlementInventory(inventories, settlement.storageContents, this.runtime.reservations);
     this.snapshot = {
       updatedAt: new Date().toISOString(),
       population: this.citizens.size,
       activeBots: citizens.filter((c) => c.connected).length,
       citizens,
-      settlement: this.store.getSettlement(),
+      settlement,
+      project: this.runtime.project,
+      inventoryView,
+      workers: citizens
+        .filter((c) => c.status !== "dead")
+        .map((c) => ({ name: c.name, task: c.currentTask ?? "idle", occupation: c.occupation })),
       events: rawEvents,
       presentedEvents: rawEvents.map((event) => formatSimEvent(event, names)),
       memories: citizens.flatMap((c) => this.store.getMemories(c.id, 5)),
@@ -521,6 +586,9 @@ export type DashboardSnapshot = {
   activeBots: number;
   citizens: Array<CitizenRecord & { inventory: Array<{ name: string; count: number }>; connected: boolean; busy: boolean }>;
   settlement: SettlementState;
+  project?: SettlementProject;
+  inventoryView?: SettlementInventoryView;
+  workers?: Array<{ name: string; task: string; occupation?: string }>;
   events: SimEvent[];
   presentedEvents: PresentedEvent[];
   memories: ReturnType<CivilizationStore["getMemories"]>;

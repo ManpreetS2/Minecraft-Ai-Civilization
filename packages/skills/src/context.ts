@@ -9,6 +9,7 @@ export type SkillContext = {
   events?: EventBus;
   citizenId?: string;
   timeoutMs?: number;
+  skipBlock?: (position: { x: number; y: number; z: number }) => boolean;
 };
 
 export function contextBot(ctx: SkillContext): Bot {

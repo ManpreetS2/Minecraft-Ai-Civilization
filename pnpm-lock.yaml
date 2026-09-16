@@ -68,6 +68,9 @@ importers:
       '@civ/minecraft-adapter':
         specifier: workspace:*
         version: link:../minecraft-adapter
+      '@civ/minecraft-knowledge':
+        specifier: workspace:*
+        version: link:../minecraft-knowledge
       '@civ/shared':
         specifier: workspace:*
         version: link:../shared
@@ -130,6 +133,15 @@ importers:
       vec3:
         specifier: ^0.1.10
         version: 0.1.10
+
+  packages/minecraft-knowledge:
+    dependencies:
+      '@civ/shared':
+        specifier: workspace:*
+        version: link:../shared
+      minecraft-data:
+        specifier: ^3.99.1
+        version: 3.116.0
 
   packages/psychology:
     dependencies:

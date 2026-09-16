@@ -87,9 +87,23 @@ export async function placeBlock(
   if (!item) {
     return fail("ITEM_NOT_FOUND", `Cannot place ${itemName}; none in inventory`, Date.now() - started, true);
   }
-  const move = await moveTo(ctx, position, 3.5);
-  if (!move.success) return move;
   const dest = new Vec3Class(Math.floor(position.x), Math.floor(position.y), Math.floor(position.z));
+  let move = await moveTo(ctx, position, 3.5);
+  if (!move.success) {
+    const stands = [
+      dest.offset(1, 0, 0),
+      dest.offset(-1, 0, 0),
+      dest.offset(0, 0, 1),
+      dest.offset(0, 0, -1),
+      dest.offset(1, 0, 1),
+      dest.offset(-1, 0, -1),
+    ];
+    for (const stand of stands) {
+      move = await moveTo(ctx, { x: stand.x, y: stand.y, z: stand.z }, 1.6);
+      if (move.success) break;
+    }
+    if (!move.success) return move;
+  }
   const existing = bot.blockAt(dest);
   if (existing && existing.name !== "air" && existing.name !== "cave_air" && existing.name !== "void_air") {
     return ok({ name: existing.name, position }, Date.now() - started);

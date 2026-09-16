@@ -28,6 +28,18 @@ export const EVENT_TYPES = [
   "SimulationStopped",
   "PaperServerReady",
   "ErrorOccurred",
+  "SettlementProjectCreated",
+  "SettlementProjectBlocked",
+  "SettlementProjectCompleted",
+  "ResourceReserved",
+  "ResourceReleased",
+  "ItemDeposited",
+  "ItemWithdrawn",
+  "ItemTransferCompleted",
+  "WorkstationCreated",
+  "WorkstationDestroyed",
+  "ConstructionBlockPlaced",
+  "ConstructionBlockFailed",
 ] as const;
 
 export type EventType = (typeof EVENT_TYPES)[number];

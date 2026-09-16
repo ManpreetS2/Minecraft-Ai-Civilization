@@ -98,6 +98,8 @@
       <section>
         <h2>Settlement</h2>
         <div id="settlement"></div>
+        <h2 style="margin-top:16px">Project</h2>
+        <div id="project"></div>
         <h2 style="margin-top:16px">Performance</h2>
         <div class="perf" id="perf"></div>
         <h2 style="margin-top:16px">LLM</h2>
@@ -115,7 +117,7 @@
     </main>
     <script>
       const $ = (id) => document.getElementById(id);
-      const NOISY = new Set(["ActionStarted", "ActionCompleted"]);
+      const NOISY = new Set(["ActionStarted", "ActionCompleted", "ConstructionBlockPlaced", "ResourceReserved", "ResourceReleased"]);
       function render(snap) {
         $("meta").textContent =
           `pop ${snap.population} · active bots ${snap.activeBots} · ${localTime(snap.updatedAt)}`;
@@ -141,6 +143,16 @@
           <div>Construction ${s.construction ? s.construction.placedBlocks + "/" + s.construction.totalBlocks : "not started"}</div>
           <div class="needs">${(s.needs || []).map((n) => `<span>${n}</span>`).join("")}</div>
         `;
+        const project = snap.project;
+        const view = snap.inventoryView || {};
+        const workers = snap.workers || [];
+        $("project").innerHTML = project ? `
+          <div><strong>Starter Shelter</strong> · Status: ${escapeHtml(project.status || "PLANNED")}</div>
+          <div class="sub">Resources: Wood ${view.planks ?? 0} / ${project.requiredResources && project.requiredResources.oak_planks ? project.requiredResources.oak_planks : 40} planks · Logs ${view.logs ?? 0} · Stone ${view.cobblestone ?? 0}</div>
+          <div>Construction: ${project.placed ?? 0} / ${project.total ?? 0} blocks · verified ${project.verified ?? 0}</div>
+          <div>Blocked: ${(project.blocked && project.blocked.length) || 0}</div>
+          <div class="sub">${workers.map((w) => `${escapeHtml(w.name)} — ${escapeHtml(friendlyTask(w.task))}`).join("<br>") || "No workers yet"}</div>
+        ` : `<div class="sub">No shelter project yet</div>`;
         const p = snap.performance || {};
         $("perf").innerHTML = `
           <div>Orchestrator tick ${p.tickMs ?? 0}ms (avg ${p.avgTickMs ?? 0}ms)</div>

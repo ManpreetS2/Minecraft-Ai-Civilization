@@ -334,6 +334,79 @@ export function formatSimEvent(event: SimEvent, names: Record<string, string> = 
         citizenName: name,
         technical,
       };
+    case "SettlementProjectCreated":
+      return {
+        headline: "The settlement started a starter shelter project.",
+        kind: "info",
+        timeLabel,
+        technical,
+      };
+    case "SettlementProjectBlocked":
+      return {
+        headline: "The starter shelter is blocked.",
+        subtext: typeof payload.reason === "string" ? payload.reason : undefined,
+        kind: "warning",
+        timeLabel,
+        technical,
+      };
+    case "SettlementProjectCompleted":
+      return {
+        headline: "The starter shelter project was verified complete.",
+        kind: "success",
+        timeLabel,
+        technical,
+      };
+    case "ItemDeposited":
+      return {
+        headline: `${name} stored items in the settlement chest.`,
+        subtext: typeof payload.count === "number" ? `${payload.count} items` : undefined,
+        kind: "success",
+        timeLabel,
+        citizenName: name,
+        technical,
+      };
+    case "ItemWithdrawn":
+      return {
+        headline: `${name} took ${String(payload.item ?? "items")} from shared storage.`,
+        kind: "info",
+        timeLabel,
+        citizenName: name,
+        technical,
+      };
+    case "ItemTransferCompleted":
+      return {
+        headline: `${citizenDisplayName(String(payload.giver ?? event.citizenId), names)} gave ${String(payload.item ?? "an item")} to ${citizenDisplayName(String(payload.receiver ?? ""), names)}.`,
+        kind: "social",
+        timeLabel,
+        citizenName: name,
+        technical,
+      };
+    case "WorkstationCreated":
+      return {
+        headline: `A ${String(payload.kind ?? "workstation")} was placed for the settlement.`,
+        kind: "success",
+        timeLabel,
+        citizenName: name,
+        technical,
+      };
+    case "WorkstationDestroyed":
+      return {
+        headline: `A known ${String(payload.kind ?? "workstation")} is gone.`,
+        kind: "warning",
+        timeLabel,
+        technical,
+      };
+    case "ResourceReserved":
+    case "ResourceReleased":
+    case "ConstructionBlockPlaced":
+    case "ConstructionBlockFailed":
+      return {
+        headline: `${String(event.type).replace(/([A-Z])/g, " $1").trim()}.`,
+        kind: event.type === "ConstructionBlockFailed" ? "warning" : "info",
+        timeLabel,
+        citizenName: name,
+        technical,
+      };
     default: {
       const typeName = String(event.type);
       return {
@@ -347,7 +420,13 @@ export function formatSimEvent(event: SimEvent, names: Record<string, string> = 
   }
 }
 
-export const NOISY_EVENT_TYPES = new Set(["ActionStarted", "ActionCompleted"]);
+export const NOISY_EVENT_TYPES = new Set([
+  "ActionStarted",
+  "ActionCompleted",
+  "ConstructionBlockPlaced",
+  "ResourceReserved",
+  "ResourceReleased",
+]);
 
 function humanReason(reason: string): string {
   const trimmed = reason.trim();
