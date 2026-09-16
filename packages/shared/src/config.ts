@@ -11,6 +11,15 @@ const envSchema = z.object({
   DATABASE_PATH: z.string().default("./data/civilization.sqlite"),
   SIM_CITIZEN_COUNT: z.coerce.number().int().default(5),
   SIM_TICK_MS: z.coerce.number().int().default(1500),
+  SIM_RUN_ID: z.string().optional(),
+  SIM_PERMADEATH_ENABLED: z
+    .enum(["true", "false"])
+    .default("false")
+    .transform((v) => v === "true"),
+  HUMAN_DIRECTIVES_ENABLED: z
+    .enum(["true", "false"])
+    .default("true")
+    .transform((v) => v === "true"),
   AUTO_START_PAPER: z
     .enum(["true", "false"])
     .default("true")
