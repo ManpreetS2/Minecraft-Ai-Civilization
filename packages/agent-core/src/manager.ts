@@ -21,9 +21,12 @@ type RuntimeCitizen = {
   busy: boolean;
   abort?: AbortController;
   lastLlmAt: number;
-  lastChatAt: number;
+      lastChatAt: number;
   lastPlan?: PlannedTask;
+  pendingLlm?: HighLevelDecision;
 };
+
+let llmInFlight = false;
 
 export class AgentManager {
   readonly events = new EventBus(400);
@@ -79,7 +82,7 @@ export class AgentManager {
         record,
         body,
         busy: false,
-        lastLlmAt: 0,
+        lastLlmAt: Date.now(),
         lastChatAt: 0,
       });
       const result = await body.connect();
@@ -151,19 +154,22 @@ export class AgentManager {
       return;
     }
 
-    let llmDecision: HighLevelDecision | undefined;
+    let llmDecision: HighLevelDecision | undefined = citizen.pendingLlm;
+    citizen.pendingLlm = undefined;
     const now = Date.now();
     const llmDue =
       this.config.LLM_ENABLED &&
+      !llmInFlight &&
       now - citizen.lastLlmAt > this.config.LLM_COOLDOWN_MS &&
       (assignedNeeds.length > 1 || (observation.food ?? 20) < 12 || Boolean(observation.nearby.find((e) => e.hostile)));
 
     if (llmDue) {
       citizen.lastLlmAt = now;
+      llmInFlight = true;
       const started = Date.now();
-      try {
-        const memories = retrieveRelevant(this.store.getMemories(citizen.record.id), assignedNeeds.join(" "), 5);
-        llmDecision = await this.cognition.decide({
+      const memories = retrieveRelevant(this.store.getMemories(citizen.record.id), assignedNeeds.join(" "), 5);
+      void this.cognition
+        .decide({
           citizenName: citizen.record.name,
           health: observation.health,
           hunger: observation.food,
@@ -172,36 +178,42 @@ export class AgentManager {
           settlementNeeds: settlement.needs,
           memories: memories.map((m) => m.content),
           nearbyCitizens: observation.players.map((p) => p.username),
+        })
+        .then((decision) => {
+          citizen.pendingLlm = decision;
+          this.store.logLlmCall({
+            citizenId: citizen.record.id,
+            latencyMs: Date.now() - started,
+            ok: true,
+            goal: decision.goal,
+            reason: decision.reason,
+          });
+          this.events.emit(
+            createEvent(
+              "LLMDecisionMade",
+              { goal: decision.goal, reason: decision.reason, provider: this.cognition.name },
+              citizen.record.id,
+            ),
+          );
+        })
+        .catch((error: unknown) => {
+          this.store.logLlmCall({
+            citizenId: citizen.record.id,
+            latencyMs: Date.now() - started,
+            ok: false,
+            error: error instanceof Error ? error.message : String(error),
+          });
+          this.events.emit(
+            createEvent(
+              "LLMSkipped",
+              { error: error instanceof Error ? error.message : String(error), provider: this.cognition.name },
+              citizen.record.id,
+            ),
+          );
+        })
+        .finally(() => {
+          llmInFlight = false;
         });
-        this.store.logLlmCall({
-          citizenId: citizen.record.id,
-          latencyMs: Date.now() - started,
-          ok: true,
-          goal: llmDecision.goal,
-          reason: llmDecision.reason,
-        });
-        this.events.emit(
-          createEvent(
-            "LLMDecisionMade",
-            { goal: llmDecision.goal, reason: llmDecision.reason, provider: this.cognition.name },
-            citizen.record.id,
-          ),
-        );
-      } catch (error) {
-        this.store.logLlmCall({
-          citizenId: citizen.record.id,
-          latencyMs: Date.now() - started,
-          ok: false,
-          error: error instanceof Error ? error.message : String(error),
-        });
-        this.events.emit(
-          createEvent(
-            "LLMSkipped",
-            { error: error instanceof Error ? error.message : String(error), provider: this.cognition.name },
-            citizen.record.id,
-          ),
-        );
-      }
     }
 
     const plan = planCitizen({

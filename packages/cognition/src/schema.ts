@@ -15,7 +15,7 @@ export const GOALS = [
 
 export const DecisionSchema = z.object({
   goal: z.enum(GOALS),
-  priority: z.number().min(0).max(1),
+  priority: z.coerce.number().min(0).max(1),
   reason: z.string().min(1).max(280),
   targetCitizenId: z.string().optional(),
 });

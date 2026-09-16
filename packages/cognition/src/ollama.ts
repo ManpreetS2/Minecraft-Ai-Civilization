@@ -9,7 +9,7 @@ export class OllamaProvider implements CognitionProvider {
     private readonly model: string,
   ) {}
 
-  async decide(prompt: CognitionPrompt, timeoutMs = 15_000): Promise<HighLevelDecision> {
+  async decide(prompt: CognitionPrompt, timeoutMs = 45_000): Promise<HighLevelDecision> {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
@@ -21,6 +21,8 @@ export class OllamaProvider implements CognitionProvider {
           model: this.model,
           stream: false,
           format: "json",
+          think: false,
+          options: { temperature: 0.2, num_predict: 96 },
           messages: [
             {
               role: "system",

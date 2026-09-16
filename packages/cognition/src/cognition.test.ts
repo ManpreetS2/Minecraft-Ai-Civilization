@@ -12,6 +12,15 @@ describe("LLM decision validation", () => {
     expect(decision.goal).toBe("gather_food");
   });
 
+  it("coerces numeric strings for priority", () => {
+    const decision = validateDecision({
+      goal: "gather_wood",
+      priority: "0.7",
+      reason: "Need logs",
+    });
+    expect(decision.priority).toBe(0.7);
+  });
+
   it("rejects hidden essays and unknown goals", () => {
     expect(() => validateDecision({ goal: "hack_server", priority: 1, reason: "nope" })).toThrow();
   });
