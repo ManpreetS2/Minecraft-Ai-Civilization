@@ -13,6 +13,8 @@
         --accent: #c4d47a;
         --bad: #e08a6a;
         --ok: #8fce7a;
+        --warn: #d4b56a;
+        --social: #8fb7d4;
         --line: #2c3426;
       }
       * { box-sizing: border-box; }
@@ -50,8 +52,8 @@
       th, td { text-align: left; padding: 6px 4px; border-bottom: 1px solid var(--line); vertical-align: top; }
       .ok { color: var(--ok); }
       .bad { color: var(--bad); }
-      .log { font-family: ui-monospace, Consolas, monospace; font-size: 12px; max-height: 320px; overflow: auto; }
-      .log div { padding: 4px 0; border-bottom: 1px dashed var(--line); }
+      .log { font-size: 13px; max-height: 360px; overflow: auto; }
+      .log article { padding: 8px 0; border-bottom: 1px dashed var(--line); }
       .needs span, .pill {
         display: inline-block;
         margin: 2px 4px 2px 0;
@@ -60,6 +62,17 @@
         background: #2a3322;
         font-size: 12px;
       }
+      .kind-success { border-left: 3px solid var(--ok); padding-left: 8px; }
+      .kind-failure { border-left: 3px solid var(--bad); padding-left: 8px; }
+      .kind-warning { border-left: 3px solid var(--warn); padding-left: 8px; }
+      .kind-social { border-left: 3px solid var(--social); padding-left: 8px; }
+      .kind-info { border-left: 3px solid #4a5640; padding-left: 8px; }
+      details { margin-top: 4px; color: var(--muted); font-size: 12px; }
+      details pre { white-space: pre-wrap; font-family: ui-monospace, Consolas, monospace; margin: 4px 0 0; }
+      .rel { margin: 10px 0; padding: 8px; background: #181d14; border-radius: 8px; }
+      .rel strong { display: block; margin-bottom: 4px; }
+      .meters span { display: inline-block; min-width: 110px; margin: 2px 12px 2px 0; font-size: 12px; color: var(--muted); }
+      .perf { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 12px; font-size: 12px; color: var(--muted); }
     </style>
   </head>
   <body>
@@ -85,6 +98,8 @@
       <section>
         <h2>Settlement</h2>
         <div id="settlement"></div>
+        <h2 style="margin-top:16px">Performance</h2>
+        <div class="perf" id="perf"></div>
         <h2 style="margin-top:16px">LLM</h2>
         <div class="log" id="llm"></div>
       </section>
@@ -94,24 +109,28 @@
       </section>
       <section>
         <h2>Memories & relationships</h2>
-        <div class="log" id="social"></div>
+        <p class="sub">Relationship bars are approximate standing, not psychological precision.</p>
+        <div id="social"></div>
       </section>
     </main>
     <script>
       const $ = (id) => document.getElementById(id);
+      const NOISY = new Set(["ActionStarted", "ActionCompleted"]);
       function render(snap) {
         $("meta").textContent =
-          `pop ${snap.population} · active bots ${snap.activeBots} · ${snap.updatedAt}`;
+          `pop ${snap.population} · active bots ${snap.activeBots} · ${localTime(snap.updatedAt)}`;
         $("citizens").innerHTML = (snap.citizens || [])
           .map((c) => {
-            const cls = c.connected ? "ok" : "bad";
+            const dead = c.status === "dead";
+            const cls = dead ? "bad" : c.connected ? "ok" : "bad";
+            const body = dead ? "deceased" : c.connected ? "online" : c.status;
             return `<tr>
-              <td><strong>${c.name}</strong><br><span class="sub">${c.occupation || ""}</span></td>
-              <td class="${cls}">${c.connected ? "online" : c.status}</td>
-              <td>${fmt(c.health)} / ${fmt(c.hunger)}<br><span class="sub">${pos(c.lastKnownPosition)}</span></td>
-              <td>${c.currentGoal || ""}<br><span class="sub">${c.decisionSource || ""}</span></td>
-              <td>${c.currentTask || ""}<br><span class="sub">${c.currentAction || ""}</span></td>
-              <td>${c.reason || ""}</td>
+              <td><strong>${escapeHtml(c.name)}</strong><br><span class="sub">${escapeHtml(c.occupation || "")}</span></td>
+              <td class="${cls}">${body}</td>
+              <td>${dead ? "—" : `${fmt(c.health)} / ${fmt(c.hunger)}`}<br><span class="sub">${pos(c.lastKnownPosition)}</span></td>
+              <td>${dead ? "—" : escapeHtml(friendlyTask(c.currentGoal))}<br><span class="sub">${escapeHtml(c.decisionSource || "")}</span></td>
+              <td>${dead ? "—" : escapeHtml(friendlyTask(c.currentTask))}<br><span class="sub">${escapeHtml(c.currentAction || "")}</span></td>
+              <td>${escapeHtml(c.reason || "")}</td>
             </tr>`;
           })
           .join("");
@@ -122,22 +141,87 @@
           <div>Construction ${s.construction ? s.construction.placedBlocks + "/" + s.construction.totalBlocks : "not started"}</div>
           <div class="needs">${(s.needs || []).map((n) => `<span>${n}</span>`).join("")}</div>
         `;
-        $("events").innerHTML = (snap.events || [])
+        const p = snap.performance || {};
+        $("perf").innerHTML = `
+          <div>Orchestrator tick ${p.tickMs ?? 0}ms (avg ${p.avgTickMs ?? 0}ms)</div>
+          <div>Last task ${p.lastTaskMs ?? 0}ms</div>
+          <div>Pathfinding ${p.pathMs ?? 0}ms · ${p.activePaths ?? 0} active</div>
+          <div>LLM ${p.llmLastMs ?? 0}ms · ${p.llmInFlight ?? 0} in flight</div>
+          <div>Events / min ${p.eventsLastMinute ?? 0}</div>
+          <div>Reconnect attempts ${p.reconnectAttempts ?? 0}</div>
+        `;
+        const presented = (snap.presentedEvents && snap.presentedEvents.length)
+          ? snap.presentedEvents
+          : (snap.events || []).map((e) => fallbackPresent(e, snap));
+        $("events").innerHTML = presented
           .slice()
           .reverse()
-          .map((e) => `<div><strong>${e.type}</strong> ${e.citizenId || ""} ${e.timestamp}<br>${escapeHtml(JSON.stringify(e.payload))}</div>`)
-          .join("");
+          .filter((e) => !NOISY.has((e.technical && e.technical.type) || e.type))
+          .map((e) => eventCard(e))
+          .join("") || "<div class='sub'>No events yet</div>";
         $("llm").innerHTML = (snap.llmCalls || [])
-          .map((c) => `<div>${c.ok ? "ok" : "fail"} ${c.latency_ms}ms ${c.goal || ""} ${c.reason || c.error || ""}</div>`)
+          .map((c) => `<div>${c.ok ? "ok" : "fail"} ${c.latency_ms}ms ${escapeHtml(c.goal || "")} ${escapeHtml(c.reason || c.error || "")}</div>`)
           .join("") || "<div class='sub'>No LLM calls yet (disabled or unavailable)</div>";
-        const mem = (snap.memories || []).map((m) => `<div>${m.citizenId}: ${escapeHtml(m.content)}</div>`).join("");
+        const names = Object.fromEntries((snap.citizens || []).map((c) => [c.id, c.name]));
+        const mem = (snap.memories || []).map((m) => `<div class="sub">${escapeHtml(names[m.citizenId] || m.citizenId)}: ${escapeHtml(m.content)}</div>`).join("");
         const rel = (snap.relationships || [])
-          .map((r) => `<div>${r.citizenId} → ${r.otherId} trust ${r.trust.toFixed(2)} affection ${r.affection.toFixed(2)} resentment ${r.resentment.toFixed(2)}</div>`)
+          .filter((r) => r.trust || r.affection || r.respect || r.resentment || r.familiarity)
+          .map((r) => `
+            <div class="rel">
+              <strong>${escapeHtml(names[r.citizenId] || r.citizenId)} → ${escapeHtml(names[r.otherId] || r.otherId)}</strong>
+              <div class="meters">
+                <span>Trust ${pct(r.trust)}</span>
+                <span>Affection ${pct(r.affection)}</span>
+                <span>Respect ${pct(r.respect)}</span>
+                <span>Resentment ${pct(r.resentment)}</span>
+                <span>Familiarity ${pct(r.familiarity)}</span>
+              </div>
+            </div>`)
           .join("");
         $("social").innerHTML = mem + rel || "<div class='sub'>None yet</div>";
       }
+      function eventCard(e) {
+        const kind = e.kind || "info";
+        const tech = e.technical || {};
+        return `<article class="kind-${kind}">
+          <div><strong>${escapeHtml(e.headline || e.type)}</strong> <span class="sub">${escapeHtml(e.timeLabel || "")}</span></div>
+          ${e.subtext ? `<div class="sub">${escapeHtml(e.subtext)}</div>` : ""}
+          <details>
+            <summary>Technical details</summary>
+            <pre>${escapeHtml(JSON.stringify({ type: tech.type || e.type, citizenId: tech.citizenId, timestamp: tech.timestamp, payload: tech.payload || e.payload }, null, 2))}</pre>
+          </details>
+        </article>`;
+      }
+      function fallbackPresent(e, snap) {
+        const names = Object.fromEntries((snap.citizens || []).map((c) => [c.id, c.name]));
+        return {
+          headline: `${e.type} ${names[e.citizenId] || e.citizenId || ""}`.trim(),
+          subtext: "",
+          kind: "info",
+          timeLabel: localTime(e.timestamp),
+          technical: e,
+        };
+      }
+      function friendlyTask(task) {
+        if (!task) return "";
+        const labels = {
+          gather_wood: "gathering wood",
+          gather_food: "gathering food",
+          mine_stone: "mining stone",
+          craft_tools: "crafting tools",
+          build_shelter: "building shelter",
+          seek_shelter: "finding shelter",
+        };
+        return labels[task] || String(task).replaceAll("_", " ");
+      }
+      function pct(n) { return typeof n === "number" ? `${Math.round(n * 100)}%` : "0%"; }
       function fmt(n) { return typeof n === "number" ? n.toFixed(0) : "—"; }
       function pos(p) { return p ? `${p.x.toFixed(0)}, ${p.y.toFixed(0)}, ${p.z.toFixed(0)}` : ""; }
+      function localTime(s) {
+        const d = new Date(s);
+        if (Number.isNaN(d.getTime())) return s || "";
+        return d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+      }
       function escapeHtml(s) {
         return String(s).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
       }

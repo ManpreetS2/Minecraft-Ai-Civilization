@@ -55,6 +55,10 @@ async function handle(
     json(res, manager.getSnapshot().citizens);
     return;
   }
+  if (url.pathname === "/api/perf") {
+    json(res, manager.getSnapshot().performance);
+    return;
+  }
   if (url.pathname === "/api/events") {
     json(res, manager.getSnapshot().events);
     return;

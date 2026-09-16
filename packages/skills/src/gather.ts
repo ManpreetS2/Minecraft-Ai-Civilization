@@ -1,4 +1,5 @@
 import { fail, ok, retry, type ActionResult, type Vec3 } from "@civ/shared";
+import { shouldBlacklistTarget } from "@civ/minecraft-adapter";
 import { Vec3 as Vec3Class } from "vec3";
 import type { SkillContext } from "./context.js";
 import { moveTo } from "./movement.js";
@@ -16,7 +17,12 @@ export async function mineBlock(
       if (!found.success) return found;
       const target = found.data.position;
       const move = await moveTo(ctx, target, 3);
-      if (!move.success) return move;
+      if (!move.success) {
+        if (shouldBlacklistTarget(move.code)) {
+          ctx.body.unreachable.mark(target);
+        }
+        return move;
+      }
 
       const bot = ctx.bot;
       const block = bot.blockAt(new Vec3Class(target.x, target.y, target.z));
@@ -29,6 +35,7 @@ export async function mineBlock(
         }
         await bot.dig(block, true);
       } catch (error) {
+        ctx.body.unreachable.mark(target, 20_000);
         return fail(
           "DIG_FAILED",
           error instanceof Error ? error.message : String(error),
@@ -43,7 +50,7 @@ export async function mineBlock(
       return ok({ name: block.name, position: target }, Date.now() - started);
     },
     2,
-    500,
+    400,
     ctx.signal,
   );
 }

@@ -13,6 +13,8 @@ export const GOALS = [
   "defend",
 ] as const;
 
+export type Goal = (typeof GOALS)[number];
+
 export const DecisionSchema = z.object({
   goal: z.enum(GOALS),
   priority: z.coerce.number().min(0).max(1),
@@ -38,8 +40,34 @@ export type CognitionProvider = {
   decide(prompt: CognitionPrompt, timeoutMs?: number): Promise<HighLevelDecision>;
 };
 
+const GOAL_SET = new Set<string>(GOALS);
+
+export function normalizeGoal(raw: unknown): Goal | undefined {
+  if (typeof raw !== "string") return undefined;
+  const key = raw.trim().toLowerCase().replaceAll(/[\s-]+/g, "_");
+  if (GOAL_SET.has(key)) return key as Goal;
+  return undefined;
+}
+
+export function normalizeDecisionInput(input: unknown): unknown {
+  if (!input || typeof input !== "object" || Array.isArray(input)) return input;
+  const source = input as Record<string, unknown>;
+  const next: Record<string, unknown> = { ...source };
+  const goal = normalizeGoal(source.goal);
+  if (goal) next.goal = goal;
+  if (typeof source.priority === "string") {
+    const trimmed = source.priority.trim();
+    if (/^-?\d+(\.\d+)?$/.test(trimmed)) {
+      next.priority = Number(trimmed);
+    }
+  } else if (typeof source.priority === "number" && !Number.isFinite(source.priority)) {
+    delete next.priority;
+  }
+  return next;
+}
+
 export function validateDecision(input: unknown): HighLevelDecision {
-  return DecisionSchema.parse(input);
+  return DecisionSchema.parse(normalizeDecisionInput(input));
 }
 
 export function extractJson(text: string): unknown {

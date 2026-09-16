@@ -18,6 +18,8 @@ export { OllamaProvider } from "./ollama.js";
 export {
   DecisionSchema,
   extractJson,
+  normalizeDecisionInput,
+  normalizeGoal,
   validateDecision,
   type CognitionPrompt,
   type CognitionProvider,

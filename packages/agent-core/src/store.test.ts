@@ -26,4 +26,31 @@ describe("CivilizationStore", () => {
     expect(again?.lastKnownPosition).toEqual({ x: 1, y: 64, z: 2 });
     restored.close();
   });
+
+  it("records a Minecraft death once and keeps the identity deceased after reopen", () => {
+    const dir = mkdtempSync(join(tmpdir(), "civ-"));
+    const path = join(dir, "death.sqlite");
+    const store = new CivilizationStore(path);
+    const at = "2026-09-16T21:00:00.000Z";
+    const pos = { x: 12, y: 64, z: -4 };
+    expect(store.markDeceased("citizen_ava", at, pos)).toBe(true);
+    expect(store.markDeceased("citizen_ava", at, pos)).toBe(false);
+    const ava = store.getCitizen("citizen_ava");
+    if (!ava) throw new Error("missing Ava");
+    expect(ava.status).toBe("dead");
+    expect(ava.diedAt).toBe(at);
+    expect(ava.deathPosition).toEqual(pos);
+    ava.status = "online";
+    ava.reason = "should not revive";
+    store.upsertCitizen(ava);
+    expect(store.getCitizen("citizen_ava")?.status).toBe("dead");
+    store.close();
+
+    const restored = new CivilizationStore(path);
+    const again = restored.getCitizen("citizen_ava");
+    expect(again?.status).toBe("dead");
+    expect(again?.diedAt).toBe(at);
+    expect(restored.markDeceased("citizen_ava")).toBe(false);
+    restored.close();
+  });
 });

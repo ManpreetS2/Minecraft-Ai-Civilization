@@ -116,7 +116,34 @@ export class CivilizationStore {
     this.db = new Database(filePath);
     this.db.pragma("journal_mode = WAL");
     this.db.exec(SCHEMA);
+    this.migrate();
     this.seed();
+  }
+
+  private migrate(): void {
+    const cols = this.db.prepare(`PRAGMA table_info(citizens)`).all() as Array<{ name: string }>;
+    const names = new Set(cols.map((col) => col.name));
+    if (!names.has("died_at")) this.db.exec(`ALTER TABLE citizens ADD COLUMN died_at TEXT`);
+    if (!names.has("death_x")) this.db.exec(`ALTER TABLE citizens ADD COLUMN death_x REAL`);
+    if (!names.has("death_y")) this.db.exec(`ALTER TABLE citizens ADD COLUMN death_y REAL`);
+    if (!names.has("death_z")) this.db.exec(`ALTER TABLE citizens ADD COLUMN death_z REAL`);
+  }
+
+  markDeceased(id: string, at = new Date().toISOString(), position?: Vec3): boolean {
+    const existing = this.getCitizen(id);
+    if (!existing) return false;
+    if (existing.status === "dead") return false;
+    this.db
+      .prepare(
+        `UPDATE citizens SET status = 'dead', died_at = ?, death_x = ?, death_y = ?, death_z = ?, reason = 'deceased'
+         WHERE id = ? AND status != 'dead'`,
+      )
+      .run(at, position?.x ?? null, position?.y ?? null, position?.z ?? null, id);
+    return true;
+  }
+
+  isDeceased(id: string): boolean {
+    return this.getCitizen(id)?.status === "dead";
   }
 
   close(): void {
@@ -156,14 +183,14 @@ export class CivilizationStore {
       INSERT INTO citizens (
         id, name, minecraft_username, created_at, status, last_x, last_y, last_z,
         health, hunger, occupation, home_id, current_goal, current_task, current_action,
-        decision_source, reason
+        decision_source, reason, died_at, death_x, death_y, death_z
       ) VALUES (
         @id, @name, @minecraftUsername, @createdAt, @status, @lastX, @lastY, @lastZ,
         @health, @hunger, @occupation, @homeId, @currentGoal, @currentTask, @currentAction,
-        @decisionSource, @reason
+        @decisionSource, @reason, @diedAt, @deathX, @deathY, @deathZ
       )
       ON CONFLICT(id) DO UPDATE SET
-        status = excluded.status,
+        status = CASE WHEN citizens.status = 'dead' THEN 'dead' ELSE excluded.status END,
         last_x = excluded.last_x,
         last_y = excluded.last_y,
         last_z = excluded.last_z,
@@ -175,7 +202,11 @@ export class CivilizationStore {
         current_task = excluded.current_task,
         current_action = excluded.current_action,
         decision_source = excluded.decision_source,
-        reason = excluded.reason
+        reason = CASE WHEN citizens.status = 'dead' THEN citizens.reason ELSE excluded.reason END,
+        died_at = COALESCE(citizens.died_at, excluded.died_at),
+        death_x = COALESCE(citizens.death_x, excluded.death_x),
+        death_y = COALESCE(citizens.death_y, excluded.death_y),
+        death_z = COALESCE(citizens.death_z, excluded.death_z)
     `,
       )
       .run({
@@ -196,6 +227,10 @@ export class CivilizationStore {
         currentAction: record.currentAction ?? null,
         decisionSource: record.decisionSource ?? null,
         reason: record.reason ?? null,
+        diedAt: record.diedAt ?? null,
+        deathX: record.deathPosition?.x ?? null,
+        deathY: record.deathPosition?.y ?? null,
+        deathZ: record.deathPosition?.z ?? null,
       });
   }
 
@@ -473,6 +508,10 @@ type CitizenRow = {
   current_action: string | null;
   decision_source: CitizenRecord["decisionSource"] | null;
   reason: string | null;
+  died_at: string | null;
+  death_x: number | null;
+  death_y: number | null;
+  death_z: number | null;
 };
 
 type EventRow = {
@@ -543,5 +582,10 @@ function mapCitizen(row: CitizenRow): CitizenRecord {
     currentAction: row.current_action ?? undefined,
     decisionSource: row.decision_source ?? undefined,
     reason: row.reason ?? undefined,
+    diedAt: row.died_at ?? undefined,
+    deathPosition:
+      row.death_x != null && row.death_y != null && row.death_z != null
+        ? { x: row.death_x, y: row.death_y, z: row.death_z }
+        : undefined,
   };
 }

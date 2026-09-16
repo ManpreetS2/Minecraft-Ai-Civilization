@@ -77,6 +77,8 @@ export type CitizenRecord = {
   currentAction?: string;
   decisionSource?: DecisionSource;
   reason?: string;
+  diedAt?: string;
+  deathPosition?: { x: number; y: number; z: number };
 };
 
 export type Relationship = {

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { fail, ok } from "./action-result.js";
 import { loadConfig } from "./config.js";
 import { createEvent, EventBus } from "./events.js";
+import { formatSimEvent, relationshipPercent } from "./format-event.js";
 import { distance, vec3 } from "./vec3.js";
 
 describe("action result helpers", () => {
@@ -40,5 +41,49 @@ describe("event bus", () => {
     bus.emit(createEvent("TaskStarted", { task: "gather_wood" }, "citizen_atlas"));
     expect(seen).toEqual(["CitizenConnected", "TaskStarted"]);
     expect(bus.getRecent()).toHaveLength(2);
+  });
+});
+
+describe("event presentation", () => {
+  it("formats task and death events into readable sentences", () => {
+    const started = formatSimEvent(
+      createEvent("TaskStarted", { task: "gather_wood", reason: "the settlement needs more wood" }, "citizen_atlas"),
+    );
+    expect(started.headline).toBe("Atlas started gathering wood.");
+    expect(started.subtext).toMatch(/Reason: the settlement needs more wood/i);
+
+    const failed = formatSimEvent(
+      createEvent(
+        "TaskFailed",
+        { task: "gather_wood", error: "moveTo timed out heading to 6 75 44" },
+        "citizen_ava",
+      ),
+    );
+    expect(failed.headline).toBe("Ava couldn't gather wood.");
+    expect(failed.subtext).toBe("Movement timed out near X 6, Y 75, Z 44.");
+    expect(failed.kind).toBe("failure");
+
+    const connected = formatSimEvent(createEvent("CitizenConnected", {}, "citizen_theo"));
+    expect(connected.headline).toBe("Theo entered the world.");
+
+    const talk = formatSimEvent(
+      createEvent("ConversationOccurred", { other: "Kai", message: "Kai, here. Eat." }, "citizen_maya"),
+    );
+    expect(talk.headline).toBe("Maya spoke with Kai.");
+    expect(talk.subtext).toBe("Kai, here. Eat.");
+
+    const llm = formatSimEvent(
+      createEvent("LLMDecisionMade", { goal: "gather_food", reason: "Hunger is low" }, "citizen_atlas"),
+    );
+    expect(llm.headline).toBe("Atlas reconsidered what to do.");
+    expect(llm.subtext).toMatch(/Goal: gather food/);
+  });
+
+  it("keeps raw event data in technical details", () => {
+    const event = createEvent("ErrorOccurred", { error: "bot exploded" }, "citizen_ava");
+    const presented = formatSimEvent(event);
+    expect(presented.technical.type).toBe("ErrorOccurred");
+    expect(presented.technical.payload).toEqual({ error: "bot exploded" });
+    expect(relationshipPercent(0.22)).toBe(22);
   });
 });

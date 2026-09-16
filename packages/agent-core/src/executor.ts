@@ -311,5 +311,5 @@ function updateSettlementFromInventory(ctx: SkillContext, store: CivilizationSto
 export function bodyContext(body: MinecraftBody, signal?: AbortSignal, events?: EventBus, citizenId?: string): SkillContext | undefined {
   const bot = body.getBot();
   if (!bot?.entity) return undefined;
-  return { body, bot, signal, events, citizenId };
+  return { body, bot, signal, events, citizenId, timeoutMs: 22_000 };
 }

@@ -17,6 +17,7 @@ import {
   resolveFromRoot,
 } from "@civ/shared";
 import { BodyLock, DuplicateBodyError } from "./body-lock.js";
+import { TargetBlacklist } from "./path-recovery.js";
 
 const activeBodies = new Map<string, MinecraftBody>();
 
@@ -38,6 +39,7 @@ export type MinecraftBodyOptions = {
   citizenId?: string;
   lockDir?: string;
   reconnect?: boolean;
+  allowRespawn?: boolean;
 };
 
 function asRecord(value: unknown): Record<string, unknown> | undefined {
@@ -50,7 +52,10 @@ export class MinecraftBody extends EventEmitter {
   private readonly config: AppConfig;
   private readonly events?: EventBus;
   private readonly lock: BodyLock;
-  private readonly shouldReconnect: boolean;
+  private shouldReconnect: boolean;
+  private readonly allowRespawn: boolean;
+  readonly unreachable = new TargetBlacklist();
+  private deceased = false;
   private bot: Bot | null = null;
   private shuttingDown = false;
   private reconnectAttempt = 0;
@@ -66,7 +71,19 @@ export class MinecraftBody extends EventEmitter {
     this.config = options.config;
     this.events = options.events;
     this.shouldReconnect = options.reconnect ?? true;
+    this.allowRespawn = options.allowRespawn ?? false;
     this.lock = new BodyLock(options.username, options.lockDir ?? resolveFromRoot("./data/locks"));
+  }
+
+  isDeceased(): boolean {
+    return this.deceased;
+  }
+
+  markDeceased(): void {
+    this.deceased = true;
+    this.shouldReconnect = false;
+    this.shuttingDown = true;
+    this.spawned = false;
   }
 
   get connected(): boolean {
@@ -102,6 +119,9 @@ export class MinecraftBody extends EventEmitter {
 
   private async connectInternal(): Promise<ActionResult<{ username: string }>> {
     const started = Date.now();
+    if (this.deceased) {
+      return fail("DEAD", `${this.username} is deceased and cannot reconnect`, Date.now() - started);
+    }
     if (this.shuttingDown) {
       return fail("CANCELLED", "Body is shutting down", Date.now() - started);
     }
@@ -323,6 +343,16 @@ export class MinecraftBody extends EventEmitter {
     });
 
     bot.on("death", () => {
+      if (this.deceased) return;
+      if (!this.allowRespawn) {
+        this.markDeceased();
+        this.events?.emit(
+          createEvent("CitizenDied", { username: this.username, position: this.position() }, this.citizenId),
+        );
+        this.emit("death");
+        void this.disconnect("citizen-deceased");
+        return;
+      }
       this.emit("death");
       this.events?.emit(
         createEvent("CitizenDied", { username: this.username, position: this.position() }, this.citizenId),
@@ -335,6 +365,7 @@ export class MinecraftBody extends EventEmitter {
     });
 
     bot.on("spawn", () => {
+      if (this.deceased) return;
       this.spawned = true;
     });
 
@@ -364,14 +395,18 @@ export class MinecraftBody extends EventEmitter {
       this.events?.emit(
         createEvent("CitizenDisconnected", { username: this.username, reason: String(reason) }, this.citizenId),
       );
-      if (!this.shuttingDown && this.shouldReconnect) {
+      if (!this.shuttingDown && this.shouldReconnect && !this.deceased) {
         this.scheduleReconnect();
       }
     });
   }
 
+  reconnectAttempts(): number {
+    return this.reconnectAttempt;
+  }
+
   private scheduleReconnect(): void {
-    if (this.shuttingDown || this.reconnectTimer) return;
+    if (this.shuttingDown || this.deceased || !this.shouldReconnect || this.reconnectTimer) return;
     this.reconnectAttempt += 1;
     const delay = Math.min(60_000, 3000 * 2 ** Math.min(this.reconnectAttempt - 1, 4));
     this.reconnectTimer = setTimeout(() => {

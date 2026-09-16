@@ -9,7 +9,7 @@ export async function moveTo(
 ): Promise<ActionResult<{ position: Vec3; distance: number }>> {
   return moveToPosition(ctx.bot, target, {
     range,
-    timeoutMs: ctx.timeoutMs ?? 60_000,
+    timeoutMs: ctx.timeoutMs ?? 22_000,
     signal: ctx.signal,
   });
 }
@@ -19,7 +19,7 @@ export async function followEntity(
   username: string,
 ): Promise<ActionResult<{ username: string; position: Vec3 }>> {
   return followPlayer(ctx.bot, username, {
-    timeoutMs: ctx.timeoutMs ?? 120_000,
+    timeoutMs: ctx.timeoutMs ?? 45_000,
     signal: ctx.signal,
   });
 }

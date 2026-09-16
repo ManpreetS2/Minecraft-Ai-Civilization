@@ -29,6 +29,26 @@ describe("LLM decision validation", () => {
     const parsed = extractJson('Sure.\n{"goal":"rest","priority":0.2,"reason":"Night"}');
     expect(validateDecision(parsed).goal).toBe("rest");
   });
+
+  it("normalizes Gather wood and numeric priority strings before schema validation", () => {
+    const decision = validateDecision({
+      goal: "Gather wood",
+      priority: "0.82",
+      reason: "Need logs for tools",
+    });
+    expect(decision.goal).toBe("gather_wood");
+    expect(decision.priority).toBe(0.82);
+    expect(validateDecision({ goal: "gather wood", priority: 0.4, reason: "Logs" }).goal).toBe("gather_wood");
+    expect(validateDecision({ goal: "GATHER_WOOD", priority: 0.4, reason: "Logs" }).goal).toBe("gather_wood");
+  });
+
+  it("still rejects unknown goals after normalization", () => {
+    expect(() => validateDecision({ goal: "take over the server", priority: 1, reason: "nope" })).toThrow();
+  });
+
+  it("rejects non-numeric priority instead of coercing it to NaN success", () => {
+    expect(() => validateDecision({ goal: "gather_wood", priority: "high", reason: "Need logs" })).toThrow();
+  });
 });
 
 describe("heuristic provider", () => {

@@ -28,16 +28,25 @@ export async function findBlock(
   if (ids.length === 0) {
     return fail("BLOCK_NOT_FOUND", `Unknown block names: ${names.join(", ")}`, Date.now() - started);
   }
-  const block = bot.findBlock({
-    matching: ids,
+  const positions = bot.findBlocks({
+    matching: (block) => {
+      if (!block?.position || !ids.includes(block.type)) return false;
+      return !ctx.body.unreachable.has({
+        x: block.position.x,
+        y: block.position.y,
+        z: block.position.z,
+      });
+    },
     maxDistance,
-    count: 1,
+    count: 24,
   });
-  if (!block) {
-    return fail("BLOCK_NOT_FOUND", `No ${names.join("/")} within ${maxDistance} blocks`, Date.now() - started, true);
+  for (const pos of positions) {
+    const block = bot.blockAt(pos);
+    if (!block) continue;
+    return ok(
+      { name: block.name, position: { x: block.position.x, y: block.position.y, z: block.position.z } },
+      Date.now() - started,
+    );
   }
-  return ok(
-    { name: block.name, position: { x: block.position.x, y: block.position.y, z: block.position.z } },
-    Date.now() - started,
-  );
+  return fail("BLOCK_NOT_FOUND", `No ${names.join("/")} within ${maxDistance} blocks`, Date.now() - started, true);
 }
