@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>First Settlement — Observer</title>
+    <style>
+      :root {
+        --bg: #12140f;
+        --panel: #1c2118;
+        --ink: #e8edd9;
+        --muted: #9aa58a;
+        --accent: #c4d47a;
+        --bad: #e08a6a;
+        --ok: #8fce7a;
+        --line: #2c3426;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: "Segoe UI", system-ui, sans-serif;
+        background: var(--bg);
+        color: var(--ink);
+      }
+      header {
+        padding: 16px 20px;
+        border-bottom: 1px solid var(--line);
+        display: flex;
+        justify-content: space-between;
+        gap: 16px;
+        align-items: baseline;
+      }
+      h1 { font-size: 18px; margin: 0; font-weight: 650; }
+      .sub { color: var(--muted); font-size: 13px; }
+      main {
+        display: grid;
+        grid-template-columns: 1.4fr 1fr;
+        gap: 12px;
+        padding: 12px;
+      }
+      section {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 12px;
+        min-height: 180px;
+      }
+      h2 { margin: 0 0 8px; font-size: 13px; color: var(--accent); letter-spacing: 0.04em; text-transform: uppercase; }
+      table { width: 100%; border-collapse: collapse; font-size: 13px; }
+      th, td { text-align: left; padding: 6px 4px; border-bottom: 1px solid var(--line); vertical-align: top; }
+      .ok { color: var(--ok); }
+      .bad { color: var(--bad); }
+      .log { font-family: ui-monospace, Consolas, monospace; font-size: 12px; max-height: 320px; overflow: auto; }
+      .log div { padding: 4px 0; border-bottom: 1px dashed var(--line); }
+      .needs span, .pill {
+        display: inline-block;
+        margin: 2px 4px 2px 0;
+        padding: 2px 8px;
+        border-radius: 99px;
+        background: #2a3322;
+        font-size: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div>
+        <h1>Minecraft AI Civilization</h1>
+        <div class="sub">First Settlement observer · live local simulation</div>
+      </div>
+      <div class="sub" id="meta">connecting…</div>
+    </header>
+    <main>
+      <section>
+        <h2>Citizens</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Name</th><th>Body</th><th>HP/Food</th><th>Goal</th><th>Task</th><th>Why</th>
+            </tr>
+          </thead>
+          <tbody id="citizens"></tbody>
+        </table>
+      </section>
+      <section>
+        <h2>Settlement</h2>
+        <div id="settlement"></div>
+        <h2 style="margin-top:16px">LLM</h2>
+        <div class="log" id="llm"></div>
+      </section>
+      <section>
+        <h2>Events</h2>
+        <div class="log" id="events"></div>
+      </section>
+      <section>
+        <h2>Memories & relationships</h2>
+        <div class="log" id="social"></div>
+      </section>
+    </main>
+    <script>
+      const $ = (id) => document.getElementById(id);
+      function render(snap) {
+        $("meta").textContent =
+          `pop ${snap.population} · active bots ${snap.activeBots} · ${snap.updatedAt}`;
+        $("citizens").innerHTML = (snap.citizens || [])
+          .map((c) => {
+            const cls = c.connected ? "ok" : "bad";
+            return `<tr>
+              <td><strong>${c.name}</strong><br><span class="sub">${c.occupation || ""}</span></td>
+              <td class="${cls}">${c.connected ? "online" : c.status}</td>
+              <td>${fmt(c.health)} / ${fmt(c.hunger)}<br><span class="sub">${pos(c.lastKnownPosition)}</span></td>
+              <td>${c.currentGoal || ""}<br><span class="sub">${c.decisionSource || ""}</span></td>
+              <td>${c.currentTask || ""}<br><span class="sub">${c.currentAction || ""}</span></td>
+              <td>${c.reason || ""}</td>
+            </tr>`;
+          })
+          .join("");
+        const s = snap.settlement || {};
+        $("settlement").innerHTML = `
+          <div>Food ${s.food ?? 0} · Wood ${s.wood ?? 0} · Stone ${s.stone ?? 0} · Tools ${s.tools ?? 0}</div>
+          <div>Beds ${s.beds ?? 0} · Housing ${s.housingCapacity ?? 0} · Shelter ${s.shelterComplete ? "yes" : "no"}</div>
+          <div>Construction ${s.construction ? s.construction.placedBlocks + "/" + s.construction.totalBlocks : "not started"}</div>
+          <div class="needs">${(s.needs || []).map((n) => `<span>${n}</span>`).join("")}</div>
+        `;
+        $("events").innerHTML = (snap.events || [])
+          .slice()
+          .reverse()
+          .map((e) => `<div><strong>${e.type}</strong> ${e.citizenId || ""} ${e.timestamp}<br>${escapeHtml(JSON.stringify(e.payload))}</div>`)
+          .join("");
+        $("llm").innerHTML = (snap.llmCalls || [])
+          .map((c) => `<div>${c.ok ? "ok" : "fail"} ${c.latency_ms}ms ${c.goal || ""} ${c.reason || c.error || ""}</div>`)
+          .join("") || "<div class='sub'>No LLM calls yet (disabled or unavailable)</div>";
+        const mem = (snap.memories || []).map((m) => `<div>${m.citizenId}: ${escapeHtml(m.content)}</div>`).join("");
+        const rel = (snap.relationships || [])
+          .map((r) => `<div>${r.citizenId} → ${r.otherId} trust ${r.trust.toFixed(2)} affection ${r.affection.toFixed(2)} resentment ${r.resentment.toFixed(2)}</div>`)
+          .join("");
+        $("social").innerHTML = mem + rel || "<div class='sub'>None yet</div>";
+      }
+      function fmt(n) { return typeof n === "number" ? n.toFixed(0) : "—"; }
+      function pos(p) { return p ? `${p.x.toFixed(0)}, ${p.y.toFixed(0)}, ${p.z.toFixed(0)}` : ""; }
+      function escapeHtml(s) {
+        return String(s).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+      }
+      async function poll() {
+        try {
+          const res = await fetch("/api/snapshot");
+          render(await res.json());
+        } catch (err) {
+          $("meta").textContent = "dashboard waiting for orchestrator";
+        }
+      }
+      poll();
+      setInterval(poll, 1500);
+      try {
+        const ws = new WebSocket(`ws://${location.host}/ws`);
+        ws.onmessage = (ev) => {
+          const msg = JSON.parse(ev.data);
+          if (msg.snapshot) render(msg.snapshot);
+        };
+      } catch {}
+    </script>
+  </body>
+</html>

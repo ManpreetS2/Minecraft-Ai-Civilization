@@ -1,0 +1,57 @@
+# Dependencies
+node_modules/
+
+# Build
+dist/
+*.tsbuildinfo
+
+# Secrets and local env
+.env
+.env.local
+*.pem
+
+# Simulation data
+data/*.sqlite
+data/*.sqlite-journal
+data/*.sqlite-wal
+data/*.sqlite-shm
+data/locks/
+data/*.jsonl
+
+# Logs
+*.log
+logs/
+
+# Paper server runtime (preserve locally, do not commit)
+server/logs/
+server/cache/
+server/libraries/
+server/versions/
+server/world/
+server/world_nether/
+server/world_the_end/
+server/plugins/
+server/config/
+server/paper.jar
+server/*.json
+server/*.yml
+server/*.properties
+server/*.txt
+server/.console_history
+!server/start.bat
+!server/README.md
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# Test artifacts
+coverage/
+.vitest/
+
+# Optional local model caches
+models/
+.ollama/
