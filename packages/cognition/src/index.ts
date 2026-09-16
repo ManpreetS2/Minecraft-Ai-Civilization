@@ -50,3 +50,8 @@ export { validateReflectionProposal, type ReflectionProposal } from "./reflectio
 export { applyReflectionProposal } from "./reflection-apply.js";
 export { heuristicDeliberation } from "./heuristic-deliberation.js";
 export { DecisionLogBuffer, type DecisionLog } from "./observability.js";
+export { classifyFailure, isSystemFailure, type FailureSignal } from "./classify.js";
+export { ExperienceLedger, type AttemptInput } from "./experience-ledger.js";
+export { validateLessonProposal, validateDecisionEvaluation, type LessonProposal } from "./lesson-schema.js";
+export { adaptMinecraftKnowledge, decisionContradictsMechanics, type GameKnowledgeProvider } from "./game-knowledge.js";
+export { renderLearningJournal, writeLearningJournal } from "./journal.js";

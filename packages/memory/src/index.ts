@@ -40,9 +40,10 @@ export {
   type EmbeddingProvider,
 } from "./embeddings.js";
 export { attachCognitiveStore, fromSimEvent, INTEGRATION_TODO } from "./integration.js";
+export { retrieveLessons, type ScoredLesson } from "./lesson-retrieval.js";
 export { retrieveMemories } from "./retrieval.js";
 export { isRoutineEvent, scoreSalience } from "./salience.js";
-export { COGNITIVE_MIGRATIONS, COGNITIVE_SCHEMA_V1 } from "./schema.js";
+export { COGNITIVE_MIGRATIONS, COGNITIVE_SCHEMA_V1, COGNITIVE_SCHEMA_V2 } from "./schema.js";
 export { CognitiveStore } from "./store.js";
 export type {
   ActivityRow,
@@ -54,6 +55,21 @@ export type {
   PsychRow,
   ReflectionRow,
 } from "./store.js";
+export type {
+  DecisionEvaluation,
+  DecisionOutcome,
+  EpisodeChain,
+  ExperienceTrack,
+  FailureCategory,
+  FailureEpisode,
+  LearningLesson,
+  LearningMetrics,
+  LessonApplication,
+  LessonRetrievalQuery,
+  LessonScope,
+  SystemIncident,
+} from "./experience.js";
+export { SYSTEM_FAILURE_CATEGORIES } from "./experience.js";
 export type {
   AppraisalDimensions,
   AssociationMemory,

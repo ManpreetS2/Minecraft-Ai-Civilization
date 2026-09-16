@@ -100,6 +100,18 @@ Live fixture run on this machine (2026-09-16, Ollama `/api/chat`, `format=json`,
 
 Re-run with `pnpm --filter @civ/cognition bench`.
 
+## Experience ledger (V3 foundation)
+
+Failures are classified before anything is learned.
+
+- Citizen experience (`ExperienceLedger.recordAttempt`) may create a bounded `LearningLesson`.
+- System incidents (keepalive, SQLite, Paper) never become citizen beliefs.
+- Lessons persist in SQLite, retrieve by goal/error, strengthen or weaken from later outcomes.
+- `renderLearningJournal` writes gitignored `artifacts/learning-journal.md`.
+- `@civ/minecraft-knowledge` is consumed through `GameKnowledgeProvider` / `adaptMinecraftKnowledge` — do not duplicate mechanics tables here.
+
+A heavier-model bake-off is not claimed yet. Keep `OLLAMA_ROUTINE_MODEL=qwen3.5:9b` until a live 20–30 fixture report beats it on quality then latency.
+
 ## Integration after the other branch lands
 
 ```ts

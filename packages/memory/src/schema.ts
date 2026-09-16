@@ -209,4 +209,108 @@ CREATE TABLE IF NOT EXISTS reflection_triggers (
 );
 `;
 
-export const COGNITIVE_MIGRATIONS = [{ name: "001_cognitive_foundation", sql: COGNITIVE_SCHEMA_V1 }] as const;
+export const COGNITIVE_SCHEMA_V2 = `
+CREATE TABLE IF NOT EXISTS failure_episodes (
+  id TEXT PRIMARY KEY,
+  citizen_id TEXT NOT NULL,
+  timestamp TEXT NOT NULL,
+  goal TEXT,
+  task TEXT,
+  action TEXT,
+  target_type TEXT,
+  target_id TEXT,
+  target_position_json TEXT,
+  context_summary TEXT NOT NULL,
+  expected_outcome TEXT,
+  actual_outcome TEXT,
+  error_code TEXT,
+  error_category TEXT NOT NULL,
+  track TEXT NOT NULL,
+  relevant_inventory_json TEXT NOT NULL DEFAULT '[]',
+  relevant_world_facts_json TEXT NOT NULL DEFAULT '[]',
+  related_memory_ids_json TEXT NOT NULL DEFAULT '[]',
+  decision_id TEXT,
+  model TEXT,
+  chain_id TEXT,
+  previous_episode_id TEXT,
+  resolved INTEGER NOT NULL DEFAULT 0,
+  FOREIGN KEY (citizen_id) REFERENCES cognitive_identities(citizen_id) ON DELETE RESTRICT
+);
+
+CREATE INDEX IF NOT EXISTS idx_failure_episodes_citizen ON failure_episodes(citizen_id, timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_failure_episodes_chain ON failure_episodes(chain_id);
+CREATE INDEX IF NOT EXISTS idx_failure_episodes_pattern ON failure_episodes(citizen_id, goal, error_code);
+
+CREATE TABLE IF NOT EXISTS system_incidents (
+  id TEXT PRIMARY KEY,
+  timestamp TEXT NOT NULL,
+  error_code TEXT,
+  error_category TEXT NOT NULL,
+  summary TEXT NOT NULL,
+  episode_id TEXT,
+  citizen_id TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_system_incidents_time ON system_incidents(timestamp DESC);
+
+CREATE TABLE IF NOT EXISTS learning_lessons (
+  id TEXT PRIMARY KEY,
+  citizen_id TEXT NOT NULL,
+  scope TEXT NOT NULL,
+  trigger_pattern TEXT NOT NULL,
+  lesson TEXT NOT NULL,
+  confidence REAL NOT NULL,
+  supporting_failure_ids_json TEXT NOT NULL DEFAULT '[]',
+  supporting_success_ids_json TEXT NOT NULL DEFAULT '[]',
+  contradicted_by_ids_json TEXT NOT NULL DEFAULT '[]',
+  times_applied INTEGER NOT NULL DEFAULT 0,
+  successful_applications INTEGER NOT NULL DEFAULT 0,
+  last_applied_at TEXT,
+  last_updated_at TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  active INTEGER NOT NULL DEFAULT 1,
+  candidate_engine_rule INTEGER NOT NULL DEFAULT 0,
+  origin TEXT NOT NULL DEFAULT 'deterministic'
+);
+
+CREATE INDEX IF NOT EXISTS idx_lessons_citizen ON learning_lessons(citizen_id, active, confidence DESC);
+
+CREATE TABLE IF NOT EXISTS lesson_applications (
+  id TEXT PRIMARY KEY,
+  lesson_id TEXT NOT NULL,
+  citizen_id TEXT NOT NULL,
+  decision_id TEXT,
+  goal TEXT,
+  outcome TEXT,
+  created_at TEXT NOT NULL,
+  FOREIGN KEY (lesson_id) REFERENCES learning_lessons(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS episode_chains (
+  id TEXT PRIMARY KEY,
+  citizen_id TEXT NOT NULL,
+  goal TEXT,
+  status TEXT NOT NULL,
+  episode_ids_json TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS decision_evaluations (
+  id TEXT PRIMARY KEY,
+  citizen_id TEXT NOT NULL,
+  decision_id TEXT,
+  goal TEXT,
+  outcome TEXT NOT NULL,
+  failure_category TEXT,
+  relevant_lesson_ids_json TEXT NOT NULL DEFAULT '[]',
+  should_reconsider INTEGER NOT NULL DEFAULT 0,
+  short_explanation TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
+`;
+
+export const COGNITIVE_MIGRATIONS = [
+  { name: "001_cognitive_foundation", sql: COGNITIVE_SCHEMA_V1 },
+  { name: "002_experience_ledger", sql: COGNITIVE_SCHEMA_V2 },
+] as const;

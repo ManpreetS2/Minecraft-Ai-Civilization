@@ -5,6 +5,16 @@ import { DEFAULT_PSYCH } from "./bounds.js";
 import { parseJson, toJson } from "./json.js";
 import { COGNITIVE_MIGRATIONS } from "./schema.js";
 import type {
+  DecisionEvaluation,
+  EpisodeChain,
+  FailureCategory,
+  FailureEpisode,
+  LearningLesson,
+  LearningMetrics,
+  LessonApplication,
+  SystemIncident,
+} from "./experience.js";
+import type {
   BehaviorObservations,
   CognitiveIdentity,
   ObjectiveWorldEvent,
@@ -1038,6 +1048,447 @@ export class CognitiveStore {
   consumeReflection(id: string): void {
     this.db.prepare(`UPDATE reflection_triggers SET consumed = 1 WHERE id = ?`).run(id);
   }
+
+  putFailureEpisode(episode: FailureEpisode): void {
+    this.upsertIdentity(episode.citizenId);
+    this.db
+      .prepare(
+        `INSERT INTO failure_episodes (
+          id, citizen_id, timestamp, goal, task, action, target_type, target_id, target_position_json,
+          context_summary, expected_outcome, actual_outcome, error_code, error_category, track,
+          relevant_inventory_json, relevant_world_facts_json, related_memory_ids_json,
+          decision_id, model, chain_id, previous_episode_id, resolved
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(
+        episode.id,
+        episode.citizenId,
+        episode.timestamp,
+        episode.goal ?? null,
+        episode.task ?? null,
+        episode.action ?? null,
+        episode.targetType ?? null,
+        episode.targetId ?? null,
+        episode.targetPosition ? toJson(episode.targetPosition) : null,
+        episode.contextSummary,
+        episode.expectedOutcome ?? null,
+        episode.actualOutcome ?? null,
+        episode.errorCode ?? null,
+        episode.errorCategory,
+        episode.track,
+        toJson(episode.relevantInventory),
+        toJson(episode.relevantWorldFacts),
+        toJson(episode.relatedMemoryIds),
+        episode.decisionId ?? null,
+        episode.model ?? null,
+        episode.chainId ?? null,
+        episode.previousEpisodeId ?? null,
+        episode.resolved ? 1 : 0,
+      );
+  }
+
+  getFailureEpisode(id: string): FailureEpisode | undefined {
+    const row = this.db.prepare(`SELECT * FROM failure_episodes WHERE id = ?`).get(id) as FailureEpisodeSql | undefined;
+    return row ? mapFailureEpisode(row) : undefined;
+  }
+
+  listFailureEpisodes(citizenId: string, limit = 40): FailureEpisode[] {
+    const rows = this.db
+      .prepare(`SELECT * FROM failure_episodes WHERE citizen_id = ? ORDER BY timestamp DESC LIMIT ?`)
+      .all(citizenId, limit) as FailureEpisodeSql[];
+    return rows.map(mapFailureEpisode);
+  }
+
+  listSimilarFailures(citizenId: string, goal?: string, errorCode?: string, limit = 12): FailureEpisode[] {
+    const rows = this.db
+      .prepare(
+        `SELECT * FROM failure_episodes
+         WHERE citizen_id = ? AND track = 'CITIZEN'
+           AND (? IS NULL OR goal = ?)
+           AND (? IS NULL OR error_code = ?)
+         ORDER BY timestamp DESC LIMIT ?`,
+      )
+      .all(citizenId, goal ?? null, goal ?? null, errorCode ?? null, errorCode ?? null, limit) as FailureEpisodeSql[];
+    return rows.map(mapFailureEpisode);
+  }
+
+  resolveFailureEpisode(id: string): void {
+    this.db.prepare(`UPDATE failure_episodes SET resolved = 1 WHERE id = ?`).run(id);
+  }
+
+  putSystemIncident(incident: SystemIncident): void {
+    this.db
+      .prepare(
+        `INSERT INTO system_incidents (id, timestamp, error_code, error_category, summary, episode_id, citizen_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(
+        incident.id,
+        incident.timestamp,
+        incident.errorCode ?? null,
+        incident.errorCategory,
+        incident.summary,
+        incident.episodeId ?? null,
+        incident.citizenId ?? null,
+      );
+  }
+
+  listSystemIncidents(limit = 50): SystemIncident[] {
+    const rows = this.db
+      .prepare(`SELECT * FROM system_incidents ORDER BY timestamp DESC LIMIT ?`)
+      .all(limit) as Array<{
+      id: string;
+      timestamp: string;
+      error_code: string | null;
+      error_category: FailureCategory;
+      summary: string;
+      episode_id: string | null;
+      citizen_id: string | null;
+    }>;
+    return rows.map((row) => ({
+      id: row.id,
+      timestamp: row.timestamp,
+      errorCode: row.error_code ?? undefined,
+      errorCategory: row.error_category,
+      summary: row.summary,
+      episodeId: row.episode_id ?? undefined,
+      citizenId: row.citizen_id ?? undefined,
+    }));
+  }
+
+  putLesson(lesson: LearningLesson): void {
+    this.upsertIdentity(lesson.citizenId);
+    this.db
+      .prepare(
+        `INSERT INTO learning_lessons (
+          id, citizen_id, scope, trigger_pattern, lesson, confidence,
+          supporting_failure_ids_json, supporting_success_ids_json, contradicted_by_ids_json,
+          times_applied, successful_applications, last_applied_at, last_updated_at, created_at,
+          active, candidate_engine_rule, origin
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(id) DO UPDATE SET
+          lesson = excluded.lesson,
+          confidence = excluded.confidence,
+          supporting_failure_ids_json = excluded.supporting_failure_ids_json,
+          supporting_success_ids_json = excluded.supporting_success_ids_json,
+          contradicted_by_ids_json = excluded.contradicted_by_ids_json,
+          times_applied = excluded.times_applied,
+          successful_applications = excluded.successful_applications,
+          last_applied_at = excluded.last_applied_at,
+          last_updated_at = excluded.last_updated_at,
+          active = excluded.active,
+          candidate_engine_rule = excluded.candidate_engine_rule`,
+      )
+      .run(
+        lesson.id,
+        lesson.citizenId,
+        lesson.scope,
+        lesson.triggerPattern,
+        lesson.lesson,
+        lesson.confidence,
+        toJson(lesson.supportingFailureIds),
+        toJson(lesson.supportingSuccessIds),
+        toJson(lesson.contradictedByIds),
+        lesson.timesApplied,
+        lesson.successfulApplications,
+        lesson.lastAppliedAt ?? null,
+        lesson.lastUpdatedAt,
+        lesson.createdAt,
+        lesson.active ? 1 : 0,
+        lesson.candidateEngineRule ? 1 : 0,
+        lesson.origin,
+      );
+  }
+
+  getLesson(id: string): LearningLesson | undefined {
+    const row = this.db.prepare(`SELECT * FROM learning_lessons WHERE id = ?`).get(id) as LessonSql | undefined;
+    return row ? mapLesson(row) : undefined;
+  }
+
+  listLessons(citizenId: string, activeOnly = true): LearningLesson[] {
+    const rows = this.db
+      .prepare(
+        activeOnly
+          ? `SELECT * FROM learning_lessons WHERE citizen_id = ? AND active = 1 ORDER BY confidence DESC, last_updated_at DESC`
+          : `SELECT * FROM learning_lessons WHERE citizen_id = ? ORDER BY last_updated_at DESC`,
+      )
+      .all(citizenId) as LessonSql[];
+    return rows.map(mapLesson);
+  }
+
+  findLessonByPattern(citizenId: string, triggerPattern: string): LearningLesson | undefined {
+    const row = this.db
+      .prepare(`SELECT * FROM learning_lessons WHERE citizen_id = ? AND trigger_pattern = ?`)
+      .get(citizenId, triggerPattern) as LessonSql | undefined;
+    return row ? mapLesson(row) : undefined;
+  }
+
+  putLessonApplication(row: LessonApplication): void {
+    this.db
+      .prepare(
+        `INSERT INTO lesson_applications (id, lesson_id, citizen_id, decision_id, goal, outcome, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(row.id, row.lessonId, row.citizenId, row.decisionId ?? null, row.goal ?? null, row.outcome ?? null, row.createdAt);
+  }
+
+  listLessonApplications(lessonId: string): LessonApplication[] {
+    const rows = this.db
+      .prepare(`SELECT * FROM lesson_applications WHERE lesson_id = ? ORDER BY created_at`)
+      .all(lessonId) as Array<{
+      id: string;
+      lesson_id: string;
+      citizen_id: string;
+      decision_id: string | null;
+      goal: string | null;
+      outcome: string | null;
+      created_at: string;
+    }>;
+    return rows.map((row) => ({
+      id: row.id,
+      lessonId: row.lesson_id,
+      citizenId: row.citizen_id,
+      decisionId: row.decision_id ?? undefined,
+      goal: row.goal ?? undefined,
+      outcome: (row.outcome as LessonApplication["outcome"]) ?? undefined,
+      createdAt: row.created_at,
+    }));
+  }
+
+  putEpisodeChain(chain: EpisodeChain): void {
+    this.upsertIdentity(chain.citizenId);
+    this.db
+      .prepare(
+        `INSERT INTO episode_chains (id, citizen_id, goal, status, episode_ids_json, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(id) DO UPDATE SET
+           status = excluded.status,
+           episode_ids_json = excluded.episode_ids_json,
+           updated_at = excluded.updated_at`,
+      )
+      .run(chain.id, chain.citizenId, chain.goal ?? null, chain.status, toJson(chain.episodeIds), chain.createdAt, chain.updatedAt);
+  }
+
+  getOpenChain(citizenId: string, goal?: string): EpisodeChain | undefined {
+    const row = this.db
+      .prepare(
+        `SELECT * FROM episode_chains WHERE citizen_id = ? AND status = 'open' AND (? IS NULL OR goal = ?)
+         ORDER BY updated_at DESC LIMIT 1`,
+      )
+      .get(citizenId, goal ?? null, goal ?? null) as EpisodeChainSql | undefined;
+    return row ? mapChain(row) : undefined;
+  }
+
+  getEpisodeChain(id: string): EpisodeChain | undefined {
+    const row = this.db.prepare(`SELECT * FROM episode_chains WHERE id = ?`).get(id) as EpisodeChainSql | undefined;
+    return row ? mapChain(row) : undefined;
+  }
+
+  putDecisionEvaluation(evaluation: DecisionEvaluation): void {
+    this.upsertIdentity(evaluation.citizenId);
+    this.db
+      .prepare(
+        `INSERT INTO decision_evaluations (
+          id, citizen_id, decision_id, goal, outcome, failure_category, relevant_lesson_ids_json,
+          should_reconsider, short_explanation, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(
+        evaluation.id,
+        evaluation.citizenId,
+        evaluation.decisionId ?? null,
+        evaluation.goal ?? null,
+        evaluation.outcome,
+        evaluation.failureCategory ?? null,
+        toJson(evaluation.relevantLessonIds),
+        evaluation.shouldReconsider ? 1 : 0,
+        evaluation.shortExplanation,
+        evaluation.createdAt,
+      );
+  }
+
+  listDecisionEvaluations(citizenId: string, limit = 20): DecisionEvaluation[] {
+    const rows = this.db
+      .prepare(`SELECT * FROM decision_evaluations WHERE citizen_id = ? ORDER BY created_at DESC LIMIT ?`)
+      .all(citizenId, limit) as DecisionEvalSql[];
+    return rows.map(mapEvaluation);
+  }
+
+  learningCounts(): Omit<LearningMetrics, "lessonsRetrieved" | "repeatedMistakeCount"> {
+    const failures = (this.db.prepare(`SELECT COUNT(*) AS n FROM failure_episodes`).get() as { n: number }).n;
+    const citizen = (
+      this.db.prepare(`SELECT COUNT(*) AS n FROM failure_episodes WHERE track = 'CITIZEN'`).get() as { n: number }
+    ).n;
+    const incidents = (this.db.prepare(`SELECT COUNT(*) AS n FROM system_incidents`).get() as { n: number }).n;
+    const lessons = (this.db.prepare(`SELECT COUNT(*) AS n FROM learning_lessons`).get() as { n: number }).n;
+    const applied = (this.db.prepare(`SELECT COUNT(*) AS n FROM lesson_applications`).get() as { n: number }).n;
+    const assisted = (
+      this.db.prepare(`SELECT COUNT(*) AS n FROM lesson_applications WHERE outcome = 'SUCCESS'`).get() as { n: number }
+    ).n;
+    const contradicted = this.db
+      .prepare(`SELECT contradicted_by_ids_json FROM learning_lessons`)
+      .all() as Array<{ contradicted_by_ids_json: string }>;
+    const contradictedCount = contradicted.filter((row) => parseJson<string[]>(row.contradicted_by_ids_json, []).length > 0)
+      .length;
+    return {
+      failuresObserved: failures,
+      citizenLearningFailures: citizen,
+      systemIncidents: incidents,
+      lessonsCreated: lessons,
+      lessonsRevised: 0,
+      lessonsContradicted: contradictedCount,
+      lessonsApplied: applied,
+      lessonAssistedSuccesses: assisted,
+    };
+  }
+}
+
+type FailureEpisodeSql = {
+  id: string;
+  citizen_id: string;
+  timestamp: string;
+  goal: string | null;
+  task: string | null;
+  action: string | null;
+  target_type: string | null;
+  target_id: string | null;
+  target_position_json: string | null;
+  context_summary: string;
+  expected_outcome: string | null;
+  actual_outcome: string | null;
+  error_code: string | null;
+  error_category: FailureCategory;
+  track: FailureEpisode["track"];
+  relevant_inventory_json: string;
+  relevant_world_facts_json: string;
+  related_memory_ids_json: string;
+  decision_id: string | null;
+  model: string | null;
+  chain_id: string | null;
+  previous_episode_id: string | null;
+  resolved: number;
+};
+
+type LessonSql = {
+  id: string;
+  citizen_id: string;
+  scope: LearningLesson["scope"];
+  trigger_pattern: string;
+  lesson: string;
+  confidence: number;
+  supporting_failure_ids_json: string;
+  supporting_success_ids_json: string;
+  contradicted_by_ids_json: string;
+  times_applied: number;
+  successful_applications: number;
+  last_applied_at: string | null;
+  last_updated_at: string;
+  created_at: string;
+  active: number;
+  candidate_engine_rule: number;
+  origin: LearningLesson["origin"];
+};
+
+type EpisodeChainSql = {
+  id: string;
+  citizen_id: string;
+  goal: string | null;
+  status: EpisodeChain["status"];
+  episode_ids_json: string;
+  created_at: string;
+  updated_at: string;
+};
+
+type DecisionEvalSql = {
+  id: string;
+  citizen_id: string;
+  decision_id: string | null;
+  goal: string | null;
+  outcome: DecisionEvaluation["outcome"];
+  failure_category: FailureCategory | null;
+  relevant_lesson_ids_json: string;
+  should_reconsider: number;
+  short_explanation: string;
+  created_at: string;
+};
+
+function mapFailureEpisode(row: FailureEpisodeSql): FailureEpisode {
+  return {
+    id: row.id,
+    citizenId: row.citizen_id,
+    timestamp: row.timestamp,
+    goal: row.goal ?? undefined,
+    task: row.task ?? undefined,
+    action: row.action ?? undefined,
+    targetType: row.target_type ?? undefined,
+    targetId: row.target_id ?? undefined,
+    targetPosition: row.target_position_json
+      ? parseJson<{ x: number; y: number; z: number } | undefined>(row.target_position_json, undefined)
+      : undefined,
+    contextSummary: row.context_summary,
+    expectedOutcome: row.expected_outcome ?? undefined,
+    actualOutcome: row.actual_outcome ?? undefined,
+    errorCode: row.error_code ?? undefined,
+    errorCategory: row.error_category,
+    track: row.track,
+    relevantInventory: parseJson<string[]>(row.relevant_inventory_json, []),
+    relevantWorldFacts: parseJson<string[]>(row.relevant_world_facts_json, []),
+    relatedMemoryIds: parseJson<string[]>(row.related_memory_ids_json, []),
+    decisionId: row.decision_id ?? undefined,
+    model: row.model ?? undefined,
+    chainId: row.chain_id ?? undefined,
+    previousEpisodeId: row.previous_episode_id ?? undefined,
+    resolved: Boolean(row.resolved),
+  };
+}
+
+function mapLesson(row: LessonSql): LearningLesson {
+  return {
+    id: row.id,
+    citizenId: row.citizen_id,
+    scope: row.scope,
+    triggerPattern: row.trigger_pattern,
+    lesson: row.lesson,
+    confidence: row.confidence,
+    supportingFailureIds: parseJson<string[]>(row.supporting_failure_ids_json, []),
+    supportingSuccessIds: parseJson<string[]>(row.supporting_success_ids_json, []),
+    contradictedByIds: parseJson<string[]>(row.contradicted_by_ids_json, []),
+    timesApplied: row.times_applied,
+    successfulApplications: row.successful_applications,
+    lastAppliedAt: row.last_applied_at ?? undefined,
+    lastUpdatedAt: row.last_updated_at,
+    createdAt: row.created_at,
+    active: Boolean(row.active),
+    candidateEngineRule: Boolean(row.candidate_engine_rule),
+    origin: row.origin,
+  };
+}
+
+function mapChain(row: EpisodeChainSql): EpisodeChain {
+  return {
+    id: row.id,
+    citizenId: row.citizen_id,
+    goal: row.goal ?? undefined,
+    status: row.status,
+    episodeIds: parseJson<string[]>(row.episode_ids_json, []),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function mapEvaluation(row: DecisionEvalSql): DecisionEvaluation {
+  return {
+    id: row.id,
+    citizenId: row.citizen_id,
+    decisionId: row.decision_id ?? undefined,
+    goal: row.goal ?? undefined,
+    outcome: row.outcome,
+    failureCategory: row.failure_category ?? undefined,
+    relevantLessonIds: parseJson<string[]>(row.relevant_lesson_ids_json, []),
+    shouldReconsider: Boolean(row.should_reconsider),
+    shortExplanation: row.short_explanation,
+    createdAt: row.created_at,
+  };
 }
 
 function mapObjective(row: {
