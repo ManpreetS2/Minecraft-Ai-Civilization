@@ -1,5 +1,5 @@
 {
-  "name": "@civ/memory",
+  "name": "@civ/psychology",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -13,10 +13,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@civ/memory": "workspace:*",
     "@civ/shared": "workspace:*",
-    "better-sqlite3": "^12.4.1"
-  },
-  "devDependencies": {
-    "@types/better-sqlite3": "^7.6.13"
+    "zod": "^3.25.76"
   }
 }

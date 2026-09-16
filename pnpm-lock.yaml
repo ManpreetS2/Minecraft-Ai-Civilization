@@ -102,6 +102,13 @@ importers:
       '@civ/shared':
         specifier: workspace:*
         version: link:../shared
+      better-sqlite3:
+        specifier: ^12.4.1
+        version: 12.11.1
+    devDependencies:
+      '@types/better-sqlite3':
+        specifier: ^7.6.13
+        version: 7.6.13
 
   packages/minecraft-adapter:
     dependencies:
@@ -117,6 +124,18 @@ importers:
       vec3:
         specifier: ^0.1.10
         version: 0.1.10
+
+  packages/psychology:
+    dependencies:
+      '@civ/memory':
+        specifier: workspace:*
+        version: link:../memory
+      '@civ/shared':
+        specifier: workspace:*
+        version: link:../shared
+      zod:
+        specifier: ^3.25.76
+        version: 3.25.76
 
   packages/shared:
     dependencies:

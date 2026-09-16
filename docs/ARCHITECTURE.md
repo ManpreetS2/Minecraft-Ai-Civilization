@@ -76,14 +76,15 @@ Every skill returns a structured `ActionResult`. Failures emit events and can be
 | `@civ/skills` | Verified skills with timeouts and cancellation |
 | `@civ/agent-core` | Identity, persistence, survival, settlement, orchestrator |
 | `@civ/cognition` | LLM provider abstraction + validation |
-| `@civ/memory` | Episodic / social / world memory retrieval |
+| `@civ/memory` | Typed citizen memory, objective event log, retrieval, optional embeddings |
+| `@civ/psychology` | Appraisal, affect, local social beliefs, habits, cognition context |
 | `@civ/society` | Relationships and conversation triggers |
 | `@civ/orchestrator` | CLI, simulation loop, HTTP/WS dashboard API |
 | `@civ/dashboard` | Local observer UI |
 
 ## Persistence
 
-SQLite (`data/civilization.sqlite`) for the MVP. Migrations live in `@civ/agent-core`.
+SQLite (`data/civilization.sqlite`) for the MVP. Citizen identity migrations live in `@civ/agent-core`. Cognitive history (memories, appraisal, associations, local social evidence) lives in `@civ/memory` as `CognitiveStore`, which can attach to the same Database later. See [COGNITIVE-FOUNDATION.md](./COGNITIVE-FOUNDATION.md).
 
 ## Events
 
