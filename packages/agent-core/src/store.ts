@@ -11,6 +11,7 @@ import {
   type SettlementState,
   type SimEvent,
   type Vec3,
+  type HumanDirective,
 } from "@civ/shared";
 
 const SCHEMA = `
@@ -106,6 +107,17 @@ CREATE TABLE IF NOT EXISTS llm_calls (
   reason TEXT,
   error TEXT
 );
+
+CREATE TABLE IF NOT EXISTS sim_meta (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS human_directives (
+  id TEXT PRIMARY KEY,
+  json TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
 `;
 
 export class CivilizationStore {
@@ -127,6 +139,10 @@ export class CivilizationStore {
     if (!names.has("death_x")) this.db.exec(`ALTER TABLE citizens ADD COLUMN death_x REAL`);
     if (!names.has("death_y")) this.db.exec(`ALTER TABLE citizens ADD COLUMN death_y REAL`);
     if (!names.has("death_z")) this.db.exec(`ALTER TABLE citizens ADD COLUMN death_z REAL`);
+    this.db.exec(`CREATE TABLE IF NOT EXISTS sim_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)`);
+    this.db.exec(
+      `CREATE TABLE IF NOT EXISTS human_directives (id TEXT PRIMARY KEY, json TEXT NOT NULL, created_at TEXT NOT NULL)`,
+    );
   }
 
   markDeceased(id: string, at = new Date().toISOString(), position?: Vec3): boolean {
@@ -148,6 +164,34 @@ export class CivilizationStore {
 
   close(): void {
     this.db.close();
+  }
+
+  getMeta(key: string): string | undefined {
+    const row = this.db.prepare(`SELECT value FROM sim_meta WHERE key = ?`).get(key) as { value: string } | undefined;
+    return row?.value;
+  }
+
+  setMeta(key: string, value: string): void {
+    this.db.prepare(`INSERT INTO sim_meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value`).run(key, value);
+  }
+
+  saveDirective(directive: HumanDirective): void {
+    this.db
+      .prepare(`INSERT INTO human_directives (id, json, created_at) VALUES (?, ?, ?) ON CONFLICT(id) DO UPDATE SET json = excluded.json`)
+      .run(directive.id, JSON.stringify(directive), directive.createdAt);
+  }
+
+  getDirective(id: string): HumanDirective | undefined {
+    const row = this.db.prepare(`SELECT json FROM human_directives WHERE id = ?`).get(id) as { json: string } | undefined;
+    if (!row) return undefined;
+    return JSON.parse(row.json) as HumanDirective;
+  }
+
+  listDirectives(limit = 40): HumanDirective[] {
+    const rows = this.db
+      .prepare(`SELECT json FROM human_directives ORDER BY created_at DESC LIMIT ?`)
+      .all(limit) as Array<{ json: string }>;
+    return rows.map((row) => JSON.parse(row.json) as HumanDirective);
   }
 
   private seed(): void {

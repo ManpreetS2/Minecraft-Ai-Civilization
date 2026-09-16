@@ -23,7 +23,15 @@ export function recoveryAttempts(target: Vec3, range = 2, adjacent = 4): Recover
 }
 
 export function shouldBlacklistTarget(code: string): boolean {
-  return code === "PATH_BLOCKED" || code === "PATH_FAILED" || code === "TIMEOUT" || code === "VERIFY_FAILED";
+  return (
+    code === "PATH_BLOCKED" ||
+    code === "PATH_FAILED" ||
+    code === "TIMEOUT" ||
+    code === "VERIFY_FAILED" ||
+    code === "TARGET_UNREACHABLE" ||
+    code === "NO_INTERACTION_POSITION" ||
+    code === "WORLD_CHANGED"
+  );
 }
 
 export function nearbyOffsets(radius = 2): Vec3[] {
@@ -94,6 +102,20 @@ export const PROTECTED_BLOCK_NAMES = [
   "oak_door",
   "spruce_door",
   "birch_door",
+  "jungle_door",
+  "acacia_door",
+  "dark_oak_door",
   "torch",
   "wall_torch",
+  "bell",
+  "composter",
+  "lectern",
+  "smithing_table",
+  "loom",
+  "cartography_table",
+  "grindstone",
+  "stonecutter",
+  "fletching_table",
+  "cauldron",
+  "water_cauldron",
 ];

@@ -10,19 +10,25 @@ import {
 import {
   attack,
   collectItem,
+  collectResource,
   craftItem,
   depositItems,
   eatFood,
-  equipItem,
   findBlock,
   flee,
   mineBlock,
+  moveTo,
   observeNearby,
+  obtainItem,
+  openDoor,
   placeBlock,
-  wander,
+  returnToSettlement,
+  withdrawItems,
+  dropItem,
   type SkillContext,
 } from "@civ/skills";
-import { materialList, nextUnplaced, starterHut, worldBlocks } from "./blueprint.js";
+import { materialList, nextUnplaced, starterHut, starterHutSize, worldBlocks } from "./blueprint.js";
+import { pickBestSite } from "./site.js";
 import type { PlannedTask } from "./planner.js";
 import type { CivilizationStore } from "./store.js";
 import { Vec3 as Vec3Class } from "vec3";
@@ -69,10 +75,25 @@ export async function executePlan(
       result = await gatherFood(ctx);
       break;
     case "craftItem":
-      result = await bootstrapTools(ctx);
+      result = await bootstrapTools(ctx, plan.item ?? plan.goal);
+      break;
+    case "obtainItem":
+      result = await obtainItem(ctx, plan.item ?? plan.goal ?? "wooden_pickaxe");
       break;
     case "buildShelter":
       result = await buildShelter(ctx, store);
+      break;
+    case "seekSafety":
+      result = await seekSafety(ctx, store);
+      break;
+    case "returnToSettlement":
+      result = await returnToSettlement(ctx, store.getSettlement().origin ?? store.getSettlement().storage);
+      break;
+    case "withdrawItems":
+      result = await withdrawItems(ctx, plan.item ?? "oak_log", 1);
+      break;
+    case "shareItem":
+      result = await shareNearby(ctx);
       break;
     case "mineBlock":
     default:
@@ -102,30 +123,9 @@ export async function executePlan(
 
 async function gatherByTask(ctx: SkillContext, task: string): Promise<ActionResult> {
   if (task === "mine_stone") {
-    const pick = ctx.bot.inventory.items().find((i) => PICKAXES.includes(i.name));
-    if (pick) {
-      await equipItem(ctx, pick.name);
-    }
-    const mined = await mineBlock(ctx, ["stone", "cobblestone", "deepslate"], 48);
-    if (!mined.success && mined.code === "BLOCK_NOT_FOUND") {
-      await wander(ctx, 28);
-      return mineBlock(ctx, ["stone", "cobblestone", "deepslate"], 48);
-    }
-    if (mined.success) {
-      await collectItem(ctx, undefined, 8);
-    }
-    return mined;
+    return collectResource(ctx, ["stone", "cobblestone", "deepslate"], 1, 48);
   }
-  const mined = await mineBlock(ctx, LOG_BLOCK_NAMES, 48);
-  if (!mined.success && mined.code === "BLOCK_NOT_FOUND") {
-    const walked = await wander(ctx, 28);
-    if (!walked.success) return walked;
-    return mineBlock(ctx, LOG_BLOCK_NAMES, 48);
-  }
-  if (mined.success) {
-    await collectItem(ctx, undefined, 8);
-  }
-  return mined;
+  return collectResource(ctx, [...LOG_BLOCK_NAMES], 1, 48);
 }
 
 async function gatherFood(ctx: SkillContext): Promise<ActionResult> {
@@ -148,7 +148,7 @@ async function gatherFood(ctx: SkillContext): Promise<ActionResult> {
   return mineBlock(ctx, LOG_BLOCK_NAMES, 48);
 }
 
-async function bootstrapTools(ctx: SkillContext): Promise<ActionResult> {
+async function bootstrapTools(ctx: SkillContext, goal = "wooden_pickaxe"): Promise<ActionResult> {
   const count = (name: string) =>
     ctx.bot.inventory.items().filter((i) => i.name === name).reduce((s, i) => s + i.count, 0);
   const has = (names: string[]) => ctx.bot.inventory.items().some((i) => names.includes(i.name));
@@ -183,10 +183,13 @@ async function bootstrapTools(ctx: SkillContext): Promise<ActionResult> {
   if (has(["cobblestone"]) && count("cobblestone") >= 3 && count("stick") >= 2 && !has(["stone_pickaxe", "iron_pickaxe"])) {
     return craftItem(ctx, "stone_pickaxe", 1);
   }
-  if (has(PICKAXES)) {
+  if (has(PICKAXES) && goal !== "stone_pickaxe") {
     return { success: true, data: { item: "already_equipped" }, durationMs: 0 };
   }
-  return mineBlock(ctx, LOG_BLOCK_NAMES, 48);
+  if (goal === "stone_pickaxe" && has(["stone_pickaxe", "iron_pickaxe"])) {
+    return { success: true, data: { item: "already_equipped" }, durationMs: 0 };
+  }
+  return collectResource(ctx, [...LOG_BLOCK_NAMES], 1, 48);
 }
 
 async function buildShelter(ctx: SkillContext, store: CivilizationStore): Promise<ActionResult> {
@@ -198,7 +201,8 @@ async function buildShelter(ctx: SkillContext, store: CivilizationStore): Promis
     if (!pos) {
       return { success: false, code: "NOT_CONNECTED", error: "No position for shelter origin", durationMs: 0, retryable: true };
     }
-    origin = chooseOrigin(pos);
+    origin = chooseOrigin(pos, ctx);
+
     settlement.origin = origin;
     settlement.construction = {
       blueprintId: hut.id,
@@ -285,13 +289,45 @@ async function buildShelter(ctx: SkillContext, store: CivilizationStore): Promis
   return placed;
 }
 
-function chooseOrigin(from: Vec3): Vec3 {
+function chooseOrigin(from: Vec3, ctx: SkillContext): Vec3 {
+  const size = starterHutSize();
+  const getBlock = (pos: Vec3) =>
+    ctx.bot.blockAt(new Vec3Class(Math.floor(pos.x), Math.floor(pos.y), Math.floor(pos.z)))?.name;
+  const best = pickBestSite(from, size.width, size.depth, getBlock);
+  if (best) return best.origin;
   const angle = (Math.floor(from.x + from.z) % 8) * (Math.PI / 4);
   return {
     x: Math.floor(from.x + Math.cos(angle) * 40),
     y: Math.floor(from.y),
     z: Math.floor(from.z + Math.sin(angle) * 40),
   };
+}
+
+async function seekSafety(ctx: SkillContext, store: CivilizationStore): Promise<ActionResult> {
+  const settlement = store.getSettlement();
+  const target = settlement.origin ?? settlement.storage;
+  if (target) {
+    const moved = await moveTo(ctx, target, 4);
+    if (moved.success) return moved;
+  }
+  const door = await findBlock(ctx, ["oak_door", "spruce_door", "birch_door"], 24);
+  if (door.success) {
+    await openDoor(ctx, door.data.position);
+    return moveTo(ctx, door.data.position, 2);
+  }
+  return observeNearby(ctx);
+}
+
+async function shareNearby(ctx: SkillContext): Promise<ActionResult> {
+  const food = ctx.bot.inventory.items().find((i) => FOOD_ITEM_NAMES.has(i.name));
+  if (!food) {
+    return { success: false, code: "NO_FOOD", error: "Nothing to share", durationMs: 0, retryable: true };
+  }
+  const nearby = ctx.body.nearbyPlayers(5);
+  if (nearby.length === 0) {
+    return observeNearby(ctx);
+  }
+  return dropItem(ctx, food.name, 1);
 }
 
 function updateSettlementFromInventory(ctx: SkillContext, store: CivilizationStore): void {

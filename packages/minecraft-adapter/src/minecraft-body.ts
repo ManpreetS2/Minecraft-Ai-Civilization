@@ -18,6 +18,7 @@ import {
 } from "@civ/shared";
 import { BodyLock, DuplicateBodyError } from "./body-lock.js";
 import { TargetBlacklist } from "./path-recovery.js";
+import { deriveConnectionHealth, emptyTelemetry, isKeepaliveTimeout, type ConnectionTelemetry } from "./connection-health.js";
 
 const activeBodies = new Map<string, MinecraftBody>();
 
@@ -40,6 +41,7 @@ export type MinecraftBodyOptions = {
   lockDir?: string;
   reconnect?: boolean;
   allowRespawn?: boolean;
+  eventLoopLag?: () => number;
 };
 
 function asRecord(value: unknown): Record<string, unknown> | undefined {
@@ -63,6 +65,10 @@ export class MinecraftBody extends EventEmitter {
   private spawned = false;
   private lastKick?: string;
   private connectingPromise: Promise<ActionResult<{ username: string }>> | null = null;
+  private awaitingRespawn = false;
+  private reconnecting = false;
+  private telemetry: ConnectionTelemetry = emptyTelemetry();
+  private readonly eventLoopLag?: () => number;
 
   constructor(options: MinecraftBodyOptions) {
     super();
@@ -72,7 +78,27 @@ export class MinecraftBody extends EventEmitter {
     this.events = options.events;
     this.shouldReconnect = options.reconnect ?? true;
     this.allowRespawn = options.allowRespawn ?? false;
+    this.eventLoopLag = options.eventLoopLag;
     this.lock = new BodyLock(options.username, options.lockDir ?? resolveFromRoot("./data/locks"));
+  }
+
+  isAwaitingRespawn(): boolean {
+    return this.awaitingRespawn;
+  }
+
+  connectionTelemetry(): ConnectionTelemetry {
+    return {
+      ...this.telemetry,
+      health: deriveConnectionHealth({
+        connected: this.connected,
+        spawned: this.spawned,
+        reconnecting: this.reconnecting,
+        deceased: this.deceased,
+        lastPacketRxAt: this.telemetry.lastPacketRxAt,
+        lastPhysicsAt: this.telemetry.lastPhysicsAt,
+        eventLoopLagMs: this.eventLoopLag?.(),
+      }),
+    };
   }
 
   isDeceased(): boolean {
@@ -149,7 +175,7 @@ export class MinecraftBody extends EventEmitter {
       username: this.username,
       auth: this.config.MINECRAFT_AUTH_MODE === "offline" ? "offline" : "microsoft",
       version: this.config.MINECRAFT_VERSION,
-      hideErrors: false,
+      hideErrors: true,
       checkTimeoutInterval: 30_000,
     };
 
@@ -164,6 +190,7 @@ export class MinecraftBody extends EventEmitter {
 
       const bot = mineflayer.createBot(options);
       this.bot = bot;
+      this.bindClientTelemetry(bot);
       this.bindBot(bot);
 
       const finish = (result: ActionResult<{ username: string }>) => {
@@ -213,6 +240,30 @@ export class MinecraftBody extends EventEmitter {
     this.teardownBot(reason);
     this.lock.release();
     activeBodies.delete(this.username.toLowerCase());
+  }
+
+  private bindClientTelemetry(bot: Bot): void {
+    const client = asRecord((bot as unknown as { _client?: unknown })._client);
+    if (!client) return;
+    const onError = (error: unknown) => {
+      if (isKeepaliveTimeout(error)) {
+        this.telemetry.keepaliveTimeouts += 1;
+        this.telemetry.reconnectReason = error instanceof Error ? error.message : String(error);
+      }
+    };
+    const onPacket = () => {
+      this.telemetry.lastPacketRxAt = Date.now();
+    };
+    if (typeof client["on"] === "function") {
+      (client["on"] as (event: string, fn: (...args: unknown[]) => void) => void)("error", onError);
+      (client["on"] as (event: string, fn: (...args: unknown[]) => void) => void)("packet", onPacket);
+      (client["on"] as (event: string, fn: (...args: unknown[]) => void) => void)("keep_alive", () => {
+        this.telemetry.lastKeepaliveAt = Date.now();
+      });
+    }
+    bot.on("physicsTick", () => {
+      this.telemetry.lastPhysicsAt = Date.now();
+    });
   }
 
   stopPathfinding(): void {
@@ -344,18 +395,20 @@ export class MinecraftBody extends EventEmitter {
 
     bot.on("death", () => {
       if (this.deceased) return;
+      this.stopPathfinding();
       if (!this.allowRespawn) {
         this.markDeceased();
         this.events?.emit(
-          createEvent("CitizenDied", { username: this.username, position: this.position() }, this.citizenId),
+          createEvent("CitizenDied", { username: this.username, position: this.position(), terminal: true }, this.citizenId),
         );
         this.emit("death");
         void this.disconnect("citizen-deceased");
         return;
       }
+      this.awaitingRespawn = true;
       this.emit("death");
       this.events?.emit(
-        createEvent("CitizenDied", { username: this.username, position: this.position() }, this.citizenId),
+        createEvent("CitizenBodyDied", { username: this.username, position: this.position(), terminal: false }, this.citizenId),
       );
       try {
         bot.respawn();
@@ -367,6 +420,12 @@ export class MinecraftBody extends EventEmitter {
     bot.on("spawn", () => {
       if (this.deceased) return;
       this.spawned = true;
+      if (this.awaitingRespawn) {
+        this.awaitingRespawn = false;
+        this.events?.emit(
+          createEvent("CitizenRespawned", { username: this.username, position: this.position(), terminal: false }, this.citizenId),
+        );
+      }
     });
 
     bot.on("chat", (username, message) => {
@@ -383,6 +442,11 @@ export class MinecraftBody extends EventEmitter {
     });
 
     bot.on("error", (error) => {
+      if (isKeepaliveTimeout(error)) {
+        this.telemetry.keepaliveTimeouts += 1;
+        this.telemetry.reconnectReason = error.message;
+        return;
+      }
       this.emit("error", error);
       this.events?.emit(
         createEvent("ErrorOccurred", { username: this.username, error: error.message }, this.citizenId),
@@ -391,6 +455,7 @@ export class MinecraftBody extends EventEmitter {
 
     bot.on("end", (reason) => {
       this.spawned = false;
+      this.telemetry.disconnects += 1;
       this.emit("disconnected", String(reason));
       this.events?.emit(
         createEvent("CitizenDisconnected", { username: this.username, reason: String(reason) }, this.citizenId),
@@ -409,8 +474,11 @@ export class MinecraftBody extends EventEmitter {
     if (this.shuttingDown || this.deceased || !this.shouldReconnect || this.reconnectTimer) return;
     this.reconnectAttempt += 1;
     const delay = Math.min(60_000, 3000 * 2 ** Math.min(this.reconnectAttempt - 1, 4));
+    this.reconnecting = true;
+    this.telemetry.reconnects += 1;
     this.reconnectTimer = setTimeout(() => {
       this.reconnectTimer = undefined;
+      this.reconnecting = false;
       void this.connect();
     }, delay);
   }

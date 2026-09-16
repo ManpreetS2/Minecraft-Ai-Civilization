@@ -13,11 +13,13 @@ export type Blueprint = {
   blocks: BlueprintBlock[];
 };
 
+export function starterHutSize(): { width: number; depth: number; wallHeight: number } {
+  return { width: 5, depth: 4, wallHeight: 2 };
+}
+
 export function starterHut(): Blueprint {
   const blocks: BlueprintBlock[] = [];
-  const width = 5;
-  const depth = 5;
-  const height = 3;
+  const { width, depth, wallHeight } = starterHutSize();
 
   for (let x = 0; x < width; x += 1) {
     for (let z = 0; z < depth; z += 1) {
@@ -25,21 +27,22 @@ export function starterHut(): Blueprint {
     }
   }
 
-  for (let y = 1; y <= height; y += 1) {
+  for (let y = 1; y <= wallHeight; y += 1) {
     for (let x = 0; x < width; x += 1) {
       for (let z = 0; z < depth; z += 1) {
         const wall = x === 0 || z === 0 || x === width - 1 || z === depth - 1;
         const door = y <= 2 && x === 2 && z === 0;
         if (wall && !door) {
-          blocks.push({ dx: x, dy: y, dz: z, block: y === height ? "oak_planks" : "oak_planks" });
+          blocks.push({ dx: x, dy: y, dz: z, block: "oak_planks" });
         }
       }
     }
   }
 
+  const roofY = wallHeight + 1;
   for (let x = 0; x < width; x += 1) {
     for (let z = 0; z < depth; z += 1) {
-      blocks.push({ dx: x, dy: height + 1, dz: z, block: "oak_planks" });
+      blocks.push({ dx: x, dy: roofY, dz: z, block: "oak_planks" });
     }
   }
 
@@ -47,7 +50,6 @@ export function starterHut(): Blueprint {
   blocks.push({ dx: 1, dy: 1, dz: 2, block: "chest" });
   blocks.push({ dx: 3, dy: 1, dz: 2, block: "crafting_table" });
   blocks.push({ dx: 1, dy: 2, dz: 1, block: "torch" });
-  blocks.push({ dx: 3, dy: 2, dz: 3, block: "torch" });
 
   return { id: "starter_hut", name: "Starter Hut", blocks };
 }

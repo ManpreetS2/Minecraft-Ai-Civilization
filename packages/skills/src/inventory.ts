@@ -172,3 +172,30 @@ export async function withdrawItems(
   }
   return ok({ item: itemName, count: after - before }, Date.now() - started);
 }
+
+export function inventoryCount(ctx: SkillContext, name: string): number {
+  return countItem(ctx, name);
+}
+
+export async function dropItem(
+  ctx: SkillContext,
+  itemName: string,
+  count = 1,
+): Promise<ActionResult<{ item: string; count: number }>> {
+  const started = Date.now();
+  const before = countItem(ctx, itemName);
+  const item = ctx.bot.inventory.items().find((i) => i.name === itemName);
+  if (!item) {
+    return fail("ITEM_NOT_FOUND", `No ${itemName} to drop`, Date.now() - started, true);
+  }
+  try {
+    await ctx.bot.toss(item.type, null, Math.min(count, item.count));
+  } catch (error) {
+    return fail("DEPOSIT_FAILED", error instanceof Error ? error.message : String(error), Date.now() - started, true);
+  }
+  const after = countItem(ctx, itemName);
+  if (after >= before) {
+    return fail("VERIFY_FAILED", `Drop of ${itemName} did not decrease inventory`, Date.now() - started, true);
+  }
+  return ok({ item: itemName, count: before - after }, Date.now() - started);
+}

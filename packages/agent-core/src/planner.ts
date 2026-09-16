@@ -1,4 +1,5 @@
 import type { BodyObservation, DecisionSource, SettlementNeed, SettlementState } from "@civ/shared";
+import { intentToPlan, type DirectiveIntent, type DirectiveMode } from "./directive-parse.js";
 
 export type PlannedTask = {
   goal: string;
@@ -8,6 +9,8 @@ export type PlannedTask = {
   reason: string;
   priority: number;
   occupation?: string;
+  directiveId?: string;
+  item?: string;
 };
 
 export type PlannerInput = {
@@ -17,12 +20,37 @@ export type PlannerInput = {
   assignedNeeds: SettlementNeed[];
   llmGoal?: string;
   llmReason?: string;
+  humanDirective?: {
+    id: string;
+    intent: DirectiveIntent;
+    mode: DirectiveMode;
+    args?: Record<string, string>;
+  };
 };
 
 const TOOL_PICKAXES = ["wooden_pickaxe", "stone_pickaxe", "iron_pickaxe", "diamond_pickaxe", "netherite_pickaxe"];
 const TOOL_AXES = ["wooden_axe", "stone_axe", "iron_axe"];
 const LOG_ITEMS = ["oak_log", "birch_log", "spruce_log", "jungle_log", "acacia_log", "dark_oak_log", "cherry_log"];
 const FOOD_ITEMS = ["apple", "bread", "cooked_beef", "cooked_porkchop", "cooked_chicken", "beef", "porkchop", "chicken", "sweet_berries", "carrot"];
+
+const LLM_MAP: Record<string, { task: string; action: string }> = {
+  gather_wood: { task: "gather_wood", action: "mineBlock" },
+  gather_food: { task: "gather_food", action: "gatherFood" },
+  mine_stone: { task: "mine_stone", action: "mineBlock" },
+  craft_tools: { task: "craft_tools", action: "craftItem" },
+  build_shelter: { task: "build_shelter", action: "buildShelter" },
+  contribute_to_project: { task: "build_shelter", action: "buildShelter" },
+  obtain_item: { task: "obtain_item", action: "obtainItem" },
+  help_citizen: { task: "help_citizen", action: "shareItem" },
+  assist_citizen: { task: "help_citizen", action: "shareItem" },
+  deposit: { task: "deposit", action: "depositItems" },
+  use_storage: { task: "deposit", action: "depositItems" },
+  rest: { task: "seek_shelter", action: "seekSafety" },
+  seek_safety: { task: "seek_shelter", action: "seekSafety" },
+  explore: { task: "observe", action: "observeNearby" },
+  defend: { task: "defend", action: "attack" },
+  survive: { task: "acquire_food", action: "gatherFood" },
+};
 
 function count(obs: BodyObservation, names: string[]): number {
   const set = new Set(names);
@@ -38,9 +66,10 @@ function inventorySlots(obs: BodyObservation): number {
 }
 
 export function planCitizen(input: PlannerInput): PlannedTask {
-  const { observation: obs, settlement, assignedNeeds, llmGoal, llmReason } = input;
+  const { observation: obs, settlement, assignedNeeds, llmGoal, llmReason, humanDirective } = input;
   const hostile = obs.nearby.find((e) => e.hostile && e.distance < 10);
   const foodCount = count(obs, FOOD_ITEMS) + settlement.food;
+  const emergency = Boolean(((obs.health ?? 20) <= 6 && hostile) || (obs.health ?? 20) <= 4);
 
   if ((obs.health ?? 20) <= 6 && hostile) {
     return task("survive", "flee_danger", "flee", "reflex", "Critical health near a hostile", 1.0);
@@ -54,25 +83,38 @@ export function planCitizen(input: PlannerInput): PlannedTask {
   if ((obs.food ?? 20) <= 8 && !hasAny(obs, FOOD_ITEMS)) {
     return task("survive", "acquire_food", "gatherFood", "reflex", "Hunger is low and inventory has no food", 0.93);
   }
-  if (hostile && hostile.name.includes("creeper") && hostile.distance < 8) {
-    return task("survive", "flee_danger", "flee", "reflex", "Creeper is too close", 0.92, "guard");
+  if (hostile && hostile.distance < 8) {
+    return task("survive", "flee_danger", "flee", "reflex", `Hostile ${hostile.name} is too close`, 0.92, "guard");
   }
-  if (hostile && hostile.distance < 6) {
-    return task("survive", "defend", "attack", "reflex", `Hostile ${hostile.name} is nearby`, 0.9, "guard");
+
+  if (humanDirective && humanDirective.mode !== "SUGGESTION" && !emergency) {
+    const mapped = intentToPlan(humanDirective.intent, humanDirective.args);
+    const planned = task(
+      mapped.goal,
+      mapped.task,
+      mapped.action,
+      "planner",
+      `Human ${humanDirective.mode.toLowerCase()}: ${humanDirective.intent}`,
+      humanDirective.mode === "ADMIN_OVERRIDE" ? 0.97 : 0.91,
+    );
+    planned.directiveId = humanDirective.id;
+    planned.item = humanDirective.args?.item;
+    return planned;
   }
-  if (obs.isNight && !settlement.shelterComplete) {
-    const hasWood = hasAny(obs, LOG_ITEMS) || hasAny(obs, ["oak_planks", "spruce_planks", "birch_planks"]);
-    if (!hasWood) {
-      return task("survive", "gather_wood", "mineBlock", "planner", "Night is coming and we still need wood for shelter", 0.88, "lumberjack");
-    }
-    return task("survive", "seek_shelter", "buildShelter", "planner", "Night without a finished shelter", 0.88, "builder");
+
+  if (obs.isNight && hostile) {
+    return task("survive", "seek_shelter", "seekSafety", "planner", "Night with nearby danger; use cover", 0.8);
+  }
+  if (obs.isNight && settlement.shelterComplete) {
+    return task("survive", "seek_shelter", "seekSafety", "planner", "Night; a usable shelter exists", 0.7);
   }
   if (inventorySlots(obs) >= 30) {
     return task("survive", "deposit", "depositItems", "reflex", "Inventory is nearly full", 0.86);
   }
 
   if (llmGoal && llmReason) {
-    return task(llmGoal, llmGoal, llmGoal, "llm", llmReason, 0.8);
+    const mapped = LLM_MAP[llmGoal] ?? { task: llmGoal, action: llmGoal };
+    return task(llmGoal, mapped.task, mapped.action, "llm", llmReason, 0.8);
   }
 
   if (!hasAny(obs, TOOL_PICKAXES) && !hasAny(obs, LOG_ITEMS) && count(obs, ["oak_planks", "spruce_planks", "birch_planks"]) < 8) {

@@ -6,13 +6,12 @@ import type { AgentManager } from "@civ/agent-core";
 import {
   adaptDirective,
   buildObserverView,
-  DirectiveBoard,
   loadConfig,
   workspaceRoot,
   type AppConfig,
   type HumanDirective,
 } from "@civ/shared";
-import { requestCitizenStop, requestDirectiveCancel, requestDirectiveFollow } from "./directive-apply.js";
+import { requestDirectiveCancel, requestDirectiveFollow } from "./directive-apply.js";
 
 const MIME: Record<string, string> = {
   ".html": "text/html; charset=utf-8",
@@ -31,12 +30,11 @@ const CORS = {
 export function startDashboardServer(manager: AgentManager, host: string, port: number): Promise<string> {
   const publicDir = resolve(workspaceRoot(), "apps/dashboard/public");
   const config = loadConfig();
-  const board = new DirectiveBoard(config.HUMAN_DIRECTIVES_ENABLED);
   const startedAt = new Date();
-  const enrich = () => enrichSnapshot(manager, board, config, startedAt);
+  const enrich = () => enrichSnapshot(manager, config, startedAt);
 
   const server = createServer((req, res) => {
-    void handle(req, res, manager, publicDir, board, enrich);
+    void handle(req, res, manager, publicDir, enrich);
   });
   const wss = new WebSocketServer({ server, path: "/ws" });
   const unsubscribe = manager.events.on((event) => {
@@ -60,7 +58,6 @@ async function handle(
   res: ServerResponse,
   manager: AgentManager,
   publicDir: string,
-  board: DirectiveBoard,
   enrich: () => unknown,
 ): Promise<void> {
   const url = new URL(req.url ?? "/", "http://127.0.0.1");
@@ -95,7 +92,7 @@ async function handle(
     return;
   }
   if (url.pathname === "/api/directives" && req.method === "GET") {
-    json(res, listDirectives(manager, board));
+    json(res, listDirectives(manager));
     return;
   }
   if (url.pathname === "/api/directives" && req.method === "POST") {
@@ -104,7 +101,7 @@ async function handle(
       json(res, { ok: false, error: body.error }, 400);
       return;
     }
-    const issued = issueDirective(manager, board, body.value);
+    const issued = issueDirective(manager, body.value);
     if (!issued.ok) {
       json(res, issued, issued.status ?? 400);
       return;
@@ -115,7 +112,7 @@ async function handle(
 
   const cancelMatch = url.pathname.match(/^\/api\/directives\/([^/]+)\/cancel$/);
   if (cancelMatch && req.method === "POST") {
-    const cancelled = cancelDirective(manager, board, cancelMatch[1] ?? "");
+    const cancelled = cancelDirective(manager, cancelMatch[1] ?? "");
     if (!cancelled.ok) {
       json(res, cancelled, cancelled.status ?? 404);
       return;
@@ -127,9 +124,9 @@ async function handle(
   const stopMatch = url.pathname.match(/^\/api\/citizens\/([^/]+)\/stop$/);
   if (stopMatch && req.method === "POST") {
     const citizenId = decodeURIComponent(stopMatch[1] ?? "");
-    const stopped = stopCitizen(manager, board, citizenId);
+    const stopped = manager.stopCitizen(citizenId);
     if (!stopped.ok) {
-      json(res, stopped, stopped.status ?? 404);
+      json(res, { ok: false, error: stopped.reason ?? "Citizen not found." }, stopped.status ?? 404);
       return;
     }
     json(res, { ok: true, snapshot: enrich() });
@@ -150,15 +147,10 @@ async function handle(
   res.end(body);
 }
 
-function enrichSnapshot(manager: AgentManager, board: DirectiveBoard, config: AppConfig, startedAt: Date): unknown {
-  const snapshot = manager.getSnapshot() as ReturnType<AgentManager["getSnapshot"]> & {
-    runId?: string;
-    permadeath?: boolean;
-    humanDirectivesEnabled?: boolean;
-    directives?: unknown[];
-  };
+function enrichSnapshot(manager: AgentManager, config: AppConfig, startedAt: Date): unknown {
+  const snapshot = manager.getSnapshot();
   const observer = buildObserverView(snapshot, {
-    directives: listDirectives(manager, board),
+    directives: listDirectives(manager),
     directivesEnabled: snapshot.humanDirectivesEnabled ?? config.HUMAN_DIRECTIVES_ENABLED,
     runId: snapshot.runId || config.SIM_RUN_ID || `dev-${formatRunId(startedAt)}`,
     permanentDeath: snapshot.permadeath ?? config.SIM_PERMADEATH_ENABLED,
@@ -172,85 +164,36 @@ function enrichSnapshot(manager: AgentManager, board: DirectiveBoard, config: Ap
   };
 }
 
-type DirectiveHost = AgentManager & {
-  issueDirective?: (input: { target: string; mode: string; instruction: string }) =>
-    | { ok: true; directives: unknown[] }
-    | { ok: false; reason?: string; error?: string; status?: number };
-  cancelDirective?: (id: string) => unknown;
-  stopCitizen?: (nameOrId: string) => { ok: boolean; reason?: string; status?: number };
-  listDirectives?: () => unknown[];
-};
-
-function host(manager: AgentManager): DirectiveHost {
-  return manager as DirectiveHost;
-}
-
-function listDirectives(manager: AgentManager, board: DirectiveBoard): HumanDirective[] {
-  const runtime = host(manager);
-  const raw = runtime.listDirectives?.() ?? (manager.getSnapshot() as { directives?: unknown[] }).directives ?? board.list();
+function listDirectives(manager: AgentManager): HumanDirective[] {
+  const raw = manager.listDirectives() ?? manager.getSnapshot().directives ?? [];
   return raw.map((row) => adaptDirective(row)).filter((row): row is HumanDirective => Boolean(row));
 }
 
 function issueDirective(
   manager: AgentManager,
-  board: DirectiveBoard,
   body: Record<string, unknown>,
 ): { ok: true; directive: HumanDirective } | { ok: false; error: string; status?: number } {
   const instruction = String(body.instruction ?? body.rawText ?? "");
-  const mode = String(body.mode ?? "DIRECTIVE");
-  const runtime = host(manager);
-  if (runtime.issueDirective) {
-    const target = String(body.target ?? (Array.isArray(body.targetIds) ? body.targetIds[0] : "everyone"));
-    const result = runtime.issueDirective({ target, mode, instruction });
-    if (!result.ok) return { ok: false, error: result.error ?? result.reason ?? "Directive rejected.", status: result.status };
-    const directive = adaptDirective(result.directives[0] ?? result.directives.at?.(-1));
-    if (!directive) return { ok: false, error: "Runtime accepted the directive but returned no record.", status: 500 };
-    return { ok: true, directive };
-  }
+  const mode = String(body.mode ?? "DIRECTIVE") as "SUGGESTION" | "DIRECTIVE" | "ADMIN_OVERRIDE";
   const citizens = manager.list().map((c) => ({ id: c.record.id, name: c.record.name }));
-  const created = board.create({
-    rawText: instruction,
-    mode,
-    selectedIds: parseSelectedIds(body, citizens),
-    citizens,
-  });
-  if (!created.ok) return created;
-  requestDirectiveFollow(manager, created.directive);
-  return created;
+  const selectedIds = parseSelectedIds(body, citizens);
+  const target = String(body.target ?? selectedIds[0] ?? "everyone");
+  const result = manager.issueDirective({ target, mode, instruction, selectedIds });
+  if (!result.ok) return { ok: false, error: result.error, status: result.status };
+  const directive = adaptDirective(result.directives[0]);
+  if (!directive) return { ok: false, error: "Runtime accepted the directive but returned no record.", status: 500 };
+  requestDirectiveFollow(manager, directive);
+  return { ok: true, directive };
 }
 
 function cancelDirective(
   manager: AgentManager,
-  board: DirectiveBoard,
   id: string,
 ): { ok: true; directive: HumanDirective } | { ok: false; error: string; status?: number } {
-  const runtime = host(manager);
-  if (runtime.cancelDirective) {
-    const result = runtime.cancelDirective(id);
-    const directive = adaptDirective(result);
-    if (!directive) return { ok: false, error: "Directive not found.", status: 404 };
-    return { ok: true, directive };
-  }
-  const cancelled = board.cancel(id);
-  if (!cancelled.ok) return cancelled;
-  requestDirectiveCancel(manager, cancelled.directive);
-  return cancelled;
-}
-
-function stopCitizen(
-  manager: AgentManager,
-  board: DirectiveBoard,
-  citizenId: string,
-): { ok: true } | { ok: false; error: string; status?: number } {
-  const runtime = host(manager);
-  if (runtime.stopCitizen) {
-    const result = runtime.stopCitizen(citizenId);
-    if (!result.ok) return { ok: false, error: result.reason ?? "Citizen not found.", status: result.status ?? 404 };
-    return { ok: true };
-  }
-  if (!requestCitizenStop(manager, citizenId)) return { ok: false, error: "Citizen not found.", status: 404 };
-  board.cancelForCitizen(citizenId);
-  return { ok: true };
+  const result = manager.cancelDirective(id);
+  if (!result.ok) return result;
+  requestDirectiveCancel(manager, result.directive);
+  return { ok: true, directive: adaptDirective(result.directive) ?? result.directive };
 }
 
 function parseSelectedIds(
