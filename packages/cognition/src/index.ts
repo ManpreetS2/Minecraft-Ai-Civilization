@@ -1,13 +1,23 @@
 import type { AppConfig } from "@civ/shared";
-import { resolveCognitionConfig } from "./config.js";
+import { cloudConfigured, resolveCognitionConfig } from "./config.js";
 import { HeuristicProvider } from "./heuristic.js";
 import { OllamaProvider } from "./ollama.js";
+import { OpenAICompatibleProvider } from "./openai-compat.js";
 import type { CognitionProvider } from "./schema.js";
 
 export function createCognition(config: AppConfig): CognitionProvider {
   const cog = resolveCognitionConfig(config);
   if (!cog.enabled) {
     return new HeuristicProvider();
+  }
+  if (cog.inferenceRoute === "CLOUD" && cloudConfigured(cog)) {
+    return new OpenAICompatibleProvider({
+      baseUrl: cog.openaiCompat.baseUrl,
+      apiKey: cog.openaiCompat.apiKey,
+      routineModel: cog.openaiCompat.routineModel,
+      fastModel: cog.openaiCompat.fastModel,
+      reflectionModel: cog.openaiCompat.reflectionModel,
+    });
   }
   if (cog.provider === "ollama") {
     return new OllamaProvider(cog.host, cog.routineModel);
@@ -17,6 +27,10 @@ export function createCognition(config: AppConfig): CognitionProvider {
 
 export { HeuristicProvider } from "./heuristic.js";
 export { OllamaProvider } from "./ollama.js";
+export { OpenAICompatibleProvider, OpenAICompatibleBackend, chatCompletionsUrl } from "./openai-compat.js";
+export { OllamaBackend } from "./ollama-backend.js";
+export { providerOrder, parseInferenceRoute, type InferenceRoute, type ProviderKind } from "./inference-route.js";
+export { decideWithFallback, reflectWithFallback } from "./routed-inference.js";
 export {
   CognitionDecisionSchema,
   DecisionSchema,
@@ -31,7 +45,7 @@ export {
   type HighLevelDecision,
 } from "./schema.js";
 export { GOALS, type Goal } from "./goals.js";
-export { resolveCognitionConfig, type CognitionConfig } from "./config.js";
+export { resolveCognitionConfig, cloudConfigured, type CognitionConfig } from "./config.js";
 export { ModelRouter, isRareReflection, type CognitionMode, type DeliberationTrigger } from "./router.js";
 export { detectEmergencyReflex, type ReflexDecision, type WorldView } from "./reflex.js";
 export {

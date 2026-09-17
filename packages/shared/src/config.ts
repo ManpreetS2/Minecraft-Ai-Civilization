@@ -37,6 +37,13 @@ const envSchema = z.object({
     .default("false")
     .transform((v) => v === "true"),
   LLM_COOLDOWN_MS: z.coerce.number().int().default(60_000),
+  LLM_INFERENCE_ROUTE: z.enum(["LOCAL", "CLOUD", "LOCAL_THEN_CLOUD", "CLOUD_THEN_LOCAL"]).default("LOCAL"),
+  OPENAI_COMPAT_BASE_URL: z.string().default(""),
+  OPENAI_COMPAT_API_KEY: z.string().default(""),
+  OPENAI_COMPAT_FAST_MODEL: z.string().default(""),
+  OPENAI_COMPAT_ROUTINE_MODEL: z.string().default(""),
+  OPENAI_COMPAT_REFLECTION_MODEL: z.string().default(""),
+  OPENAI_COMPAT_TIMEOUT_MS: z.coerce.number().int().positive().default(45_000),
 });
 
 export type AppConfig = z.infer<typeof envSchema>;

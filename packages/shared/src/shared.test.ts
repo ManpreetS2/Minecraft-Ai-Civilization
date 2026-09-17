@@ -32,6 +32,9 @@ describe("config", () => {
     expect(cfg.OLLAMA_ROUTINE_MODEL).toBe("qwen3.5:9b");
     expect(cfg.OLLAMA_FAST_MODEL).toBe("qwen3.5:4b");
     expect(cfg.OLLAMA_MAX_CONCURRENCY).toBe(1);
+    expect(cfg.LLM_INFERENCE_ROUTE).toBe("LOCAL");
+    expect(cfg.OPENAI_COMPAT_BASE_URL).toBe("");
+    expect(cfg.LLM_PROVIDER).toBe("ollama");
   });
 });
 

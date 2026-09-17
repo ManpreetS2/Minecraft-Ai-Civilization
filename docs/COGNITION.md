@@ -32,6 +32,21 @@ This branch exposes `CognitionService` / `ModelRouter` / `CognitionContextBuilde
 | `OLLAMA_TIMEOUT_MS` | 45000 | Per request |
 | `OLLAMA_REFLECTION_ENABLED` | false | Deep reflection stays off until you opt in |
 | `LLM_COOLDOWN_MS` | 60000 | Idle/routine re-ask cooldown |
+| `LLM_INFERENCE_ROUTE` | LOCAL | `LOCAL` (default), `CLOUD`, `LOCAL_THEN_CLOUD`, `CLOUD_THEN_LOCAL` |
+| `OPENAI_COMPAT_BASE_URL` | empty | Optional OpenAI-compatible chat completions root. Unset = cloud disabled |
+| `OPENAI_COMPAT_API_KEY` | empty | Sent as Bearer token only. Never logged |
+| `OPENAI_COMPAT_FAST_MODEL` | empty | Optional hosted fast model. Do not use `auto` for reproducible tests |
+| `OPENAI_COMPAT_ROUTINE_MODEL` | empty | Optional hosted routine model |
+| `OPENAI_COMPAT_REFLECTION_MODEL` | empty | Optional hosted reflection model |
+
+Ollama remains the default. Cloud is never used unless `LLM_INFERENCE_ROUTE` includes `CLOUD` **and** the OpenAI-compatible URL/model are set. There is no automatic cloud fallback on `LOCAL`.
+
+Provider bakeoff (skips if Ollama is already loaded, unless `COGNITION_BENCH_FORCE=true`):
+
+```
+pnpm --filter @civ/cognition bench:providers
+COGNITION_BENCH_CLOUD=true pnpm --filter @civ/cognition bench:providers
+```
 
 Model names belong in config, not routers or prompt builders.
 

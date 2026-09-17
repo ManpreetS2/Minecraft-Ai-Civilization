@@ -625,5 +625,6 @@ describe("config", () => {
     expect(resolved.maxConcurrency).toBe(1);
     expect(resolved.contextSize).toBe(8192);
     expect(resolved.reflectionEnabled).toBe(false);
+    expect(resolved.inferenceRoute).toBe("LOCAL");
   });
 });

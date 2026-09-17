@@ -21,6 +21,8 @@ export type ObserverDebugSnapshot = {
   decisionFactors: string[];
   validation: GuardResult;
   model?: string;
+  provider?: string;
+  fallbackCount?: number;
   latencyMs?: number;
   mode?: CognitionMode;
 };
@@ -40,6 +42,8 @@ export function observerDebugSnapshot(args: {
   validation: GuardResult;
   factors?: string[];
   model?: string;
+  provider?: string;
+  fallbackCount?: number;
   latencyMs?: number;
   mode?: CognitionMode;
 }): ObserverDebugSnapshot {
@@ -62,6 +66,8 @@ export function observerDebugSnapshot(args: {
     decisionFactors: args.factors ?? [],
     validation: args.validation,
     model: args.model,
+    provider: args.provider,
+    fallbackCount: args.fallbackCount,
     latencyMs: args.latencyMs,
     mode: args.mode,
   };

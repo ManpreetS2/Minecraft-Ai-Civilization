@@ -11,7 +11,8 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "bench": "tsx src/run-benchmark.ts"
+    "bench": "tsx src/run-benchmark.ts",
+    "bench:providers": "tsx src/run-provider-benchmark.ts"
   },
   "dependencies": {
     "@civ/memory": "workspace:*",

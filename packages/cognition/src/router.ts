@@ -1,5 +1,6 @@
 import type { ReflectionTrigger } from "@civ/psychology";
 import type { CognitionConfig } from "./config.js";
+import { providerOrder, type InferenceRoute, type ProviderKind } from "./inference-route.js";
 import { detectEmergencyReflex, type WorldView } from "./reflex.js";
 
 export type CognitionMode = "NO_LLM" | "ROUTINE_DELIBERATION" | "DEEP_REFLECTION";
@@ -28,14 +29,24 @@ export type RouteResult = {
   mode: CognitionMode;
   reason: string;
   reflex?: ReturnType<typeof detectEmergencyReflex>;
+  providerOrder?: ProviderKind[];
 };
 
 /**
- * The router chooses the cognition privilege level.
- * The model never chooses its own privilege.
+ * Privilege router first, then optional provider order.
+ * Emergencies never select Ollama or an OpenAI-compatible backend.
+ *
+ *   ModelRouter
+ *   ├── NO_LLM (reflex / cooldown / disabled)
+ *   ├── OllamaProvider
+ *   └── OpenAICompatibleProvider
  */
 export class ModelRouter {
-  constructor(private readonly config: Pick<CognitionConfig, "enabled" | "reflectionEnabled">) {}
+  constructor(
+    private readonly config: Pick<CognitionConfig, "enabled" | "reflectionEnabled"> & {
+      inferenceRoute?: InferenceRoute;
+    },
+  ) {}
 
   route(input: RouteInput): RouteResult {
     const reflex = detectEmergencyReflex(input.view);
@@ -55,6 +66,7 @@ export class ModelRouter {
         reason: input.reflectionAvailable
           ? `reflection:${input.reflectionTrigger?.kind}`
           : "reflection_model_unavailable_fallback",
+        providerOrder: this.providers(),
       };
     }
 
@@ -70,7 +82,15 @@ export class ModelRouter {
       return { mode: "NO_LLM", reason: "no_deliberation_trigger" };
     }
 
-    return { mode: "ROUTINE_DELIBERATION", reason: "routine_trigger" };
+    return {
+      mode: "ROUTINE_DELIBERATION",
+      reason: "routine_trigger",
+      providerOrder: this.providers(),
+    };
+  }
+
+  providers(): ProviderKind[] {
+    return providerOrder(this.config.inferenceRoute ?? "LOCAL");
   }
 }
 

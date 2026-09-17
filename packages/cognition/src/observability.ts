@@ -4,6 +4,8 @@ import type { Goal } from "./goals.js";
 export type DecisionLog = {
   citizenId: string;
   model?: string;
+  provider?: string;
+  fallbackCount?: number;
   mode: CognitionMode;
   latencyMs?: number;
   queueWaitMs?: number;

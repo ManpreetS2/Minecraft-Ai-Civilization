@@ -1,19 +1,21 @@
 import { randomId } from "@civ/memory";
 import type { CitizenMind, CognitionContext, ReflectionContext, ReflectionTrigger } from "@civ/psychology";
 import { prepareReflection } from "@civ/psychology";
-import { resolveCognitionConfig, type CognitionConfig } from "./config.js";
+import { cloudConfigured, resolveCognitionConfig, type CognitionConfig } from "./config.js";
 import { CognitionContextBuilder } from "./context-builder.js";
 import { createCooldownState, markDeliberated, shouldDeliberate } from "./cooldown.js";
 import { heuristicDeliberation } from "./heuristic-deliberation.js";
 import { DecisionLogBuffer, type DecisionLog } from "./observability.js";
-import { ollamaChat, parseModelJson } from "./ollama-client.js";
+import { OllamaBackend } from "./ollama-backend.js";
+import { OpenAICompatibleBackend } from "./openai-compat.js";
+import { decideWithFallback, factsFromContext, reflectWithFallback } from "./routed-inference.js";
 import { buildDeliberationMessages } from "./prompt.js";
 import { InferenceQueue } from "./queue.js";
 import { applyReflectionProposal } from "./reflection-apply.js";
-import { validateReflectionProposal, type ReflectionProposal } from "./reflection-schema.js";
+import { type ReflectionProposal } from "./reflection-schema.js";
 import { detectEmergencyReflex, type ReflexDecision, type WorldView } from "./reflex.js";
 import { ModelRouter, type CognitionMode, type DeliberationTrigger, type RouteResult } from "./router.js";
-import { validateCognitionDecision, type CognitionDecision } from "./schema.js";
+import { type CognitionDecision } from "./schema.js";
 import { isDecisionStale, type DecisionAssumptions } from "./stale.js";
 import type { AppConfig } from "@civ/shared";
 import { isEdibleName } from "./fact-guards.js";
@@ -27,6 +29,8 @@ export type ModelTurn<T> = {
   value: T;
   normalized: boolean;
   model: string;
+  provider?: string;
+  fallbackCount?: number;
   promptTokens?: number;
   evalTokens?: number;
   rawError?: string;
@@ -98,7 +102,7 @@ export class CognitionService {
     this.builder = args.mind ? new CognitionContextBuilder(args.mind) : undefined;
     this.router = new ModelRouter(args.config);
     this.queue = new InferenceQueue(args.config.maxConcurrency);
-    this.deliberator = args.deliberator ?? createOllamaDeliberator(args.config);
+    this.deliberator = args.deliberator ?? createRoutedDeliberator(args.config);
   }
 
   static fromAppConfig(app: AppConfig, mind?: CitizenMind, deliberator?: Deliberator): CognitionService {
@@ -228,6 +232,7 @@ export class CognitionService {
           decision: queued.value.value,
           normalized: queued.value.normalized,
           model: queued.value.model,
+          provider: queued.value.provider,
           latencyMs: queued.meta.latencyMs,
           queueWaitMs: queued.meta.queueWaitMs,
           memoryCount: ctx.relevantMemories.length,
@@ -243,6 +248,8 @@ export class CognitionService {
         decision: queued.value.value,
         normalized: queued.value.normalized,
         model: queued.value.model,
+        provider: queued.value.provider,
+        fallbackCount: queued.value.fallbackCount,
         latencyMs: queued.meta.latencyMs,
         queueWaitMs: queued.meta.queueWaitMs,
         promptTokens: queued.value.promptTokens,
@@ -291,6 +298,7 @@ export class CognitionService {
         const log = this.record({
           citizenId: req.citizenId,
           model,
+          provider: queued.value.provider,
           mode: "DEEP_REFLECTION",
           accepted: true,
           normalized: queued.value.normalized,
@@ -356,6 +364,8 @@ export class CognitionService {
     discardedReason?: string;
     normalized?: boolean;
     model?: string;
+    provider?: string;
+    fallbackCount?: number;
     latencyMs?: number;
     queueWaitMs?: number;
     promptTokens?: number;
@@ -368,6 +378,8 @@ export class CognitionService {
     const log = this.record({
       citizenId: args.req.citizenId,
       model: args.model,
+      provider: args.provider,
+      fallbackCount: args.fallbackCount,
       mode: args.route.mode,
       latencyMs: args.latencyMs,
       queueWaitMs: args.queueWaitMs,
@@ -456,44 +468,75 @@ function fallbackContext(req: DecideRequest, ctx?: CognitionContext): CognitionC
   };
 }
 
-function createOllamaDeliberator(config: CognitionConfig): Deliberator {
+function createRoutedDeliberator(config: CognitionConfig): Deliberator {
+  const backends = {
+    ollama: new OllamaBackend(config.host),
+    openai_compat: cloudConfigured(config)
+      ? new OpenAICompatibleBackend({
+          baseUrl: config.openaiCompat.baseUrl,
+          apiKey: config.openaiCompat.apiKey,
+          routineModel: config.openaiCompat.routineModel,
+          fastModel: config.openaiCompat.fastModel,
+          reflectionModel: config.openaiCompat.reflectionModel,
+        })
+      : undefined,
+  };
+  const secrets = [config.openaiCompat.apiKey];
   return {
     async decide(ctx, timeoutMs) {
-      const knowledge = "relevantGameKnowledge" in ctx ? (ctx as { relevantGameKnowledge?: { facts: string[] } }).relevantGameKnowledge : undefined;
+      const knowledge =
+        "relevantGameKnowledge" in ctx
+          ? (ctx as { relevantGameKnowledge?: { facts: string[] } }).relevantGameKnowledge
+          : undefined;
       const messages = buildDeliberationMessages(ctx, config.contextSize, knowledge);
-      const chat = await ollamaChat({
-        host: config.host,
-        model: config.routineModel,
-        system: messages.system,
-        user: messages.user,
-        timeoutMs,
-        contextSize: config.contextSize,
+      const result = await decideWithFallback({
+        backends,
+        route: config.inferenceRoute,
+        facts: factsFromContext(ctx),
+        secrets,
+        requestFor: (backend) => ({
+          system: messages.system,
+          user: messages.user,
+          model: backend.kind === "openai_compat" ? config.openaiCompat.routineModel : config.routineModel,
+          timeoutMs: backend.kind === "openai_compat" ? config.openaiCompat.timeoutMs : timeoutMs,
+          contextSize: config.contextSize,
+        }),
       });
-      const parsed = parseModelJson(chat.content);
       return {
-        value: validateCognitionDecision(parsed),
+        value: result.value,
         normalized: true,
-        model: config.routineModel,
-        promptTokens: chat.promptTokens,
-        evalTokens: chat.evalTokens,
+        model: result.model,
+        provider: result.provider,
+        fallbackCount: result.fallbackCount,
+        promptTokens: result.promptTokens,
+        evalTokens: result.evalTokens,
       };
     },
     async reflect(prompt, timeoutMs, model) {
-      const chat = await ollamaChat({
-        host: config.host,
-        model,
-        system: "Reply with JSON only for a rare citizen reflection. No chain-of-thought. Do not invent Minecraft world facts.",
-        user: prompt,
-        timeoutMs,
-        numPredict: 220,
-        contextSize: config.contextSize,
+      const result = await reflectWithFallback({
+        backends,
+        route: config.inferenceRoute,
+        secrets,
+        requestFor: (backend) => ({
+          system: "Reply with JSON only for a rare citizen reflection. No chain-of-thought. Do not invent Minecraft world facts.",
+          user: prompt,
+          model:
+            backend.kind === "openai_compat"
+              ? config.openaiCompat.reflectionModel || config.openaiCompat.routineModel
+              : model,
+          timeoutMs: backend.kind === "openai_compat" ? Math.min(config.openaiCompat.timeoutMs, timeoutMs) : timeoutMs,
+          numPredict: 220,
+          contextSize: config.contextSize,
+        }),
       });
       return {
-        value: validateReflectionProposal(parseModelJson(chat.content)),
+        value: result.value,
         normalized: true,
-        model,
-        promptTokens: chat.promptTokens,
-        evalTokens: chat.evalTokens,
+        model: result.model,
+        provider: result.provider,
+        fallbackCount: result.fallbackCount,
+        promptTokens: result.promptTokens,
+        evalTokens: result.evalTokens,
       };
     },
   };
