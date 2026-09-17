@@ -3,8 +3,9 @@ import { deriveConnectionHealth, isKeepaliveTimeout } from "./connection-health.
 import { scoreResourceTarget } from "./path-probe.js";
 import { recoveryAttempts, shouldBlacklistTarget, TargetBlacklist } from "./path-recovery.js";
 import { occupantNear, registerOccupancy, clearOccupancy } from "./occupancy.js";
-import { PROTECTED_BLOCK_NAMES } from "./path-recovery.js";
+import { PROTECTED_BLOCK_NAMES, isProtectedFromPathfinder } from "./path-recovery.js";
 import { createNavigationBackend } from "./navigation.js";
+import { movementAllowsDig } from "./pathing.js";
 
 describe("connection health", () => {
   it("treats keepalive timeouts as degraded reconnect signals, not death", () => {
@@ -79,6 +80,8 @@ describe("path probe and recovery", () => {
     expect(shouldBlacklistTarget("TARGET_UNREACHABLE")).toBe(true);
     expect(shouldBlacklistTarget("NO_INTERACTION_POSITION")).toBe(true);
     expect(shouldBlacklistTarget("WORLD_CHANGED")).toBe(true);
+    expect(shouldBlacklistTarget("TARGET_GONE")).toBe(true);
+    expect(shouldBlacklistTarget("TARGET_CHANGED")).toBe(true);
     expect(shouldBlacklistTarget("NOT_CONNECTED")).toBe(false);
   });
 
@@ -109,7 +112,12 @@ describe("citizen congestion", () => {
 
 describe("protected blocks", () => {
   it("protects village workstations and storage from pathfinder digging", () => {
+    expect(isProtectedFromPathfinder("oak_trapdoor")).toBe(true);
+    expect(isProtectedFromPathfinder("farmland")).toBe(true);
     expect(PROTECTED_BLOCK_NAMES).toEqual(expect.arrayContaining(["chest", "crafting_table", "furnace", "bell", "composter"]));
+    expect(movementAllowsDig("SAFE_NAVIGATION")).toBe(false);
+    expect(movementAllowsDig("RESOURCE_APPROACH")).toBe(false);
+    expect(movementAllowsDig("CONTROLLED_EXCAVATION")).toBe(true);
   });
 });
 

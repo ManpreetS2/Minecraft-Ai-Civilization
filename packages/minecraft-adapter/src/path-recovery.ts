@@ -30,7 +30,10 @@ export function shouldBlacklistTarget(code: string): boolean {
     code === "VERIFY_FAILED" ||
     code === "TARGET_UNREACHABLE" ||
     code === "NO_INTERACTION_POSITION" ||
-    code === "WORLD_CHANGED"
+    code === "WORLD_CHANGED" ||
+    code === "TARGET_GONE" ||
+    code === "TARGET_CHANGED" ||
+    code === "STUCK"
   );
 }
 
@@ -118,4 +121,33 @@ export const PROTECTED_BLOCK_NAMES = [
   "fletching_table",
   "cauldron",
   "water_cauldron",
+  "farmland",
+  "dirt_path",
+  "hay_block",
+  "oak_planks",
+  "oak_fence",
+  "oak_stairs",
+  "glass",
+  "glass_pane",
+  "ladder",
 ];
+
+export function isProtectedFromPathfinder(name: string): boolean {
+  if (PROTECTED_BLOCK_NAMES.includes(name)) return true;
+  return (
+    name.endsWith("_door") ||
+    name.endsWith("_bed") ||
+    name.endsWith("_fence") ||
+    name.endsWith("_gate") ||
+    name.endsWith("_stairs") ||
+    name.endsWith("_slab") ||
+    name.endsWith("_trapdoor") ||
+    name.includes("chest") ||
+    name === "farmland" ||
+    name === "wheat" ||
+    name === "carrots" ||
+    name === "potatoes" ||
+    name === "beetroots" ||
+    name.includes("torch")
+  );
+}

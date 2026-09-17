@@ -35,6 +35,7 @@ logs/
 hs_err_pid*.log
 
 # Paper / Minecraft runtime — keep locally, never commit
+server/plugins-build/
 server/**/*.jar
 server/*.jar
 server/paper.jar

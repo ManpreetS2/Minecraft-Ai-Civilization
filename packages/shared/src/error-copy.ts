@@ -6,7 +6,6 @@ export type TranslatedError = {
 export function translateError(error?: string, task?: unknown): TranslatedError {
   if (!error) return { subtext: "Something went wrong." };
   const text = error.trim();
-  const upper = text.toUpperCase();
   const taskText = String(task ?? "");
 
   if (/TARGET_BLACKLISTED|blacklisted/i.test(text)) {
@@ -15,16 +14,29 @@ export function translateError(error?: string, task?: unknown): TranslatedError 
       subtext: "That target could not be reached, so another one will be tried.",
     };
   }
-  if (/NO_RECIPE/i.test(text)) {
-    const item = text.replace(/NO_RECIPE/i, "").trim().replaceAll("_", " ") || "that item";
+  if (/NO_RECIPE|UNKNOWN_RECIPE/i.test(text)) {
+    const item = text.replace(/UNKNOWN_RECIPE|NO_RECIPE/i, "").trim().replaceAll("_", " ") || "that item";
     return { subtext: `Didn't have a known recipe for ${item}.` };
   }
-  if (/MISSING/.test(upper) && /STICK/.test(upper)) {
+  if (/UNKNOWN_ITEM/i.test(text)) {
+    const item = text.replace(/UNKNOWN_ITEM/i, "").trim().replaceAll("_", " ") || "that item";
+    return { subtext: `${item} is not a Minecraft item in this version.` };
+  }
+  if (/MISSING/.test(text.toUpperCase()) && /STICK/.test(text.toUpperCase())) {
     const count = text.match(/(\d+)/)?.[1];
     return { subtext: count ? `Missing ${count} sticks.` : "Missing sticks." };
   }
-  if (/MISSING/.test(upper) && /PICKAXE|TOOL/.test(upper)) {
+  if (/MISSING/.test(text.toUpperCase()) && /PICKAXE|TOOL/.test(text.toUpperCase())) {
     return { subtext: "A required tool wasn't available." };
+  }
+  if (/MISSING_INGREDIENT|PREREQUISITE_MISSING|Need \d+/i.test(text)) {
+    return { subtext: humanizeLoose(text) };
+  }
+  if (/NO_CRAFTING_TABLE|NEED_CRAFTING_TABLE|NEED_WORKSTATION/i.test(text)) {
+    return { subtext: "A crafting table is required and none is reachable." };
+  }
+  if (/PURPOSELESS_PLACEMENT|FunctionalBlockPlacedWithoutPurpose/i.test(text)) {
+    return { subtext: "That functional block had no valid placement purpose. This is a mechanics bug, not a citizen lesson." };
   }
   if (/INVENTORY_FULL|inventory is full/i.test(text)) {
     return { subtext: "Inventory is full." };

@@ -29,6 +29,11 @@ const KNOWN: Record<string, ThreatInfo> = {
   player: { name: "player", attitude: "OTHER", threat: "none", notes: "Another connected body." },
 };
 
+export function knownThreat(entityName: string): ThreatInfo | undefined {
+  const key = entityName.toLowerCase().replace(/^minecraft:/, "");
+  return KNOWN[key];
+}
+
 export function getThreatInfo(entityName: string): ThreatInfo {
   const key = entityName.toLowerCase().replace(/^minecraft:/, "");
   return (

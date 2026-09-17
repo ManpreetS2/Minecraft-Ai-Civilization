@@ -45,9 +45,26 @@ const envSchema = z.object({
     .default("false")
     .transform((v) => v === "true"),
   LLM_COOLDOWN_MS: z.coerce.number().int().default(60_000),
+  MECHANICS_PROBE_ENABLED: z
+    .enum(["true", "false"])
+    .default("false")
+    .transform((v) => v === "true"),
+  MECHANICS_PROBE_KEEP_ALIVE: z
+    .enum(["true", "false"])
+    .default("false")
+    .transform((v) => v === "true"),
+  MECHANICS_PROBE_USERNAME: z.string().default("MechProbe"),
 });
 
 export type AppConfig = z.infer<typeof envSchema>;
+
+export const RESERVED_MECHANICS_PROBE_NAMES = ["MechProbe", "CivPathProbe"] as const;
+
+export function isMechanicsProbeUsername(name: string | undefined): boolean {
+  if (!name) return false;
+  const normalized = name.trim().toLowerCase();
+  return RESERVED_MECHANICS_PROBE_NAMES.some((entry) => entry.toLowerCase() === normalized);
+}
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   return envSchema.parse(env);

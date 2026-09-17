@@ -49,6 +49,33 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 - License: ISC
 - What we use: Optional experimental `MineflayerBaritoneBackend` behind the `NavigationBackend` interface for A/B comparison. Default remains mineflayer-pathfinder until a live benchmark shows a win. The current backend class delegates to pathfinder if the Baritone plugin is not installed.
 
+## PrismarineJS / minecraft-data
+
+- Repository: https://github.com/PrismarineJS/minecraft-data
+- License: MIT
+- What we use: Versioned 1.21.11 recipes, items, blocks, foods. Authoritative recipe source for `@civ/minecraft-knowledge`.
+- Copyright: PrismarineJS contributors
+
+## PrismarineJS / prismarine-block
+
+- Repository: https://github.com/PrismarineJS/prismarine-block
+- License: MIT
+- What we use: Harvestability / dig and tool facts consumed through Mineflayer block objects and our knowledge layer.
+- Copyright: PrismarineJS contributors
+
+## PrismarineJS / mineflayer-auto-eat
+
+- Repository: https://github.com/PrismarineJS/mineflayer-auto-eat
+- License: MIT
+- What we use: Evaluated as physical food-selection/eating mechanics. Not loaded as a plugin. Planner still decides WHEN eating is appropriate; `eatFood` performs consume + hunger verification.
+- Copyright: PrismarineJS contributors
+
+## CybersharpX / Phoenix
+
+- Repository: https://github.com/CybersharpX/Phoenix
+- License: not vendored; reference only
+- What we use: Architectural study of WorldModel, TaskTree, obtainItem, recovery. No Phoenix source is copied into this repository.
+
 ## Not used
 
 - `nuxdie/baritone-ts` (AGPL-3.0) is **not** copied or vendored. No AGPL navigation code is included in this repository.

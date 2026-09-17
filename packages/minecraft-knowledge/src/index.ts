@@ -4,27 +4,56 @@ import {
   isDangerousBlock,
   isReplaceable,
   isSolid,
+  preferredAvailableTool,
   preferredTool,
   requiredTool,
   breakTime,
 } from "./blocks.js";
 import {
-  canCraftFromPlan,
+  analyzeObtain,
+  countOf,
   mergeRecipes,
   overlayRecipes,
   planCraft,
+  recipesForItem,
   recipesFromMinecraftData,
   type CraftPlanStep,
   type IngredientBag,
   type KnowledgeRecipe,
+  type ObtainAnalysis,
 } from "./crafting.js";
-import { loadMinecraftData, resolveMinecraftVersion, type McData } from "./data.js";
+import { loadMinecraftData, resolveMinecraftVersion, type McBlock, type McData, type McItem } from "./data.js";
 import { canEatNow, foodIndex, foodValue, getFoodOptions, isFood, saturationValue, type FoodInfo } from "./food.js";
 import { classifyHazard, getThreatInfo } from "./mobs.js";
 import { compactFacts, type RelevantGameKnowledge, type RelevantQuery } from "./relevant.js";
 import { classifyTimeOfDay, nightIncreasesHostileRisk, SURVIVAL_RULES, ticksUntil, type TimePeriod } from "./survival.js";
 import { interpretVillageFeature, villageChestImpliesOwnership } from "./village.js";
 import { classifyBlockUse, WORLD_CONSTRAINTS } from "./world.js";
+import {
+  entityAttitude,
+  interactionType,
+  isBed,
+  isContainer,
+  isDisposableScaffold,
+  canOccupyFeet,
+  canStandOn,
+  hasCollision,
+  isDoor,
+  isFenceGate,
+  isHazard,
+  isHostileEntity,
+  isIronDoor,
+  isPassable,
+  isProjectileEntity,
+  isStandable,
+  isTool,
+  isTrapdoor,
+  isWoodenDoor,
+  isWorkstation,
+  type InteractionType,
+} from "./classify.js";
+import { looksLikeItemName, normalizeBlockName, normalizeItemName } from "./names.js";
+import { nightRisk, sleepFacts, type SleepFacts, type SleepQuery } from "./sleep.js";
 
 export class MinecraftKnowledge {
   readonly version: string;
@@ -45,8 +74,138 @@ export class MinecraftKnowledge {
     this.foods = foodIndex(this.data);
   }
 
+  getItem(name: string): McItem | undefined {
+    const n = this.normalizeItemName(name);
+    return this.data.itemsByName[n];
+  }
+
+  getBlock(name: string): McBlock | undefined {
+    const n = this.normalizeBlockName(name);
+    return this.data.blocksByName[n];
+  }
+
   getRecipesFor(item: string): KnowledgeRecipe[] {
-    return this.recipes.filter((recipe) => recipe.result === item);
+    return recipesForItem(item, this.recipes);
+  }
+
+  getRecipe(item: string, inventory: IngredientBag = {}): KnowledgeRecipe | undefined {
+    const matches = this.getRecipesFor(item);
+    if (matches.length === 0) return undefined;
+    return analyzeObtain(item, 1, inventory, this.recipes, true, Boolean(this.getItem(item))).chosen ?? matches[0];
+  }
+
+  getRecipes(item: string): KnowledgeRecipe[] {
+    return this.getRecipesFor(item);
+  }
+
+  getRecipeInputs(item: string, inventory: IngredientBag = {}): IngredientBag {
+    return { ...(this.getRecipe(item, inventory)?.ingredients ?? {}) };
+  }
+
+  getRecipeOutputCount(item: string): number {
+    return this.getRecipe(item)?.resultCount ?? 0;
+  }
+
+  requiredWorkstation(item: string): "crafting_table" | undefined {
+    const recipe = this.getRecipe(item);
+    return recipe?.needsTable ? "crafting_table" : undefined;
+  }
+
+  isCraftable(item: string, inventory: IngredientBag, nearbyWorkstations: string[]): boolean {
+    return this.canCraft(inventory, nearbyWorkstations, item);
+  }
+
+  preferredToolForInventory(block: string, inventory: Array<{ name: string; count: number }>) {
+    return preferredAvailableTool(block, inventory, this.data);
+  }
+
+  isTool(item: string) {
+    return isTool(item);
+  }
+  isReplaceable(block: string) {
+    return isReplaceable(this.normalizeBlockName(block));
+  }
+  isPassable(block: string) {
+    return isPassable(block, this.data);
+  }
+  isStandable(block: string) {
+    return isStandable(block, this.data);
+  }
+  isContainer(block: string) {
+    return isContainer(block);
+  }
+  isDoor(block: string) {
+    return isDoor(block);
+  }
+  isWoodenDoor(block: string) {
+    return isWoodenDoor(block);
+  }
+  isIronDoor(block: string) {
+    return isIronDoor(block);
+  }
+  isFenceGate(block: string) {
+    return isFenceGate(block);
+  }
+  isTrapdoor(block: string) {
+    return isTrapdoor(block);
+  }
+  hasCollision(block: string) {
+    return hasCollision(block, this.data);
+  }
+  canOccupyFeet(block: string) {
+    return canOccupyFeet(block, this.data);
+  }
+  canStandOn(block: string) {
+    return canStandOn(block, this.data);
+  }
+  isBed(block: string) {
+    return isBed(block);
+  }
+  isWorkstation(block: string) {
+    return isWorkstation(block);
+  }
+  isHazard(block: string) {
+    return isHazard(block);
+  }
+  isHostileEntity(entity: string) {
+    return isHostileEntity(entity, this.data);
+  }
+  isProjectileEntity(entity: string) {
+    return isProjectileEntity(entity, this.data);
+  }
+  isDisposableScaffold(item: string) {
+    return isDisposableScaffold(item);
+  }
+  interactionType(block: string): InteractionType {
+    return interactionType(block);
+  }
+  entityAttitude(entity: string) {
+    return entityAttitude(entity, this.data);
+  }
+  normalizeItemName(name: string) {
+    return normalizeItemName(name);
+  }
+  normalizeBlockName(name: string) {
+    return normalizeBlockName(name);
+  }
+  sleepFacts(query: SleepQuery): SleepFacts {
+    return sleepFacts(query);
+  }
+
+  analyzeObtain(item: string, inventory: IngredientBag, nearbyWorkstations: string[], quantity = 1): ObtainAnalysis {
+    const hasTable = nearbyWorkstations.includes("crafting_table");
+    return analyzeObtain(item, quantity, inventory, this.recipes, hasTable, Boolean(this.getItem(item)) || looksLikeItemName(item) && this.getRecipesFor(item).length > 0);
+  }
+
+  factsForObtain(item: string, inventory: IngredientBag, nearbyWorkstations: string[]): string[] {
+    return compactFacts(this.analyzeObtain(item, inventory, nearbyWorkstations).facts, 8);
+  }
+
+  nextObtainAction(item: string, inventory: IngredientBag, nearbyWorkstations: string[]): CraftPlanStep | { kind: "done"; item: string } | { kind: "unknown"; item: string } {
+    const analysis = this.analyzeObtain(item, inventory, nearbyWorkstations);
+    if (analysis.alreadyOwned) return { kind: "done", item: analysis.item };
+    if (!analysis.known && analysis.recipes.length === 0 && !this.getItem(item)) return { kind: "unknown", item: analysis.item };
+    return analysis.next ?? { kind: "done", item: analysis.item };
   }
 
   getIngredients(recipe: KnowledgeRecipe): IngredientBag {
@@ -57,14 +216,26 @@ export class MinecraftKnowledge {
     return recipe.needsTable;
   }
 
-  getCraftingDependencies(item: string, inventory: IngredientBag = {}, hasTable = false): CraftPlanStep[] {
-    return planCraft(item, 1, inventory, this.recipes, hasTable);
+  recipeExists(item: string): boolean {
+    return this.getRecipesFor(item).length > 0;
+  }
+
+  getCraftingDependencies(
+    item: string,
+    inventory: IngredientBag = {},
+    hasTable = false,
+    quantity = 1,
+  ): CraftPlanStep[] {
+    return planCraft(item, quantity, inventory, this.recipes, hasTable);
   }
 
   canCraft(inventory: IngredientBag, nearbyWorkstations: string[], item: string): boolean {
-    const hasTable = nearbyWorkstations.includes("crafting_table") || (inventory.crafting_table ?? 0) > 0;
-    const steps = this.getCraftingDependencies(item, inventory, hasTable);
-    return canCraftFromPlan(steps);
+    const hasTable = nearbyWorkstations.includes("crafting_table");
+    const analysis = this.analyzeObtain(item, inventory, nearbyWorkstations);
+    if (analysis.alreadyOwned) return true;
+    if (!analysis.chosen) return false;
+    if (analysis.chosen.needsTable && !hasTable) return false;
+    return Object.entries(analysis.chosen.ingredients).every(([name, need]) => countOf(inventory, name) >= need);
   }
 
   planFor(item: string, inventory: IngredientBag, nearbyInfrastructure: string[]): CraftPlanStep[] {
@@ -79,13 +250,10 @@ export class MinecraftKnowledge {
     return requiredTool(block, this.data);
   }
   canHarvest(block: string, tool?: string) {
-    return canHarvest(block, tool, this.data);
+    return canHarvest(this.normalizeBlockName(block), tool ? this.normalizeItemName(tool) : undefined, this.data);
   }
   breakTime(block: string, tool?: string) {
     return breakTime(block, tool, this.data);
-  }
-  isReplaceable(block: string) {
-    return isReplaceable(block);
   }
   isSolid(block: string) {
     return isSolid(block, this.data);
@@ -98,7 +266,8 @@ export class MinecraftKnowledge {
   }
 
   isFood(item: string) {
-    return isFood(item, this.foods);
+    const n = this.normalizeItemName(item);
+    return isFood(n, this.foods) || isFood(item, this.foods);
   }
   foodValue(item: string) {
     return foodValue(item, this.foods);
@@ -172,8 +341,14 @@ export class MinecraftKnowledge {
       if (classifyBlockUse(block) === "crafting_table") facts.push("A crafting table enables 3x3 recipes.");
       if (classifyBlockUse(block) === "chest") facts.push("A chest stores physical items. Presence is not ownership.");
     }
+    if (goal.includes("door") || goal.includes("shelter") || goal.includes("build")) {
+      facts.push(...this.factsForObtain("oak_door", inv, tableNearby ? ["crafting_table"] : []));
+    }
     if (goal.includes("night") || goal.includes("shelter")) {
       facts.push("Night increases hostile-mob risk; it does not force a single action.");
+      if (typeof query.timeOfDay === "number") {
+        facts.push(nightRisk(query.timeOfDay) ? "It is currently a risky time of day." : "It is currently daytime.");
+      }
     }
     return { goal: query.goal, facts: compactFacts(facts), source: "minecraft-mechanics" };
   }
@@ -227,5 +402,26 @@ export {
   WORLD_CONSTRAINTS,
   nightIncreasesHostileRisk,
 };
+export {
+  PLANKS,
+  LOGS,
+  LOG_TO_PLANKS,
+  countOf,
+  recipesFromMinecraftData,
+  cellIngredientIds,
+  cellIngredientName,
+} from "./crafting.js";
 export { interpretVillageFeature, villageChestImpliesOwnership } from "./village.js";
-export type { CraftPlanStep, IngredientBag, KnowledgeRecipe, RelevantGameKnowledge, RelevantQuery, TimePeriod };
+export { normalizeItemName, normalizeBlockName, friendlyName } from "./names.js";
+export { sleepFacts } from "./sleep.js";
+export type { SleepFacts, SleepQuery } from "./sleep.js";
+export type {
+  CraftPlanStep,
+  IngredientBag,
+  KnowledgeRecipe,
+  ObtainAnalysis,
+  RelevantGameKnowledge,
+  RelevantQuery,
+  TimePeriod,
+  InteractionType,
+};

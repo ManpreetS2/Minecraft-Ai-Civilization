@@ -34,6 +34,17 @@ export function classifyFailure(signal: FailureSignal): ClassifiedFailure {
   if (INFRA_CODES.test(blob)) {
     return { category: "INFRASTRUCTURE", track: "SYSTEM", citizenLearns: false, code: signal.errorCode ?? "INFRASTRUCTURE" };
   }
+  if (
+    signal.errorCode === "PURPOSELESS_PLACEMENT" ||
+    /FunctionalBlockPlacedWithoutPurpose|without purpose|open field|freestanding door/i.test(blob)
+  ) {
+    return {
+      category: "INFRASTRUCTURE",
+      track: "SYSTEM",
+      citizenLearns: false,
+      code: "PURPOSELESS_PLACEMENT",
+    };
+  }
 
   if (signal.missingTool || signal.errorCode === "MISSING_TOOL") {
     return { category: "KNOWLEDGE_ERROR", track: "CITIZEN", citizenLearns: true, code: "MISSING_TOOL" };

@@ -107,3 +107,123 @@ describe("version-aware loader", () => {
     expect(minecraftKnowledge().version.startsWith("1.21")).toBe(true);
   });
 });
+
+describe("authoritative recipe resolution", () => {
+  it("resolves oak log -> planks", () => {
+    const recipe = knowledge.getRecipe("oak_planks");
+    expect(recipe?.ingredients.oak_log).toBe(1);
+    expect(recipe?.resultCount).toBe(4);
+    expect(recipe?.needsTable).toBe(false);
+  });
+
+  it("resolves planks -> sticks and planks -> crafting table", () => {
+    expect(knowledge.getRecipeInputs("stick").any_planks ?? knowledge.getRecipeInputs("stick").oak_planks).toBe(2);
+    expect(knowledge.requiredWorkstation("crafting_table")).toBeUndefined();
+    expect(knowledge.getRecipe("crafting_table")?.needsTable).toBe(false);
+  });
+
+  it("resolves oak_door from minecraft-data ids: 6 oak planks, table, output 3", () => {
+    const recipe = knowledge.getRecipe("oak_door");
+    expect(recipe).toBeDefined();
+    expect(recipe?.ingredients.oak_planks).toBe(6);
+    expect(recipe?.needsTable).toBe(true);
+    expect(recipe?.resultCount).toBe(3);
+    expect(recipe?.shaped).toBe(true);
+    expect(knowledge.getRecipeOutputCount("oak_door")).toBe(3);
+    expect(knowledge.requiredWorkstation("oak_door")).toBe("crafting_table");
+  });
+
+  it("plans logs -> oak_door instead of reporting no recipe", () => {
+    const analysis = knowledge.analyzeObtain("oak_door", { oak_log: 2 }, ["crafting_table"]);
+    expect(analysis.known).toBe(true);
+    expect(analysis.recipes.length).toBeGreaterThan(0);
+    expect(analysis.steps.some((step) => step.kind === "craft" && step.item === "oak_planks")).toBe(true);
+    expect(analysis.steps.at(-1)).toMatchObject({ kind: "craft", item: "oak_door", needsTable: true });
+    expect(analysis.facts.join(" ")).toMatch(/oak door/i);
+    expect(analysis.facts.join(" ")).not.toMatch(/no recipe/i);
+  });
+
+  it("plans logs -> wooden pickaxe and cobble -> stone pickaxe", () => {
+    const wood = knowledge.planFor("wooden_pickaxe", { oak_log: 3 }, ["crafting_table"]);
+    expect(wood.some((step) => step.kind === "craft" && step.item === "oak_planks")).toBe(true);
+    expect(wood.at(-1)).toMatchObject({ kind: "craft", item: "wooden_pickaxe" });
+    const next = knowledge.analyzeObtain("wooden_pickaxe", { oak_log: 16 }, ["crafting_table"]).next;
+    expect(next).toMatchObject({ kind: "craft", item: "oak_planks" });
+    expect(knowledge.canCraft({ cobblestone: 3, stick: 2 }, ["crafting_table"], "stone_pickaxe")).toBe(true);
+  });
+
+  it("resolves the chest recipe using available planks, not a random wood variant", () => {
+    const analysis = knowledge.analyzeObtain("chest", { oak_planks: 8 }, ["crafting_table"]);
+    expect(analysis.chosen?.ingredients.any_planks ?? analysis.chosen?.ingredients.oak_planks).toBe(8);
+    expect(knowledge.isCraftable("chest", { oak_planks: 8 }, ["crafting_table"])).toBe(true);
+  });
+
+  it("distinguishes missing workstation from missing recipe", () => {
+    const missingTable = knowledge.analyzeObtain("oak_door", { oak_planks: 6 }, []);
+    expect(missingTable.known).toBe(true);
+    expect(missingTable.needsTable).toBe(true);
+    expect(missingTable.facts.some((fact) => /no crafting table/i.test(fact))).toBe(true);
+    const withTable = knowledge.analyzeObtain("oak_door", { oak_planks: 6 }, ["crafting_table"]);
+    expect(knowledge.isCraftable("oak_door", { oak_planks: 6 }, ["crafting_table"])).toBe(true);
+    expect(withTable.facts.some((fact) => /reachable nearby/i.test(fact))).toBe(true);
+  });
+
+  it("treats already-owned results as done and reports partial ingredients", () => {
+    expect(knowledge.analyzeObtain("oak_door", { oak_door: 3 }, ["crafting_table"]).alreadyOwned).toBe(true);
+    const partial = knowledge.analyzeObtain("oak_door", { oak_planks: 2 }, ["crafting_table"]);
+    expect(partial.missingIngredients.oak_planks).toBe(4);
+    expect(partial.next?.kind).toBe("gather");
+  });
+
+  it("keeps multiple recipe variants and rejects unknown/invalid names", () => {
+    expect(knowledge.getRecipes("chest").length).toBeGreaterThan(1);
+    expect(knowledge.getItem("not_a_real_item")).toBeUndefined();
+    expect(knowledge.analyzeObtain("not_a_real_item", {}, []).known).toBe(false);
+    expect(knowledge.normalizeItemName("Oak Door")).toBe("oak_door");
+    expect(knowledge.getItem("Totally Invented Block!!!")).toBeUndefined();
+  });
+});
+
+describe("block interaction and entity knowledge", () => {
+  it("identifies beds, doors, containers, food, tools, and harvestability", () => {
+    expect(knowledge.isBed("red_bed")).toBe(true);
+    expect(knowledge.isDoor("oak_door")).toBe(true);
+    expect(knowledge.isContainer("chest")).toBe(true);
+    expect(knowledge.isWorkstation("crafting_table")).toBe(true);
+    expect(knowledge.isFood("cooked_beef")).toBe(true);
+    expect(knowledge.foodValue("bread")).toBeGreaterThan(0);
+    expect(knowledge.isTool("wooden_pickaxe")).toBe(true);
+    expect(knowledge.canHarvest("stone", undefined)).toBe(false);
+    expect(knowledge.canHarvest("stone", "wooden_pickaxe")).toBe(true);
+    expect(knowledge.preferredToolForInventory("stone", [{ name: "wooden_pickaxe", count: 1 }, { name: "oak_log", count: 3 }])).toBe(
+      "wooden_pickaxe",
+    );
+    expect(knowledge.interactionType("chest")).toBe("open");
+    expect(knowledge.interactionType("oak_log")).toBe("mine");
+    expect(knowledge.isHostileEntity("creeper")).toBe(true);
+    expect(knowledge.isHostileEntity("cow")).toBe(false);
+    expect(knowledge.entityAttitude("enderman")).toBe("NEUTRAL");
+    expect(knowledge.isDisposableScaffold("cobblestone")).toBe(true);
+    expect(knowledge.isPassable("air")).toBe(true);
+    expect(knowledge.isStandable("stone")).toBe(true);
+    expect(knowledge.isWoodenDoor("oak_door")).toBe(true);
+    expect(knowledge.isIronDoor("iron_door")).toBe(true);
+    expect(knowledge.isFenceGate("oak_fence_gate")).toBe(true);
+    expect(knowledge.normalizeItemName("steak")).toBe("cooked_beef");
+    expect(knowledge.isFood("steak")).toBe(true);
+    expect(knowledge.analyzeObtain("diamond_dirt_sword", {}, []).known).toBe(false);
+  });
+
+  it("answers sleep from world state, not the model", () => {
+    const night = knowledge.sleepFacts({
+      timeOfDay: 14_000,
+      bedPresent: true,
+      bedReachable: true,
+      hostilesNearby: false,
+    });
+    expect(night.canAttempt).toBe(true);
+    const day = knowledge.sleepFacts({ timeOfDay: 1000, bedPresent: true, bedReachable: true });
+    expect(day.canAttempt).toBe(false);
+    expect(day.reasons.join(" ")).toMatch(/night/i);
+  });
+});

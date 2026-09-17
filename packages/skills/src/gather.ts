@@ -1,9 +1,16 @@
-import { fail, ok, retry, type ActionResult, type Vec3 } from "@civ/shared";
-import { shouldBlacklistTarget } from "@civ/minecraft-adapter";
+import { fail, ok, retry, type ActionResult, type ErrorCode, type Vec3 } from "@civ/shared";
+import { navigationBackend, shouldBlacklistTarget } from "@civ/minecraft-adapter";
 import { Vec3 as Vec3Class } from "vec3";
 import type { SkillContext } from "./context.js";
-import { moveTo } from "./movement.js";
 import { findBlock } from "./observe.js";
+import { lookAtPosition } from "./look.js";
+import { moveTo } from "./movement.js";
+
+export function classifyStaleTarget(expected?: string, actual?: string): ErrorCode | undefined {
+  if (!actual || actual === "air" || actual === "cave_air" || actual === "void_air") return "TARGET_GONE";
+  if (expected && actual !== expected) return "TARGET_CHANGED";
+  return undefined;
+}
 
 export async function mineBlock(
   ctx: SkillContext,
@@ -16,7 +23,10 @@ export async function mineBlock(
       const found = await findBlock(ctx, names, maxDistance);
       if (!found.success) return found;
       const target = found.data.position;
-      const move = await moveTo(ctx, target, 3);
+      const move = await navigationBackend().navigateToInteractWithBlock(ctx.bot, target, {
+        timeoutMs: ctx.timeoutMs ?? 18_000,
+        signal: ctx.signal,
+      });
       if (!move.success) {
         if (shouldBlacklistTarget(move.code)) {
           ctx.body.unreachable.mark(target);
@@ -26,9 +36,15 @@ export async function mineBlock(
 
       const bot = ctx.bot;
       const block = bot.blockAt(new Vec3Class(target.x, target.y, target.z));
-      if (!block || block.name === "air") {
-        return fail("BLOCK_NOT_FOUND", "Target block disappeared before mining", Date.now() - started, true);
+      const stale = classifyStaleTarget(found.data.name, block?.name);
+      if (stale) {
+        ctx.body.unreachable.mark(target, 8_000);
+        return fail(stale, "Target block disappeared or changed before mining", Date.now() - started, true);
       }
+      if (!block || block.name === "air") {
+        return fail("TARGET_GONE", "Target block disappeared before mining", Date.now() - started, true);
+      }
+      await lookAtPosition(ctx, target);
       try {
         if (ctx.signal?.aborted) {
           return fail("CANCELLED", "Cancelled before dig", Date.now() - started);
@@ -66,40 +82,34 @@ export async function collectItem(
   if (!origin) {
     return fail("NOT_CONNECTED", "Not spawned", Date.now() - started);
   }
-  const drops = Object.values(bot.entities).filter((entity) => {
-    if (entity.name !== "item" && entity.entityType !== undefined && entity.name !== "Item") {
-      if (entity.name !== "item") return false;
-    }
-    if (!entity.position) return false;
-    const dist = origin.distanceTo(entity.position);
-    if (dist > maxDistance) return false;
-    if (!itemName) return entity.name === "item" || entity.displayName?.toString() === "Item";
-    const metadata = entity.getDroppedItem?.();
-    return !metadata || metadata.name === itemName || entity.name === "item";
-  });
-
+  const before = bot.inventory.items().reduce((sum, item) => sum + item.count, 0);
   const nearby = Object.values(bot.entities).filter((entity) => {
     if (!entity.position) return false;
-    const isItem = entity.name === "item" || entity.name === "Item";
+    const raw = `${entity.name ?? ""} ${entity.displayName ?? ""}`.toLowerCase();
+    const isItem =
+      raw.includes("item") ||
+      Boolean((entity as { getDroppedItem?: () => unknown }).getDroppedItem?.()) ||
+      Boolean((entity as { item?: unknown }).item);
     if (!isItem) return false;
     return origin.distanceTo(entity.position) <= maxDistance;
   });
-
-  const targets = nearby.length > 0 ? nearby : drops;
-  if (targets.length === 0) {
+  if (nearby.length === 0) {
     return fail("ITEM_NOT_FOUND", `No dropped items nearby${itemName ? ` matching ${itemName}` : ""}`, Date.now() - started, true);
   }
 
-  let collected = 0;
-  for (const entity of targets.slice(0, 8)) {
+  let reached = 0;
+  for (const entity of nearby.slice(0, 8)) {
     if (ctx.signal?.aborted) break;
     const pos = entity.position;
     if (!pos) continue;
     const move = await moveTo(ctx, { x: pos.x, y: pos.y, z: pos.z }, 1.2);
-    if (move.success) collected += 1;
+    if (move.success) reached += 1;
   }
-  if (collected === 0) {
+  await new Promise((resolve) => setTimeout(resolve, 250));
+  const after = bot.inventory.items().reduce((sum, item) => sum + item.count, 0);
+  const collected = Math.max(0, after - before);
+  if (collected === 0 && reached === 0) {
     return fail("ITEM_NOT_FOUND", "Could not reach dropped items", Date.now() - started, true);
   }
-  return ok({ collected }, Date.now() - started);
+  return ok({ collected: Math.max(collected, reached) }, Date.now() - started);
 }

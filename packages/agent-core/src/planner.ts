@@ -17,6 +17,18 @@ export type PlannedTask = {
 
 export type WorkRole = "wood" | "food" | "stone" | "tools" | "build";
 
+export type LastOutcome = {
+  task: string;
+  action: string;
+  success: boolean;
+  code?: string;
+  error?: string;
+  item?: string;
+  nextTask?: string;
+  nextAction?: string;
+  streak: number;
+};
+
 export type PlannerInput = {
   citizenId: string;
   observation: BodyObservation;
@@ -26,6 +38,7 @@ export type PlannerInput = {
   llmGoal?: string;
   llmReason?: string;
   projectStatus?: string;
+  lastOutcome?: LastOutcome;
   humanDirective?: {
     id: string;
     intent: DirectiveIntent;
@@ -118,9 +131,12 @@ export function planCitizen(input: PlannerInput): PlannedTask {
       humanDirective.mode === "ADMIN_OVERRIDE" ? 0.97 : 0.91,
     );
     planned.directiveId = humanDirective.id;
-    planned.item = humanDirective.args?.item;
+    planned.item = humanDirective.args?.item ?? (mapped.task === "obtain_item" ? mapped.goal : undefined);
     return planned;
   }
+
+  const corrective = correctiveFromFailure(input);
+  if (corrective && !emergency) return corrective;
 
   if (obs.isNight && hostile) {
     return task("survive", "seek_shelter", "seekSafety", "planner", "Night with nearby danger; use cover", 0.8);
@@ -148,7 +164,9 @@ export function planCitizen(input: PlannerInput): PlannedTask {
     return task("bootstrap", "gather_wood", "mineBlock", "planner", "Need logs to craft the first tools", 0.84, "lumberjack");
   }
   if (!hasAny(obs, TOOL_PICKAXES) && (hasAny(obs, LOG_ITEMS) || hasAny(obs, ["oak_planks"]))) {
-    return task("bootstrap", "craft_tools", "craftItem", "planner", "Have wood; craft a pickaxe through the recipe chain", 0.83, "crafter");
+    const planned = task("bootstrap", "obtain_item", "obtainItem", "planner", "Have wood; craft a pickaxe through the recipe chain", 0.83, "crafter");
+    planned.item = "wooden_pickaxe";
+    return planned;
   }
 
   if (!settlement.storage && (hasAny(obs, LOG_ITEMS) || count(obs, ["oak_planks"]) >= 8) && workRole === "build") {
@@ -163,12 +181,16 @@ export function planCitizen(input: PlannerInput): PlannedTask {
   }
   if (workRole === "stone" || assignedNeeds[0] === "NEED_STONE") {
     if (!hasAny(obs, TOOL_PICKAXES)) {
-      return task("bootstrap", "craft_tools", "craftItem", "planner", "Need a pickaxe before mining stone", 0.67, "crafter");
+      const planned = task("bootstrap", "obtain_item", "obtainItem", "planner", "Need a pickaxe before mining stone", 0.67, "crafter");
+      planned.item = "wooden_pickaxe";
+      return planned;
     }
     return task("settlement", "mine_stone", "mineBlock", "planner", "Assigned to mine stone", 0.66, "miner");
   }
   if (workRole === "tools" || assignedNeeds[0] === "NEED_TOOLS") {
-    return task("settlement", "craft_tools", "craftItem", "planner", "Assigned to craft tools", 0.64, "crafter");
+    const planned = task("settlement", "obtain_item", "obtainItem", "planner", "Assigned to craft tools", 0.64, "crafter");
+    planned.item = hasAny(obs, TOOL_PICKAXES) ? "stone_pickaxe" : "wooden_pickaxe";
+    return planned;
   }
   if ((workRole === "build" || assignedNeeds[0] === "NEED_HOUSING" || assignedNeeds[0] === "NEED_BEDS") && !shelterReady) {
     return task("settlement", "build_shelter", "buildShelter", "planner", "Assigned to the starter shelter", 0.72, "builder");
@@ -178,7 +200,9 @@ export function planCitizen(input: PlannerInput): PlannedTask {
     return task("settlement", "build_shelter", "buildShelter", "planner", "Enough wood to start the shelter", 0.62, "builder");
   }
   if (!hasAny(obs, TOOL_AXES) && hasAny(obs, LOG_ITEMS)) {
-    return task("bootstrap", "craft_tools", "craftItem", "planner", "Craft an axe for faster gathering", 0.6, "crafter");
+    const planned = task("bootstrap", "obtain_item", "obtainItem", "planner", "Craft an axe for faster gathering", 0.6, "crafter");
+    planned.item = "wooden_axe";
+    return planned;
   }
   if (heldFood >= 4 && settlement.storage) {
     return task("settlement", "deposit", "depositItems", "planner", "Store surplus in the settlement chest", 0.45);
@@ -197,6 +221,86 @@ function task(
   occupation?: string,
 ): PlannedTask {
   return { goal, task: taskName, action, source, reason, priority, occupation };
+}
+
+function correctiveFromFailure(input: PlannerInput): PlannedTask | undefined {
+  const last = input.lastOutcome;
+  if (!last || last.success) return undefined;
+  if (last.streak > 8) {
+    return task("idle", "observe", "observeNearby", "planner", "Backing off after repeated failures", 0.35);
+  }
+  const knowledge = minecraftKnowledge();
+  const bag = Object.fromEntries(input.observation.inventory.map((item) => [item.name, item.count]));
+  const item = typeof last.item === "string" && last.item ? last.item : undefined;
+  const code = last.code ?? "";
+
+  if (code === "INVENTORY_FULL") {
+    return task("survive", "deposit", "depositItems", "planner", "Inventory is full; store items", 0.88);
+  }
+  if (code === "MISSING_TOOL") {
+    const planned = task("bootstrap", "obtain_item", "obtainItem", "planner", "Need a usable tool first", 0.86, "crafter");
+    planned.item = "wooden_pickaxe";
+    return planned;
+  }
+  if (code === "NO_CRAFTING_TABLE" || code === "NEED_WORKSTATION") {
+    const planned = task("bootstrap", "obtain_item", "obtainItem", "planner", "Need a reachable crafting table", 0.86, "crafter");
+    planned.item = "crafting_table";
+    return planned;
+  }
+
+  if (
+    last.nextTask === "gather_wood" ||
+    (last.task === "build_shelter" && /wood|oak_log|planks/i.test(`${last.error ?? ""} ${item ?? ""}`))
+  ) {
+    return task("settlement", "gather_wood", "mineBlock", "planner", "Gathering wood for the shelter", 0.83, "lumberjack");
+  }
+
+  if (
+    (code === "MISSING_INGREDIENT" ||
+      code === "PREREQUISITE_MISSING" ||
+      code === "NO_RECIPE" ||
+      code === "UNKNOWN_RECIPE" ||
+      code === "UNKNOWN_ITEM") &&
+    item
+  ) {
+    const analysis = knowledge.analyzeObtain(item, bag, []);
+    if ((code === "NO_RECIPE" || code === "UNKNOWN_RECIPE" || code === "UNKNOWN_ITEM") && !analysis.known) {
+      return task("idle", "observe", "observeNearby", "planner", `${item.replaceAll("_", " ")} is not a known Minecraft item or recipe`, 0.4);
+    }
+    const next = analysis.next;
+    if (next?.kind === "gather") {
+      const gatherWood = next.item.endsWith("_log") || next.item.includes("plank");
+      return task(
+        "settlement",
+        gatherWood ? "gather_wood" : "mine_stone",
+        "mineBlock",
+        "planner",
+        `Gathering ${next.item.replaceAll("_", " ")}`,
+        0.83,
+        gatherWood ? "lumberjack" : "miner",
+      );
+    }
+    if (next?.kind === "craft" || next?.kind === "ensure_table") {
+      const planned = task(
+        "bootstrap",
+        "obtain_item",
+        "obtainItem",
+        "planner",
+        next.kind === "ensure_table" ? "Need a crafting table" : `Crafting ${next.item.replaceAll("_", " ")}`,
+        0.84,
+        "crafter",
+      );
+      planned.item = next.kind === "ensure_table" ? "crafting_table" : next.item;
+      return planned;
+    }
+  }
+
+  if (last.task === "seek_shelter" && (code === "TARGET_UNREACHABLE" || code === "TIMEOUT" || code === "PATH_BLOCKED") && last.streak >= 3) {
+    if (!input.settlement.shelterComplete) {
+      return task("settlement", "build_shelter", "buildShelter", "planner", "Failed shelter coordinate; resume building", 0.7, "builder");
+    }
+  }
+  return undefined;
 }
 
 export function assignSettlementNeeds(

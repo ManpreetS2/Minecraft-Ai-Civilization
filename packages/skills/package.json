@@ -14,6 +14,7 @@
   },
   "dependencies": {
     "@civ/minecraft-adapter": "workspace:*",
+    "@civ/minecraft-knowledge": "workspace:*",
     "@civ/shared": "workspace:*",
     "mineflayer": "^4.37.1",
     "vec3": "^0.1.10"

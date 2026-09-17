@@ -16,10 +16,7 @@ export function intentToPlan(
     case "mine_stone":
       return { goal: "mine_stone", task: "mine_stone", action: "mineBlock" };
     case "craft_tools":
-      if (item === "stone_pickaxe" || item === "wooden_pickaxe") {
-        return { goal: item, task: "obtain_item", action: "obtainItem" };
-      }
-      return { goal: "craft_tools", task: "craft_tools", action: "craftItem" };
+      return { goal: item ?? "wooden_pickaxe", task: "obtain_item", action: "obtainItem" };
     case "obtain_item":
       return { goal: item ?? "wooden_pickaxe", task: "obtain_item", action: "obtainItem" };
     case "use_storage":

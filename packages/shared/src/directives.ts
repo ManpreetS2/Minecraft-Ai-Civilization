@@ -63,6 +63,8 @@ const INTENT_PATTERNS: Array<{ intent: DirectiveIntent; pattern: RegExp }> = [
   { intent: "deposit_items", pattern: /\b(put|store|deposit|dump).*(chest|storage|wood|log)/i },
   { intent: "withdraw_items", pattern: /\b(take|withdraw|get).*(from|out of).*(chest|storage)\b/i },
   { intent: "transfer_item", pattern: /\b(give|hand|bring)\b/i },
+  { intent: "obtain_item", pattern: /\b((oak[_ ]?)?door|wooden[_ ]pickaxe|stone[_ ]pickaxe|crafting[_ ]table|workbench|chest|torch|bread)\b/i },
+  { intent: "obtain_item", pattern: /\b(craft|make|obtain)\s+(an?\s+)?[a-z]/i },
   { intent: "craft_tools", pattern: /\b(stone tools?|tools?|pickaxe|axe|craft)\b/i },
   { intent: "gather_wood", pattern: /\b(wood|logs?|timber|chop|lumber)\b/i },
   { intent: "gather_food", pattern: /\b(food|hungry|eat|hunt|berries|bread)\b/i },
@@ -100,9 +102,19 @@ export function parseHumanDirective(
 
   let item: string | undefined;
   if (/\bwood|logs?\b/i.test(text)) item = "oak_log";
-  if (/\bfood|bread|apple\b/i.test(text)) item = item ?? "food";
+  if (/\bfood|apple\b/i.test(text)) item = item ?? "food";
+  if (/\bbread\b/i.test(text)) item = "bread";
   if (/\bstone pick/i.test(text)) item = "stone_pickaxe";
   if (/\bwooden pick/i.test(text)) item = "wooden_pickaxe";
+  if (/\b(oak[_ ]?)?door\b/i.test(text)) item = "oak_door";
+  if (/\bcrafting[_ ]table|workbench\b/i.test(text)) item = "crafting_table";
+  if (/\bchest\b/i.test(text)) item = "chest";
+  if (/\btorch/i.test(text)) item = "torch";
+  const crafted = text.match(/\b(?:craft|make|obtain)\s+(?:an?\s+)?([a-z][a-z0-9 _-]{1,40})/i);
+  if (crafted?.[1]) {
+    const extracted = crafted[1].trim().toLowerCase().replace(/\s+/g, "_").replace(/-+/g, "_");
+    if (extracted && extracted !== "tools" && extracted !== "food") item = extracted;
+  }
 
   return {
     ok: true,

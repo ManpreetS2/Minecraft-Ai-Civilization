@@ -61,7 +61,7 @@ export async function returnToSettlement(ctx: SkillContext, origin?: Vec3) {
 
 export async function assistProject(ctx: SkillContext, next?: { position: Vec3; block: string }) {
   if (!next) return fail("WORLD_CHANGED", "No unclaimed construction job", 0, true);
-  return placeBlock(ctx, next.block, next.position);
+  return placeBlock(ctx, next.block, next.position, { purpose: "shelter_blueprint" });
 }
 
 export { eatFood, openDoor, placeBlock };

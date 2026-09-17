@@ -48,6 +48,21 @@ describe("natural language directives", () => {
     expect(tools.ok).toBe(true);
     if (tools.ok) expect(tools.intent).toBe("craft_tools");
 
+    const door = parseHumanDirective("Kai craft an oak door", citizens);
+    expect(door.ok).toBe(true);
+    if (door.ok) {
+      expect(door.intent).toBe("obtain_item");
+      expect(door.item).toBe("oak_door");
+      expect(door.targetNames).toEqual(["Kai"]);
+    }
+
+    const pick = parseHumanDirective("Kai obtain stone pickaxe", citizens);
+    expect(pick.ok).toBe(true);
+    if (pick.ok) {
+      expect(pick.intent).toBe("obtain_item");
+      expect(pick.item).toBe("stone_pickaxe");
+    }
+
     const give = parseHumanDirective("Give Atlas some food", citizens);
     expect(give.ok).toBe(true);
     if (give.ok) expect(give.intent).toBe("transfer_item");

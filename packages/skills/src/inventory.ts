@@ -1,18 +1,87 @@
-import { fail, ok, type ActionResult, FOOD_ITEM_NAMES, type Vec3 } from "@civ/shared";
+import { fail, ok, type ActionResult, type Vec3 } from "@civ/shared";
+import { minecraftKnowledge } from "@civ/minecraft-knowledge";
+import { navigationBackend } from "@civ/minecraft-adapter";
 import { Vec3 as Vec3Class } from "vec3";
 import type { SkillContext } from "./context.js";
-import { moveTo } from "./movement.js";
 import { findBlock } from "./observe.js";
+import { lookAtPosition } from "./look.js";
 
 function countItem(ctx: SkillContext, name: string): number {
+  const knowledge = minecraftKnowledge();
+  const n = knowledge.normalizeItemName(name) || name;
   return ctx.bot.inventory
     .items()
-    .filter((item) => item.name === name)
+    .filter((item) => item.name === n || knowledge.normalizeItemName(item.name) === n)
     .reduce((sum, item) => sum + item.count, 0);
 }
 
 export function inventoryCount(ctx: SkillContext, name: string): number {
   return countItem(ctx, name);
+}
+
+export function hasItem(ctx: SkillContext, name: string, count = 1): boolean {
+  return inventoryCount(ctx, name) >= count;
+}
+
+export function listInventory(ctx: SkillContext): Array<{ name: string; count: number }> {
+  const bag: Record<string, number> = {};
+  for (const item of ctx.bot.inventory.items()) {
+    bag[item.name] = (bag[item.name] ?? 0) + item.count;
+  }
+  return Object.entries(bag).map(([name, count]) => ({ name, count }));
+}
+
+export function inventorySpace(ctx: SkillContext): number {
+  const inv = ctx.bot.inventory;
+  const start = typeof inv.inventoryStart === "number" ? inv.inventoryStart : 9;
+  const end = typeof inv.inventoryEnd === "number" ? inv.inventoryEnd : 44;
+  let empty = 0;
+  for (let i = start; i <= end; i += 1) {
+    if (!inv.slots[i]) empty += 1;
+  }
+  return empty;
+}
+
+export function canFitDrop(ctx: SkillContext, names: string[]): boolean {
+  if (inventorySpace(ctx) > 0) return true;
+  const knowledge = minecraftKnowledge();
+  const wanted = new Set(names.map((name) => knowledge.normalizeItemName(name) || name));
+  return ctx.bot.inventory.items().some((item) => {
+    if (!wanted.has(item.name)) return false;
+    const max = item.stackSize ?? 64;
+    return item.count < max;
+  });
+}
+
+export function edibleItems(ctx: SkillContext): Array<{ name: string; count: number }> {
+  const knowledge = minecraftKnowledge();
+  return listInventory(ctx).filter((item) => knowledge.isFood(item.name));
+}
+
+export function toolsOwned(ctx: SkillContext): string[] {
+  const knowledge = minecraftKnowledge();
+  return listInventory(ctx)
+    .filter((item) => knowledge.isTool(item.name))
+    .map((item) => item.name);
+}
+
+export function buildingItems(ctx: SkillContext): Array<{ name: string; count: number }> {
+  return listInventory(ctx).filter(
+    (item) =>
+      item.name.endsWith("_planks") ||
+      item.name.endsWith("_log") ||
+      item.name === "cobblestone" ||
+      item.name === "dirt" ||
+      item.name === "crafting_table" ||
+      item.name.endsWith("_door"),
+  );
+}
+
+export function findInventoryItem(ctx: SkillContext, name: string): { name: string; count: number } | undefined {
+  const knowledge = minecraftKnowledge();
+  const n = knowledge.normalizeItemName(name) || name;
+  const found = ctx.bot.inventory.items().find((item) => item.name === n);
+  return found ? { name: found.name, count: found.count } : undefined;
 }
 
 export async function equipItem(
@@ -21,32 +90,43 @@ export async function equipItem(
   destination: "hand" | "head" | "torso" | "legs" | "feet" | "off-hand" = "hand",
 ): Promise<ActionResult<{ item: string }>> {
   const started = Date.now();
-  const item = ctx.bot.inventory.items().find((i) => i.name === itemName);
+  const knowledge = minecraftKnowledge();
+  const name = knowledge.normalizeItemName(itemName) || itemName;
+  const item = ctx.bot.inventory.items().find((entry) => entry.name === name);
   if (!item) {
-    return fail("ITEM_NOT_FOUND", `No ${itemName} in inventory`, Date.now() - started, true);
+    return fail("ITEM_NOT_FOUND", `No ${name} in inventory`, Date.now() - started, true);
   }
   try {
     await ctx.bot.equip(item, destination);
   } catch (error) {
     return fail("EQUIP_FAILED", error instanceof Error ? error.message : String(error), Date.now() - started, true);
   }
-  const held = destination === "hand" ? ctx.bot.heldItem?.name : itemName;
-  if (destination === "hand" && held !== itemName) {
-    return fail("VERIFY_FAILED", `Expected to hold ${itemName}, holding ${held ?? "nothing"}`, Date.now() - started, true);
+  const held = destination === "hand" ? ctx.bot.heldItem?.name : name;
+  if (destination === "hand" && held !== name) {
+    return fail("VERIFY_FAILED", `Expected to hold ${name}, holding ${held ?? "nothing"}`, Date.now() - started, true);
   }
-  return ok({ item: itemName }, Date.now() - started);
+  return ok({ item: name }, Date.now() - started);
 }
 
 export async function eatFood(ctx: SkillContext): Promise<ActionResult<{ item: string; food: number }>> {
   const started = Date.now();
-  const food = ctx.bot.inventory.items().find((item) => FOOD_ITEM_NAMES.has(item.name));
+  const knowledge = minecraftKnowledge();
+  const hunger = ctx.bot.food ?? 20;
+  const food = edibleItems(ctx)[0];
   if (!food) {
     return fail("NO_FOOD", "No edible item in inventory", Date.now() - started, true);
   }
-  const beforeHunger = ctx.bot.food ?? 0;
+  if (!knowledge.canEatNow({ hunger }, food.name) && hunger >= 20) {
+    return fail("EAT_FAILED", "Hunger is already full", Date.now() - started, true);
+  }
+  const stack = ctx.bot.inventory.items().find((item) => item.name === food.name);
+  if (!stack) {
+    return fail("NO_FOOD", "No edible item in inventory", Date.now() - started, true);
+  }
+  const beforeHunger = hunger;
   const beforeCount = countItem(ctx, food.name);
   try {
-    await ctx.bot.equip(food, "hand");
+    await ctx.bot.equip(stack, "hand");
     await ctx.bot.consume();
   } catch (error) {
     return fail("EAT_FAILED", error instanceof Error ? error.message : String(error), Date.now() - started, true);
@@ -72,15 +152,157 @@ async function resolveContainer(
     if (!block || !names.includes(block.name)) {
       return fail("CONTAINER_NOT_FOUND", "Preferred container is missing", Date.now() - started, true);
     }
-    const move = await moveTo(ctx, preferred, 3);
+    const move = await navigationBackend().navigateToInteractWithBlock(ctx.bot, preferred, {
+      timeoutMs: ctx.timeoutMs ?? 12_000,
+      signal: ctx.signal,
+    });
     if (!move.success) return move;
     return ok({ position: preferred }, Date.now() - started);
   }
   const found = await findBlock(ctx, names, 16);
   if (!found.success) return found;
-  const move = await moveTo(ctx, found.data.position, 3);
+  const move = await navigationBackend().navigateToInteractWithBlock(ctx.bot, found.data.position, {
+    timeoutMs: ctx.timeoutMs ?? 12_000,
+    signal: ctx.signal,
+  });
   if (!move.success) return move;
   return ok({ position: found.data.position }, Date.now() - started);
+}
+
+type MineflayerRecipe = {
+  requiresTable?: boolean;
+  result?: { id?: number; count?: number };
+  inShape?: Array<Array<{ id: number } | null | undefined>>;
+  ingredients?: Array<{ id: number; count?: number }>;
+  delta?: Array<{ id: number; count: number }>;
+};
+
+function recipeApi(bot: SkillContext["bot"]): {
+  recipesAll: (itemType: number, metadata: number | null, craftingTable: unknown) => MineflayerRecipe[];
+  recipesFor: (itemType: number, metadata: number | null, minResultCount: number | null, craftingTable: unknown) => MineflayerRecipe[];
+  craft: (recipe: MineflayerRecipe, count: number, craftingTable?: unknown) => Promise<void>;
+} {
+  return bot as unknown as {
+    recipesAll: (itemType: number, metadata: number | null, craftingTable: unknown) => MineflayerRecipe[];
+    recipesFor: (itemType: number, metadata: number | null, minResultCount: number | null, craftingTable: unknown) => MineflayerRecipe[];
+    craft: (recipe: MineflayerRecipe, count: number, craftingTable?: unknown) => Promise<void>;
+  };
+}
+
+function wait(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function recipeIngredientIds(recipe: MineflayerRecipe): Map<number, number> {
+  const needed = new Map<number, number>();
+  if (Array.isArray(recipe.inShape)) {
+    for (const row of recipe.inShape) {
+      if (!Array.isArray(row)) continue;
+      for (const cell of row) {
+        if (!cell || cell.id < 0) continue;
+        needed.set(cell.id, (needed.get(cell.id) ?? 0) + 1);
+      }
+    }
+  }
+  if (Array.isArray(recipe.ingredients)) {
+    for (const ingredient of recipe.ingredients) {
+      if (!ingredient || ingredient.id < 0) continue;
+      needed.set(ingredient.id, (needed.get(ingredient.id) ?? 0) + Math.abs(ingredient.count ?? 1));
+    }
+  }
+  if (needed.size === 0 && Array.isArray(recipe.delta)) {
+    for (const delta of recipe.delta) {
+      if (delta.count < 0) needed.set(delta.id, (needed.get(delta.id) ?? 0) + Math.abs(delta.count));
+    }
+  }
+  return needed;
+}
+
+function recipeIngredientsOwned(bot: SkillContext["bot"], recipe: MineflayerRecipe): boolean {
+  const needed = recipeIngredientIds(recipe);
+  if (needed.size === 0) return false;
+  for (const [id, amount] of needed) {
+    if (bot.inventory.count(id, null) < amount) return false;
+  }
+  return true;
+}
+
+function scoreOwnedRecipe(bot: SkillContext["bot"], recipe: MineflayerRecipe): number {
+  let score = 0;
+  for (const [id, amount] of recipeIngredientIds(recipe)) {
+    const item = bot.registry.items[id];
+    const have = bot.inventory.count(id, null);
+    score += Math.min(have, amount);
+    const name = item?.name ?? "";
+    if (name.includes("oak_") || name === "stick" || name === "cobblestone") score += 6;
+    if (name.includes("cherry_") || name.includes("pale_oak_") || name.includes("bamboo_")) score -= 8;
+  }
+  return score;
+}
+
+async function closeCraftWindow(bot: SkillContext["bot"]): Promise<void> {
+  const current = bot.currentWindow;
+  if (!current) return;
+  try {
+    await bot.closeWindow(current);
+  } catch {
+    // already closed
+  }
+}
+
+async function emptyHand(bot: SkillContext["bot"]): Promise<void> {
+  const safe = bot.inventory.items().find((item) => item.name === "cooked_beef" || item.name === "stick" || item.name.endsWith("_sapling"));
+  try {
+    if (safe) await bot.equip(safe, "hand");
+    else await bot.unequip("hand");
+  } catch {
+    try {
+      await bot.unequip("hand");
+    } catch {
+      // already empty
+    }
+  }
+}
+
+function faceTowardBlock(bot: SkillContext["bot"], block: { position: { x: number; y: number; z: number } }) {
+  const origin = bot.entity?.position;
+  if (!origin) return new Vec3Class(0, 1, 0);
+  const eye = origin.offset(0, 1.62, 0);
+  const center = new Vec3Class(block.position.x + 0.5, block.position.y + 0.5, block.position.z + 0.5);
+  const dx = center.x - eye.x;
+  const dy = center.y - eye.y;
+  const dz = center.z - eye.z;
+  const ax = Math.abs(dx);
+  const ay = Math.abs(dy);
+  const az = Math.abs(dz);
+  if (ax >= ay && ax >= az) return new Vec3Class(dx > 0 ? -1 : 1, 0, 0);
+  if (ay >= ax && ay >= az) return new Vec3Class(0, dy > 0 ? -1 : 1, 0);
+  return new Vec3Class(0, 0, dz > 0 ? -1 : 1);
+}
+
+async function withDelayedActivate<T>(bot: SkillContext["bot"], fn: () => Promise<T>): Promise<T> {
+  const original = bot.activateBlock.bind(bot);
+  bot.activateBlock = async (block, direction, cursorPos) => {
+    await wait(80);
+    const face = direction ?? faceTowardBlock(bot, block);
+    return original(block, face, cursorPos);
+  };
+  try {
+    return await fn();
+  } finally {
+    bot.activateBlock = original;
+  }
+}
+
+async function syncInventory(bot: SkillContext["bot"]): Promise<void> {
+  const window = bot.currentWindow ?? bot.inventory;
+  const sync = (bot as unknown as { _syncWindow?: (window: unknown) => Promise<void> })._syncWindow;
+  if (typeof sync !== "function") return;
+  try {
+    await Promise.race([sync.call(bot, window), wait(1500)]);
+  } catch {
+    // 1.21.11 may not answer a dummy click; inventory packets still apply
+  }
 }
 
 export async function craftItem(
@@ -91,28 +313,58 @@ export async function craftItem(
 ): Promise<ActionResult<{ item: string; count: number }>> {
   const started = Date.now();
   const bot = ctx.bot;
-  const item = bot.registry.itemsByName[itemName];
+  const api = recipeApi(bot);
+  const knowledge = minecraftKnowledge();
+  const name = knowledge.normalizeItemName(itemName) || itemName;
+  const item = bot.registry.itemsByName[name] ?? knowledge.getItem(name);
   if (!item) {
-    return fail("ITEM_NOT_FOUND", `Unknown item ${itemName}`, Date.now() - started);
+    return fail("UNKNOWN_ITEM", `Unknown item ${itemName}`, Date.now() - started, false, { item: name });
   }
-  const before = countItem(ctx, itemName);
-  const inventoryRecipes = bot.recipesFor(item.id, null, count, false);
-  const anyRecipes = inventoryRecipes.length > 0 ? inventoryRecipes : bot.recipesFor(item.id, null, count, null);
-  if (anyRecipes.length === 0) {
-    return fail("NO_RECIPE", `No craftable recipe for ${itemName}`, Date.now() - started, true);
+
+  const bag: Record<string, number> = {};
+  for (const held of bot.inventory.items()) bag[held.name] = (bag[held.name] ?? 0) + held.count;
+
+  const knownRecipes = knowledge.getRecipes(name);
+  const existing = api.recipesAll(item.id, null, true);
+  if (existing.length === 0 && knownRecipes.length === 0) {
+    return fail(
+      "UNKNOWN_RECIPE",
+      `${name} has no crafting recipe in Minecraft ${knowledge.version}`,
+      Date.now() - started,
+      false,
+      { item: name },
+    );
   }
-  let craftingTable = null;
-  if (inventoryRecipes.length === 0) {
-    const found = table
-      ? { success: true as const, data: { position: table } }
-      : await findBlock(ctx, ["crafting_table"], 24);
+
+  const needsTable =
+    existing.some((recipe) => recipe.requiresTable) ||
+    knownRecipes.some((recipe) => recipe.needsTable) ||
+    knowledge.requiredWorkstation(name) === "crafting_table";
+
+  let craftingTable = table
+    ? bot.blockAt(new Vec3Class(Math.floor(table.x), Math.floor(table.y), Math.floor(table.z)))
+    : null;
+  if (craftingTable && craftingTable.name !== "crafting_table") craftingTable = null;
+
+  if (needsTable && (!craftingTable || craftingTable.name !== "crafting_table")) {
+    const found = await findBlock(ctx, ["crafting_table"], 24);
     if (!found.success) {
-      return fail("NO_CRAFTING_TABLE", "Need a crafting table nearby", Date.now() - started, true);
+      return fail(
+        "NEED_WORKSTATION",
+        `Couldn't craft ${name.replaceAll("_", " ")} because no crafting table is reachable.`,
+        Date.now() - started,
+        true,
+        { item: name },
+      );
     }
-    const tablePos = found.data.position;
-    const move = await moveTo(ctx, tablePos, 3);
+    const move = await navigationBackend().navigateToInteractWithBlock(bot, found.data.position, {
+      timeoutMs: ctx.timeoutMs ?? 18_000,
+      signal: ctx.signal,
+    });
     if (!move.success) return move;
-    craftingTable = bot.blockAt(new Vec3Class(Math.floor(tablePos.x), Math.floor(tablePos.y), Math.floor(tablePos.z)));
+    craftingTable = bot.blockAt(
+      new Vec3Class(Math.floor(found.data.position.x), Math.floor(found.data.position.y), Math.floor(found.data.position.z)),
+    );
     if (!craftingTable || craftingTable.name !== "crafting_table") {
       craftingTable = bot.findBlock({
         matching: bot.registry.blocksByName.crafting_table?.id ?? -1,
@@ -120,19 +372,134 @@ export async function craftItem(
       });
     }
     if (!craftingTable || craftingTable.name !== "crafting_table") {
-      return fail("NO_CRAFTING_TABLE", "Crafting table vanished", Date.now() - started, true);
+      return fail("TARGET_GONE", "Crafting table vanished", Date.now() - started, true, { item: name });
     }
   }
-  try {
-    await bot.craft(anyRecipes[0]!, count, craftingTable ?? undefined);
-  } catch (error) {
-    return fail("CRAFT_FAILED", error instanceof Error ? error.message : String(error), Date.now() - started, true);
+
+  const stations = craftingTable ? ["crafting_table"] : [];
+  const analysis = knowledge.analyzeObtain(name, bag, stations, count);
+  if (analysis.next?.kind === "gather") {
+    const missing = Object.entries(analysis.missingIngredients)[0];
+    return fail(
+      "MISSING_INGREDIENT",
+      `Need ${missing?.[1] ?? analysis.next.count} ${(missing?.[0] ?? analysis.next.item).replaceAll("_", " ")} to craft ${name.replaceAll("_", " ")}.`,
+      Date.now() - started,
+      true,
+      {
+        item: name,
+        missing: missing?.[0] ?? analysis.next.item,
+        missingCount: missing?.[1] ?? analysis.next.count,
+        next: analysis.next.item,
+        nextTask: analysis.next.item.endsWith("_log") ? "gather_wood" : "mine_stone",
+        nextAction: "mineBlock",
+      },
+    );
   }
-  const after = countItem(ctx, itemName);
-  if (after <= before) {
-    return fail("VERIFY_FAILED", `Crafted ${itemName} but inventory count did not increase`, Date.now() - started, true);
+  if (analysis.next?.kind === "craft" && analysis.next.item !== name) {
+    return fail(
+      "PREREQUISITE_MISSING",
+      `Need to craft ${analysis.next.item.replaceAll("_", " ")} before ${name.replaceAll("_", " ")}.`,
+      Date.now() - started,
+      true,
+      { item: name, next: analysis.next.item, nextKind: "craft" },
+    );
   }
-  return ok({ item: itemName, count: after - before }, Date.now() - started);
+  if (analysis.next?.kind === "ensure_table" || (needsTable && !craftingTable)) {
+    return fail(
+      "NEED_WORKSTATION",
+      `Couldn't craft ${name.replaceAll("_", " ")} because no crafting table is reachable.`,
+      Date.now() - started,
+      true,
+      { item: name },
+    );
+  }
+
+  const tableContext = needsTable ? craftingTable : null;
+  const craftable = api.recipesFor(item.id, null, Math.max(1, count), tableContext);
+  if (craftable.length === 0) {
+    const firstMissing = Object.entries(analysis.missingIngredients)[0];
+    if (firstMissing) {
+      return fail(
+        "MISSING_INGREDIENT",
+        `Need ${firstMissing[1]} ${firstMissing[0].replaceAll("_", " ")} to craft ${name.replaceAll("_", " ")}.`,
+        Date.now() - started,
+        true,
+        { item: name, missing: firstMissing[0], missingCount: firstMissing[1], next: firstMissing[0] },
+      );
+    }
+    if (needsTable && !craftingTable) {
+      return fail("NEED_WORKSTATION", "Need a crafting table nearby", Date.now() - started, true, { item: name });
+    }
+    return fail(
+      "CRAFT_FAILED",
+      `Recipe for ${name.replaceAll("_", " ")} exists but is not craftable with the current inventory and table.`,
+      Date.now() - started,
+      true,
+      { item: name },
+    );
+  }
+
+  await closeCraftWindow(bot);
+  await emptyHand(bot);
+  if (tableContext) {
+    await lookAtPosition(ctx, {
+      x: tableContext.position.x,
+      y: tableContext.position.y,
+      z: tableContext.position.z,
+    });
+  }
+
+  const owned = craftable.filter((recipe) => recipeIngredientsOwned(bot, recipe)).sort((a, b) => scoreOwnedRecipe(bot, b) - scoreOwnedRecipe(bot, a));
+  if (owned.length === 0) {
+    const firstMissing = Object.entries(analysis.missingIngredients)[0];
+    return fail(
+      "MISSING_INGREDIENT",
+      firstMissing
+        ? `Need ${firstMissing[1]} ${firstMissing[0].replaceAll("_", " ")} to craft ${name.replaceAll("_", " ")}.`
+        : `Recipe for ${name.replaceAll("_", " ")} exists but none of the ingredient variants are in inventory.`,
+      Date.now() - started,
+      true,
+      { item: name, missing: firstMissing?.[0], missingCount: firstMissing?.[1] },
+    );
+  }
+  const pool = owned.slice(0, 6);
+  let lastError = "no recipe attempted";
+  for (const recipe of pool) {
+    const resultCount = Math.max(1, recipe.result?.count ?? (knowledge.getRecipeOutputCount(name) || 1));
+    const crafts = Math.max(1, Math.ceil(count / resultCount));
+    const beforeNow = countItem(ctx, name);
+    try {
+      await withDelayedActivate(bot, () =>
+        Promise.race([
+          api.craft(recipe, crafts, tableContext ?? undefined),
+          wait(12_000).then(() => Promise.reject(new Error("craft timed out waiting for the crafting window"))),
+        ]),
+      );
+    } catch (error) {
+      lastError = error instanceof Error ? error.message : String(error);
+      await closeCraftWindow(bot);
+      await syncInventory(bot);
+      await wait(250);
+      const gained = countItem(ctx, name) - beforeNow;
+      if (gained > 0) return ok({ item: name, count: gained }, Date.now() - started);
+      continue;
+    }
+    await wait(400);
+    const afterNow = countItem(ctx, name);
+    if (afterNow > beforeNow) return ok({ item: name, count: afterNow - beforeNow }, Date.now() - started);
+    await syncInventory(bot);
+    await closeCraftWindow(bot);
+    const synced = countItem(ctx, name);
+    if (synced > beforeNow) return ok({ item: name, count: synced - beforeNow }, Date.now() - started);
+    lastError = "inventory did not increase";
+  }
+  return fail(
+    "VERIFY_FAILED",
+    `Crafted ${name.replaceAll("_", " ")} but inventory count did not increase (${lastError})`,
+    Date.now() - started,
+    true,
+    { item: name },
+  );
 }
 
 export async function depositItems(

@@ -87,6 +87,7 @@ const NEED_LABELS: Record<string, string> = {
 };
 
 const ITEM_ONE: Record<string, string> = {
+  oak_door: "an oak door",
   oak_log: "oak log",
   birch_log: "birch log",
   spruce_log: "spruce log",

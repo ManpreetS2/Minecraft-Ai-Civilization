@@ -10,12 +10,15 @@
     "atlas": "tsx src/atlas-cli.ts",
     "reset-dev": "tsx src/reset-dev.ts",
     "terrain": "tsx src/terrain-test.ts",
+    "mechanics": "tsx src/live-mechanics-test.ts",
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
     "@civ/agent-core": "workspace:*",
     "@civ/minecraft-adapter": "workspace:*",
+    "@civ/minecraft-knowledge": "workspace:*",
+    "@civ/skills": "workspace:*",
     "@civ/shared": "workspace:*",
     "dotenv": "^16.6.1",
     "ws": "^8.18.3"

@@ -133,6 +133,47 @@ describe("planCitizen", () => {
     });
     expect(planned.action).toBe("flee");
   });
+
+  it("gathers wood after a shelter oak_door prerequisite failure instead of rebuilding immediately", () => {
+    const planned = planCitizen({
+      citizenId: "citizen_kai",
+      observation: obs({ inventory: [{ name: "oak_log", count: 2 }] }),
+      settlement: { ...emptySettlement(), needs: ["NEED_HOUSING"] },
+      assignedNeeds: ["NEED_HOUSING"],
+      workRole: "build",
+      lastOutcome: {
+        task: "build_shelter",
+        action: "buildShelter",
+        success: false,
+        code: "MISSING_INGREDIENT",
+        error: "Need more wood for the shelter",
+        item: "oak_door",
+        nextTask: "gather_wood",
+        streak: 1,
+      },
+    });
+    expect(planned.task).toBe("gather_wood");
+    expect(planned.action).toBe("mineBlock");
+  });
+
+  it("deposits when the last mining action reported a full inventory", () => {
+    const planned = planCitizen({
+      citizenId: "citizen_ava",
+      observation: obs({ inventory: [{ name: "oak_log", count: 64 }] }),
+      settlement: emptySettlement(),
+      assignedNeeds: ["NEED_WOOD"],
+      workRole: "wood",
+      lastOutcome: {
+        task: "gather_wood",
+        action: "mineBlock",
+        success: false,
+        code: "INVENTORY_FULL",
+        error: "Inventory is full",
+        streak: 1,
+      },
+    });
+    expect(planned.action).toBe("depositItems");
+  });
 });
 
 describe("assignSettlementNeeds", () => {

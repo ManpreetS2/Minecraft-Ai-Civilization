@@ -17,6 +17,7 @@ import {
   resolveFromRoot,
 } from "@civ/shared";
 import { BodyLock, DuplicateBodyError } from "./body-lock.js";
+import { patchMineflayerCrafting } from "./craft-patch.js";
 import { TargetBlacklist } from "./path-recovery.js";
 import { deriveConnectionHealth, emptyTelemetry, isKeepaliveTimeout, type ConnectionTelemetry } from "./connection-health.js";
 
@@ -190,6 +191,7 @@ export class MinecraftBody extends EventEmitter {
 
       const bot = mineflayer.createBot(options);
       this.bot = bot;
+      patchMineflayerCrafting(bot);
       this.bindClientTelemetry(bot);
       this.bindBot(bot);
 
@@ -203,6 +205,7 @@ export class MinecraftBody extends EventEmitter {
       bot.once("spawn", () => {
         this.spawned = true;
         this.reconnectAttempt = 0;
+        this.bindClientTelemetry(bot);
         this.emit("spawned");
         this.events?.emit(
           createEvent(
@@ -249,6 +252,7 @@ export class MinecraftBody extends EventEmitter {
       if (isKeepaliveTimeout(error)) {
         this.telemetry.keepaliveTimeouts += 1;
         this.telemetry.reconnectReason = error instanceof Error ? error.message : String(error);
+        return;
       }
     };
     const onPacket = () => {

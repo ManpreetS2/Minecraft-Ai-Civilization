@@ -15,6 +15,12 @@ export const ERROR_CODES = [
   "CRAFT_FAILED",
   "NO_RECIPE",
   "NO_CRAFTING_TABLE",
+  "NEED_WORKSTATION",
+  "PURPOSELESS_PLACEMENT",
+  "STUCK",
+  "TARGET_GONE",
+  "TARGET_CHANGED",
+  "ACTION_PREEMPTED",
   "CONTAINER_BUSY",
   "CONTAINER_NOT_FOUND",
   "DEPOSIT_FAILED",
@@ -36,6 +42,10 @@ export const ERROR_CODES = [
   "MISSING_INGREDIENT",
   "MISSING_TOOL",
   "PREREQUISITE_MISSING",
+  "UNKNOWN_RECIPE",
+  "UNKNOWN_ITEM",
+  "NOT_SLEEP_TIME",
+  "BED_OCCUPIED",
   "TARGET_UNREACHABLE",
   "NO_INTERACTION_POSITION",
   "WORLD_CHANGED",
@@ -62,6 +72,7 @@ export type ActionFailure = {
   error: string;
   durationMs: number;
   retryable: boolean;
+  details?: Record<string, unknown>;
 };
 
 export type ActionResult<T = unknown> = ActionSuccess<T> | ActionFailure;
@@ -75,8 +86,9 @@ export function fail(
   error: string,
   durationMs: number,
   retryable = false,
+  details?: Record<string, unknown>,
 ): ActionFailure {
-  return { success: false, code, error, durationMs, retryable };
+  return { success: false, code, error, durationMs, retryable, details };
 }
 
 export function isOk<T>(result: ActionResult<T>): result is ActionSuccess<T> {

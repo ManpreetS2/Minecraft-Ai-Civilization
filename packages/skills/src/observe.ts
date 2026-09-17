@@ -30,13 +30,7 @@ export async function findBlock(
     return fail("BLOCK_NOT_FOUND", `Unknown block names: ${names.join(", ")}`, Date.now() - started);
   }
   const positions = bot.findBlocks({
-    matching: (block) => {
-      if (!block?.position || !ids.includes(block.type)) return false;
-      const position = { x: block.position.x, y: block.position.y, z: block.position.z };
-      if (ctx.body.unreachable.has(position)) return false;
-      if (skip?.(position) || ctx.skipBlock?.(position)) return false;
-      return true;
-    },
+    matching: ids,
     maxDistance,
     count: 24,
   });
@@ -44,6 +38,7 @@ export async function findBlock(
     const block = bot.blockAt(pos);
     if (!block) continue;
     const position = { x: block.position.x, y: block.position.y, z: block.position.z };
+    if (ctx.body.unreachable.has(position)) continue;
     if (skip?.(position) || ctx.skipBlock?.(position)) continue;
     return ok({ name: block.name, position }, Date.now() - started);
   }
@@ -62,13 +57,7 @@ export function findBlockCandidates(
     .filter((id): id is number => typeof id === "number");
   if (ids.length === 0) return [];
   const positions = bot.findBlocks({
-    matching: (block) => {
-      if (!block?.position || !ids.includes(block.type)) return false;
-      const position = { x: block.position.x, y: block.position.y, z: block.position.z };
-      if (ctx.body.unreachable.has(position)) return false;
-      if (ctx.skipBlock?.(position)) return false;
-      return true;
-    },
+    matching: ids,
     maxDistance,
     count,
   });
@@ -77,6 +66,7 @@ export function findBlockCandidates(
     const block = bot.blockAt(pos);
     if (!block) continue;
     const position = { x: block.position.x, y: block.position.y, z: block.position.z };
+    if (ctx.body.unreachable.has(position)) continue;
     if (ctx.skipBlock?.(position)) continue;
     result.push({ name: block.name, position });
   }

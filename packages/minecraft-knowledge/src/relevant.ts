@@ -12,6 +12,7 @@ export type RelevantQuery = {
   hunger?: number;
   hasPickaxe?: boolean;
   hasCraftingTableNearby?: boolean;
+  timeOfDay?: number;
 };
 
 export function compactFacts(facts: string[], limit = 8): string[] {

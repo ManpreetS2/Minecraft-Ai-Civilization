@@ -25,6 +25,17 @@ describe("failure classification", () => {
     expect(classified.category).toBe("KNOWLEDGE_ERROR");
     expect(classified.citizenLearns).toBe(true);
   });
+
+  it("keeps purposeless functional placement as a system bug, not a citizen lesson", () => {
+    const classified = classifyFailure({
+      errorCode: "PURPOSELESS_PLACEMENT",
+      errorMessage: "FunctionalBlockPlacedWithoutPurpose: beds belong under a roof",
+      goal: "place_bed",
+    });
+    expect(classified.track).toBe("SYSTEM");
+    expect(classified.citizenLearns).toBe(false);
+    expect(classified.code).toBe("PURPOSELESS_PLACEMENT");
+  });
 });
 
 describe("experience ledger", () => {
@@ -65,6 +76,22 @@ describe("experience ledger", () => {
     expect(store.listLessons("citizen_atlas")).toHaveLength(0);
     expect(store.listSystemIncidents()[0]?.errorCategory).toBe("NETWORK");
     expect(renderLearningJournal(store)).toMatch(/Citizen learning: NONE/);
+    store.close();
+  });
+
+  it("does not write a citizen lesson for purposeless functional placement", () => {
+    const store = new CognitiveStore(":memory:");
+    const ledger = new ExperienceLedger(store, createIdFactory("p"));
+    const result = ledger.recordAttempt({
+      citizenId: "citizen_atlas",
+      goal: "place_bed",
+      contextSummary: "Tried to dump a bed in an open field.",
+      signal: { errorCode: "PURPOSELESS_PLACEMENT", errorMessage: "FunctionalBlockPlacedWithoutPurpose" },
+    });
+    expect(result.track).toBe("SYSTEM");
+    expect(result.createdLesson).toBe(false);
+    expect(store.listLessons("citizen_atlas")).toHaveLength(0);
+    expect(store.listSystemIncidents()[0]?.errorCode).toBe("PURPOSELESS_PLACEMENT");
     store.close();
   });
 

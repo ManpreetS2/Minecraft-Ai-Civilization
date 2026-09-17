@@ -61,13 +61,39 @@ export function presentEvent(event: PresentableEvent, names: Record<string, stri
   const base = { timeLabel, citizenName: name, technical, importance, icon };
 
   switch (type) {
-    case "TaskStarted":
+    case "TaskStarted": {
+      const taskName = String(payload.task ?? "");
+      if (taskName === "mine_stone") {
+        return {
+          ...base,
+          headline: `${name} is mining stone.`,
+          subtext: reason ? `Reason: ${humanReason(reason)}` : undefined,
+          kind: "info",
+        };
+      }
+      if (taskName === "gather_wood") {
+        return {
+          ...base,
+          headline: `${name} is moving toward trees.`,
+          subtext: reason ? `Reason: ${humanReason(reason)}` : undefined,
+          kind: "info",
+        };
+      }
+      if (taskName === "obtain_item") {
+        return {
+          ...base,
+          headline: `${name} is obtaining ${friendlyItem(payload.item ?? payload.goal)}.`,
+          subtext: reason ? `Reason: ${humanReason(reason)}` : undefined,
+          kind: "info",
+        };
+      }
       return {
         ...base,
         headline: `${name} started ${task}.`,
         subtext: reason ? `Reason: ${humanReason(reason)}` : undefined,
         kind: "info",
       };
+    }
     case "TaskCompleted":
       return { ...base, headline: `${name} finished ${task}.`, kind: "success" };
     case "TaskFailed":
@@ -180,6 +206,27 @@ export function presentEvent(event: PresentableEvent, names: Record<string, stri
         count,
       };
     }
+    case "FunctionalBlockPlacedWithoutPurpose":
+      return {
+        ...base,
+        headline: "A functional block was blocked because it had no valid purpose.",
+        subtext: typeof payload.reason === "string" ? payload.reason : "This is a mechanics bug, not something a citizen learned.",
+        kind: "warning",
+        citizenName: undefined,
+      };
+    case "ObstacleRemovalStarted":
+      return {
+        ...base,
+        headline: `${name} is clearing an obstacle.`,
+        subtext: typeof payload.block === "string" ? friendlyItem(payload.block) : undefined,
+        kind: "warning",
+      };
+    case "ObstacleRemoved":
+      return {
+        ...base,
+        headline: `${name} cleared an obstacle.`,
+        kind: "info",
+      };
     case "ItemDeposited": {
       const count = Number(payload.count ?? 1);
       return {
@@ -349,7 +396,7 @@ export function eventImportance(type: string, payload: Record<string, unknown> =
     return "DEBUG";
   }
   if (
-    /Died|Respawned|Disconnected|ErrorOccurred|ConstructionCompleted|HumanDirective|ItemCrafted|CraftingCompleted|ItemTransfer|SimulationStarted|PaperServerReady|SystemIncident|WorkstationCreated/i.test(
+    /Died|Respawned|Disconnected|ErrorOccurred|ConstructionCompleted|HumanDirective|ItemCrafted|CraftingCompleted|ItemTransfer|SimulationStarted|PaperServerReady|SystemIncident|WorkstationCreated|FunctionalBlockPlacedWithoutPurpose/i.test(
       type,
     )
   ) {

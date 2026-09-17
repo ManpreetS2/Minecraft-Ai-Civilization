@@ -1,8 +1,16 @@
-import { fail, ok, type ActionResult, type Vec3 } from "@civ/shared";
+import { fail, ok, createEvent, type ActionResult, type Vec3 } from "@civ/shared";
+import { navigationBackend } from "@civ/minecraft-adapter";
+import { minecraftKnowledge } from "@civ/minecraft-knowledge";
 import { Vec3 as Vec3Class } from "vec3";
 import type { SkillContext } from "./context.js";
 import { findBlock } from "./observe.js";
-import { moveTo } from "./movement.js";
+import { lookAtPosition } from "./look.js";
+import {
+  evaluateFunctionalPlacement,
+  isFunctionalItem,
+  worldGetterFromBot,
+  type PlacementIntent,
+} from "./placement.js";
 
 const BED_NAMES = [
   "white_bed",
@@ -23,17 +31,39 @@ const BED_NAMES = [
   "light_blue_bed",
 ];
 
-export async function sleep(ctx: SkillContext): Promise<ActionResult<{ rested: boolean }>> {
+export async function sleep(ctx: SkillContext, preferred?: Vec3): Promise<ActionResult<{ rested: boolean }>> {
   const started = Date.now();
   const bot = ctx.bot;
-  if (bot.time.timeOfDay < 12_500 || bot.time.timeOfDay > 23_000) {
-    return fail("SLEEP_FAILED", "It is not night enough to sleep", Date.now() - started, true);
+  const knowledge = minecraftKnowledge();
+  const hostiles = ctx.body.nearbyEntities(8).some((entity) => entity.hostile);
+  const preferredBlock = preferred
+    ? bot.blockAt(new Vec3Class(Math.floor(preferred.x), Math.floor(preferred.y), Math.floor(preferred.z)))
+    : null;
+  const found =
+    preferred && preferredBlock && preferredBlock.name.endsWith("_bed")
+      ? { success: true as const, data: { name: preferredBlock.name, position: preferred } }
+      : await findBlock(ctx, BED_NAMES, 32);
+  const facts = knowledge.sleepFacts({
+    timeOfDay: bot.time.timeOfDay,
+    thundering: Boolean((bot as { thunderState?: number }).thunderState),
+    raining: Boolean(bot.isRaining),
+    bedPresent: found.success,
+    bedReachable: found.success,
+    hostilesNearby: hostiles,
+  });
+  if (!facts.validSleepTime) {
+    return fail("NOT_SLEEP_TIME", facts.reasons.join(" ") || "It is not night enough to sleep", Date.now() - started, true);
   }
-  const found = await findBlock(ctx, BED_NAMES, 16);
+  if (hostiles) {
+    return fail("HOSTILE_NEARBY", "Hostiles are too close to sleep", Date.now() - started, true);
+  }
   if (!found.success) {
     return fail("NO_BED", "No bed nearby", Date.now() - started, true);
   }
-  const move = await moveTo(ctx, found.data.position, 2);
+  const move = await navigationBackend().navigateToInteractWithBlock(ctx.bot, found.data.position, {
+    timeoutMs: ctx.timeoutMs ?? 12_000,
+    signal: ctx.signal,
+  });
   if (!move.success) return move;
   const bed = bot.findBlock({
     matching: (b) => b.name.endsWith("_bed"),
@@ -42,12 +72,24 @@ export async function sleep(ctx: SkillContext): Promise<ActionResult<{ rested: b
   if (!bed) {
     return fail("NO_BED", "Bed vanished", Date.now() - started, true);
   }
+  await lookAtPosition(ctx, found.data.position);
   try {
     await bot.sleep(bed);
   } catch (error) {
-    return fail("SLEEP_FAILED", error instanceof Error ? error.message : String(error), Date.now() - started, true);
+    const message = error instanceof Error ? error.message : String(error);
+    const lower = message.toLowerCase();
+    if (lower.includes("occupied")) {
+      return fail("BED_OCCUPIED", message, Date.now() - started, true);
+    }
+    if (lower.includes("night") || lower.includes("thunder")) {
+      return fail("NOT_SLEEP_TIME", message, Date.now() - started, true);
+    }
+    if (lower.includes("monster") || lower.includes("hostile")) {
+      return fail("HOSTILE_NEARBY", message, Date.now() - started, true);
+    }
+    return fail("SLEEP_FAILED", message, Date.now() - started, true);
   }
-  return ok({ rested: true }, Date.now() - started);
+  return ok({ rested: Boolean(bot.isSleeping) || true }, Date.now() - started);
 }
 
 export async function attack(
@@ -69,7 +111,8 @@ export async function attack(
     return fail("ENTITY_NOT_FOUND", "No hostile target nearby", Date.now() - started, true);
   }
   try {
-    bot.attack(resolved);
+    await ctx.bot.lookAt(resolved.position);
+    ctx.bot.attack(resolved);
   } catch (error) {
     return fail("ATTACK_FAILED", error instanceof Error ? error.message : String(error), Date.now() - started, true);
   }
@@ -80,39 +123,81 @@ export async function placeBlock(
   ctx: SkillContext,
   itemName: string,
   position: Vec3,
+  intent?: PlacementIntent,
 ): Promise<ActionResult<{ name: string; position: Vec3 }>> {
   const started = Date.now();
   const bot = ctx.bot;
-  const item = bot.inventory.items().find((i) => i.name === itemName);
+  const knowledge = minecraftKnowledge();
+  const name = knowledge.normalizeItemName(itemName) || itemName;
+  if (isFunctionalItem(name)) {
+    const decision = evaluateFunctionalPlacement({
+      item: name,
+      purpose: intent?.purpose,
+      position,
+      getBlock: worldGetterFromBot(bot),
+    });
+    if (!decision.ok) {
+      ctx.events?.emit(
+        createEvent(
+          "FunctionalBlockPlacedWithoutPurpose",
+          {
+            item: name,
+            purpose: intent?.purpose,
+            position,
+            reason: decision.reason,
+            blocked: true,
+          },
+          ctx.citizenId,
+        ),
+      );
+      ctx.events?.emit(
+        createEvent(
+          "SystemIncident",
+          {
+            summary: `Blocked purposeless ${name} placement.`,
+            error: decision.reason,
+            code: decision.code ?? "PURPOSELESS_PLACEMENT",
+          },
+          ctx.citizenId,
+        ),
+      );
+      return fail(
+        decision.code ?? "PURPOSELESS_PLACEMENT",
+        decision.reason ?? `Refusing to place ${name} without a valid context`,
+        Date.now() - started,
+        false,
+        { item: name, position },
+      );
+    }
+  }
+  const item = bot.inventory.items().find((i) => i.name === name);
   if (!item) {
-    return fail("ITEM_NOT_FOUND", `Cannot place ${itemName}; none in inventory`, Date.now() - started, true);
+    return fail("ITEM_NOT_FOUND", `Cannot place ${name}; none in inventory`, Date.now() - started, true);
   }
   const dest = new Vec3Class(Math.floor(position.x), Math.floor(position.y), Math.floor(position.z));
-  let move = await moveTo(ctx, position, 3.5);
-  if (!move.success) {
-    const stands = [
-      dest.offset(1, 0, 0),
-      dest.offset(-1, 0, 0),
-      dest.offset(0, 0, 1),
-      dest.offset(0, 0, -1),
-      dest.offset(1, 0, 1),
-      dest.offset(-1, 0, -1),
-    ];
-    for (const stand of stands) {
-      move = await moveTo(ctx, { x: stand.x, y: stand.y, z: stand.z }, 1.6);
-      if (move.success) break;
-    }
-    if (!move.success) return move;
-  }
+  const move = await navigationBackend().navigateToPlaceBlock(ctx.bot, position, {
+    timeoutMs: ctx.timeoutMs ?? 16_000,
+    signal: ctx.signal,
+  });
+  if (!move.success) return move;
   const existing = bot.blockAt(dest);
-  if (existing && existing.name !== "air" && existing.name !== "cave_air" && existing.name !== "void_air") {
-    return ok({ name: existing.name, position }, Date.now() - started);
+  if (existing && !knowledge.isReplaceable(existing.name) && existing.name !== "air") {
+    if (existing.name === name || (name.endsWith("_door") && existing.name.endsWith("_door"))) {
+      return ok({ name: existing.name, position }, Date.now() - started);
+    }
+    return fail(
+      "PLACE_FAILED",
+      `Cannot place ${name}; ${existing.name} already occupies that cell`,
+      Date.now() - started,
+      true,
+    );
   }
   try {
     await bot.equip(item, "hand");
   } catch (error) {
     return fail("EQUIP_FAILED", error instanceof Error ? error.message : String(error), Date.now() - started, true);
   }
+  await lookAtPosition(ctx, position);
 
   const neighbors = [
     dest.offset(0, -1, 0),
@@ -126,7 +211,7 @@ export async function placeBlock(
   let lastError = "no supporting neighbor";
   for (const n of neighbors) {
     const nb = bot.blockAt(n);
-    if (!nb || nb.name === "air" || nb.name === "cave_air") continue;
+    if (!nb || knowledge.isReplaceable(nb.name) || nb.name === "air" || nb.name === "cave_air") continue;
     try {
       await bot.placeBlock(nb, dest.minus(n));
       placed = true;
@@ -136,7 +221,7 @@ export async function placeBlock(
     }
   }
   if (!placed) {
-    return fail("PLACE_FAILED", `Could not place ${itemName}: ${lastError}`, Date.now() - started, true);
+    return fail("PLACE_FAILED", `Could not place ${name}: ${lastError}`, Date.now() - started, true);
   }
   const after = bot.blockAt(dest);
   if (!after || after.name === "air") {

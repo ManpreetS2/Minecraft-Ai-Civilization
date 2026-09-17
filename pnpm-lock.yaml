@@ -43,9 +43,15 @@ importers:
       '@civ/minecraft-adapter':
         specifier: workspace:*
         version: link:../../packages/minecraft-adapter
+      '@civ/minecraft-knowledge':
+        specifier: workspace:*
+        version: link:../../packages/minecraft-knowledge
       '@civ/shared':
         specifier: workspace:*
         version: link:../../packages/shared
+      '@civ/skills':
+        specifier: workspace:*
+        version: link:../../packages/skills
       dotenv:
         specifier: ^16.6.1
         version: 16.6.1
@@ -166,6 +172,9 @@ importers:
       '@civ/minecraft-adapter':
         specifier: workspace:*
         version: link:../minecraft-adapter
+      '@civ/minecraft-knowledge':
+        specifier: workspace:*
+        version: link:../minecraft-knowledge
       '@civ/shared':
         specifier: workspace:*
         version: link:../shared

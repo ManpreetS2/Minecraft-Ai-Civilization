@@ -5,19 +5,21 @@ import { applySocialEvent, sameWorkFamily, SocialDirector } from "@civ/society";
 import {
   createEvent,
   DEFAULT_CITIZENS,
+  isMechanicsProbeUsername,
   EventBus,
   EventLoopMonitor,
   formatSimEvent,
   resolveFromRoot,
   yieldEventLoop,
   type AppConfig,
+  type ActionResult,
   type CitizenRecord,
   type PresentedEvent,
   type SettlementState,
   type SimEvent,
 } from "@civ/shared";
 import { minecraftKnowledge } from "@civ/minecraft-knowledge";
-import { assignSettlementNeeds, assignWorkRoles, planCitizen, type PlannedTask } from "./planner.js";
+import { assignSettlementNeeds, assignWorkRoles, planCitizen, type LastOutcome, type PlannedTask } from "./planner.js";
 import { bodyContext, completeVerifiedTransfer, executePlan } from "./executor.js";
 import { deriveSettlementInventory, type SettlementInventoryView } from "./inventory-view.js";
 import { SettlementRuntime } from "./settlement-runtime.js";
@@ -35,6 +37,7 @@ type RuntimeCitizen = {
   lastLlmAt: number;
   lastChatAt: number;
   lastPlan?: PlannedTask;
+  lastOutcome?: LastOutcome;
   pendingLlm?: HighLevelDecision;
 };
 
@@ -116,7 +119,7 @@ export class AgentManager {
     this.store.setMeta("runId", this.runId);
     this.store.setMeta("humanDirectives", String(this.config.HUMAN_DIRECTIVES_ENABLED));
     this.store.setMeta("permadeath", String(this.config.SIM_PERMADEATH_ENABLED));
-    const wanted = DEFAULT_CITIZENS.slice(0, count);
+    const wanted = DEFAULT_CITIZENS.slice(0, count).filter((identity) => !isMechanicsProbeUsername(identity.name));
     this.events.emit(
       createEvent("SimulationStarted", {
         citizens: wanted.map((c) => c.name),
@@ -127,6 +130,7 @@ export class AgentManager {
     );
 
     for (const identity of wanted) {
+      if (isMechanicsProbeUsername(identity.name) || isMechanicsProbeUsername(identity.id)) continue;
       const record = this.store.getCitizen(identity.id) ?? {
         id: identity.id,
         name: identity.name,
@@ -354,6 +358,7 @@ export class AgentManager {
       llmGoal: llmDecision?.goal,
       llmReason: llmDecision?.reason,
       projectStatus: this.runtime.project?.status,
+      lastOutcome: citizen.lastOutcome,
       humanDirective:
         activeDirective?.intent && activeDirective.mode !== "SUGGESTION"
           ? {
@@ -377,7 +382,7 @@ export class AgentManager {
       this.events.emit(
         createEvent(
           "TaskStarted",
-          { task: plan.task, goal: plan.goal, source: plan.source, reason: plan.reason },
+          { task: plan.task, goal: plan.goal, source: plan.source, reason: plan.reason, item: plan.item },
           citizen.record.id,
         ),
       );
@@ -394,6 +399,7 @@ export class AgentManager {
     void executePlan(ctx, plan, this.store, this.events, this.runtime)
       .then((result) => {
         lastTaskMs = Date.now() - taskStarted;
+        citizen.lastOutcome = lastOutcomeFrom(plan, result, citizen.lastOutcome);
         if (plan.task !== "observe") {
           this.events.emit(
             createEvent(
@@ -408,11 +414,11 @@ export class AgentManager {
             ),
           );
         }
-        if (!result.success) {
+        if (!result.success && shouldRememberFailure(result.code, plan.item)) {
           this.store.addMemory(
             createMemory(citizen.record.id, "episodic", `Task ${plan.task} failed: ${result.error}`, 0.45),
           );
-        } else if (plan.task === "gather_wood" || plan.task === "gather_food" || plan.task === "build_shelter") {
+        } else if (result.success && (plan.task === "gather_wood" || plan.task === "gather_food" || plan.task === "build_shelter")) {
           this.store.addMemory(createMemory(citizen.record.id, "episodic", `Completed ${plan.task}`, 0.4));
         }
         this.maybeCollectDropped(citizen);
@@ -420,6 +426,14 @@ export class AgentManager {
       })
       .catch((error: unknown) => {
         lastTaskMs = Date.now() - taskStarted;
+        citizen.lastOutcome = {
+          task: plan.task,
+          action: plan.action,
+          success: false,
+          error: String(error),
+          item: plan.item,
+          streak: citizen.lastOutcome?.task === plan.task ? (citizen.lastOutcome.streak ?? 0) + 1 : 1,
+        };
         this.events.emit(createEvent("TaskFailed", { task: plan.task, error: String(error) }, citizen.record.id));
       })
       .finally(() => {
@@ -788,8 +802,46 @@ function emptySnapshot(): DashboardSnapshot {
   };
 }
 
+function lastOutcomeFrom(plan: PlannedTask, result: ActionResult, previous?: LastOutcome): LastOutcome {
+  const details = result.success ? undefined : result.details;
+  const item =
+    plan.item ??
+    (typeof details?.item === "string" ? details.item : undefined) ??
+    (typeof details?.next === "string" ? details.next : undefined);
+  return {
+    task: plan.task,
+    action: plan.action,
+    success: result.success,
+    code: result.success ? undefined : result.code,
+    error: result.success ? undefined : result.error,
+    item,
+    nextTask: typeof details?.nextTask === "string" ? details.nextTask : undefined,
+    nextAction: typeof details?.nextAction === "string" ? details.nextAction : undefined,
+    streak: result.success ? 0 : previous?.task === plan.task ? previous.streak + 1 : 1,
+  };
+}
+
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+const INFRA_FAILURES = new Set([
+  "TIMEOUT",
+  "NOT_CONNECTED",
+  "KICKED",
+  "CANCELLED",
+  "INTERRUPTED",
+  "PATH_FAILED",
+  "PATH_BLOCKED",
+]);
+
+function shouldRememberFailure(code: string, item?: string): boolean {
+  if (INFRA_FAILURES.has(code)) return false;
+  if (code === "PURPOSELESS_PLACEMENT") return false;
+  if ((code === "NO_RECIPE" || code === "UNKNOWN_RECIPE") && item && minecraftKnowledge().recipeExists(item)) {
+    return false;
+  }
+  return true;
 }
 
 export { CivilizationStore } from "./store.js";

@@ -1,5 +1,5 @@
 import { createEvent, type ActionResult, type EventBus, type Vec3 } from "@civ/shared";
-import { craftItem, placeBlock, type SkillContext } from "@civ/skills";
+import { obtainItem, placeBlock, type SkillContext } from "@civ/skills";
 import { Vec3 as Vec3Class } from "vec3";
 import { nextUnplaced, starterHut, starterHutSize } from "./blueprint.js";
 import { cellClaimKey } from "./claims.js";
@@ -12,7 +12,7 @@ import {
   type BuildStage,
   type SettlementProject,
 } from "./projects.js";
-import { bagFromItems, nextCraftStep, PLANKS } from "./recipes.js";
+import { bagFromItems, PLANKS } from "./recipes.js";
 import type { SettlementRuntime } from "./settlement-runtime.js";
 import { candidateOrigins, evaluateSite, isProtectedBlock, pickBestSite } from "./site.js";
 import type { CivilizationStore } from "./store.js";
@@ -65,13 +65,12 @@ export async function buildShelter(
     .filter(([name]) => name.endsWith("_log"))
     .reduce((sum, [, count]) => sum + count, 0);
   if (!materialsReady(project.requiredResources, { oak_planks: plankCount + logCount * 4, planks: plankCount })) {
-    const step = nextCraftStep("oak_planks", 8, inv, true);
-    if (step?.kind === "craft") {
-      return craftItem(ctx, step.item, step.count);
+    const planks = await obtainItem(ctx, "oak_planks", 8);
+    if (!planks.success) {
+      runtime.project = transitionProject(project, { type: "materials_missing" });
+      persistProject(store, runtime);
+      return planks;
     }
-    runtime.project = transitionProject(project, { type: "materials_missing" });
-    persistProject(store, runtime);
-    return { success: false, code: "ITEM_NOT_FOUND", error: "Need more wood for the shelter", durationMs: 0, retryable: true };
   }
 
   if (project.status === "PROCURING" || project.status === "PLANNED") {
@@ -120,23 +119,22 @@ export async function buildShelter(
   }
 
   const itemName = next.block === "oak_door" ? "oak_door" : next.block;
-  if (!ctx.bot.inventory.items().some((i) => i.name === itemName)) {
-    if (itemName === "torch") {
-      const crafted = await craftItem(ctx, "torch", 1);
-      if (!crafted.success) {
-        runtime.claims.release("block", claimKey, ctx.citizenId);
+  if (!ctx.bot.inventory.items().some((i) => i.name === itemName || (itemName === "oak_door" && i.name.endsWith("_door")))) {
+    const obtained = await obtainItem(ctx, itemName, 1);
+    if (!obtained.success) {
+      runtime.claims.release("block", claimKey, ctx.citizenId);
+      if (itemName === "torch") {
         return placeOrSkip(ctx, "oak_planks", next.position, store, runtime, events);
       }
-    } else {
-      const crafted = await craftItem(ctx, itemName, 1);
-      if (!crafted.success) {
-        runtime.claims.release("block", claimKey, ctx.citizenId);
-        return crafted;
-      }
+      return obtained;
     }
   }
 
-  const placed = await placeBlock(ctx, itemName, next.position);
+  const placed = await placeBlock(ctx, itemName, next.position, {
+    purpose: "shelter_blueprint",
+    projectId: project.id,
+    structureId: hut.id,
+  });
   runtime.claims.release("block", claimKey, ctx.citizenId);
   if (!placed.success) {
     runtime.project = transitionProject(project, { type: "block_blocked", position: next.position });
@@ -182,7 +180,7 @@ async function placeOrSkip(
   if (!ctx.bot.inventory.items().some((i) => i.name === itemName)) {
     return { success: false, code: "ITEM_NOT_FOUND", error: `Need ${itemName}`, durationMs: 0, retryable: true };
   }
-  const placed = await placeBlock(ctx, itemName, position);
+  const placed = await placeBlock(ctx, itemName, position, { purpose: "shelter_blueprint" });
   if (!placed.success) {
     events.emit(createEvent("ConstructionBlockFailed", { block: itemName, position, error: placed.error }, ctx.citizenId));
   }

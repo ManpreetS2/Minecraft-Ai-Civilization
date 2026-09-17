@@ -52,7 +52,7 @@ describe("event presentation", () => {
     const started = formatSimEvent(
       createEvent("TaskStarted", { task: "gather_wood", reason: "the settlement needs more wood" }, "citizen_atlas"),
     );
-    expect(started.headline).toBe("Atlas started gathering wood.");
+    expect(started.headline).toBe("Atlas is moving toward trees.");
     expect(started.subtext).toMatch(/Reason: the settlement needs more wood/i);
 
     const failed = formatSimEvent(

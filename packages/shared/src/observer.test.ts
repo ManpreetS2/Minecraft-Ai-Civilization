@@ -54,7 +54,10 @@ describe("error translation", () => {
 describe("event presentation", () => {
   it("formats the observer headlines from the spec", () => {
     expect(presentEvent(createEvent("TaskStarted", { task: "gather_wood" }, "citizen_atlas")).headline).toBe(
-      "Atlas started gathering wood.",
+      "Atlas is moving toward trees.",
+    );
+    expect(presentEvent(createEvent("TaskStarted", { task: "mine_stone" }, "citizen_atlas")).headline).toBe(
+      "Atlas is mining stone.",
     );
     expect(presentEvent(createEvent("TaskCompleted", { task: "gather_wood" }, "citizen_atlas")).headline).toBe(
       "Atlas finished gathering wood.",

@@ -1,4 +1,5 @@
 import type { MinecraftBody } from "@civ/minecraft-adapter";
+import { navigationBackend, shouldBlacklistTarget, findReachableInteractionPosition } from "@civ/minecraft-adapter";
 import {
   confirmTransfer,
   createEvent,
@@ -12,27 +13,25 @@ import {
   attack,
   collectItem,
   collectResource,
-  craftItem,
   depositItems,
   dropItem,
   eatFood,
   findBlock,
   flee,
   mineBlock,
-  moveTo,
   observeNearby,
   obtainItem,
   placeBlock,
   returnToSettlement,
-  wander,
   withdrawItems,
+  type PlacementIntent,
   type SkillContext,
 } from "@civ/skills";
 import { Vec3 as Vec3Class } from "vec3";
 import { cellClaimKey } from "./claims.js";
 import { buildShelter, emitProjectCreated } from "./construction.js";
-import { bagFromItems, gatherCategory, nextCraftStep } from "./recipes.js";
 import type { PlannedTask } from "./planner.js";
+import { interiorStandingCells, isInsideShelter } from "./shelter.js";
 import { SettlementRuntime } from "./settlement-runtime.js";
 import type { CivilizationStore } from "./store.js";
 import { bestCraftTarget, equipBestTool, needsReplacement } from "./tools.js";
@@ -178,65 +177,27 @@ async function executeCraftChain(
   events: EventBus,
   runtime: SettlementRuntime,
 ): Promise<ActionResult> {
-  const bag = bagFromItems(ctx.bot.inventory.items().map((i) => ({ name: i.name, count: i.count })));
-  let table = knownCraftingTable(ctx, store);
-  if (table && ctx.citizenId) {
-    const claimed = runtime.claims.tryClaim("workstation", cellClaimKey(table.x, table.y, table.z), ctx.citizenId, 40_000);
-    if (!claimed) table = undefined;
-  }
-
-  const hasTableItem = ctx.bot.inventory.items().some((i) => i.name === "crafting_table");
-  const step = nextCraftStep(target, 1, bag, Boolean(table) || hasTableItem);
-  if (!step) {
-    if (hasTableItem && !table) {
+  const table = knownCraftingTable(ctx, store);
+  const obtained = await obtainItem(ctx, target, 1);
+  if (obtained.success) {
+    events.emit(createEvent("ItemCrafted", { item: target, count: obtained.data.count }, ctx.citizenId));
+    if (target === "crafting_table" && !table) {
+      const existing = await findBlock(ctx, ["crafting_table"], 24);
+      if (existing.success) {
+        rememberWorkstation(store, "crafting_table", existing.data.position);
+        return obtained;
+      }
       return placeWorkstation(ctx, store, events, "crafting_table");
     }
-    return { success: true, data: { item: target, already: true }, durationMs: 0 };
-  }
-
-  if (step.kind === "gather") {
-    const category = gatherCategory(step.item);
-    if (category === "stone") return gatherByTask(ctx, "mine_stone", runtime);
-    if (category === "crop") return gatherFood(ctx, store, events);
-    return gatherByTask(ctx, "gather_wood", runtime);
-  }
-
-  if (step.kind === "ensure_table") {
-    if (hasTableItem) return placeWorkstation(ctx, store, events, "crafting_table");
-    return executeCraftChain(ctx, "crafting_table", store, events, runtime);
-  }
-
-  if (step.kind === "craft") {
-    if (step.needsTable && !table && hasTableItem) {
-      const placed = await placeWorkstation(ctx, store, events, "crafting_table");
-      if (!placed.success) return placed;
-      table = knownCraftingTable(ctx, store);
+    if (target === "chest") {
+      const chest = knownChest(ctx, store);
+      if (!chest) return placeWorkstation(ctx, store, events, "chest");
     }
-    const crafted = await craftItem(ctx, step.item, step.count, table);
-    if (crafted.success) {
-      events.emit(createEvent("ItemCrafted", { item: step.item, count: crafted.data.count }, ctx.citizenId));
-      if (step.item === "crafting_table" && !table) {
-        return placeWorkstation(ctx, store, events, "crafting_table");
-      }
-      if (step.item === "chest") {
-        const chest = knownChest(ctx, store);
-        if (!chest) return placeWorkstation(ctx, store, events, "chest");
-      }
-      return crafted;
-    }
-    if (crafted.code === "NO_RECIPE" || crafted.code === "NO_CRAFTING_TABLE") {
-      const retry = nextCraftStep(step.item, 1, bag, Boolean(table));
-      if (retry && retry.kind === "gather") {
-        return gatherByTask(ctx, gatherCategory(retry.item) === "stone" ? "mine_stone" : "gather_wood", runtime);
-      }
-      if (retry && retry.kind === "craft" && retry.item !== step.item) {
-        return craftItem(ctx, retry.item, retry.count, table);
-      }
-    }
-    return crafted;
   }
-
-  return gatherByTask(ctx, "gather_wood", runtime);
+  if (ctx.citizenId && table) {
+    runtime.claims.release("workstation", cellClaimKey(table.x, table.y, table.z), ctx.citizenId);
+  }
+  return obtained;
 }
 
 async function placeWorkstation(
@@ -245,30 +206,64 @@ async function placeWorkstation(
   events: EventBus,
   kind: "crafting_table" | "chest",
 ): Promise<ActionResult> {
-  const pos = ctx.body.position();
-  if (!pos) {
-    return { success: false, code: "NOT_CONNECTED", error: "No position to place workstation", durationMs: 0, retryable: true };
+  if (kind === "crafting_table") {
+    const existing = await findBlock(ctx, ["crafting_table"], 24);
+    if (existing.success) {
+      rememberWorkstation(store, "crafting_table", existing.data.position);
+      return { success: true, data: { reused: true, position: existing.data.position }, durationMs: 0 };
+    }
   }
-  const target = { x: Math.floor(pos.x) + 1, y: Math.floor(pos.y), z: Math.floor(pos.z) };
-  const existing = ctx.bot.blockAt(new Vec3Class(target.x, target.y, target.z));
-  const dest =
-    existing && existing.name !== "air" && existing.name !== "cave_air"
-      ? { x: target.x, y: target.y + 1, z: target.z }
-      : target;
-  const placed = await placeBlock(ctx, kind, dest);
-  if (!placed.success) return placed;
-  rememberWorkstation(store, kind, dest);
-  events.emit(createEvent("WorkstationCreated", { kind, position: dest }, ctx.citizenId));
-  return placed;
+  const origin = store.getSettlement().origin;
+  const intent: PlacementIntent =
+    kind === "chest"
+      ? { purpose: "household_storage", item: kind, structureId: "starter_hut" }
+      : { purpose: "temporary_worksite", item: kind, temporary: true, cleanupPolicy: "pickup_when_idle" };
+  const candidates: Vec3[] = [];
+  if (kind === "chest" && origin) {
+    for (const cell of interiorStandingCells(origin)) {
+      candidates.push({ x: Math.floor(cell.x), y: Math.floor(cell.y), z: Math.floor(cell.z) });
+    }
+  } else {
+    const pos = ctx.body.position();
+    if (!pos) {
+      return { success: false, code: "NOT_CONNECTED", error: "No position to place workstation", durationMs: 0, retryable: true };
+    }
+    const ox = Math.floor(pos.x);
+    const oy = Math.floor(pos.y);
+    const oz = Math.floor(pos.z);
+    for (const offset of [
+      { x: 1, z: 0 },
+      { x: -1, z: 0 },
+      { x: 0, z: 1 },
+      { x: 0, z: -1 },
+    ]) {
+      candidates.push({ x: ox + offset.x, y: oy, z: oz + offset.z });
+      candidates.push({ x: ox + offset.x, y: oy + 1, z: oz + offset.z });
+    }
+  }
+  for (const dest of candidates) {
+    const placed = await placeBlock(ctx, kind, dest, intent);
+    if (placed.success) {
+      rememberWorkstation(store, kind, dest);
+      events.emit(createEvent("WorkstationCreated", { kind, position: dest, temporary: intent.temporary === true }, ctx.citizenId));
+      return placed;
+    }
+    if (placed.code === "PURPOSELESS_PLACEMENT") continue;
+  }
+  return {
+    success: false,
+    code: "PURPOSELESS_PLACEMENT",
+    error: `No valid ${kind} placement context nearby`,
+    durationMs: 0,
+    retryable: true,
+  };
 }
 
 async function gatherByTask(ctx: SkillContext, task: string, runtime: SettlementRuntime): Promise<ActionResult> {
   if (task === "mine_stone") {
     if (needsReplacement(ctx, "pickaxe")) {
-      const crafted = await craftItem(ctx, "wooden_pickaxe", 1);
-      if (!crafted.success && crafted.code === "NO_RECIPE") {
-        return gatherByTask(ctx, "gather_wood", runtime);
-      }
+      const crafted = await obtainItem(ctx, "wooden_pickaxe", 1);
+      if (!crafted.success) return crafted;
     }
     await equipBestTool(ctx, "pickaxe");
     const collected = await collectResource(ctx, ["stone", "cobblestone", "deepslate"], 1, 48);
@@ -289,21 +284,27 @@ async function mineClaimed(
 ): Promise<ActionResult> {
   const found = await findBlock(ctx, names, 48);
   if (!found.success) {
-    const walked = await wander(ctx, 28);
-    if (!walked.success) return walked;
-    return mineBlock(ctx, names, 48);
+    const wider = await findBlock(ctx, names, 72);
+    if (!wider.success) return wider;
+    return mineClaimedTarget(ctx, names, runtime, kind, wider.data.position);
   }
-  const key = cellClaimKey(found.data.position.x, found.data.position.y, found.data.position.z);
+  return mineClaimedTarget(ctx, names, runtime, kind, found.data.position);
+}
+
+async function mineClaimedTarget(
+  ctx: SkillContext,
+  names: string[],
+  runtime: SettlementRuntime,
+  kind: string,
+  position: Vec3,
+): Promise<ActionResult> {
+  const key = cellClaimKey(position.x, position.y, position.z);
   if (ctx.citizenId && !runtime.claims.tryClaim(kind, key, ctx.citizenId, 60_000)) {
-    ctx.body.unreachable.mark(found.data.position, 8_000);
+    ctx.body.unreachable.mark(position, 8_000);
     return mineBlock(ctx, names, 48);
   }
   const mined = await mineBlock(ctx, names, 48);
   runtime.claims.release(kind, key, ctx.citizenId);
-  if (!mined.success && mined.code === "BLOCK_NOT_FOUND") {
-    await wander(ctx, 28);
-    return mineBlock(ctx, names, 48);
-  }
   if (mined.success) {
     ctx.events?.emit(createEvent("ResourceCollected", { name: mined.data.name, position: mined.data.position }, ctx.citizenId));
     await collectItem(ctx, undefined, 8);
@@ -354,10 +355,23 @@ async function gatherFood(ctx: SkillContext, store: CivilizationStore, events: E
 
   const wheat = ctx.bot.inventory.items().filter((i) => i.name === "wheat").reduce((s, i) => s + i.count, 0);
   if (wheat >= 3) {
-    return craftItem(ctx, "bread", 1);
+    return obtainItem(ctx, "bread", 1);
   }
 
-  return wander(ctx, 20);
+  const farther = await findBlock(ctx, [...CROP_BLOCKS, "sweet_berry_bush"], 48);
+  if (farther.success) {
+    const mined = await mineBlock(ctx, [...CROP_BLOCKS, "sweet_berry_bush"], 48);
+    if (mined.success) await collectItem(ctx, undefined, 8);
+    return mined;
+  }
+
+  return {
+    success: false,
+    code: "NO_FOOD",
+    error: "No food sources in search range",
+    durationMs: 0,
+    retryable: true,
+  };
 }
 
 async function findMatureCrop(ctx: SkillContext): Promise<ActionResult<{ name: string; position: Vec3 }>> {
@@ -448,15 +462,91 @@ async function withdrawItemsNamed(
 
 async function seekSafety(ctx: SkillContext, store: CivilizationStore): Promise<ActionResult> {
   const settlement = store.getSettlement();
-  const target = settlement.origin ?? settlement.storage ?? knownCraftingTable(ctx, store);
-  if (target) {
-    return moveTo(ctx, target, 4);
+  const origin = settlement.origin;
+  const pos = ctx.body.position();
+  const hostiles = ctx.body.nearbyEntities(12).some((entity) => entity.hostile);
+  if (origin && isInsideShelter(pos, origin) && !hostiles) {
+    return { success: true, data: { verified: true, quality: "safe", position: pos }, durationMs: 0 };
   }
-  const house = await findBlock(ctx, ["oak_door", "spruce_door", "white_bed", "crafting_table"], 24);
-  if (house.success) {
-    return moveTo(ctx, house.data.position, 3);
+
+  const coveredBed = await findBlock(
+    ctx,
+    [
+      "white_bed",
+      "red_bed",
+      "blue_bed",
+      "yellow_bed",
+      "black_bed",
+      "brown_bed",
+      "green_bed",
+      "light_gray_bed",
+      "gray_bed",
+      "cyan_bed",
+      "orange_bed",
+      "lime_bed",
+      "pink_bed",
+      "purple_bed",
+      "magenta_bed",
+      "light_blue_bed",
+    ],
+    32,
+  );
+  if (coveredBed.success) {
+    const standing = findReachableInteractionPosition(ctx.bot, coveredBed.data.position) ?? coveredBed.data.position;
+    const moved = await navigationBackend().navigateNear(ctx.bot, standing, 1.4, {
+      timeoutMs: ctx.timeoutMs ?? 16_000,
+      signal: ctx.signal,
+    });
+    if (moved.success) {
+      const here = ctx.body.position();
+      const roof = ctx.bot.blockAt(
+        new Vec3Class(Math.floor(coveredBed.data.position.x), Math.floor(coveredBed.data.position.y) + 2, Math.floor(coveredBed.data.position.z)),
+      );
+      if (roof && roof.boundingBox === "block") {
+        if (!hostiles) {
+          return { success: true, data: { verified: true, quality: "safe", reused: "village_or_human_bed", position: here }, durationMs: moved.durationMs };
+        }
+        return {
+          success: false,
+          code: "HOSTILE_NEARBY",
+          error: "Bed is usable but not currently safe",
+          durationMs: moved.durationMs,
+          retryable: true,
+          details: { quality: "usable", reused: "village_or_human_bed" },
+        };
+      }
+    }
   }
-  return observeNearby(ctx);
+
+  const cells = origin ? interiorStandingCells(origin) : [];
+  for (const cell of cells) {
+    if (ctx.body.unreachable.has(cell)) continue;
+    const moved = await navigationBackend().navigateNear(ctx.bot, cell, 1.2, {
+      timeoutMs: ctx.timeoutMs ?? 16_000,
+      signal: ctx.signal,
+    });
+    if (!moved.success) {
+      if (shouldBlacklistTarget(moved.code)) ctx.body.unreachable.mark(cell, 45_000);
+      continue;
+    }
+    const here = ctx.body.position();
+    if (isInsideShelter(here, origin) && !ctx.body.nearbyEntities(8).some((entity) => entity.hostile)) {
+      return { success: true, data: { verified: true, quality: "safe", position: here }, durationMs: moved.durationMs };
+    }
+    if (isInsideShelter(here, origin)) {
+      return { success: true, data: { verified: true, quality: "usable", position: here }, durationMs: moved.durationMs };
+    }
+    ctx.body.unreachable.mark(cell, 20_000);
+  }
+
+  return {
+    success: false,
+    code: "TARGET_UNREACHABLE",
+    error: "Reached the area but not a usable interior standing cell",
+    durationMs: 0,
+    retryable: true,
+    details: { nextTask: "build_shelter", quality: "reachable" },
+  };
 }
 
 async function shareFoodNearby(ctx: SkillContext, events: EventBus): Promise<ActionResult> {

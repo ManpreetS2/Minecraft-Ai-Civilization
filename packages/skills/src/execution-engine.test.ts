@@ -16,13 +16,13 @@ describe("skill result schemas", () => {
 describe("obtainItem prerequisite chaining", () => {
   it("resolves stone pickaxe through wood then cobble", () => {
     const chain = prerequisiteChain("stone_pickaxe");
-    expect(chain[0]).toBe("oak_log");
+    expect(chain).toEqual(expect.arrayContaining(["oak_log", "cobblestone"]));
     expect(recipeFor("stone_pickaxe")?.kind).toBe("craft");
   });
 
   it("skips already-held ingredients", () => {
     const missing = missingPrerequisites(
-      { oak_planks: 8, stick: 4, cobblestone: 3 },
+      { oak_planks: 8, stick: 4, cobblestone: 3, crafting_table: 1 },
       "stone_pickaxe",
     );
     expect(missing).toEqual(["stone_pickaxe"]);

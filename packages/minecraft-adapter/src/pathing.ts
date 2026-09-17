@@ -5,6 +5,7 @@ import { distance, fail, ok, abortedResult, type ActionResult, type Vec3 } from 
 import {
   DISPOSABLE_SCAFFOLD,
   PROTECTED_BLOCK_NAMES,
+  isProtectedFromPathfinder,
   movedEnough,
   recoveryAttempts,
 } from "./path-recovery.js";
@@ -31,11 +32,22 @@ type MovementSettings = {
   infiniteLiquidDropdownDistance: boolean;
   dontMineUnderFallingBlock: boolean;
   blocksCantBreak: Set<number>;
+  blocksToAvoid?: Set<number>;
+  canOpenDoors?: boolean;
   entityCost?: number;
   liquidCost?: number;
   digCost?: number;
   placeCost?: number;
 };
+
+/** Normal walking never mines. Explicit mining skills dig the chosen block themselves. */
+export const NORMAL_NAVIGATION_CAN_DIG = false;
+
+export type MovementProfile = "SAFE_NAVIGATION" | "RESOURCE_APPROACH" | "CONTROLLED_EXCAVATION";
+
+export function movementAllowsDig(profile: MovementProfile): boolean {
+  return profile === "CONTROLLED_EXCAVATION";
+}
 
 export type PathfinderApi = {
   setMovements: (movements: MovementSettings) => void;
@@ -45,7 +57,7 @@ export type PathfinderApi = {
   getPathTo?: (movements: MovementSettings, goal: unknown, timeout?: number) => { status?: string; cost?: number };
 };
 
-const configured = new WeakMap<Bot, { api: PathfinderApi; scaffoldKey: string }>();
+const configured = new WeakMap<Bot, { api: PathfinderApi; key: string }>();
 let activePaths = 0;
 let lastPathMs = 0;
 let pathAttempts = 0;
@@ -94,34 +106,48 @@ function scaffoldingIds(bot: Bot): number[] {
   return ids;
 }
 
-export function configureMovements(bot: Bot): PathfinderApi {
+export function configureMovements(bot: Bot, profile: MovementProfile = "SAFE_NAVIGATION"): PathfinderApi {
   bot.loadPlugin(pathfinder);
   const scaffold = scaffoldingIds(bot);
-  const key = scaffold.join(",");
+  const key = `${profile}:${scaffold.join(",")}`;
   const existing = configured.get(bot);
-  if (existing && existing.scaffoldKey === key) {
+  if (existing && existing.key === key) {
     return existing.api;
   }
   const movements = new Movements(bot);
-  movements.canDig = true;
+  movements.canDig = movementAllowsDig(profile);
   movements.allowParkour = true;
-  movements.allow1by1towers = scaffold.length > 0;
+  movements.allow1by1towers = false;
   movements.maxDropDown = 3;
   movements.infiniteLiquidDropdownDistance = false;
   movements.dontMineUnderFallingBlock = true;
-  movements.scafoldingBlocks = scaffold;
+  movements.scafoldingBlocks = profile === "CONTROLLED_EXCAVATION" ? scaffold : [];
   movements.entityCost = 8;
   movements.liquidCost = 8;
   movements.digCost = 10;
   movements.placeCost = 8;
-  for (const name of PROTECTED_BLOCK_NAMES) {
+  if (typeof movements.canOpenDoors === "boolean") movements.canOpenDoors = true;
+  const hazards = ["lava", "fire", "soul_fire", "magma_block", "cactus", "campfire", "soul_campfire"];
+  for (const name of hazards) {
     const id = bot.registry.blocksByName[name]?.id;
-    if (typeof id === "number") movements.blocksCantBreak.add(id);
+    if (typeof id === "number") movements.blocksToAvoid?.add(id);
   }
+  protectFromPathfinder(bot, movements);
   const api = botPathfinder(bot);
   api.setMovements(movements);
-  configured.set(bot, { api, scaffoldKey: key });
+  configured.set(bot, { api, key });
   return api;
+}
+
+function protectFromPathfinder(bot: Bot, movements: MovementSettings): void {
+  const names = new Set(PROTECTED_BLOCK_NAMES);
+  const byName = bot.registry.blocksByName as Record<string, { id: number; name: string }>;
+  for (const block of Object.values(byName)) {
+    if (!block?.name) continue;
+    if (isProtectedFromPathfinder(block.name) || names.has(block.name)) {
+      movements.blocksCantBreak.add(block.id);
+    }
+  }
 }
 
 export function loadPathfinder(bot: Bot): PathfinderApi {
@@ -189,7 +215,6 @@ async function attemptGoto(
   }
 
   const pf = configureMovements(bot);
-  const noScaffold = scaffoldingIds(bot).length === 0;
   const goal = new goals.GoalNear(
     Math.floor(target.x),
     Math.floor(target.y),
@@ -197,7 +222,7 @@ async function attemptGoto(
     Math.max(1, Math.floor(target.range)),
   );
 
-  let pathStatus = noScaffold ? "noScaffold" : "running";
+  let pathStatus = "running";
   const onUpdate = (result: { status?: string }) => {
     if (result.status) pathStatus = result.status;
   };
@@ -232,8 +257,12 @@ async function attemptGoto(
     const message = error instanceof Error ? error.message : String(error);
     const lower = message.toLowerCase();
     if (pathStatus === "noPath" || lower.includes("no path")) {
-      const extra = noScaffold ? " (no scaffolding blocks in inventory)" : "";
-      return fail("PATH_BLOCKED", `no path to ${fmt(target)}${extra}`, duration, true);
+      return fail(
+        "PATH_BLOCKED",
+        `no walkable path to ${fmt(target)} without mining terrain`,
+        duration,
+        true,
+      );
     }
     if (message === "STUCK") {
       pathStuck += 1;

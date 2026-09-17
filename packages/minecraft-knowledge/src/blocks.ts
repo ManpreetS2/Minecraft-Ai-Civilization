@@ -1,4 +1,4 @@
-import type { McBlock, McData, McItem } from "./data.js";
+import type { McBlock, McData } from "./data.js";
 
 export type ToolKind = "pickaxe" | "axe" | "shovel" | "hoe" | "shears" | "sword" | "hand";
 
@@ -145,4 +145,31 @@ export function isPreferredToolItem(blockName: string, toolName: string | undefi
   return toolKindOf(toolName) === kind;
 }
 
-export type { McItem };
+export function preferredAvailableTool(
+  blockName: string,
+  inventory: Array<{ name: string; count: number }>,
+  data: McData,
+): string | undefined {
+  const kind = preferredTool(blockName, data);
+  const ranked = inventory
+    .filter((item) => item.count > 0 && toolKindOf(item.name) === kind)
+    .sort((a, b) => toolTier(b.name) - toolTier(a.name));
+  if (ranked[0]) return ranked[0].name;
+  if (kind === "hand") return undefined;
+  const anyTool = inventory.find((item) => item.count > 0 && canHarvest(blockName, item.name, data));
+  return anyTool?.name;
+}
+
+const TIER: Record<string, number> = {
+  wooden: 1,
+  stone: 2,
+  iron: 3,
+  golden: 2,
+  diamond: 4,
+  netherite: 5,
+};
+
+function toolTier(name: string): number {
+  const prefix = name.split("_")[0] ?? "";
+  return TIER[prefix] ?? 0;
+}
