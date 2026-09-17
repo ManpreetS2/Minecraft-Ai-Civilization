@@ -68,7 +68,11 @@ export async function collectResource(
       timeoutMs: ctx.timeoutMs ?? 18_000,
       signal: ctx.signal,
     });
-    if (!approach.success) {
+    const here = ctx.bot.entity?.position;
+    const reach = here
+      ? Math.hypot(best.position.x - here.x, best.position.y - here.y, best.position.z - here.z)
+      : 99;
+    if (!approach.success && reach > 4.5) {
       if (shouldBlacklistTarget(approach.code)) ctx.body.unreachable.mark(best.position, 25_000);
       skipped.add(key);
       continue;

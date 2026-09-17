@@ -30,6 +30,10 @@ export function rankResourceTargets(
     const distance = origin
       ? Math.hypot(block.position.x - origin.x, block.position.y - origin.y, block.position.z - origin.z)
       : 99;
+    const inReach =
+      Boolean(origin) &&
+      distance <= 4.5 &&
+      Math.abs(block.position.y - (origin?.y ?? 0)) <= 2;
     const congested = occupantNear(interaction ?? block.position, bot.username, 1.1);
     const score = scoreResourceTarget({
       distance,
@@ -37,7 +41,7 @@ export function rankResourceTargets(
       claimed: Boolean(options.claimed?.(block.position)),
       blacklisted: Boolean(options.blacklisted?.(block.position)),
       hazards: options.hazardsNear?.(block.position) ?? 0,
-      interactionOk: Boolean(interaction) && probe.reachable,
+      interactionOk: (Boolean(interaction) && probe.reachable) || inReach,
     });
     ranked.push({ ...block, score, cost: probe.cost, interaction });
   }

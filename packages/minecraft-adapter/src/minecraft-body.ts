@@ -206,6 +206,7 @@ export class MinecraftBody extends EventEmitter {
         this.spawned = true;
         this.reconnectAttempt = 0;
         this.bindClientTelemetry(bot);
+        patchMineflayerCrafting(bot);
         this.emit("spawned");
         this.events?.emit(
           createEvent(

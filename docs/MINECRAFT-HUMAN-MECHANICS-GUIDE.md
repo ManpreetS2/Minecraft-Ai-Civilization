@@ -94,6 +94,8 @@ oak_planks → crafting_table if none reachable (2x2)
 
 Do not open the vanilla recipe book GUI. Use `bot.recipesFor` / `bot.recipesAll` / `bot.craft`.
 
+1.21.11 recipe lists often put cherry/bamboo plank variants **before** oak. `craftItem` must select a recipe whose named ingredients exist in Mineflayer inventory (not the first `recipesFor` match). Mineflayer `craft()` may hang on `_syncWindow` / `updateSlot:0`; the adapter bounds that wait and then verifies inventory delta.
+
 Reuse a nearby real crafting table. Cached coordinates are re-checked in the world before use (`knownCraftingTable` forgets stale cells).
 
 ## Mining / placing

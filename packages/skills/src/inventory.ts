@@ -193,21 +193,30 @@ function wait(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function cellItemId(cell: { id: number } | number | null | undefined): number | undefined {
+  if (cell == null) return undefined;
+  if (typeof cell === "number") return cell >= 0 ? cell : undefined;
+  if (typeof cell === "object" && typeof cell.id === "number" && cell.id >= 0) return cell.id;
+  return undefined;
+}
+
 function recipeIngredientIds(recipe: MineflayerRecipe): Map<number, number> {
   const needed = new Map<number, number>();
   if (Array.isArray(recipe.inShape)) {
     for (const row of recipe.inShape) {
       if (!Array.isArray(row)) continue;
       for (const cell of row) {
-        if (!cell || cell.id < 0) continue;
-        needed.set(cell.id, (needed.get(cell.id) ?? 0) + 1);
+        const id = cellItemId(cell);
+        if (id === undefined) continue;
+        needed.set(id, (needed.get(id) ?? 0) + 1);
       }
     }
   }
   if (Array.isArray(recipe.ingredients)) {
     for (const ingredient of recipe.ingredients) {
-      if (!ingredient || ingredient.id < 0) continue;
-      needed.set(ingredient.id, (needed.get(ingredient.id) ?? 0) + Math.abs(ingredient.count ?? 1));
+      const id = cellItemId(ingredient);
+      if (id === undefined) continue;
+      needed.set(id, (needed.get(id) ?? 0) + Math.abs(ingredient.count ?? 1));
     }
   }
   if (needed.size === 0 && Array.isArray(recipe.delta)) {
@@ -218,24 +227,35 @@ function recipeIngredientIds(recipe: MineflayerRecipe): Map<number, number> {
   return needed;
 }
 
+function inventoryByName(bot: SkillContext["bot"]): Record<string, number> {
+  const bag: Record<string, number> = {};
+  for (const item of bot.inventory.items()) {
+    bag[item.name] = (bag[item.name] ?? 0) + item.count;
+  }
+  return bag;
+}
+
 function recipeIngredientsOwned(bot: SkillContext["bot"], recipe: MineflayerRecipe): boolean {
   const needed = recipeIngredientIds(recipe);
   if (needed.size === 0) return false;
+  const bag = inventoryByName(bot);
   for (const [id, amount] of needed) {
-    if (bot.inventory.count(id, null) < amount) return false;
+    const name = bot.registry.items[id]?.name;
+    if (!name || (bag[name] ?? 0) < amount) return false;
   }
   return true;
 }
 
 function scoreOwnedRecipe(bot: SkillContext["bot"], recipe: MineflayerRecipe): number {
+  const bag = inventoryByName(bot);
   let score = 0;
   for (const [id, amount] of recipeIngredientIds(recipe)) {
-    const item = bot.registry.items[id];
-    const have = bot.inventory.count(id, null);
-    score += Math.min(have, amount);
-    const name = item?.name ?? "";
-    if (name.includes("oak_") || name === "stick" || name === "cobblestone") score += 6;
-    if (name.includes("cherry_") || name.includes("pale_oak_") || name.includes("bamboo_")) score -= 8;
+    const name = bot.registry.items[id]?.name ?? "";
+    score += Math.min(bag[name] ?? 0, amount);
+    if (name.includes("oak_") || name === "stick" || name === "cobblestone") score += 8;
+    if (name.includes("cherry_") || name.includes("pale_oak_") || name.includes("bamboo_") || name.includes("mangrove_")) {
+      score -= 12;
+    }
   }
   return score;
 }
@@ -472,7 +492,7 @@ export async function craftItem(
       await withDelayedActivate(bot, () =>
         Promise.race([
           api.craft(recipe, crafts, tableContext ?? undefined),
-          wait(12_000).then(() => Promise.reject(new Error("craft timed out waiting for the crafting window"))),
+          wait(6_000).then(() => Promise.reject(new Error("craft timed out waiting for the crafting window"))),
         ]),
       );
     } catch (error) {
@@ -484,14 +504,17 @@ export async function craftItem(
       if (gained > 0) return ok({ item: name, count: gained }, Date.now() - started);
       continue;
     }
-    await wait(400);
+    await closeCraftWindow(bot);
+    await wait(600);
     const afterNow = countItem(ctx, name);
     if (afterNow > beforeNow) return ok({ item: name, count: afterNow - beforeNow }, Date.now() - started);
     await syncInventory(bot);
-    await closeCraftWindow(bot);
+    await wait(250);
     const synced = countItem(ctx, name);
     if (synced > beforeNow) return ok({ item: name, count: synced - beforeNow }, Date.now() - started);
     lastError = "inventory did not increase";
+    const used = [...recipeIngredientIds(recipe).keys()].map((id) => bot.registry.items[id]?.name ?? String(id));
+    console.warn(`craft ${name} recipe ${used.join("+")} did not increase inventory`);
   }
   return fail(
     "VERIFY_FAILED",

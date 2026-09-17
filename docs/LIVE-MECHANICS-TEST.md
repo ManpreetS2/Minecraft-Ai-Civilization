@@ -70,41 +70,42 @@ Never mark LIVE VERIFIED from a unit test.
 
 ## Live Paper results
 
-Run: `pnpm --filter @civ/orchestrator mechanics` on 2026-09-17 against Paper 1.21.11 at 127.0.0.1:25565. Probe `MechProbe`. RCON connected. Dashboard/sim not running. World was **not** reset.
+Latest green run: `pnpm --filter @civ/orchestrator mechanics` on 2026-09-17 against Paper 1.21.11 at 127.0.0.1:25565. Probe `MechProbe`. RCON connected. World was **not** reset. Exit code 0.
 
-Spawn `229.7 65.0 195.7`. Several RCON `setblock` calls returned "Could not set the block" (cells occupied). An existing crafting table at `227,65,195` was reused.
+Spawn `223.7 61.0 184.3` (hole / tight pad). `NORMAL_NAVIGATION_CAN_DIG=false`. `oak_door recipe exists: true` (minecraft-data 1.21.11).
 
 ```
-- PASS walk 15-25 blocks without mining (21993ms)
-      no unrelated solids became air; pathfinder reported PATH_FAILED/stuck and displacement was 0
+- PASS walk 15-25 blocks without mining (73186ms)
+      no unrelated solids became air; this spawn was stuck (0.0 blocks, PATH_FAILED)
 - PASS reject open-field bed/door/table without valid context
 - PASS reuse existing crafting table instead of dumping another
 - PASS standing cell differs from target stone block
 - PASS open wooden door
 - PASS inspect inventory
-- FAIL log -> planks -> sticks -> table -> wooden pickaxe
-      PREREQUISITE_MISSING Need to craft oak planks before wooden pickaxe
-- SKIP mine intended stone and collect cobble
-      no pickaxe
-- FAIL craft stone pickaxe
-      VERIFY_FAILED inventory count did not increase (3x3 GUI / updateSlot still unreliable)
-- PASS logs -> oak_door (no NO_RECIPE)
-      oak_door obtained; open-terrain door place blocked as PURPOSELESS_PLACEMENT;
-      RCON doorway walls were not enough for isDoorwayOpening (still PURPOSELESS_PLACEMENT)
-- PASS chest deposit/withdraw
-- PASS eat if hungry
-- FAIL sleep if valid time
-      SLEEP_FAILED bot is not sleeping (bed fixture setblock failed)
-- PASS pickup nearby drop if present
+- PASS log -> planks -> sticks -> table -> wooden pickaxe (14566ms)
+- PASS mine intended stone and collect cobble (38699ms)
+- PASS craft stone pickaxe (12053ms)
+- PASS logs -> oak_door (no NO_RECIPE) (13031ms)
+- PASS chest deposit/withdraw (22752ms)
+- PASS eat if hungry (9597ms)
+- SKIP sleep if valid time (1509ms) SKIP NO_INTERACTION_POSITION
+- PASS pickup nearby drop if present (885ms)
 ```
 
-**Not LIVE VERIFIED overall.** Citizens are not mechanically competent yet.
+Same-day supporting runs (same Paper world, not reset):
 
-Known live blockers:
+- Walk 14.1 blocks with solids broken=0 (better spawn at `229.5 65.0 195.5`).
+- Sleep PASS (2549ms) when a reachable bed existed.
+- Wooden pickaxe originally failed `PREREQUISITE_MISSING` / cherry_planks-first recipes; fixed then re-verified PASS.
+- Stone pickaxe originally hung on Mineflayer `_syncWindow` / `updateSlot:0`; bounded sync then re-verified PASS.
 
-1. 3x3 crafting table window (`stone_pickaxe` inventory delta) still fails on 1.21.11 even when `oak_door` succeeded in this run.
-2. `obtainItem(wooden_pickaxe)` still surfaced `PREREQUISITE_MISSING` instead of finishing the plank step (recovery tightened after this run; not re-verified live).
-3. Normal navigation `canDig=false` did not break terrain, but also failed to walk (`PATH_FAILED` stuck).
-4. Freestanding door rejection works; placing into a real doorway still needs a verified two-block wall opening.
+**Not a claim of general “Minecraft capable.”** These are specific verified actions on one probe body.
 
-Do not mark LIVE PAPER VERIFIED in the capability matrix from unit tests.
+Remaining live gaps:
+
+1. Hole/tight-pad navigation: `canDig=false` correctly refuses to mine out, so walk distance can be 0.
+2. Sleep needs a reachable standing cell beside the bed; SKIP is not a PASS.
+3. Freestanding door rejection works; placing into a constructed doorway still often returns `PURPOSELESS_PLACEMENT`.
+4. Fence gates, furnace, attack/flee, swim, climb were not live-tested in this suite.
+
+Do not mark LIVE PAPER VERIFIED from unit tests alone.

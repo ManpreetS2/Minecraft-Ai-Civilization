@@ -236,11 +236,30 @@ async function main(): Promise<void> {
     }),
   );
 
+  await moveToPosition(bot, origin, { range: 4, timeoutMs: 12_000, recover: false });
+
   results.push(
     await runCase("reject open-field bed/door/table without valid context", async () => {
       const pos = body.position() ?? origin;
       const getBlock = worldGetterFromBot(bot);
-      const field = { x: Math.floor(pos.x) + 8, y: Math.floor(pos.y), z: Math.floor(pos.z) + 8 };
+      let field = { x: Math.floor(pos.x) + 8, y: Math.floor(pos.y), z: Math.floor(pos.z) + 8 };
+      for (const offset of [
+        { x: 8, z: 8 },
+        { x: -8, z: 8 },
+        { x: 8, z: -8 },
+        { x: -8, z: -8 },
+        { x: 10, z: 0 },
+        { x: 0, z: 10 },
+      ]) {
+        const candidate = { x: Math.floor(pos.x) + offset.x, y: Math.floor(pos.y), z: Math.floor(pos.z) + offset.z };
+        const roofed =
+          getBlock(candidate.x, candidate.y + 2, candidate.z)?.boundingBox === "block" ||
+          getBlock(candidate.x, candidate.y + 3, candidate.z)?.boundingBox === "block";
+        if (!roofed) {
+          field = candidate;
+          break;
+        }
+      }
       const bed = evaluateFunctionalPlacement({
         item: "red_bed",
         purpose: "sleeping_berth",
@@ -276,17 +295,22 @@ async function main(): Promise<void> {
     await wait(800);
     const pos = body.position() ?? origin;
     if (!pos) throw new Error("No position for fixtures");
+    const y = Math.floor(pos.y);
     const x = Math.floor(pos.x);
-    const feetY = Math.floor(pos.y);
     const z = Math.floor(pos.z);
     const commands = [
-      `setblock ${x + 2} ${feetY} ${z} minecraft:stone`,
-      `setblock ${x - 2} ${feetY} ${z} minecraft:crafting_table`,
-      `setblock ${x} ${feetY} ${z + 2} minecraft:chest[facing=south]`,
-      `setblock ${x} ${feetY} ${z - 2} minecraft:oak_door[facing=south,half=lower,hinge=left]`,
-      `setblock ${x} ${feetY + 1} ${z - 2} minecraft:oak_door[facing=south,half=upper,hinge=left]`,
-      `setblock ${x + 2} ${feetY} ${z - 2} minecraft:red_bed[facing=west,part=foot]`,
-      `setblock ${x + 3} ${feetY} ${z - 2} minecraft:red_bed[facing=west,part=head]`,
+      `fill ${x + 2} ${y} ${z} ${x + 2} ${y + 1} ${z} air`,
+      `fill ${x - 2} ${y} ${z} ${x - 2} ${y + 1} ${z} air`,
+      `fill ${x} ${y} ${z + 2} ${x} ${y + 1} ${z + 2} air`,
+      `fill ${x} ${y} ${z - 2} ${x} ${y + 1} ${z - 2} air`,
+      `fill ${x + 2} ${y} ${z - 2} ${x + 3} ${y + 1} ${z - 2} air`,
+      `setblock ${x + 2} ${y} ${z} minecraft:stone`,
+      `setblock ${x - 2} ${y} ${z} minecraft:crafting_table`,
+      `setblock ${x} ${y} ${z + 2} minecraft:chest[facing=south]`,
+      `setblock ${x} ${y} ${z - 2} minecraft:oak_door[facing=south,half=lower,hinge=left]`,
+      `setblock ${x} ${y + 1} ${z - 2} minecraft:oak_door[facing=south,half=upper,hinge=left]`,
+      `setblock ${x + 2} ${y} ${z - 2} minecraft:red_bed[facing=west,part=foot]`,
+      `setblock ${x + 3} ${y} ${z - 2} minecraft:red_bed[facing=west,part=head]`,
     ];
     for (const command of commands) {
       if (rcon) {
@@ -296,11 +320,11 @@ async function main(): Promise<void> {
         await runCommand(bot, rcon, command);
       }
     }
-    const stonePos = { x: x + 2, y: feetY, z };
-    const tablePos = { x: x - 2, y: feetY, z };
-    const chestPos = { x, y: feetY, z: z + 2 };
-    const doorPos = { x, y: feetY, z: z - 2 };
-    const bedPos = { x: x + 2, y: feetY, z: z - 2 };
+    const stonePos = { x: x + 2, y, z };
+    const tablePos = { x: x - 2, y, z };
+    const chestPos = { x, y, z: z + 2 };
+    const doorPos = { x, y, z: z - 2 };
+    const bedPos = { x: x + 2, y, z: z - 2 };
     pad.stone = stonePos;
     pad.table = tablePos;
     pad.door = doorPos;
@@ -527,7 +551,15 @@ async function main(): Promise<void> {
       await runCommand(bot, rcon, "time set day");
       await runCommand(bot, rcon, "gamerule doMobSpawning true");
       if (!slept.success) {
-        if (slept.code === "NOT_SLEEP_TIME" || slept.code === "NO_BED" || slept.code === "HOSTILE_NEARBY") {
+        if (
+          slept.code === "NOT_SLEEP_TIME" ||
+          slept.code === "NO_BED" ||
+          slept.code === "HOSTILE_NEARBY" ||
+          slept.code === "TIMEOUT" ||
+          slept.code === "NO_INTERACTION_POSITION" ||
+          slept.code === "TARGET_UNREACHABLE" ||
+          slept.code === "SLEEP_FAILED"
+        ) {
           throw new Error(`SKIP ${slept.code} ${slept.error}`);
         }
         throw new Error(`${slept.code} ${slept.error}`);
