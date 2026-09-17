@@ -1,0 +1,2571 @@
+{
+  "generatedFrom": "packages/cognition/src/vectors.ts",
+  "count": 190,
+  "vectors": [
+    {
+      "id": "personal_vs_settlement_food_001",
+      "family": "personal_vs_settlement_food",
+      "title": "Atlas holds 64 steak, hunger 14, settlement food 0",
+      "facts": {
+        "hunger": 14,
+        "health": 20,
+        "inventory": [
+          {
+            "name": "steak",
+            "count": 64
+          }
+        ],
+        "settlementFoodReserve": 0,
+        "settlementNeeds": [
+          "NEED_FOOD"
+        ]
+      },
+      "expect": {
+        "cannotClaim": "no food",
+        "personalFood": 64,
+        "settlementFood": 0,
+        "forbiddenPersonalGoalReason": "starvation"
+      }
+    },
+    {
+      "id": "fact_consistency_001",
+      "family": "fact_consistency",
+      "title": "Health 20 cannot be critically injured",
+      "facts": {
+        "health": 20,
+        "reason": "I am critically injured"
+      },
+      "expect": {
+        "guard": "HEALTH_NOT_CRITICAL"
+      }
+    },
+    {
+      "id": "fact_consistency_002",
+      "family": "fact_consistency",
+      "title": "No creeper nearby cannot claim immediate creeper",
+      "facts": {
+        "nearbyHostiles": [],
+        "reason": "A creeper is about to explode"
+      },
+      "expect": {
+        "guard": "NO_CREEPER_THREAT"
+      }
+    },
+    {
+      "id": "fact_consistency_003",
+      "family": "fact_consistency",
+      "title": "Pickaxe present cannot claim tool absent",
+      "facts": {
+        "inventory": [
+          {
+            "name": "iron_pickaxe",
+            "count": 1
+          }
+        ],
+        "reason": "I don't have a pickaxe"
+      },
+      "expect": {
+        "guard": "TOOL_PRESENT"
+      }
+    },
+    {
+      "id": "fact_consistency_004",
+      "family": "fact_consistency",
+      "title": "Complete project cannot finish same project",
+      "facts": {
+        "projectComplete": true,
+        "goal": "contribute_to_project",
+        "reason": "finish the same project"
+      },
+      "expect": {
+        "guard": "PROJECT_ALREADY_COMPLETE"
+      }
+    },
+    {
+      "id": "no_llm_001",
+      "family": "no_llm",
+      "title": "Creeper at 4 blocks is reflex",
+      "facts": {
+        "nearbyHostiles": [
+          {
+            "name": "creeper",
+            "distance": 4
+          }
+        ],
+        "health": 18,
+        "inventory": []
+      },
+      "expect": {
+        "mode": "NO_LLM",
+        "reflex": true
+      }
+    },
+    {
+      "id": "no_llm_002",
+      "family": "no_llm",
+      "title": "Drowning is reflex",
+      "facts": {
+        "oxygen": 2,
+        "inventory": [],
+        "nearbyHostiles": []
+      },
+      "expect": {
+        "mode": "NO_LLM",
+        "reflex": "drowning"
+      }
+    },
+    {
+      "id": "no_llm_003",
+      "family": "no_llm",
+      "title": "Fire is reflex",
+      "facts": {
+        "onFire": true,
+        "inventory": [],
+        "nearbyHostiles": []
+      },
+      "expect": {
+        "mode": "NO_LLM",
+        "reflex": "fire"
+      }
+    },
+    {
+      "id": "no_llm_004",
+      "family": "no_llm",
+      "title": "Hunger 5 with bread is eat reflex",
+      "facts": {
+        "hunger": 5,
+        "inventory": [
+          {
+            "name": "bread",
+            "count": 1
+          }
+        ],
+        "nearbyHostiles": []
+      },
+      "expect": {
+        "mode": "NO_LLM",
+        "reflex": "eat_available_food"
+      }
+    },
+    {
+      "id": "compound_001",
+      "family": "compound",
+      "title": "Gather stone and craft tools without pickaxe",
+      "facts": {
+        "text": "Gather stone and craft better tools",
+        "hasPickaxe": false
+      },
+      "expect": {
+        "primary": "craft_tools",
+        "followUp": [
+          "mine_stone"
+        ]
+      }
+    },
+    {
+      "id": "compound_002",
+      "family": "compound",
+      "title": "Walk west is execution-level",
+      "facts": {
+        "text": "walk west then jump"
+      },
+      "expect": {
+        "code": "EXECUTION_LEVEL"
+      }
+    },
+    {
+      "id": "compound_003",
+      "family": "compound",
+      "title": "Unknown phrase rejected",
+      "facts": {
+        "text": "do a backflip"
+      },
+      "expect": {
+        "code": "UNKNOWN_GOAL"
+      }
+    },
+    {
+      "id": "execution_vs_decision_001",
+      "family": "execution_vs_decision",
+      "title": "Path blocked is not a bad gather_wood decision",
+      "facts": {
+        "goal": "gather_wood",
+        "errorCode": "PATH_BLOCKED"
+      },
+      "expect": {
+        "category": "SKILL_EXECUTION",
+        "not": "AGENT_DECISION"
+      }
+    },
+    {
+      "id": "infrastructure_veto_001",
+      "family": "infrastructure_veto",
+      "title": "Keepalive is system",
+      "facts": {
+        "errorMessage": "client timed out after 30000 milliseconds",
+        "goal": "gather_wood"
+      },
+      "expect": {
+        "track": "SYSTEM",
+        "citizenLearns": false
+      }
+    },
+    {
+      "id": "speech_not_action_001",
+      "family": "speech_not_action",
+      "title": "I'll give Maya food is not a transfer",
+      "facts": {
+        "text": "I'll give Maya food"
+      },
+      "expect": {
+        "fulfillsPromise": false
+      }
+    },
+    {
+      "id": "communication_001",
+      "family": "communication",
+      "title": "Mining one log should stay silent",
+      "facts": {
+        "activity": "gather_wood",
+        "routine": true
+      },
+      "expect": {
+        "speak": false
+      }
+    },
+    {
+      "id": "goal_validity_001",
+      "family": "goal_validity",
+      "title": "Goal gather_food is bounded",
+      "facts": {
+        "goal": "gather_food"
+      },
+      "expect": {
+        "valid": true,
+        "goal": "gather_food"
+      }
+    },
+    {
+      "id": "goal_validity_002",
+      "family": "goal_validity",
+      "title": "Goal gather_wood is bounded",
+      "facts": {
+        "goal": "gather_wood"
+      },
+      "expect": {
+        "valid": true,
+        "goal": "gather_wood"
+      }
+    },
+    {
+      "id": "goal_validity_003",
+      "family": "goal_validity",
+      "title": "Goal mine_stone is bounded",
+      "facts": {
+        "goal": "mine_stone"
+      },
+      "expect": {
+        "valid": true,
+        "goal": "mine_stone"
+      }
+    },
+    {
+      "id": "goal_validity_004",
+      "family": "goal_validity",
+      "title": "Goal craft_tools is bounded",
+      "facts": {
+        "goal": "craft_tools"
+      },
+      "expect": {
+        "valid": true,
+        "goal": "craft_tools"
+      }
+    },
+    {
+      "id": "goal_validity_005",
+      "family": "goal_validity",
+      "title": "Goal build_shelter is bounded",
+      "facts": {
+        "goal": "build_shelter"
+      },
+      "expect": {
+        "valid": true,
+        "goal": "build_shelter"
+      }
+    },
+    {
+      "id": "goal_validity_006",
+      "family": "goal_validity",
+      "title": "Goal contribute_to_project is bounded",
+      "facts": {
+        "goal": "contribute_to_project"
+      },
+      "expect": {
+        "valid": true,
+        "goal": "contribute_to_project"
+      }
+    },
+    {
+      "id": "goal_validity_007",
+      "family": "goal_validity",
+      "title": "Goal help_citizen is bounded",
+      "facts": {
+        "goal": "help_citizen"
+      },
+      "expect": {
+        "valid": true,
+        "goal": "help_citizen"
+      }
+    },
+    {
+      "id": "goal_validity_008",
+      "family": "goal_validity",
+      "title": "Goal assist_citizen is bounded",
+      "facts": {
+        "goal": "assist_citizen"
+      },
+      "expect": {
+        "valid": true,
+        "goal": "assist_citizen"
+      }
+    },
+    {
+      "id": "goal_validity_009",
+      "family": "goal_validity",
+      "title": "Goal deposit is bounded",
+      "facts": {
+        "goal": "deposit"
+      },
+      "expect": {
+        "valid": true,
+        "goal": "deposit"
+      }
+    },
+    {
+      "id": "goal_validity_010",
+      "family": "goal_validity",
+      "title": "Goal use_storage is bounded",
+      "facts": {
+        "goal": "use_storage"
+      },
+      "expect": {
+        "valid": true,
+        "goal": "use_storage"
+      }
+    },
+    {
+      "id": "goal_validity_011",
+      "family": "goal_validity",
+      "title": "Goal rest is bounded",
+      "facts": {
+        "goal": "rest"
+      },
+      "expect": {
+        "valid": true,
+        "goal": "rest"
+      }
+    },
+    {
+      "id": "goal_validity_012",
+      "family": "goal_validity",
+      "title": "Goal explore is bounded",
+      "facts": {
+        "goal": "explore"
+      },
+      "expect": {
+        "valid": true,
+        "goal": "explore"
+      }
+    },
+    {
+      "id": "goal_validity_013",
+      "family": "goal_validity",
+      "title": "Goal defend is bounded",
+      "facts": {
+        "goal": "defend"
+      },
+      "expect": {
+        "valid": true,
+        "goal": "defend"
+      }
+    },
+    {
+      "id": "goal_validity_014",
+      "family": "goal_validity",
+      "title": "Goal seek_safety is bounded",
+      "facts": {
+        "goal": "seek_safety"
+      },
+      "expect": {
+        "valid": true,
+        "goal": "seek_safety"
+      }
+    },
+    {
+      "id": "goal_validity_015",
+      "family": "goal_validity",
+      "title": "Goal return_to_settlement is bounded",
+      "facts": {
+        "goal": "return_to_settlement"
+      },
+      "expect": {
+        "valid": true,
+        "goal": "return_to_settlement"
+      }
+    },
+    {
+      "id": "goal_validity_016",
+      "family": "goal_validity",
+      "title": "Goal socialize is bounded",
+      "facts": {
+        "goal": "socialize"
+      },
+      "expect": {
+        "valid": true,
+        "goal": "socialize"
+      }
+    },
+    {
+      "id": "goal_validity_017",
+      "family": "goal_validity",
+      "title": "Goal transfer_item is bounded",
+      "facts": {
+        "goal": "transfer_item"
+      },
+      "expect": {
+        "valid": true,
+        "goal": "transfer_item"
+      }
+    },
+    {
+      "id": "goal_validity_018",
+      "family": "goal_validity",
+      "title": "Goal reconsider is bounded",
+      "facts": {
+        "goal": "reconsider"
+      },
+      "expect": {
+        "valid": true,
+        "goal": "reconsider"
+      }
+    },
+    {
+      "id": "diversity_001",
+      "family": "diversity",
+      "title": "Atlas should not clone all-wood when NEED_WOOD",
+      "facts": {
+        "citizen": "Atlas",
+        "settlementNeeds": [
+          "NEED_WOOD"
+        ],
+        "inventory": [
+          {
+            "name": "steak",
+            "count": 8
+          }
+        ],
+        "recentWork": "build"
+      },
+      "expect": {
+        "notAllSame": true
+      }
+    },
+    {
+      "id": "diversity_002",
+      "family": "diversity",
+      "title": "Maya should not clone all-wood when NEED_WOOD",
+      "facts": {
+        "citizen": "Maya",
+        "settlementNeeds": [
+          "NEED_WOOD"
+        ],
+        "inventory": [],
+        "recentWork": "gather_wood"
+      },
+      "expect": {
+        "notAllSame": true
+      }
+    },
+    {
+      "id": "diversity_003",
+      "family": "diversity",
+      "title": "Theo should not clone all-wood when NEED_WOOD",
+      "facts": {
+        "citizen": "Theo",
+        "settlementNeeds": [
+          "NEED_WOOD"
+        ],
+        "inventory": [],
+        "recentWork": "build"
+      },
+      "expect": {
+        "notAllSame": true
+      }
+    },
+    {
+      "id": "diversity_004",
+      "family": "diversity",
+      "title": "Ava should not clone all-wood when NEED_WOOD",
+      "facts": {
+        "citizen": "Ava",
+        "settlementNeeds": [
+          "NEED_WOOD"
+        ],
+        "inventory": [],
+        "recentWork": "gather_wood"
+      },
+      "expect": {
+        "notAllSame": true
+      }
+    },
+    {
+      "id": "diversity_005",
+      "family": "diversity",
+      "title": "Kai should not clone all-wood when NEED_WOOD",
+      "facts": {
+        "citizen": "Kai",
+        "settlementNeeds": [
+          "NEED_WOOD"
+        ],
+        "inventory": [],
+        "recentWork": "build"
+      },
+      "expect": {
+        "notAllSame": true
+      }
+    },
+    {
+      "id": "perspective_001",
+      "family": "perspective",
+      "title": "Atlas interprets empty chest via DIRECT",
+      "facts": {
+        "citizen": "Atlas",
+        "source": "DIRECT",
+        "claim": "Theo took bread",
+        "objective": "5 bread removed from chest"
+      },
+      "expect": {
+        "interpretation": "uncertain",
+        "objectiveUnchanged": true
+      }
+    },
+    {
+      "id": "perspective_002",
+      "family": "perspective",
+      "title": "Maya interprets empty chest via WITNESSED",
+      "facts": {
+        "citizen": "Maya",
+        "source": "WITNESSED",
+        "claim": "Theo was near the chest",
+        "objective": "5 bread removed from chest"
+      },
+      "expect": {
+        "interpretation": "suspicious",
+        "objectiveUnchanged": true
+      }
+    },
+    {
+      "id": "perspective_003",
+      "family": "perspective",
+      "title": "Kai interprets empty chest via HEARD",
+      "facts": {
+        "citizen": "Kai",
+        "source": "HEARD",
+        "claim": "Maya said Theo stole food",
+        "objective": "5 bread removed from chest"
+      },
+      "expect": {
+        "interpretation": "rumor",
+        "objectiveUnchanged": true
+      }
+    },
+    {
+      "id": "perspective_004",
+      "family": "perspective",
+      "title": "Ava interprets empty chest via DIRECT",
+      "facts": {
+        "citizen": "Ava",
+        "source": "DIRECT",
+        "claim": "Creeper exploded the chest",
+        "objective": "5 bread removed from chest"
+      },
+      "expect": {
+        "interpretation": "creeper",
+        "objectiveUnchanged": true
+      }
+    },
+    {
+      "id": "perspective_005",
+      "family": "perspective",
+      "title": "Theo interprets empty chest via DIRECT",
+      "facts": {
+        "citizen": "Theo",
+        "source": "DIRECT",
+        "claim": "I withdrew 5 bread",
+        "objective": "5 bread removed from chest"
+      },
+      "expect": {
+        "interpretation": "necessary",
+        "objectiveUnchanged": true
+      }
+    },
+    {
+      "id": "rumor_provenance_001",
+      "family": "rumor_provenance",
+      "title": "Rumor chain step 1",
+      "facts": {
+        "informant": "Maya",
+        "claim": "Theo stole food",
+        "confidence": 0.5
+      },
+      "expect": {
+        "storedAs": "HEARD",
+        "notObjective": true
+      }
+    },
+    {
+      "id": "rumor_provenance_002",
+      "family": "rumor_provenance",
+      "title": "Rumor chain step 2",
+      "facts": {
+        "informant": "Theo",
+        "claim": "Theo stole food",
+        "confidence": 0.6000000000000001
+      },
+      "expect": {
+        "storedAs": "HEARD",
+        "notObjective": true
+      }
+    },
+    {
+      "id": "rumor_provenance_003",
+      "family": "rumor_provenance",
+      "title": "Rumor chain step 3",
+      "facts": {
+        "informant": "Ava",
+        "claim": "Theo stole food",
+        "confidence": 0.4
+      },
+      "expect": {
+        "storedAs": "HEARD",
+        "notObjective": true
+      }
+    },
+    {
+      "id": "rumor_provenance_004",
+      "family": "rumor_provenance",
+      "title": "Rumor chain step 4",
+      "facts": {
+        "informant": "Kai",
+        "claim": "Theo stole food",
+        "confidence": 0.5
+      },
+      "expect": {
+        "storedAs": "HEARD",
+        "notObjective": true
+      }
+    },
+    {
+      "id": "rumor_provenance_005",
+      "family": "rumor_provenance",
+      "title": "Rumor chain step 5",
+      "facts": {
+        "informant": "Atlas",
+        "claim": "Theo stole food",
+        "confidence": 0.6000000000000001
+      },
+      "expect": {
+        "storedAs": "HEARD",
+        "notObjective": true
+      }
+    },
+    {
+      "id": "rumor_provenance_006",
+      "family": "rumor_provenance",
+      "title": "Rumor chain step 6",
+      "facts": {
+        "informant": "Maya",
+        "claim": "Theo stole food",
+        "confidence": 0.4
+      },
+      "expect": {
+        "storedAs": "HEARD",
+        "notObjective": true
+      }
+    },
+    {
+      "id": "rumor_provenance_007",
+      "family": "rumor_provenance",
+      "title": "Rumor chain step 7",
+      "facts": {
+        "informant": "Theo",
+        "claim": "Theo stole food",
+        "confidence": 0.5
+      },
+      "expect": {
+        "storedAs": "HEARD",
+        "notObjective": true
+      }
+    },
+    {
+      "id": "rumor_provenance_008",
+      "family": "rumor_provenance",
+      "title": "Rumor chain step 8",
+      "facts": {
+        "informant": "Ava",
+        "claim": "Theo stole food",
+        "confidence": 0.6000000000000001
+      },
+      "expect": {
+        "storedAs": "HEARD",
+        "notObjective": true
+      }
+    },
+    {
+      "id": "rumor_provenance_009",
+      "family": "rumor_provenance",
+      "title": "Rumor chain step 9",
+      "facts": {
+        "informant": "Kai",
+        "claim": "Theo stole food",
+        "confidence": 0.4
+      },
+      "expect": {
+        "storedAs": "HEARD",
+        "notObjective": true
+      }
+    },
+    {
+      "id": "rumor_provenance_010",
+      "family": "rumor_provenance",
+      "title": "Rumor chain step 10",
+      "facts": {
+        "informant": "Atlas",
+        "claim": "Theo stole food",
+        "confidence": 0.5
+      },
+      "expect": {
+        "storedAs": "HEARD",
+        "notObjective": true
+      }
+    },
+    {
+      "id": "rumor_provenance_011",
+      "family": "rumor_provenance",
+      "title": "Rumor chain step 11",
+      "facts": {
+        "informant": "Maya",
+        "claim": "Theo stole food",
+        "confidence": 0.6000000000000001
+      },
+      "expect": {
+        "storedAs": "HEARD",
+        "notObjective": true
+      }
+    },
+    {
+      "id": "rumor_provenance_012",
+      "family": "rumor_provenance",
+      "title": "Rumor chain step 12",
+      "facts": {
+        "informant": "Theo",
+        "claim": "Theo stole food",
+        "confidence": 0.4
+      },
+      "expect": {
+        "storedAs": "HEARD",
+        "notObjective": true
+      }
+    },
+    {
+      "id": "staleness_001",
+      "family": "staleness",
+      "title": "Stale case 1",
+      "facts": {
+        "assumed": {
+          "hunger": 6,
+          "hasFoodInInventory": false,
+          "nearbyHostile": false,
+          "health": 18
+        },
+        "current": {
+          "hunger": 16,
+          "hasFoodInInventory": true,
+          "nearbyHostile": false,
+          "health": 18
+        }
+      },
+      "expect": {
+        "stale": true
+      }
+    },
+    {
+      "id": "staleness_002",
+      "family": "staleness",
+      "title": "Stale case 2",
+      "facts": {
+        "assumed": {
+          "hunger": 6,
+          "hasFoodInInventory": false,
+          "nearbyHostile": false,
+          "health": 18
+        },
+        "current": {
+          "hunger": 6,
+          "hasFoodInInventory": false,
+          "nearbyHostile": true,
+          "health": 18
+        }
+      },
+      "expect": {
+        "stale": true
+      }
+    },
+    {
+      "id": "staleness_003",
+      "family": "staleness",
+      "title": "Stale case 3",
+      "facts": {
+        "assumed": {
+          "hunger": 6,
+          "hasFoodInInventory": false,
+          "nearbyHostile": false,
+          "health": 18
+        },
+        "current": {
+          "hunger": 6,
+          "hasFoodInInventory": false,
+          "nearbyHostile": false,
+          "health": 3
+        }
+      },
+      "expect": {
+        "stale": true
+      }
+    },
+    {
+      "id": "staleness_004",
+      "family": "staleness",
+      "title": "Stale case 4",
+      "facts": {
+        "assumed": {
+          "hunger": 6,
+          "hasFoodInInventory": false,
+          "nearbyHostile": false,
+          "health": 18
+        },
+        "current": {
+          "hunger": 6,
+          "hasFoodInInventory": true,
+          "nearbyHostile": false,
+          "health": 18,
+          "directiveId": "d2"
+        }
+      },
+      "expect": {
+        "stale": true
+      }
+    },
+    {
+      "id": "staleness_005",
+      "family": "staleness",
+      "title": "Stale case 5",
+      "facts": {
+        "assumed": {
+          "hunger": 6,
+          "hasFoodInInventory": false,
+          "nearbyHostile": false,
+          "health": 18
+        },
+        "current": {
+          "hunger": 6,
+          "hasFoodInInventory": false,
+          "nearbyHostile": false,
+          "health": 18,
+          "projectComplete": true
+        }
+      },
+      "expect": {
+        "stale": true
+      }
+    },
+    {
+      "id": "staleness_006",
+      "family": "staleness",
+      "title": "Stale case 6",
+      "facts": {
+        "assumed": {
+          "hunger": 6,
+          "hasFoodInInventory": false,
+          "nearbyHostile": false,
+          "health": 18
+        },
+        "current": {
+          "hunger": 6,
+          "hasFoodInInventory": false,
+          "nearbyHostile": false,
+          "health": 18
+        }
+      },
+      "expect": {
+        "stale": false
+      }
+    },
+    {
+      "id": "staleness_007",
+      "family": "staleness",
+      "title": "Stale case 7",
+      "facts": {
+        "assumed": {
+          "hunger": 6,
+          "hasFoodInInventory": false,
+          "nearbyHostile": false,
+          "health": 18
+        },
+        "current": {
+          "hunger": 6,
+          "hasFoodInInventory": false,
+          "nearbyHostile": false,
+          "health": 18
+        }
+      },
+      "expect": {
+        "stale": false
+      }
+    },
+    {
+      "id": "staleness_008",
+      "family": "staleness",
+      "title": "Stale case 8",
+      "facts": {
+        "assumed": {
+          "hunger": 6,
+          "hasFoodInInventory": false,
+          "nearbyHostile": false,
+          "health": 18
+        },
+        "current": {
+          "hunger": 6,
+          "hasFoodInInventory": false,
+          "nearbyHostile": false,
+          "health": 18
+        }
+      },
+      "expect": {
+        "stale": false
+      }
+    },
+    {
+      "id": "staleness_009",
+      "family": "staleness",
+      "title": "Stale case 9",
+      "facts": {
+        "assumed": {
+          "hunger": 6,
+          "hasFoodInInventory": false,
+          "nearbyHostile": false,
+          "health": 18
+        },
+        "current": {
+          "hunger": 6,
+          "hasFoodInInventory": false,
+          "nearbyHostile": false,
+          "health": 18
+        }
+      },
+      "expect": {
+        "stale": false
+      }
+    },
+    {
+      "id": "staleness_010",
+      "family": "staleness",
+      "title": "Stale case 10",
+      "facts": {
+        "assumed": {
+          "hunger": 6,
+          "hasFoodInInventory": false,
+          "nearbyHostile": false,
+          "health": 18
+        },
+        "current": {
+          "hunger": 6,
+          "hasFoodInInventory": false,
+          "nearbyHostile": false,
+          "health": 18
+        }
+      },
+      "expect": {
+        "stale": false
+      }
+    },
+    {
+      "id": "memory_retrieval_021",
+      "family": "memory_retrieval",
+      "title": "Relevant memory subset 1",
+      "facts": {
+        "variant": 0,
+        "citizen": "Atlas"
+      },
+      "expect": {
+        "covered": true
+      }
+    },
+    {
+      "id": "memory_retrieval_022",
+      "family": "memory_retrieval",
+      "title": "Relevant memory subset 2",
+      "facts": {
+        "variant": 1,
+        "citizen": "Maya"
+      },
+      "expect": {
+        "covered": true
+      }
+    },
+    {
+      "id": "memory_retrieval_023",
+      "family": "memory_retrieval",
+      "title": "Relevant memory subset 3",
+      "facts": {
+        "variant": 2,
+        "citizen": "Theo"
+      },
+      "expect": {
+        "covered": true
+      }
+    },
+    {
+      "id": "memory_retrieval_024",
+      "family": "memory_retrieval",
+      "title": "Relevant memory subset 4",
+      "facts": {
+        "variant": 3,
+        "citizen": "Ava"
+      },
+      "expect": {
+        "covered": true
+      }
+    },
+    {
+      "id": "memory_retrieval_025",
+      "family": "memory_retrieval",
+      "title": "Relevant memory subset 5",
+      "facts": {
+        "variant": 4,
+        "citizen": "Kai"
+      },
+      "expect": {
+        "covered": true
+      }
+    },
+    {
+      "id": "memory_retrieval_026",
+      "family": "memory_retrieval",
+      "title": "Relevant memory subset 6",
+      "facts": {
+        "variant": 5,
+        "citizen": "Atlas"
+      },
+      "expect": {
+        "covered": true
+      }
+    },
+    {
+      "id": "memory_retrieval_027",
+      "family": "memory_retrieval",
+      "title": "Relevant memory subset 7",
+      "facts": {
+        "variant": 6,
+        "citizen": "Maya"
+      },
+      "expect": {
+        "covered": true
+      }
+    },
+    {
+      "id": "memory_retrieval_028",
+      "family": "memory_retrieval",
+      "title": "Relevant memory subset 8",
+      "facts": {
+        "variant": 7,
+        "citizen": "Theo"
+      },
+      "expect": {
+        "covered": true
+      }
+    },
+    {
+      "id": "lesson_029",
+      "family": "lesson",
+      "title": "Lesson same goal same error 1",
+      "facts": {
+        "variant": 0,
+        "citizen": "Atlas"
+      },
+      "expect": {
+        "covered": true
+      }
+    },
+    {
+      "id": "lesson_030",
+      "family": "lesson",
+      "title": "Lesson same goal same error 2",
+      "facts": {
+        "variant": 1,
+        "citizen": "Maya"
+      },
+      "expect": {
+        "covered": true
+      }
+    },
+    {
+      "id": "lesson_031",
+      "family": "lesson",
+      "title": "Lesson same goal same error 3",
+      "facts": {
+        "variant": 2,
+        "citizen": "Theo"
+      },
+      "expect": {
+        "covered": true
+      }
+    },
+    {
+      "id": "lesson_032",
+      "family": "lesson",
+      "title": "Lesson same goal same error 4",
+      "facts": {
+        "variant": 3,
+        "citizen": "Ava"
+      },
+      "expect": {
+        "covered": true
+      }
+    },
+    {
+      "id": "lesson_033",
+      "family": "lesson",
+      "title": "Lesson same goal same error 5",
+      "facts": {
+        "variant": 4,
+        "citizen": "Kai"
+      },
+      "expect": {
+        "covered": true
+      }
+    },
+    {
+      "id": "lesson_034",
+      "family": "lesson",
+      "title": "Lesson same goal same error 6",
+      "facts": {
+        "variant": 5,
+        "citizen": "Atlas"
+      },
+      "expect": {
+        "covered": true
+      }
+    },
+    {
+      "id": "lesson_035",
+      "family": "lesson",
+      "title": "Lesson same goal same error 7",
+      "facts": {
+        "variant": 6,
+        "citizen": "Maya"
+      },
+      "expect": {
+        "covered": true
+      }
+    },
+    {
+      "id": "lesson_036",
+      "family": "lesson",
+      "title": "Lesson same goal same error 8",
+      "facts": {
+        "variant": 7,
+        "citizen": "Theo"
+      },
+      "expect": {
+        "covered": true
+      }
+    },
+    {
+      "id": "social_037",
+      "family": "social",
+      "title": "Pairwise trust not global reputation 1",
+      "facts": {
+        "variant": 0,
+        "citizen": "Atlas"
+      },
+      "expect": {
+        "covered": true
+      }
+    },
+    {
+      "id": "social_038",
+      "family": "social",
+      "title": "Pairwise trust not global reputation 2",
+      "facts": {
+        "variant": 1,
+        "citizen": "Maya"
+      },
+      "expect": {
+        "covered": true
+      }
+    },
+    {
+      "id": "social_039",
+      "family": "social",
+      "title": "Pairwise trust not global reputation 3",
+      "facts": {
+        "variant": 2,
+        "citizen": "Theo"
+      },
+      "expect": {
+        "covered": true
+      }
+    },
+    {
+      "id": "social_040",
+      "family": "social",
+      "title": "Pairwise trust not global reputation 4",
+      "facts": {
+        "variant": 3,
+        "citizen": "Ava"
+      },
+      "expect": {
+        "covered": true
+      }
+    },
+    {
+      "id": "social_041",
+      "family": "social",
+      "title": "Pairwise trust not global reputation 5",
+      "facts": {
+        "variant": 4,
+        "citizen": "Kai"
+      },
+      "expect": {
+        "covered": true
+      }
+    },
+    {
+      "id": "social_042",
+      "family": "social",
+      "title": "Pairwise trust not global reputation 6",
+      "facts": {
+        "variant": 5,
+        "citizen": "Atlas"
+      },
+      "expect": {
+        "covered": true
+      }
+    },
+    {
+      "id": "social_043",
+      "family": "social",
+      "title": "Pairwise trust not global reputation 7",
+      "facts": {
+        "variant": 6,
+        "citizen": "Maya"
+      },
+      "expect": {
+        "covered": true
+      }
+    },
+    {
+      "id": "social_044",
+      "family": "social",
+      "title": "Pairwise trust not global reputation 8",
+      "facts": {
+        "variant": 7,
+        "citizen": "Theo"
+      },
+      "expect": {
+        "covered": true
+      }
+    },
+    {
+      "id": "uncertainty_045",
+      "family": "uncertainty",
+      "title": "Unknown source stays uncertain 1",
+      "facts": {
+        "variant": 0,
+        "citizen": "Atlas"
+      },
+      "expect": {
+        "covered": true
+      }
+    },
+    {
+      "id": "uncertainty_046",
+      "family": "uncertainty",
+      "title": "Unknown source stays uncertain 2",
+      "facts": {
+        "variant": 1,
+        "citizen": "Maya"
+      },
+      "expect": {
+        "covered": true
+      }
+    },
+    {
+      "id": "uncertainty_047",
+      "family": "uncertainty",
+      "title": "Unknown source stays uncertain 3",
+      "facts": {
+        "variant": 2,
+        "citizen": "Theo"
+      },
+      "expect": {
+        "covered": true
+      }
+    },
+    {
+      "id": "uncertainty_048",
+      "family": "uncertainty",
+      "title": "Unknown source stays uncertain 4",
+      "facts": {
+        "variant": 3,
+        "citizen": "Ava"
+      },
+      "expect": {
+        "covered": true
+      }
+    },
+    {
+      "id": "uncertainty_049",
+      "family": "uncertainty",
+      "title": "Unknown source stays uncertain 5",
+      "facts": {
+        "variant": 4,
+        "citizen": "Kai"
+      },
+      "expect": {
+        "covered": true
+      }
+    },
+    {
+      "id": "uncertainty_050",
+      "family": "uncertainty",
+      "title": "Unknown source stays uncertain 6",
+      "facts": {
+        "variant": 5,
+        "citizen": "Atlas"
+      },
+      "expect": {
+        "covered": true
+      }
+    },
+    {
+      "id": "uncertainty_051",
+      "family": "uncertainty",
+      "title": "Unknown source stays uncertain 7",
+      "facts": {
+        "variant": 6,
+        "citizen": "Maya"
+      },
+      "expect": {
+        "covered": true
+      }
+    },
+    {
+      "id": "uncertainty_052",
+      "family": "uncertainty",
+      "title": "Unknown source stays uncertain 8",
+      "facts": {
+        "variant": 7,
+        "citizen": "Theo"
+      },
+      "expect": {
+        "covered": true
+      }
+    },
+    {
+      "id": "reflection_053",
+      "family": "reflection",
+      "title": "Routine mining does not reflect 1",
+      "facts": {
+        "variant": 0,
+        "citizen": "Atlas"
+      },
+      "expect": {
+        "covered": true
+      }
+    },
+    {
+      "id": "reflection_054",
+      "family": "reflection",
+      "title": "Routine mining does not reflect 2",
+      "facts": {
+        "variant": 1,
+        "citizen": "Maya"
+      },
+      "expect": {
+        "covered": true
+      }
+    },
+    {
+      "id": "reflection_055",
+      "family": "reflection",
+      "title": "Routine mining does not reflect 3",
+      "facts": {
+        "variant": 2,
+        "citizen": "Theo"
+      },
+      "expect": {
+        "covered": true
+      }
+    },
+    {
+      "id": "reflection_056",
+      "family": "reflection",
+      "title": "Routine mining does not reflect 4",
+      "facts": {
+        "variant": 3,
+        "citizen": "Ava"
+      },
+      "expect": {
+        "covered": true
+      }
+    },
+    {
+      "id": "reflection_057",
+      "family": "reflection",
+      "title": "Routine mining does not reflect 5",
+      "facts": {
+        "variant": 4,
+        "citizen": "Kai"
+      },
+      "expect": {
+        "covered": true
+      }
+    },
+    {
+      "id": "reflection_058",
+      "family": "reflection",
+      "title": "Routine mining does not reflect 6",
+      "facts": {
+        "variant": 5,
+        "citizen": "Atlas"
+      },
+      "expect": {
+        "covered": true
+      }
+    },
+    {
+      "id": "reflection_059",
+      "family": "reflection",
+      "title": "Routine mining does not reflect 7",
+      "facts": {
+        "variant": 6,
+        "citizen": "Maya"
+      },
+      "expect": {
+        "covered": true
+      }
+    },
+    {
+      "id": "reflection_060",
+      "family": "reflection",
+      "title": "Routine mining does not reflect 8",
+      "facts": {
+        "variant": 7,
+        "citizen": "Theo"
+      },
+      "expect": {
+        "covered": true
+      }
+    },
+    {
+      "id": "fallback_061",
+      "family": "fallback",
+      "title": "LLM down uses heuristic 1",
+      "facts": {
+        "variant": 0,
+        "citizen": "Atlas"
+      },
+      "expect": {
+        "covered": true
+      }
+    },
+    {
+      "id": "fallback_062",
+      "family": "fallback",
+      "title": "LLM down uses heuristic 2",
+      "facts": {
+        "variant": 1,
+        "citizen": "Maya"
+      },
+      "expect": {
+        "covered": true
+      }
+    },
+    {
+      "id": "fallback_063",
+      "family": "fallback",
+      "title": "LLM down uses heuristic 3",
+      "facts": {
+        "variant": 2,
+        "citizen": "Theo"
+      },
+      "expect": {
+        "covered": true
+      }
+    },
+    {
+      "id": "fallback_064",
+      "family": "fallback",
+      "title": "LLM down uses heuristic 4",
+      "facts": {
+        "variant": 3,
+        "citizen": "Ava"
+      },
+      "expect": {
+        "covered": true
+      }
+    },
+    {
+      "id": "fallback_065",
+      "family": "fallback",
+      "title": "LLM down uses heuristic 5",
+      "facts": {
+        "variant": 4,
+        "citizen": "Kai"
+      },
+      "expect": {
+        "covered": true
+      }
+    },
+    {
+      "id": "fallback_066",
+      "family": "fallback",
+      "title": "LLM down uses heuristic 6",
+      "facts": {
+        "variant": 5,
+        "citizen": "Atlas"
+      },
+      "expect": {
+        "covered": true
+      }
+    },
+    {
+      "id": "fallback_067",
+      "family": "fallback",
+      "title": "LLM down uses heuristic 7",
+      "facts": {
+        "variant": 6,
+        "citizen": "Maya"
+      },
+      "expect": {
+        "covered": true
+      }
+    },
+    {
+      "id": "fallback_068",
+      "family": "fallback",
+      "title": "LLM down uses heuristic 8",
+      "facts": {
+        "variant": 7,
+        "citizen": "Theo"
+      },
+      "expect": {
+        "covered": true
+      }
+    },
+    {
+      "id": "directive_069",
+      "family": "directive",
+      "title": "Human directive is high priority context 1",
+      "facts": {
+        "variant": 0,
+        "citizen": "Atlas"
+      },
+      "expect": {
+        "covered": true
+      }
+    },
+    {
+      "id": "directive_070",
+      "family": "directive",
+      "title": "Human directive is high priority context 2",
+      "facts": {
+        "variant": 1,
+        "citizen": "Maya"
+      },
+      "expect": {
+        "covered": true
+      }
+    },
+    {
+      "id": "directive_071",
+      "family": "directive",
+      "title": "Human directive is high priority context 3",
+      "facts": {
+        "variant": 2,
+        "citizen": "Theo"
+      },
+      "expect": {
+        "covered": true
+      }
+    },
+    {
+      "id": "directive_072",
+      "family": "directive",
+      "title": "Human directive is high priority context 4",
+      "facts": {
+        "variant": 3,
+        "citizen": "Ava"
+      },
+      "expect": {
+        "covered": true
+      }
+    },
+    {
+      "id": "directive_073",
+      "family": "directive",
+      "title": "Human directive is high priority context 5",
+      "facts": {
+        "variant": 4,
+        "citizen": "Kai"
+      },
+      "expect": {
+        "covered": true
+      }
+    },
+    {
+      "id": "directive_074",
+      "family": "directive",
+      "title": "Human directive is high priority context 6",
+      "facts": {
+        "variant": 5,
+        "citizen": "Atlas"
+      },
+      "expect": {
+        "covered": true
+      }
+    },
+    {
+      "id": "directive_075",
+      "family": "directive",
+      "title": "Human directive is high priority context 7",
+      "facts": {
+        "variant": 6,
+        "citizen": "Maya"
+      },
+      "expect": {
+        "covered": true
+      }
+    },
+    {
+      "id": "directive_076",
+      "family": "directive",
+      "title": "Human directive is high priority context 8",
+      "facts": {
+        "variant": 7,
+        "citizen": "Theo"
+      },
+      "expect": {
+        "covered": true
+      }
+    },
+    {
+      "id": "conflicting_goals_077",
+      "family": "conflicting_goals",
+      "title": "Hunger vs settlement wood 1",
+      "facts": {
+        "variant": 0,
+        "citizen": "Atlas"
+      },
+      "expect": {
+        "covered": true
+      }
+    },
+    {
+      "id": "conflicting_goals_078",
+      "family": "conflicting_goals",
+      "title": "Hunger vs settlement wood 2",
+      "facts": {
+        "variant": 1,
+        "citizen": "Maya"
+      },
+      "expect": {
+        "covered": true
+      }
+    },
+    {
+      "id": "conflicting_goals_079",
+      "family": "conflicting_goals",
+      "title": "Hunger vs settlement wood 3",
+      "facts": {
+        "variant": 2,
+        "citizen": "Theo"
+      },
+      "expect": {
+        "covered": true
+      }
+    },
+    {
+      "id": "conflicting_goals_080",
+      "family": "conflicting_goals",
+      "title": "Hunger vs settlement wood 4",
+      "facts": {
+        "variant": 3,
+        "citizen": "Ava"
+      },
+      "expect": {
+        "covered": true
+      }
+    },
+    {
+      "id": "conflicting_goals_081",
+      "family": "conflicting_goals",
+      "title": "Hunger vs settlement wood 5",
+      "facts": {
+        "variant": 4,
+        "citizen": "Kai"
+      },
+      "expect": {
+        "covered": true
+      }
+    },
+    {
+      "id": "conflicting_goals_082",
+      "family": "conflicting_goals",
+      "title": "Hunger vs settlement wood 6",
+      "facts": {
+        "variant": 5,
+        "citizen": "Atlas"
+      },
+      "expect": {
+        "covered": true
+      }
+    },
+    {
+      "id": "conflicting_goals_083",
+      "family": "conflicting_goals",
+      "title": "Hunger vs settlement wood 7",
+      "facts": {
+        "variant": 6,
+        "citizen": "Maya"
+      },
+      "expect": {
+        "covered": true
+      }
+    },
+    {
+      "id": "conflicting_goals_084",
+      "family": "conflicting_goals",
+      "title": "Hunger vs settlement wood 8",
+      "facts": {
+        "variant": 7,
+        "citizen": "Theo"
+      },
+      "expect": {
+        "covered": true
+      }
+    },
+    {
+      "id": "success_failure_learning_085",
+      "family": "success_failure_learning",
+      "title": "Recovery records success 1",
+      "facts": {
+        "variant": 0,
+        "citizen": "Atlas"
+      },
+      "expect": {
+        "covered": true
+      }
+    },
+    {
+      "id": "success_failure_learning_086",
+      "family": "success_failure_learning",
+      "title": "Recovery records success 2",
+      "facts": {
+        "variant": 1,
+        "citizen": "Maya"
+      },
+      "expect": {
+        "covered": true
+      }
+    },
+    {
+      "id": "success_failure_learning_087",
+      "family": "success_failure_learning",
+      "title": "Recovery records success 3",
+      "facts": {
+        "variant": 2,
+        "citizen": "Theo"
+      },
+      "expect": {
+        "covered": true
+      }
+    },
+    {
+      "id": "success_failure_learning_088",
+      "family": "success_failure_learning",
+      "title": "Recovery records success 4",
+      "facts": {
+        "variant": 3,
+        "citizen": "Ava"
+      },
+      "expect": {
+        "covered": true
+      }
+    },
+    {
+      "id": "success_failure_learning_089",
+      "family": "success_failure_learning",
+      "title": "Recovery records success 5",
+      "facts": {
+        "variant": 4,
+        "citizen": "Kai"
+      },
+      "expect": {
+        "covered": true
+      }
+    },
+    {
+      "id": "success_failure_learning_090",
+      "family": "success_failure_learning",
+      "title": "Recovery records success 6",
+      "facts": {
+        "variant": 5,
+        "citizen": "Atlas"
+      },
+      "expect": {
+        "covered": true
+      }
+    },
+    {
+      "id": "success_failure_learning_091",
+      "family": "success_failure_learning",
+      "title": "Recovery records success 7",
+      "facts": {
+        "variant": 6,
+        "citizen": "Maya"
+      },
+      "expect": {
+        "covered": true
+      }
+    },
+    {
+      "id": "success_failure_learning_092",
+      "family": "success_failure_learning",
+      "title": "Recovery records success 8",
+      "facts": {
+        "variant": 7,
+        "citizen": "Theo"
+      },
+      "expect": {
+        "covered": true
+      }
+    },
+    {
+      "id": "recovery_093",
+      "family": "recovery",
+      "title": "Safe rebuild weakens obsolete avoidance 1",
+      "facts": {
+        "variant": 0,
+        "citizen": "Atlas"
+      },
+      "expect": {
+        "covered": true
+      }
+    },
+    {
+      "id": "recovery_094",
+      "family": "recovery",
+      "title": "Safe rebuild weakens obsolete avoidance 2",
+      "facts": {
+        "variant": 1,
+        "citizen": "Maya"
+      },
+      "expect": {
+        "covered": true
+      }
+    },
+    {
+      "id": "recovery_095",
+      "family": "recovery",
+      "title": "Safe rebuild weakens obsolete avoidance 3",
+      "facts": {
+        "variant": 2,
+        "citizen": "Theo"
+      },
+      "expect": {
+        "covered": true
+      }
+    },
+    {
+      "id": "recovery_096",
+      "family": "recovery",
+      "title": "Safe rebuild weakens obsolete avoidance 4",
+      "facts": {
+        "variant": 3,
+        "citizen": "Ava"
+      },
+      "expect": {
+        "covered": true
+      }
+    },
+    {
+      "id": "recovery_097",
+      "family": "recovery",
+      "title": "Safe rebuild weakens obsolete avoidance 5",
+      "facts": {
+        "variant": 4,
+        "citizen": "Kai"
+      },
+      "expect": {
+        "covered": true
+      }
+    },
+    {
+      "id": "recovery_098",
+      "family": "recovery",
+      "title": "Safe rebuild weakens obsolete avoidance 6",
+      "facts": {
+        "variant": 5,
+        "citizen": "Atlas"
+      },
+      "expect": {
+        "covered": true
+      }
+    },
+    {
+      "id": "recovery_099",
+      "family": "recovery",
+      "title": "Safe rebuild weakens obsolete avoidance 7",
+      "facts": {
+        "variant": 6,
+        "citizen": "Maya"
+      },
+      "expect": {
+        "covered": true
+      }
+    },
+    {
+      "id": "recovery_100",
+      "family": "recovery",
+      "title": "Safe rebuild weakens obsolete avoidance 8",
+      "facts": {
+        "variant": 7,
+        "citizen": "Theo"
+      },
+      "expect": {
+        "covered": true
+      }
+    },
+    {
+      "id": "creeper_loss_101",
+      "family": "creeper_loss",
+      "title": "Creeper storage loss is high salience 1",
+      "facts": {
+        "variant": 0,
+        "citizen": "Atlas"
+      },
+      "expect": {
+        "covered": true
+      }
+    },
+    {
+      "id": "creeper_loss_102",
+      "family": "creeper_loss",
+      "title": "Creeper storage loss is high salience 2",
+      "facts": {
+        "variant": 1,
+        "citizen": "Maya"
+      },
+      "expect": {
+        "covered": true
+      }
+    },
+    {
+      "id": "creeper_loss_103",
+      "family": "creeper_loss",
+      "title": "Creeper storage loss is high salience 3",
+      "facts": {
+        "variant": 2,
+        "citizen": "Theo"
+      },
+      "expect": {
+        "covered": true
+      }
+    },
+    {
+      "id": "creeper_loss_104",
+      "family": "creeper_loss",
+      "title": "Creeper storage loss is high salience 4",
+      "facts": {
+        "variant": 3,
+        "citizen": "Ava"
+      },
+      "expect": {
+        "covered": true
+      }
+    },
+    {
+      "id": "creeper_loss_105",
+      "family": "creeper_loss",
+      "title": "Creeper storage loss is high salience 5",
+      "facts": {
+        "variant": 4,
+        "citizen": "Kai"
+      },
+      "expect": {
+        "covered": true
+      }
+    },
+    {
+      "id": "creeper_loss_106",
+      "family": "creeper_loss",
+      "title": "Creeper storage loss is high salience 6",
+      "facts": {
+        "variant": 5,
+        "citizen": "Atlas"
+      },
+      "expect": {
+        "covered": true
+      }
+    },
+    {
+      "id": "creeper_loss_107",
+      "family": "creeper_loss",
+      "title": "Creeper storage loss is high salience 7",
+      "facts": {
+        "variant": 6,
+        "citizen": "Maya"
+      },
+      "expect": {
+        "covered": true
+      }
+    },
+    {
+      "id": "creeper_loss_108",
+      "family": "creeper_loss",
+      "title": "Creeper storage loss is high salience 8",
+      "facts": {
+        "variant": 7,
+        "citizen": "Theo"
+      },
+      "expect": {
+        "covered": true
+      }
+    },
+    {
+      "id": "follow_up_109",
+      "family": "follow_up",
+      "title": "Follow-ups reconsider after primary complete 1",
+      "facts": {
+        "variant": 0,
+        "citizen": "Atlas"
+      },
+      "expect": {
+        "covered": true
+      }
+    },
+    {
+      "id": "follow_up_110",
+      "family": "follow_up",
+      "title": "Follow-ups reconsider after primary complete 2",
+      "facts": {
+        "variant": 1,
+        "citizen": "Maya"
+      },
+      "expect": {
+        "covered": true
+      }
+    },
+    {
+      "id": "follow_up_111",
+      "family": "follow_up",
+      "title": "Follow-ups reconsider after primary complete 3",
+      "facts": {
+        "variant": 2,
+        "citizen": "Theo"
+      },
+      "expect": {
+        "covered": true
+      }
+    },
+    {
+      "id": "follow_up_112",
+      "family": "follow_up",
+      "title": "Follow-ups reconsider after primary complete 4",
+      "facts": {
+        "variant": 3,
+        "citizen": "Ava"
+      },
+      "expect": {
+        "covered": true
+      }
+    },
+    {
+      "id": "follow_up_113",
+      "family": "follow_up",
+      "title": "Follow-ups reconsider after primary complete 5",
+      "facts": {
+        "variant": 4,
+        "citizen": "Kai"
+      },
+      "expect": {
+        "covered": true
+      }
+    },
+    {
+      "id": "follow_up_114",
+      "family": "follow_up",
+      "title": "Follow-ups reconsider after primary complete 6",
+      "facts": {
+        "variant": 5,
+        "citizen": "Atlas"
+      },
+      "expect": {
+        "covered": true
+      }
+    },
+    {
+      "id": "follow_up_115",
+      "family": "follow_up",
+      "title": "Follow-ups reconsider after primary complete 7",
+      "facts": {
+        "variant": 6,
+        "citizen": "Maya"
+      },
+      "expect": {
+        "covered": true
+      }
+    },
+    {
+      "id": "follow_up_116",
+      "family": "follow_up",
+      "title": "Follow-ups reconsider after primary complete 8",
+      "facts": {
+        "variant": 7,
+        "citizen": "Theo"
+      },
+      "expect": {
+        "covered": true
+      }
+    },
+    {
+      "id": "fact_consistency_117",
+      "family": "fact_consistency",
+      "title": "Cannot invent hostile 1",
+      "facts": {
+        "variant": 0,
+        "citizen": "Atlas"
+      },
+      "expect": {
+        "covered": true
+      }
+    },
+    {
+      "id": "fact_consistency_118",
+      "family": "fact_consistency",
+      "title": "Cannot invent hostile 2",
+      "facts": {
+        "variant": 1,
+        "citizen": "Maya"
+      },
+      "expect": {
+        "covered": true
+      }
+    },
+    {
+      "id": "fact_consistency_119",
+      "family": "fact_consistency",
+      "title": "Cannot invent hostile 3",
+      "facts": {
+        "variant": 2,
+        "citizen": "Theo"
+      },
+      "expect": {
+        "covered": true
+      }
+    },
+    {
+      "id": "fact_consistency_120",
+      "family": "fact_consistency",
+      "title": "Cannot invent hostile 4",
+      "facts": {
+        "variant": 3,
+        "citizen": "Ava"
+      },
+      "expect": {
+        "covered": true
+      }
+    },
+    {
+      "id": "fact_consistency_121",
+      "family": "fact_consistency",
+      "title": "Cannot invent hostile 5",
+      "facts": {
+        "variant": 4,
+        "citizen": "Kai"
+      },
+      "expect": {
+        "covered": true
+      }
+    },
+    {
+      "id": "fact_consistency_122",
+      "family": "fact_consistency",
+      "title": "Cannot invent hostile 6",
+      "facts": {
+        "variant": 5,
+        "citizen": "Atlas"
+      },
+      "expect": {
+        "covered": true
+      }
+    },
+    {
+      "id": "fact_consistency_123",
+      "family": "fact_consistency",
+      "title": "Cannot invent hostile 7",
+      "facts": {
+        "variant": 6,
+        "citizen": "Maya"
+      },
+      "expect": {
+        "covered": true
+      }
+    },
+    {
+      "id": "fact_consistency_124",
+      "family": "fact_consistency",
+      "title": "Cannot invent hostile 8",
+      "facts": {
+        "variant": 7,
+        "citizen": "Theo"
+      },
+      "expect": {
+        "covered": true
+      }
+    },
+    {
+      "id": "perspective_010",
+      "family": "perspective",
+      "title": "Perspective fixture 1",
+      "facts": {
+        "observer": "Atlas",
+        "target": "Maya",
+        "mood": "stressed",
+        "source": "HEARD",
+        "need": "food"
+      },
+      "expect": {
+        "objectiveUnchanged": true,
+        "localBelief": true
+      }
+    },
+    {
+      "id": "perspective_011",
+      "family": "perspective",
+      "title": "Perspective fixture 2",
+      "facts": {
+        "observer": "Maya",
+        "target": "Theo",
+        "mood": "calm",
+        "source": "WITNESSED",
+        "need": "none"
+      },
+      "expect": {
+        "objectiveUnchanged": true,
+        "localBelief": true
+      }
+    },
+    {
+      "id": "perspective_012",
+      "family": "perspective",
+      "title": "Perspective fixture 3",
+      "facts": {
+        "observer": "Theo",
+        "target": "Ava",
+        "mood": "calm",
+        "source": "HEARD",
+        "need": "none"
+      },
+      "expect": {
+        "objectiveUnchanged": true,
+        "localBelief": true
+      }
+    },
+    {
+      "id": "perspective_013",
+      "family": "perspective",
+      "title": "Perspective fixture 4",
+      "facts": {
+        "observer": "Ava",
+        "target": "Kai",
+        "mood": "stressed",
+        "source": "WITNESSED",
+        "need": "none"
+      },
+      "expect": {
+        "objectiveUnchanged": true,
+        "localBelief": true
+      }
+    },
+    {
+      "id": "perspective_014",
+      "family": "perspective",
+      "title": "Perspective fixture 5",
+      "facts": {
+        "observer": "Kai",
+        "target": "Atlas",
+        "mood": "calm",
+        "source": "HEARD",
+        "need": "food"
+      },
+      "expect": {
+        "objectiveUnchanged": true,
+        "localBelief": true
+      }
+    },
+    {
+      "id": "perspective_015",
+      "family": "perspective",
+      "title": "Perspective fixture 6",
+      "facts": {
+        "observer": "Atlas",
+        "target": "Maya",
+        "mood": "calm",
+        "source": "WITNESSED",
+        "need": "none"
+      },
+      "expect": {
+        "objectiveUnchanged": true,
+        "localBelief": true
+      }
+    },
+    {
+      "id": "perspective_016",
+      "family": "perspective",
+      "title": "Perspective fixture 7",
+      "facts": {
+        "observer": "Maya",
+        "target": "Theo",
+        "mood": "stressed",
+        "source": "HEARD",
+        "need": "none"
+      },
+      "expect": {
+        "objectiveUnchanged": true,
+        "localBelief": true
+      }
+    },
+    {
+      "id": "perspective_017",
+      "family": "perspective",
+      "title": "Perspective fixture 8",
+      "facts": {
+        "observer": "Theo",
+        "target": "Ava",
+        "mood": "calm",
+        "source": "WITNESSED",
+        "need": "none"
+      },
+      "expect": {
+        "objectiveUnchanged": true,
+        "localBelief": true
+      }
+    },
+    {
+      "id": "perspective_018",
+      "family": "perspective",
+      "title": "Perspective fixture 9",
+      "facts": {
+        "observer": "Ava",
+        "target": "Kai",
+        "mood": "calm",
+        "source": "HEARD",
+        "need": "food"
+      },
+      "expect": {
+        "objectiveUnchanged": true,
+        "localBelief": true
+      }
+    },
+    {
+      "id": "perspective_019",
+      "family": "perspective",
+      "title": "Perspective fixture 10",
+      "facts": {
+        "observer": "Kai",
+        "target": "Atlas",
+        "mood": "stressed",
+        "source": "WITNESSED",
+        "need": "none"
+      },
+      "expect": {
+        "objectiveUnchanged": true,
+        "localBelief": true
+      }
+    },
+    {
+      "id": "perspective_020",
+      "family": "perspective",
+      "title": "Perspective fixture 11",
+      "facts": {
+        "observer": "Atlas",
+        "target": "Maya",
+        "mood": "calm",
+        "source": "HEARD",
+        "need": "none"
+      },
+      "expect": {
+        "objectiveUnchanged": true,
+        "localBelief": true
+      }
+    },
+    {
+      "id": "perspective_021",
+      "family": "perspective",
+      "title": "Perspective fixture 12",
+      "facts": {
+        "observer": "Maya",
+        "target": "Theo",
+        "mood": "calm",
+        "source": "WITNESSED",
+        "need": "none"
+      },
+      "expect": {
+        "objectiveUnchanged": true,
+        "localBelief": true
+      }
+    },
+    {
+      "id": "perspective_022",
+      "family": "perspective",
+      "title": "Perspective fixture 13",
+      "facts": {
+        "observer": "Theo",
+        "target": "Ava",
+        "mood": "stressed",
+        "source": "HEARD",
+        "need": "food"
+      },
+      "expect": {
+        "objectiveUnchanged": true,
+        "localBelief": true
+      }
+    },
+    {
+      "id": "perspective_023",
+      "family": "perspective",
+      "title": "Perspective fixture 14",
+      "facts": {
+        "observer": "Ava",
+        "target": "Kai",
+        "mood": "calm",
+        "source": "WITNESSED",
+        "need": "none"
+      },
+      "expect": {
+        "objectiveUnchanged": true,
+        "localBelief": true
+      }
+    },
+    {
+      "id": "perspective_024",
+      "family": "perspective",
+      "title": "Perspective fixture 15",
+      "facts": {
+        "observer": "Kai",
+        "target": "Atlas",
+        "mood": "calm",
+        "source": "HEARD",
+        "need": "none"
+      },
+      "expect": {
+        "objectiveUnchanged": true,
+        "localBelief": true
+      }
+    },
+    {
+      "id": "perspective_025",
+      "family": "perspective",
+      "title": "Perspective fixture 16",
+      "facts": {
+        "observer": "Atlas",
+        "target": "Maya",
+        "mood": "stressed",
+        "source": "WITNESSED",
+        "need": "none"
+      },
+      "expect": {
+        "objectiveUnchanged": true,
+        "localBelief": true
+      }
+    },
+    {
+      "id": "perspective_026",
+      "family": "perspective",
+      "title": "Perspective fixture 17",
+      "facts": {
+        "observer": "Maya",
+        "target": "Theo",
+        "mood": "calm",
+        "source": "HEARD",
+        "need": "food"
+      },
+      "expect": {
+        "objectiveUnchanged": true,
+        "localBelief": true
+      }
+    },
+    {
+      "id": "perspective_027",
+      "family": "perspective",
+      "title": "Perspective fixture 18",
+      "facts": {
+        "observer": "Theo",
+        "target": "Ava",
+        "mood": "calm",
+        "source": "WITNESSED",
+        "need": "none"
+      },
+      "expect": {
+        "objectiveUnchanged": true,
+        "localBelief": true
+      }
+    },
+    {
+      "id": "perspective_028",
+      "family": "perspective",
+      "title": "Perspective fixture 19",
+      "facts": {
+        "observer": "Ava",
+        "target": "Kai",
+        "mood": "stressed",
+        "source": "HEARD",
+        "need": "none"
+      },
+      "expect": {
+        "objectiveUnchanged": true,
+        "localBelief": true
+      }
+    },
+    {
+      "id": "perspective_029",
+      "family": "perspective",
+      "title": "Perspective fixture 20",
+      "facts": {
+        "observer": "Kai",
+        "target": "Atlas",
+        "mood": "calm",
+        "source": "WITNESSED",
+        "need": "none"
+      },
+      "expect": {
+        "objectiveUnchanged": true,
+        "localBelief": true
+      }
+    }
+  ]
+}

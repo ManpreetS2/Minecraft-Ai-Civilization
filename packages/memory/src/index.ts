@@ -41,7 +41,7 @@ export {
 } from "./embeddings.js";
 export { attachCognitiveStore, fromSimEvent, INTEGRATION_TODO } from "./integration.js";
 export { retrieveLessons, type ScoredLesson } from "./lesson-retrieval.js";
-export { retrieveMemories } from "./retrieval.js";
+export { retrieveMemories, diversifyMemories } from "./retrieval.js";
 export { isRoutineEvent, scoreSalience } from "./salience.js";
 export { COGNITIVE_MIGRATIONS, COGNITIVE_SCHEMA_V1, COGNITIVE_SCHEMA_V2 } from "./schema.js";
 export { CognitiveStore } from "./store.js";

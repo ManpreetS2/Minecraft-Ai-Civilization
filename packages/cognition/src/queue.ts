@@ -4,6 +4,11 @@ export type InferenceJob<T> = {
   id: string;
   citizenId: string;
   type: InferenceType;
+  requestType?: "routine" | "reflection" | "classify";
+  priority?: number;
+  createdAt?: number;
+  deadline?: number;
+  stalenessKey?: string;
   run: () => Promise<T>;
 };
 
@@ -34,6 +39,7 @@ type Waiter<T> = {
 export class InferenceQueue {
   private readonly waiting: Array<Waiter<unknown>> = [];
   private inFlight = 0;
+  private readonly inFlightByCitizen = new Map<string, number>();
 
   constructor(private readonly maxConcurrency: number) {}
 
@@ -53,11 +59,35 @@ export class InferenceQueue {
     });
   }
 
+  private pickNext(now: number): Waiter<unknown> | undefined {
+    for (let i = this.waiting.length - 1; i >= 0; i -= 1) {
+      const waiter = this.waiting[i];
+      if (waiter?.job.deadline && waiter.job.deadline < now) {
+        this.waiting.splice(i, 1);
+        waiter.reject(new Error("DEADLINE_EXCEEDED"));
+      }
+    }
+    if (this.waiting.length === 0) return undefined;
+    let bestIndex = 0;
+    let bestScore = Number.POSITIVE_INFINITY;
+    this.waiting.forEach((waiter, index) => {
+      const inflight = this.inFlightByCitizen.get(waiter.job.citizenId) ?? 0;
+      const queuedSame = this.waiting.filter((row) => row.job.citizenId === waiter.job.citizenId).length;
+      const score = inflight * 100 + queuedSame + index * 0.001;
+      if (score < bestScore) {
+        bestScore = score;
+        bestIndex = index;
+      }
+    });
+    return this.waiting.splice(bestIndex, 1)[0];
+  }
+
   private pump(): void {
     while (this.inFlight < this.maxConcurrency && this.waiting.length > 0) {
-      const next = this.waiting.shift();
+      const next = this.pickNext(Date.now());
       if (!next) return;
       this.inFlight += 1;
+      this.inFlightByCitizen.set(next.job.citizenId, (this.inFlightByCitizen.get(next.job.citizenId) ?? 0) + 1);
       const started = Date.now();
       const queueWaitMs = started - next.enqueuedAt;
       void next.job
@@ -76,6 +106,9 @@ export class InferenceQueue {
         .catch((error: unknown) => next.reject(error))
         .finally(() => {
           this.inFlight -= 1;
+          const remaining = (this.inFlightByCitizen.get(next.job.citizenId) ?? 1) - 1;
+          if (remaining <= 0) this.inFlightByCitizen.delete(next.job.citizenId);
+          else this.inFlightByCitizen.set(next.job.citizenId, remaining);
           this.pump();
         });
     }

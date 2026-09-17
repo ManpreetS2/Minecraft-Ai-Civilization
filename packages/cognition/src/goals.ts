@@ -17,7 +17,9 @@ export const GOALS = [
   "explore",
   "defend",
   "seek_safety",
+  "return_to_settlement",
   "socialize",
+  "transfer_item",
   "reconsider",
 ] as const;
 
@@ -38,13 +40,20 @@ export const GOAL_ALIASES: Record<string, Goal> = {
   minestone: "mine_stone",
   mine: "mine_stone",
   get_stone: "mine_stone",
+  gather_stone: "mine_stone",
+  gatherstone: "mine_stone",
+  collect_stone: "mine_stone",
   crafttools: "craft_tools",
   make_tools: "craft_tools",
+  craft_better_tools: "craft_tools",
+  make_better_tools: "craft_tools",
   help: "assist_citizen",
   helpcitizen: "assist_citizen",
   assist: "assist_citizen",
   assistcitizen: "assist_citizen",
   deposit_items: "use_storage",
+  withdraw_items: "use_storage",
+  withdraw: "use_storage",
   store_items: "use_storage",
   put_away: "use_storage",
   use_chest: "use_storage",
@@ -64,6 +73,12 @@ export const GOAL_ALIASES: Record<string, Goal> = {
   work_on_project: "contribute_to_project",
   join_project: "contribute_to_project",
   build_project: "contribute_to_project",
+  go_home: "return_to_settlement",
+  return_home: "return_to_settlement",
+  return_to_village: "return_to_settlement",
+  give_item: "transfer_item",
+  share_item: "transfer_item",
+  hand_item: "transfer_item",
 };
 
 export const PRIVILEGED_FIELDS = new Set([

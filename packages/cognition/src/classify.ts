@@ -19,7 +19,7 @@ export type ClassifiedFailure = {
   code: string;
 };
 
-const NETWORK_CODES = /keepalive|econnreset|etimedout|timed out|socket hang up|econnrefused|enotfound|websocket/i;
+const NETWORK_CODES = /keepalive|econnreset|etimedout|client timed out|socket hang up|econnrefused|enotfound|websocket/i;
 const SERVER_CODES = /paper|minecraft server|tick timeout|protocol/i;
 const INFRA_CODES = /sqlite|database is locked|ebusy|enoent|oom|out of memory/i;
 
@@ -43,6 +43,13 @@ export function classifyFailure(signal: FailureSignal): ClassifiedFailure {
   }
   if (signal.unreachable || signal.errorCode === "TARGET_UNREACHABLE") {
     return { category: "WORLD_CONSTRAINT", track: "CITIZEN", citizenLearns: true, code: "TARGET_UNREACHABLE" };
+  }
+  if (
+    signal.errorCode === "PATH_BLOCKED" ||
+    signal.errorCode === "PATH_FAILED" ||
+    /GoalNear|moveTo timed out|stuck heading|no path to/i.test(blob)
+  ) {
+    return { category: "SKILL_EXECUTION", track: "CITIZEN", citizenLearns: true, code: signal.errorCode ?? "PATH_FAILED" };
   }
   if (signal.inventoryFull || signal.errorCode === "INVENTORY_FULL") {
     return { category: "RESOURCE_CONFLICT", track: "CITIZEN", citizenLearns: true, code: "INVENTORY_FULL" };

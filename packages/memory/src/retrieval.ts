@@ -36,10 +36,9 @@ export function retrieveMemories(
       queryEmbedding: options.queryEmbedding,
     }))
     .filter((entry) => entry.score > 0.05)
-    .sort((a, b) => b.score - a.score)
-    .slice(0, limit);
+    .sort((a, b) => b.score - a.score);
 
-  return scored;
+  return diversifyMemories(scored).slice(0, limit);
 }
 
 function scoreOne(
@@ -133,6 +132,31 @@ function scoreOne(
   }
 
   return { memory, score: clamp01(score), reasons: [...new Set(reasons)] };
+}
+
+function memoryPattern(memory: StoredMemory): string {
+  const head = memory.summary
+    .toLowerCase()
+    .replace(/\d+/g, "#")
+    .replace(/\b(again|still|once more|retry|retries)\b/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 48);
+  return `${memory.eventType}:${head}`;
+}
+
+/** Prefer one summarized pattern plus the most recent copy, not five identical failures. */
+export function diversifyMemories(scored: ScoredMemory[]): ScoredMemory[] {
+  const seen = new Map<string, number>();
+  const out: ScoredMemory[] = [];
+  for (const item of scored) {
+    const key = memoryPattern(item.memory);
+    const count = seen.get(key) ?? 0;
+    if (count >= 2) continue;
+    seen.set(key, count + 1);
+    out.push(item);
+  }
+  return out;
 }
 
 function recencyScore(timestamp: string, now: number): number {

@@ -2,10 +2,11 @@ import type { DeliberationTrigger } from "./router.js";
 
 export type CooldownState = {
   lastAt: Map<string, number>;
+  lastHash: Map<string, string>;
 };
 
 export function createCooldownState(): CooldownState {
-  return { lastAt: new Map() };
+  return { lastAt: new Map(), lastHash: new Map() };
 }
 
 export type DeliberateCheck = {
@@ -17,6 +18,7 @@ export type DeliberateCheck = {
   busy: boolean;
   consecutiveFailures: number;
   idle: boolean;
+  worldHash?: string;
 };
 
 /**
@@ -38,7 +40,8 @@ export function shouldDeliberate(check: DeliberateCheck, state: CooldownState): 
   if (check.idle && !check.hasGoal && !check.busy) {
     const last = state.lastAt.get(check.citizenId);
     if (last !== undefined && check.now - last < check.cooldownMs) {
-      return { allowed: false, reason: "idle_cooldown" };
+      const hashUnchanged = !check.worldHash || state.lastHash.get(check.citizenId) === check.worldHash;
+      if (hashUnchanged) return { allowed: false, reason: "idle_cooldown" };
     }
     return { allowed: true, reason: "idle" };
   }
@@ -47,11 +50,13 @@ export function shouldDeliberate(check: DeliberateCheck, state: CooldownState): 
   }
   const last = state.lastAt.get(check.citizenId);
   if (last !== undefined && check.now - last < check.cooldownMs) {
-    return { allowed: false, reason: "cooldown" };
+    const hashUnchanged = !check.worldHash || state.lastHash.get(check.citizenId) === check.worldHash;
+    if (hashUnchanged) return { allowed: false, reason: "cooldown" };
   }
   return { allowed: true, reason: check.trigger };
 }
 
-export function markDeliberated(state: CooldownState, citizenId: string, now: number): void {
+export function markDeliberated(state: CooldownState, citizenId: string, now: number, worldHash?: string): void {
   state.lastAt.set(citizenId, now);
+  if (worldHash) state.lastHash.set(citizenId, worldHash);
 }

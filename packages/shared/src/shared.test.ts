@@ -30,6 +30,7 @@ describe("config", () => {
     expect(cfg.MINECRAFT_AUTH_MODE).toBe("offline");
     expect(cfg.LLM_ENABLED).toBe(false);
     expect(cfg.OLLAMA_ROUTINE_MODEL).toBe("qwen3.5:9b");
+    expect(cfg.OLLAMA_FAST_MODEL).toBe("qwen3.5:4b");
     expect(cfg.OLLAMA_MAX_CONCURRENCY).toBe(1);
   });
 });

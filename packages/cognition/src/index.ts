@@ -55,3 +55,18 @@ export { ExperienceLedger, type AttemptInput } from "./experience-ledger.js";
 export { validateLessonProposal, validateDecisionEvaluation, type LessonProposal } from "./lesson-schema.js";
 export { adaptMinecraftKnowledge, decisionContradictsMechanics, type GameKnowledgeProvider } from "./game-knowledge.js";
 export { renderLearningJournal, writeLearningJournal } from "./journal.js";
+export {
+  BoundedDecisionSchema,
+  assembleBoundedDecision,
+  normalizeFollowUps,
+  validateBoundedDecision,
+  type BoundedDecision,
+} from "./decision-contract.js";
+export { parseCompoundGoal, isExecutionLevelObject, rejectExecutionLevel } from "./compound.js";
+export { guardDecisionFacts, personalEdibleCount, isEdibleName, type GuardResult } from "./fact-guards.js";
+export { hashWorldState, factsFromView, type WorldStateFacts } from "./world-hash.js";
+export { chatInvalidatesWork, shouldReconsiderFollowUps, assumptionsFromFacts } from "./stale.js";
+export { SpeechGate, speechIsNotAction, SPEECH_INTENTS, type SpeechIntent } from "./communication.js";
+export { observerDebugSnapshot, type ObserverDebugSnapshot } from "./debug-snapshot.js";
+export { COGNITION_VECTORS, buildCognitionVectors, type CognitionVector } from "./vectors.js";
+export { evaluateCognitionVector, evaluateCognitionVectors } from "./vector-eval.js";

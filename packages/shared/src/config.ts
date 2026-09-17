@@ -26,6 +26,7 @@ const envSchema = z.object({
     .transform((v) => v === "true"),
   OLLAMA_HOST: z.string().default("http://127.0.0.1:11434"),
   OLLAMA_MODEL: z.string().default("qwen3.5:9b"),
+  OLLAMA_FAST_MODEL: z.string().default("qwen3.5:4b"),
   OLLAMA_ROUTINE_MODEL: z.string().default("qwen3.5:9b"),
   OLLAMA_REFLECTION_MODEL: z.string().default("gpt-oss:20b"),
   OLLAMA_CONTEXT_SIZE: z.coerce.number().int().positive().default(8192),

@@ -78,3 +78,36 @@ export function decayAssociation(value: LearnedAssociation, days: number): Learn
   const factor = Math.max(0, 1 - 0.02 * days);
   return { ...value, strength: clamp01(value.strength * factor) };
 }
+
+/**
+ * Bounded risk recalibration.
+ * One harmless event cannot wipe strong repeated evidence.
+ * One dangerous event cannot jump to permanent maximal fear.
+ */
+export function recalibrateAssociation(
+  value: LearnedAssociation,
+  change: { safeRepeats?: number; dangerRepeats?: number },
+  at: string,
+): LearnedAssociation {
+  let strength = value.strength;
+  let confidence = value.confidence;
+  const safe = change.safeRepeats ?? 0;
+  const danger = change.dangerRepeats ?? 0;
+  if (safe > 0) {
+    const delta = Math.min(0.12, 0.03 * safe);
+    strength = weaken(strength, delta);
+    confidence = clamp01(confidence * 0.98);
+  }
+  if (danger > 0) {
+    const delta = Math.min(0.18, 0.08 * danger);
+    strength = reinforce(strength, delta);
+    confidence = clamp01(confidence + 0.05);
+  }
+  return {
+    ...value,
+    strength,
+    confidence,
+    lastReinforcedAt: danger > 0 ? at : value.lastReinforcedAt,
+    lastContradictedAt: safe > 0 ? at : value.lastContradictedAt,
+  };
+}

@@ -1,5 +1,5 @@
 import type { CognitiveStore, StoredMemory } from "@civ/memory";
-import { CONSOLIDATION_ROUTINE_MIN, periodKey } from "@civ/memory";
+import { CONSOLIDATION_ROUTINE_MIN } from "@civ/memory";
 import { normalizeActivity } from "./activity.js";
 
 export type ConsolidationResult = {
@@ -14,7 +14,7 @@ export function consolidateCitizen(
   at: string,
   idFactory: () => string,
 ): ConsolidationResult {
-  const routines = store.listRoutines(citizenId, periodKey(at));
+  const routines = store.listRoutines(citizenId);
   const compressedIds: string[] = [];
   const summariesCreated: StoredMemory[] = [];
 

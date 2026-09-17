@@ -23,6 +23,7 @@ This branch exposes `CognitionService` / `ModelRouter` / `CognitionContextBuilde
 | `LLM_ENABLED` / `OLLAMA_ENABLED` | false | Master switch. Either may enable cognition. |
 | `LLM_PROVIDER` | ollama | `ollama` or `none` |
 | `OLLAMA_HOST` | http://127.0.0.1:11434 | |
+| `OLLAMA_FAST_MODEL` | qwen3.5:4b | Cheap normalize/classify if used |
 | `OLLAMA_ROUTINE_MODEL` | qwen3.5:9b | Routine deliberation |
 | `OLLAMA_REFLECTION_MODEL` | gpt-oss:20b | Rare deep reflection; not required to be loaded |
 | `OLLAMA_MODEL` | qwen3.5:9b | Legacy fallback if routine model unset |
@@ -54,15 +55,25 @@ Not reflex: night, low wood, full inventory, missing tool, generic shelter need.
 
 ## Decision schema
 
+Preferred runtime-facing contract:
+
 ```
-CognitionDecision { goal, priority, reason, targetCitizenId?, targetProjectId?, targetResource?, uncertainty? }
+BoundedDecision {
+  decisionId, primaryGoal, followUpGoals,
+  priority, confidence, reason, createdAt,
+  worldStateHash, relevantMemoryIds, relevantLessonIds
+}
 ```
 
-Allowed goals include existing planner names plus `contribute_to_project`, `seek_safety`, `socialize`, `assist_citizen`, `use_storage`, `reconsider`.
+Legacy planner-facing `CognitionDecision { goal, priority, reason, targetCitizenId?, targetProjectId?, targetResource?, uncertainty? }` is still emitted by `CognitionService`.
 
-Related phrasing may normalize (`Gather wood` → `gather_wood`). Unrelated names are rejected. `socialize` / `assist_citizen` require a real `targetCitizenId`. Privileged fields such as `thinking` / `chain_of_thought` / `give_item` are rejected.
+Allowed goals include existing planner names plus `contribute_to_project`, `seek_safety`, `socialize`, `assist_citizen`, `use_storage`, `return_to_settlement`, `transfer_item`, `reconsider`.
+
+Related phrasing may normalize (`Gather wood` → `gather_wood`). Unrelated names are rejected. Execution-level commands (`walk west`, block coordinates) are rejected as `EXECUTION_LEVEL`. `socialize` / `assist_citizen` require a real `targetCitizenId`. Privileged fields such as `thinking` / `chain_of_thought` are rejected.
 
 LLM output is a **proposal**. It does not create item transfers, deaths, or other objective world facts.
+
+See `docs/COGNITION-INTEGRATION-CONTRACT.md` and `docs/COGNITION-V2-AUDIT.md`.
 
 ## Frequency and queue
 

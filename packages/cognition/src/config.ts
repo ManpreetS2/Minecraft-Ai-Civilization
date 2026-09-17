@@ -7,6 +7,7 @@ export type CognitionConfig = {
   enabled: boolean;
   provider: AppConfig["LLM_PROVIDER"];
   host: string;
+  fastModel: string;
   routineModel: string;
   reflectionModel: string;
   contextSize: number;
@@ -24,6 +25,7 @@ export function resolveCognitionConfig(config: AppConfig): CognitionConfig {
     enabled: Boolean(config.LLM_ENABLED || config.OLLAMA_ENABLED) && config.LLM_PROVIDER !== "none",
     provider: config.LLM_PROVIDER,
     host: config.OLLAMA_HOST,
+    fastModel: config.OLLAMA_FAST_MODEL || "qwen3.5:4b",
     routineModel: config.OLLAMA_ROUTINE_MODEL || config.OLLAMA_MODEL || DEFAULT_ROUTINE_MODEL,
     reflectionModel: config.OLLAMA_REFLECTION_MODEL || DEFAULT_REFLECTION_MODEL,
     contextSize: config.OLLAMA_CONTEXT_SIZE,

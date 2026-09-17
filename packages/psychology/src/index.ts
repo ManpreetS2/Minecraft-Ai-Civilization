@@ -1,5 +1,5 @@
 export { activityFromRow, normalizeActivity, recordActivityAttempt } from "./activity.js";
-export { applyAssociationProposal, associationFromRow, associationToRow, decayAssociation } from "./associations.js";
+export { applyAssociationProposal, associationFromRow, associationToRow, decayAssociation, recalibrateAssociation } from "./associations.js";
 export {
   AppraisalResultSchema,
   DeterministicAppraisal,
@@ -13,6 +13,8 @@ export { computeDimensions, factualSummary } from "./dimensions.js";
 export { habitContext, recordHabit } from "./habits.js";
 export { ingestHeardClaim, ingestObjectiveEvent } from "./ingestion.js";
 export { CitizenMind, type CitizenCognitiveSnapshot, type CitizenMindOptions } from "./mind.js";
+export { compactMindSnapshot, type MindSnapshot } from "./mind-snapshot.js";
+export { ObligationBoard, isCooperation, type Obligation, type ObligationStatus } from "./obligations.js";
 export { generateCitizenNarrative } from "./narrative.js";
 export {
   applyPsychDeltas,

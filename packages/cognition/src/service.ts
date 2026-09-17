@@ -16,7 +16,7 @@ import { ModelRouter, type CognitionMode, type DeliberationTrigger, type RouteRe
 import { validateCognitionDecision, type CognitionDecision } from "./schema.js";
 import { isDecisionStale, type DecisionAssumptions } from "./stale.js";
 import type { AppConfig } from "@civ/shared";
-import { FOOD_ITEM_NAMES } from "@civ/shared";
+import { isEdibleName } from "./fact-guards.js";
 
 export type Deliberator = {
   decide(ctx: CognitionContext, timeoutMs: number): Promise<ModelTurn<CognitionDecision>>;
@@ -407,7 +407,7 @@ export function assumptionsFrom(view: WorldView, req: Pick<DecideRequest, "curre
     createdAtMs: Date.now(),
     hunger: view.hunger,
     health: view.health,
-    hasFoodInInventory: view.inventory.some((i) => FOOD_ITEM_NAMES.has(i.name) && i.count > 0),
+    hasFoodInInventory: view.inventory.some((i) => i.count > 0 && isEdibleName(i.name)),
     nearbyHostile: view.nearbyHostiles.some((h) => h.distance < 12),
     currentGoal: req.currentGoal,
     significantEventId: req.significantEventId,

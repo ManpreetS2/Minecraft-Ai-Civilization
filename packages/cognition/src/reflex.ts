@@ -1,4 +1,4 @@
-import { FOOD_ITEM_NAMES } from "@civ/shared";
+import { isEdibleName } from "./fact-guards.js";
 
 export type WorldView = {
   health?: number;
@@ -49,7 +49,7 @@ export function detectEmergencyReflex(view: WorldView): ReflexDecision | undefin
       priority: 1,
     };
   }
-  const hasFood = view.inventory.some((item) => FOOD_ITEM_NAMES.has(item.name) && item.count > 0);
+  const hasFood = view.inventory.some((item) => item.count > 0 && isEdibleName(item.name));
   if ((view.hunger ?? 20) <= 7 && hasFood) {
     return {
       kind: "eat_available_food",
