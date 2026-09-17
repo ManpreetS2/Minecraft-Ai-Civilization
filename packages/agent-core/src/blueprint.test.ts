@@ -6,6 +6,7 @@ describe("starter hut blueprint", () => {
     const hut = starterHut();
     const materials = materialList(hut);
     expect(hut.blocks.length).toBeGreaterThan(40);
+    expect(hut.blocks.length).toBeLessThan(85);
     expect(materials.oak_planks).toBeGreaterThan(20);
     expect(materials.chest).toBe(1);
     expect(materials.crafting_table).toBe(1);

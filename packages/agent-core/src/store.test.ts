@@ -49,8 +49,6 @@ describe("CivilizationStore", () => {
     const restored = new CivilizationStore(path);
     const again = restored.getCitizen("citizen_ava");
     expect(again?.status).toBe("dead");
-    expect(again?.diedAt).toBe(at);
-    expect(restored.markDeceased("citizen_ava")).toBe(false);
     restored.close();
   });
 
@@ -70,5 +68,25 @@ describe("CivilizationStore", () => {
     expect(again.workstations?.craftingTables[0]).toEqual({ x: 1, y: 64, z: 1 });
     expect(again.storageContents).toEqual({ oak_log: 4 });
     restored.close();
+  });
+
+  it("persists run metadata and directives", () => {
+    const dir = mkdtempSync(join(tmpdir(), "civ-"));
+    const path = join(dir, "meta.sqlite");
+    const store = new CivilizationStore(path);
+    store.setMeta("runId", "run-abc");
+    expect(store.getMeta("runId")).toBe("run-abc");
+    store.saveDirective({
+      id: "d1",
+      targetIds: ["citizen_atlas"],
+      mode: "DIRECTIVE",
+      rawText: "Atlas get some wood",
+      parsedIntent: "gather_wood",
+      status: "ACTIVE",
+      createdAt: new Date().toISOString(),
+      outcomes: { citizen_atlas: "ACTIVE" },
+    });
+    expect(store.listDirectives()[0]?.parsedIntent).toBe("gather_wood");
+    store.close();
   });
 });

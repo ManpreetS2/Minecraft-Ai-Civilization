@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>First Settlement — Observer</title>
+    <title>Civilization Observer Console</title>
     <style>
       :root {
         --bg: #12140f;
@@ -15,6 +15,7 @@
         --ok: #8fce7a;
         --warn: #d4b56a;
         --social: #8fb7d4;
+        --human: #c9a8e8;
         --line: #2c3426;
       }
       * { box-sizing: border-box; }
@@ -36,23 +37,29 @@
       .sub { color: var(--muted); font-size: 13px; }
       main {
         display: grid;
-        grid-template-columns: 1.4fr 1fr;
+        grid-template-columns: 1.35fr 0.9fr;
         gap: 12px;
         padding: 12px;
       }
+      .span-2 { grid-column: 1 / -1; }
       section {
         background: var(--panel);
         border: 1px solid var(--line);
         border-radius: 10px;
         padding: 12px;
-        min-height: 180px;
       }
-      h2 { margin: 0 0 8px; font-size: 13px; color: var(--accent); letter-spacing: 0.04em; text-transform: uppercase; }
-      table { width: 100%; border-collapse: collapse; font-size: 13px; }
-      th, td { text-align: left; padding: 6px 4px; border-bottom: 1px solid var(--line); vertical-align: top; }
-      .ok { color: var(--ok); }
-      .bad { color: var(--bad); }
-      .log { font-size: 13px; max-height: 360px; overflow: auto; }
+      h2 { margin: 0 0 10px; font-size: 12px; color: var(--accent); letter-spacing: 0.06em; text-transform: uppercase; }
+      .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; }
+      .card {
+        background: #181d14;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 10px;
+      }
+      .card h3 { margin: 0; font-size: 15px; letter-spacing: 0.04em; }
+      .activity { font-size: 14px; margin: 4px 0 8px; }
+      .stats { font-size: 12px; color: var(--muted); display: grid; gap: 2px; }
+      .log { font-size: 13px; max-height: 520px; overflow: auto; }
       .log article { padding: 8px 0; border-bottom: 1px dashed var(--line); }
       .needs span, .pill {
         display: inline-block;
@@ -66,182 +73,334 @@
       .kind-failure { border-left: 3px solid var(--bad); padding-left: 8px; }
       .kind-warning { border-left: 3px solid var(--warn); padding-left: 8px; }
       .kind-social { border-left: 3px solid var(--social); padding-left: 8px; }
+      .kind-human { border-left: 3px solid var(--human); padding-left: 8px; }
       .kind-info { border-left: 3px solid #4a5640; padding-left: 8px; }
       details { margin-top: 4px; color: var(--muted); font-size: 12px; }
       details pre { white-space: pre-wrap; font-family: ui-monospace, Consolas, monospace; margin: 4px 0 0; }
       .rel { margin: 10px 0; padding: 8px; background: #181d14; border-radius: 8px; }
       .rel strong { display: block; margin-bottom: 4px; }
       .meters span { display: inline-block; min-width: 110px; margin: 2px 12px 2px 0; font-size: 12px; color: var(--muted); }
-      .perf { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 12px; font-size: 12px; color: var(--muted); }
+      .health, .settle { display: grid; gap: 4px; font-size: 13px; }
+      form { display: grid; gap: 8px; }
+      label { font-size: 12px; color: var(--muted); display: grid; gap: 4px; }
+      select, input, textarea, button {
+        font: inherit;
+        color: var(--ink);
+        background: #141910;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        padding: 8px;
+      }
+      button { cursor: pointer; background: #2a3322; }
+      button.danger { background: #3a241c; }
+      .row { display: flex; gap: 8px; flex-wrap: wrap; }
+      .ok { color: var(--ok); }
+      .bad { color: var(--bad); }
+      .warn { color: var(--warn); }
+      .help { font-size: 12px; color: var(--muted); }
+      .feed-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+      .split { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+      @media (max-width: 980px) {
+        main, .split { grid-template-columns: 1fr; }
+      }
     </style>
   </head>
   <body>
     <header>
       <div>
-        <h1>Minecraft AI Civilization</h1>
-        <div class="sub">First Settlement observer · live local simulation</div>
+        <h1>Civilization Observer Console</h1>
+        <div class="sub">A window into the first settlement — not an application log</div>
       </div>
       <div class="sub" id="meta">connecting…</div>
     </header>
     <main>
       <section>
         <h2>Citizens</h2>
-        <table>
-          <thead>
-            <tr>
-              <th>Name</th><th>Body</th><th>HP/Food</th><th>Goal</th><th>Task</th><th>Why</th>
-            </tr>
-          </thead>
-          <tbody id="citizens"></tbody>
-        </table>
+        <div class="cards" id="citizens"></div>
       </section>
       <section>
-        <h2>Settlement</h2>
-        <div id="settlement"></div>
-        <h2 style="margin-top:16px">Project</h2>
-        <div id="project"></div>
-        <h2 style="margin-top:16px">Performance</h2>
-        <div class="perf" id="perf"></div>
-        <h2 style="margin-top:16px">LLM</h2>
-        <div class="log" id="llm"></div>
+        <h2>First Settlement</h2>
+        <div class="settle" id="settlement"></div>
+        <h2 style="margin-top:16px">Simulation</h2>
+        <div class="health" id="health"></div>
+        <details>
+          <summary>Detailed metrics</summary>
+          <div class="sub" id="perf"></div>
+        </details>
+      </section>
+      <section class="span-2">
+        <h2>Human Directives</h2>
+        <p class="help" id="modeHelp">Suggestion: the citizen may choose not to follow it.</p>
+        <form id="directiveForm">
+          <div class="row">
+            <label>Target
+              <select id="target"></select>
+            </label>
+            <label>Mode
+              <select id="mode">
+                <option value="DIRECTIVE">Directive</option>
+                <option value="SUGGESTION">Suggestion</option>
+                <option value="ADMIN_OVERRIDE">Admin override</option>
+              </select>
+            </label>
+          </div>
+          <label>Instruction
+            <input id="instruction" maxlength="280" placeholder="Theo help finish the shelter" />
+          </label>
+          <div class="row">
+            <button type="submit">Send</button>
+          </div>
+          <div class="help" id="directiveStatus"></div>
+        </form>
+        <div id="directives"></div>
       </section>
       <section>
-        <h2>Events</h2>
+        <div class="feed-head">
+          <h2>What just happened</h2>
+          <label class="sub"><input type="checkbox" id="showDebug" /> Show debug events</label>
+        </div>
         <div class="log" id="events"></div>
       </section>
       <section>
-        <h2>Memories & relationships</h2>
-        <p class="sub">Relationship bars are approximate standing, not psychological precision.</p>
+        <h2>Citizen learning</h2>
+        <div id="learning"></div>
+        <h2 style="margin-top:16px">Relationships</h2>
+        <p class="sub">Approximate observed social state.</p>
         <div id="social"></div>
+        <h2 style="margin-top:16px">System</h2>
+        <p class="sub">Infrastructure issues — not citizen lessons.</p>
+        <div id="incidents"></div>
       </section>
     </main>
     <script>
       const $ = (id) => document.getElementById(id);
-      const NOISY = new Set(["ActionStarted", "ActionCompleted", "ConstructionBlockPlaced", "ResourceReserved", "ResourceReleased"]);
+      const HELP = {
+        SUGGESTION: "Suggestion: the citizen hears this as context and may choose not to follow it.",
+        DIRECTIVE: "Directive: a high-priority request. Followed unless there is an emergency, missing tools, or the world makes it impossible.",
+        ADMIN_OVERRIDE: "Admin override: cancels the current high-level task and prioritizes this. Still cannot bypass Minecraft physics, inventory, pathfinding, or emergencies.",
+      };
+      $("mode").addEventListener("change", () => { $("modeHelp").textContent = HELP[$("mode").value]; });
+      $("showDebug").addEventListener("change", () => { if (window.__snap) render(window.__snap); });
+
       function render(snap) {
-        $("meta").textContent =
-          `pop ${snap.population} · active bots ${snap.activeBots} · ${localTime(snap.updatedAt)}`;
-        $("citizens").innerHTML = (snap.citizens || [])
-          .map((c) => {
-            const dead = c.status === "dead";
-            const cls = dead ? "bad" : c.connected ? "ok" : "bad";
-            const body = dead ? "deceased" : c.connected ? "online" : c.status;
-            return `<tr>
-              <td><strong>${escapeHtml(c.name)}</strong><br><span class="sub">${escapeHtml(c.occupation || "")}</span></td>
-              <td class="${cls}">${body}</td>
-              <td>${dead ? "—" : `${fmt(c.health)} / ${fmt(c.hunger)}`}<br><span class="sub">${pos(c.lastKnownPosition)}</span></td>
-              <td>${dead ? "—" : escapeHtml(friendlyTask(c.currentGoal))}<br><span class="sub">${escapeHtml(c.decisionSource || "")}</span></td>
-              <td>${dead ? "—" : escapeHtml(friendlyTask(c.currentTask))}<br><span class="sub">${escapeHtml(c.currentAction || "")}</span></td>
-              <td>${escapeHtml(c.reason || "")}</td>
-            </tr>`;
-          })
-          .join("");
-        const s = snap.settlement || {};
-        $("settlement").innerHTML = `
-          <div>Food ${s.food ?? 0} · Wood ${s.wood ?? 0} · Stone ${s.stone ?? 0} · Tools ${s.tools ?? 0}</div>
-          <div>Beds ${s.beds ?? 0} · Housing ${s.housingCapacity ?? 0} · Shelter ${s.shelterComplete ? "yes" : "no"}</div>
-          <div>Construction ${s.construction ? s.construction.placedBlocks + "/" + s.construction.totalBlocks : "not started"}</div>
-          <div class="needs">${(s.needs || []).map((n) => `<span>${n}</span>`).join("")}</div>
-        `;
-        const project = snap.project;
-        const view = snap.inventoryView || {};
-        const workers = snap.workers || [];
-        $("project").innerHTML = project ? `
-          <div><strong>Starter Shelter</strong> · Status: ${escapeHtml(project.status || "PLANNED")}</div>
-          <div class="sub">Resources: Wood ${view.planks ?? 0} / ${project.requiredResources && project.requiredResources.oak_planks ? project.requiredResources.oak_planks : 40} planks · Logs ${view.logs ?? 0} · Stone ${view.cobblestone ?? 0}</div>
-          <div>Construction: ${project.placed ?? 0} / ${project.total ?? 0} blocks · verified ${project.verified ?? 0}</div>
-          <div>Blocked: ${(project.blocked && project.blocked.length) || 0}</div>
-          <div class="sub">${workers.map((w) => `${escapeHtml(w.name)} — ${escapeHtml(friendlyTask(w.task))}`).join("<br>") || "No workers yet"}</div>
-        ` : `<div class="sub">No shelter project yet</div>`;
+        window.__snap = snap;
+        const obs = snap.observer || {};
+        $("meta").textContent = obs.clockLabel || localTime(snap.updatedAt);
+        const citizens = obs.citizens || fallbackCitizens(snap);
+        $("citizens").innerHTML = citizens.map(citizenCard).join("") || "<div class='sub'>No citizens yet</div>";
+        fillTargets(snap.citizens || []);
+        $("settlement").innerHTML = settlementHtml(obs.settlement, snap.settlement);
+        $("health").innerHTML = healthHtml(obs.health, snap);
         const p = snap.performance || {};
         $("perf").innerHTML = `
-          <div>Orchestrator tick ${p.tickMs ?? 0}ms (avg ${p.avgTickMs ?? 0}ms)</div>
-          <div>Last task ${p.lastTaskMs ?? 0}ms</div>
-          <div>Pathfinding ${p.pathMs ?? 0}ms · ${p.activePaths ?? 0} active</div>
-          <div>LLM ${p.llmLastMs ?? 0}ms · ${p.llmInFlight ?? 0} in flight</div>
-          <div>Events / min ${p.eventsLastMinute ?? 0}</div>
-          <div>Reconnect attempts ${p.reconnectAttempts ?? 0}</div>
+          Tick ${p.tickMs ?? "—"} ms · last task ${p.lastTaskMs ?? "—"} ms
+          · path ${p.pathMs ?? "—"} ms · events/min ${p.eventsLastMinute ?? "—"}
+          · reconnects ${p.reconnectAttempts ?? "—"}
         `;
-        const presented = (snap.presentedEvents && snap.presentedEvents.length)
-          ? snap.presentedEvents
-          : (snap.events || []).map((e) => fallbackPresent(e, snap));
-        $("events").innerHTML = presented
-          .slice()
-          .reverse()
-          .filter((e) => !NOISY.has((e.technical && e.technical.type) || e.type))
-          .map((e) => eventCard(e))
-          .join("") || "<div class='sub'>No events yet</div>";
-        $("llm").innerHTML = (snap.llmCalls || [])
-          .map((c) => `<div>${c.ok ? "ok" : "fail"} ${c.latency_ms}ms ${escapeHtml(c.goal || "")} ${escapeHtml(c.reason || c.error || "")}</div>`)
-          .join("") || "<div class='sub'>No LLM calls yet (disabled or unavailable)</div>";
-        const names = Object.fromEntries((snap.citizens || []).map((c) => [c.id, c.name]));
-        const mem = (snap.memories || []).map((m) => `<div class="sub">${escapeHtml(names[m.citizenId] || m.citizenId)}: ${escapeHtml(m.content)}</div>`).join("");
-        const rel = (snap.relationships || [])
-          .filter((r) => r.trust || r.affection || r.respect || r.resentment || r.familiarity)
-          .map((r) => `
-            <div class="rel">
-              <strong>${escapeHtml(names[r.citizenId] || r.citizenId)} → ${escapeHtml(names[r.otherId] || r.otherId)}</strong>
-              <div class="meters">
-                <span>Trust ${pct(r.trust)}</span>
-                <span>Affection ${pct(r.affection)}</span>
-                <span>Respect ${pct(r.respect)}</span>
-                <span>Resentment ${pct(r.resentment)}</span>
-                <span>Familiarity ${pct(r.familiarity)}</span>
-              </div>
-            </div>`)
-          .join("");
-        $("social").innerHTML = mem + rel || "<div class='sub'>None yet</div>";
+        const presented = filterFeed(obs.feedEvents || obs.presentedEvents || snap.presentedEvents || []);
+        $("events").innerHTML = presented.slice().reverse().map(eventCard).join("") || "<div class='sub'>Nothing has happened yet</div>";
+        $("learning").innerHTML = learningHtml(obs);
+        $("social").innerHTML = (obs.relationships || []).map(relCard).join("") || "<div class='sub'>No observed social standing yet</div>";
+        $("incidents").innerHTML = (obs.incidents || []).slice().reverse().map(eventCard).join("") || "<div class='sub'>No system incidents</div>";
+        $("directives").innerHTML = (obs.directives || snap.directives || []).map(directiveCard).join("");
       }
+
+      function citizenCard(c) {
+        const cls = c.statusLabel === "Deceased" || !c.connected ? "bad" : "ok";
+        return `<article class="card">
+          <h3>${escapeHtml(c.name)}</h3>
+          <div class="activity">${escapeHtml(c.activity)}</div>
+          <div class="stats">
+            ${c.healthLabel ? `<div>${escapeHtml(c.healthLabel)}</div>` : ""}
+            ${c.hungerLabel ? `<div>${escapeHtml(c.hungerLabel)}</div>` : ""}
+            <div>${escapeHtml(c.location)}</div>
+            ${c.instruction ? `<div>Current instruction: ${escapeHtml(c.instruction)}</div>` : ""}
+            ${c.occupation ? `<div>Appears: ${escapeHtml(c.occupation)}</div>` : ""}
+            <div class="${cls}">${escapeHtml(c.statusLabel)}</div>
+          </div>
+          <details>
+            <summary>Technical details</summary>
+            <pre>${escapeHtml(JSON.stringify(c.technical, null, 2))}</pre>
+          </details>
+          <button class="danger" data-stop="${escapeHtml(c.id)}">Stop citizen</button>
+        </article>`;
+      }
+
+      function settlementHtml(obs, raw) {
+        const s = obs || {};
+        const r = raw || {};
+        return `
+          <div><strong>${escapeHtml(s.name || r.name || "First Settlement")}</strong></div>
+          <div>Citizens active: ${escapeHtml(s.citizensActive || "")}</div>
+          ${s.food != null ? `<div>Food: ${s.food}</div>` : ""}
+          ${s.logs != null ? `<div>Logs: ${s.logs}</div>` : ""}
+          ${s.stone != null ? `<div>Stone: ${s.stone}</div>` : ""}
+          ${s.tools != null ? `<div>Tools: ${s.tools}</div>` : ""}
+          ${s.sharedStorage ? `<div>Shared storage: ${escapeHtml(s.sharedStorage)}</div>` : ""}
+          ${s.craftingTables != null ? `<div>Crafting tables: ${escapeHtml(s.craftingTables)}</div>` : ""}
+          ${s.shelter ? `<div>${escapeHtml(s.shelter.label)}: ${escapeHtml(s.shelter.status)}${s.shelter.progress ? " · " + escapeHtml(s.shelter.progress) : ""}</div>` : "<div>Starter shelter: not started</div>"}
+          <div>Current needs: ${(s.needs || []).map((n) => `<span class="pill">${escapeHtml(n)}</span>`).join("") || "<span class='sub'>None reported</span>"}</div>
+        `;
+      }
+
+      function healthHtml(h, snap) {
+        const health = h || {};
+        return `
+          <div>Run: ${escapeHtml(health.run || "local")}</div>
+          <div>Mode: ${snap.developmentMode || health.permanentDeath === "OFF" ? "Development" : "Survival"}</div>
+          <div>Permanent death: ${escapeHtml(health.permanentDeath || "OFF")}</div>
+          <div>Bots: ${escapeHtml(health.bots || String(snap.activeBots ?? 0) + " connected")}</div>
+          <div>Connection: ${escapeHtml(health.connection || "")}</div>
+          ${health.averageTick ? `<div>Average tick: ${escapeHtml(health.averageTick)}</div>` : ""}
+          ${health.llm ? `<div>LLM: ${escapeHtml(health.llm)}</div>` : ""}
+          ${health.pathfinding ? `<div>Pathfinding: ${escapeHtml(health.pathfinding)}</div>` : ""}
+          <div>Recent warnings: ${health.recentWarnings ?? 0}</div>
+        `;
+      }
+
       function eventCard(e) {
         const kind = e.kind || "info";
         const tech = e.technical || {};
+        const sub = (e.subtext || "").split("\n").map((line) => `<div class="sub">${escapeHtml(line)}</div>`).join("");
         return `<article class="kind-${kind}">
-          <div><strong>${escapeHtml(e.headline || e.type)}</strong> <span class="sub">${escapeHtml(e.timeLabel || "")}</span></div>
-          ${e.subtext ? `<div class="sub">${escapeHtml(e.subtext)}</div>` : ""}
+          <div><span class="sub">${escapeHtml(e.timeLabel || "")}</span> ${e.icon || ""} <strong>${escapeHtml(e.headline || e.type)}</strong></div>
+          ${sub}
           <details>
             <summary>Technical details</summary>
-            <pre>${escapeHtml(JSON.stringify({ type: tech.type || e.type, citizenId: tech.citizenId, timestamp: tech.timestamp, payload: tech.payload || e.payload }, null, 2))}</pre>
+            <pre>${escapeHtml(JSON.stringify({
+              type: tech.type || e.type,
+              citizenId: tech.citizenId,
+              timestamp: tech.timestamp,
+              payload: tech.payload || e.payload,
+              taskId: (tech.payload || {}).taskId,
+              projectId: (tech.payload || {}).projectId,
+              error: (tech.payload || {}).error,
+              model: (tech.payload || {}).model,
+              latency: (tech.payload || {}).latency,
+            }, null, 2))}</pre>
           </details>
         </article>`;
       }
-      function fallbackPresent(e, snap) {
-        const names = Object.fromEntries((snap.citizens || []).map((c) => [c.id, c.name]));
-        return {
-          headline: `${e.type} ${names[e.citizenId] || e.citizenId || ""}`.trim(),
-          subtext: "",
-          kind: "info",
-          timeLabel: localTime(e.timestamp),
-          technical: e,
-        };
+
+      function learningHtml(obs) {
+        const learned = (obs.learned || []).map((m) => `<div>${escapeHtml(m.citizenName)} learned: “${escapeHtml(m.text)}”</div>`).join("");
+        const remembers = (obs.remembers || []).map((m) => `<div>${escapeHtml(m.citizenName)} remembers: “${escapeHtml(m.text)}”</div>`).join("");
+        return learned + remembers || "<div class='sub'>No memories yet</div>";
       }
-      function friendlyTask(task) {
-        if (!task) return "";
-        const labels = {
-          gather_wood: "gathering wood",
-          gather_food: "gathering food",
-          mine_stone: "mining stone",
-          craft_tools: "crafting tools",
-          build_shelter: "building shelter",
-          seek_shelter: "finding shelter",
-        };
-        return labels[task] || String(task).replaceAll("_", " ");
+
+      function relCard(r) {
+        return `<div class="rel">
+          <strong>${escapeHtml(r.from)} → ${escapeHtml(r.to)}</strong>
+          <div class="meters">
+            <span>Trust: ${r.trust}%</span>
+            <span>Affection: ${r.affection}%</span>
+            <span>Respect: ${r.respect}%</span>
+            <span>Resentment: ${r.resentment}%</span>
+            <span>Familiarity: ${r.familiarity}%</span>
+          </div>
+          <div class="sub">${escapeHtml(r.caption || "Approximate observed social state.")}</div>
+        </div>`;
       }
-      function pct(n) { return typeof n === "number" ? `${Math.round(n * 100)}%` : "0%"; }
-      function fmt(n) { return typeof n === "number" ? n.toFixed(0) : "—"; }
-      function pos(p) { return p ? `${p.x.toFixed(0)}, ${p.y.toFixed(0)}, ${p.z.toFixed(0)}` : ""; }
+
+      function directiveCard(d) {
+        const outcomes = (d.outcomes || []).map((o) => {
+          const mark = o.status === "COMPLETED" ? "✓" : o.status === "FAILED" || o.status === "REJECTED" ? "⚠" : o.status === "CANCELLED" ? "–" : "●";
+          const cls = o.status === "COMPLETED" ? "ok" : o.status === "FAILED" || o.status === "REJECTED" ? "bad" : "warn";
+          return `<span class="${cls}">${escapeHtml(o.name)} ${mark} ${escapeHtml(o.label)}</span>`;
+        }).join(" · ");
+        return `<article class="card kind-human" style="margin-top:8px">
+          <div><strong>${escapeHtml(d.youLine)}</strong></div>
+          <div>“${escapeHtml(d.quote)}”</div>
+          <div class="sub">Parsed: ${escapeHtml(d.parsed)} · ${escapeHtml(d.mode)}</div>
+          <div>Status: ${escapeHtml(d.statusLabel)}</div>
+          <div class="sub">${outcomes}</div>
+          ${d.failureReason ? `<div class="bad">${escapeHtml(d.failureReason)}</div>` : ""}
+          <button data-cancel="${escapeHtml(d.id)}">Cancel directive</button>
+          <details><summary>Technical details</summary><pre>${escapeHtml(JSON.stringify(d.technical, null, 2))}</pre></details>
+        </article>`;
+      }
+
+      function fallbackCitizens(snap) {
+        return (snap.citizens || []).map((c) => ({
+          id: c.id,
+          name: c.name,
+          activity: String(c.currentTask || c.currentGoal || c.status || "").replaceAll("_", " "),
+          statusLabel: c.status,
+          healthLabel: typeof c.health === "number" ? `Health ${Math.round(c.health)} / 20` : undefined,
+          hungerLabel: typeof c.hunger === "number" ? `Hunger ${Math.round(c.hunger)} / 20` : undefined,
+          location: "",
+          instruction: c.currentGoal,
+          connected: c.connected,
+          technical: { goal: c.currentGoal, task: c.currentTask, action: c.currentAction, decisionSource: c.decisionSource, citizenId: c.id },
+        }));
+      }
+
+      function fillTargets(citizens) {
+        const select = $("target");
+        const current = select.value;
+        const opts = ["<option value='everyone'>Everyone</option>"]
+          .concat(citizens.map((c) => `<option value="${escapeHtml(c.id)}">${escapeHtml(c.name)}</option>`));
+        select.innerHTML = opts.join("");
+        if ([...select.options].some((o) => o.value === current)) select.value = current;
+      }
+
+      function filterFeed(events) {
+        if ($("showDebug").checked) return events;
+        return events.filter((e) => e.importance !== "DEBUG");
+      }
+
       function localTime(s) {
         const d = new Date(s);
         if (Number.isNaN(d.getTime())) return s || "";
         return d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
       }
       function escapeHtml(s) {
-        return String(s).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+        return String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
       }
+
+      document.body.addEventListener("click", async (ev) => {
+        const stop = ev.target.closest("[data-stop]");
+        if (stop) {
+          await post(`/api/citizens/${encodeURIComponent(stop.getAttribute("data-stop"))}/stop`);
+          return;
+        }
+        const cancel = ev.target.closest("[data-cancel]");
+        if (cancel) await post(`/api/directives/${encodeURIComponent(cancel.getAttribute("data-cancel"))}/cancel`);
+      });
+
+      $("directiveForm").addEventListener("submit", async (ev) => {
+        ev.preventDefault();
+        $("directiveStatus").textContent = "Sending…";
+        const res = await post("/api/directives", {
+          instruction: $("instruction").value,
+          mode: $("mode").value,
+          target: $("target").value,
+        });
+        $("directiveStatus").textContent = res && res.ok ? "Sent. Waiting for a verified result — not marked complete just because it was accepted." : (res && res.error) || "Could not send.";
+        if (res && res.ok) $("instruction").value = "";
+      });
+
+      async function post(path, body) {
+        try {
+          const res = await fetch(path, {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: body ? JSON.stringify(body) : "{}",
+          });
+          const data = await res.json();
+          if (data.snapshot) render(data.snapshot);
+          return data;
+        } catch (err) {
+          $("directiveStatus").textContent = "Dashboard could not reach the orchestrator.";
+          return { ok: false, error: String(err) };
+        }
+      }
+
       async function poll() {
         try {
           const res = await fetch("/api/snapshot");
           render(await res.json());
-        } catch (err) {
+        } catch {
           $("meta").textContent = "dashboard waiting for orchestrator";
         }
       }

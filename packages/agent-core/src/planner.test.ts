@@ -64,13 +64,38 @@ describe("planCitizen", () => {
   it("does not send everyone to gather wood just because it is night", () => {
     const planned = planCitizen({
       citizenId: "citizen_atlas",
-      observation: obs({ isNight: true }),
-      settlement: emptySettlement(),
+      observation: obs({
+        isNight: true,
+        inventory: [
+          { name: "wooden_pickaxe", count: 1 },
+          { name: "oak_planks", count: 16 },
+        ],
+      }),
+      settlement: {
+        ...emptySettlement(),
+        food: 20,
+        wood: 40,
+        stone: 40,
+        tools: 4,
+        needs: ["NEED_HOUSING"],
+      },
       assignedNeeds: ["NEED_HOUSING"],
       workRole: "build",
     });
     expect(planned.task).not.toBe("gather_wood");
     expect(planned.action).toBe("buildShelter");
+  });
+
+  it("does not treat empty settlement reserve as personal starvation when steak is carried", () => {
+    const planned = planCitizen({
+      citizenId: "citizen_atlas",
+      observation: obs({ food: 14, inventory: [{ name: "cooked_beef", count: 64 }] }),
+      settlement: { ...emptySettlement(), food: 0, needs: ["NEED_FOOD"] },
+      assignedNeeds: [],
+      workRole: "wood",
+    });
+    expect(planned.action).not.toBe("gatherFood");
+    expect(planned.reason.toLowerCase()).not.toMatch(/no food|has no food|starv/);
   });
 
   it("prefers existing shelter at night once it is verified", () => {
@@ -81,6 +106,32 @@ describe("planCitizen", () => {
       assignedNeeds: [],
     });
     expect(planned.action).toBe("seekSafety");
+  });
+
+  it("follows a human directive unless an emergency reflex fires", () => {
+    const planned = planCitizen({
+      citizenId: "citizen_atlas",
+      observation: obs(),
+      settlement: emptySettlement(),
+      assignedNeeds: ["NEED_FOOD"],
+      humanDirective: { id: "d1", intent: "gather_wood", mode: "DIRECTIVE" },
+    });
+    expect(planned.task).toBe("gather_wood");
+    expect(planned.directiveId).toBe("d1");
+  });
+
+  it("lets emergency reflex beat a human directive", () => {
+    const planned = planCitizen({
+      citizenId: "citizen_atlas",
+      observation: obs({
+        health: 5,
+        nearby: [{ id: 1, name: "zombie", type: "mob", hostile: true, position: { x: 1, y: 64, z: 1 }, distance: 3 }],
+      }),
+      settlement: emptySettlement(),
+      assignedNeeds: [],
+      humanDirective: { id: "d1", intent: "gather_wood", mode: "ADMIN_OVERRIDE" },
+    });
+    expect(planned.action).toBe("flee");
   });
 });
 

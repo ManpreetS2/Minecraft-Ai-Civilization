@@ -7,7 +7,10 @@ export type CitizenStatus =
   | "online"
   | "dead"
   | "error"
-  | "idle";
+  | "idle"
+  | "respawning";
+
+export type ConnectionHealth = "CONNECTED" | "DEGRADED" | "RECONNECTING" | "OFFLINE";
 
 export type DecisionSource = "reflex" | "planner" | "llm";
 

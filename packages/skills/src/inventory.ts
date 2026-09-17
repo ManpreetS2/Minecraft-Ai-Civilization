@@ -43,13 +43,20 @@ export async function eatFood(ctx: SkillContext): Promise<ActionResult<{ item: s
   if (!food) {
     return fail("NO_FOOD", "No edible item in inventory", Date.now() - started, true);
   }
+  const beforeHunger = ctx.bot.food ?? 0;
+  const beforeCount = countItem(ctx, food.name);
   try {
     await ctx.bot.equip(food, "hand");
     await ctx.bot.consume();
   } catch (error) {
     return fail("EAT_FAILED", error instanceof Error ? error.message : String(error), Date.now() - started, true);
   }
-  return ok({ item: food.name, food: ctx.bot.food }, Date.now() - started);
+  const afterHunger = ctx.bot.food ?? 0;
+  const afterCount = countItem(ctx, food.name);
+  if (afterCount >= beforeCount && afterHunger <= beforeHunger && beforeHunger < 20) {
+    return fail("VERIFY_FAILED", "Eating did not consume food or raise hunger", Date.now() - started, true);
+  }
+  return ok({ item: food.name, food: afterHunger }, Date.now() - started);
 }
 
 export type ContainerTarget = Vec3;

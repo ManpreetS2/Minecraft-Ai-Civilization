@@ -1,8 +1,21 @@
-import { MinecraftBody, activePathCount, lastPathDurationMs } from "@civ/minecraft-adapter";
+import { MinecraftBody, activePathCount, lastPathDurationMs, pathMetrics } from "@civ/minecraft-adapter";
 import { createCognition, type CognitionProvider, type HighLevelDecision } from "@civ/cognition";
 import { createMemory, retrieveRelevant } from "@civ/memory";
 import { applySocialEvent, sameWorkFamily, SocialDirector } from "@civ/society";
-import { createEvent, DEFAULT_CITIZENS, EventBus, formatSimEvent, resolveFromRoot, type AppConfig, type CitizenRecord, type PresentedEvent, type SettlementState, type SimEvent, type Vec3 } from "@civ/shared";
+import {
+  createEvent,
+  DEFAULT_CITIZENS,
+  EventBus,
+  EventLoopMonitor,
+  formatSimEvent,
+  resolveFromRoot,
+  yieldEventLoop,
+  type AppConfig,
+  type CitizenRecord,
+  type PresentedEvent,
+  type SettlementState,
+  type SimEvent,
+} from "@civ/shared";
 import { minecraftKnowledge } from "@civ/minecraft-knowledge";
 import { assignSettlementNeeds, assignWorkRoles, planCitizen, type PlannedTask } from "./planner.js";
 import { bodyContext, completeVerifiedTransfer, executePlan } from "./executor.js";
@@ -10,6 +23,9 @@ import { deriveSettlementInventory, type SettlementInventoryView } from "./inven
 import { SettlementRuntime } from "./settlement-runtime.js";
 import type { SettlementProject } from "./projects.js";
 import { CivilizationStore } from "./store.js";
+import { DirectiveBoard } from "./directives.js";
+import { applyBodyRespawn, applyTemporaryBodyDeath, applyTerminalDeath } from "./lifecycle.js";
+import type { DirectiveMode, HumanDirective } from "./directive-parse.js";
 
 type RuntimeCitizen = {
   record: CitizenRecord;
@@ -53,7 +69,10 @@ export class AgentManager {
   private running = false;
   private snapshot: DashboardSnapshot;
   private lastTickMs = 0;
+  private runId = "";
+  private readonly loop = new EventLoopMonitor();
   private readonly runtime = new SettlementRuntime();
+  private readonly directives: DirectiveBoard;
   private readonly pendingDrops = new Map<string, { item: string; count: number; giverId: string; giverBefore: number }>();
 
   constructor(config: AppConfig, store?: CivilizationStore) {
@@ -61,10 +80,18 @@ export class AgentManager {
     this.store = store ?? new CivilizationStore(resolveFromRoot(config.DATABASE_PATH));
     this.cognition = createCognition(config);
     this.snapshot = emptySnapshot();
+    this.directives = new DirectiveBoard(
+      this.store,
+      this.events,
+      () => this.config.HUMAN_DIRECTIVES_ENABLED,
+      () => this.runId,
+    );
     this.events.on((event) => {
       this.eventTimes.push(Date.now());
       this.store.appendEvent(event);
       if (event.type === "CitizenDied") this.handleDeathEvent(event);
+      if (event.type === "CitizenBodyDied") this.handleBodyDied(event);
+      if (event.type === "CitizenRespawned") this.handleRespawned(event);
       if (event.type === "ItemTransferred") this.notePendingDrop(event);
     });
   }
@@ -84,8 +111,20 @@ export class AgentManager {
   async start(count = this.config.SIM_CITIZEN_COUNT): Promise<void> {
     if (this.running) return;
     this.running = true;
+    this.loop.start();
+    this.runId = crypto.randomUUID();
+    this.store.setMeta("runId", this.runId);
+    this.store.setMeta("humanDirectives", String(this.config.HUMAN_DIRECTIVES_ENABLED));
+    this.store.setMeta("permadeath", String(this.config.SIM_PERMADEATH_ENABLED));
     const wanted = DEFAULT_CITIZENS.slice(0, count);
-    this.events.emit(createEvent("SimulationStarted", { citizens: wanted.map((c) => c.name) }));
+    this.events.emit(
+      createEvent("SimulationStarted", {
+        citizens: wanted.map((c) => c.name),
+        runId: this.runId,
+        permadeath: this.config.SIM_PERMADEATH_ENABLED,
+        humanDirectives: this.config.HUMAN_DIRECTIVES_ENABLED,
+      }),
+    );
 
     for (const identity of wanted) {
       const record = this.store.getCitizen(identity.id) ?? {
@@ -95,13 +134,24 @@ export class AgentManager {
         createdAt: new Date().toISOString(),
         status: "offline" as const,
       };
+      if (!this.config.SIM_PERMADEATH_ENABLED && record.status === "dead") {
+        this.store.restoreLivingIdentity(record.id, "development mode; identity restored");
+        const restored = this.store.getCitizen(identity.id);
+        if (restored) {
+          record.status = restored.status;
+          record.diedAt = restored.diedAt;
+          record.deathPosition = restored.deathPosition;
+          record.reason = restored.reason;
+        }
+      }
       const body = new MinecraftBody({
         username: identity.name,
         config: this.config,
         events: this.events,
         citizenId: identity.id,
         reconnect: record.status !== "dead",
-        allowRespawn: false,
+        allowRespawn: !this.config.SIM_PERMADEATH_ENABLED,
+        eventLoopLag: () => this.loop.lagMs,
       });
       if (record.status === "dead") {
         body.markDeceased();
@@ -132,6 +182,7 @@ export class AgentManager {
 
   async stop(): Promise<void> {
     this.running = false;
+    this.loop.stop();
     if (this.tickTimer) clearInterval(this.tickTimer);
     if (this.perfTimer) clearInterval(this.perfTimer);
     for (const citizen of this.citizens.values()) {
@@ -166,6 +217,7 @@ export class AgentManager {
     for (const citizen of this.citizens.values()) {
       try {
         await this.tickCitizen(citizen, settlement, assignments.get(citizen.record.id) ?? [], roles.get(citizen.record.id));
+        await yieldEventLoop();
       } catch (error) {
         this.events.emit(
           createEvent(
@@ -193,8 +245,13 @@ export class AgentManager {
     assignedNeeds: ReturnType<typeof assignSettlementNeeds> extends Map<string, infer V> ? V : never,
     workRole?: ReturnType<typeof assignWorkRoles> extends Map<string, infer V> ? V : never,
   ): Promise<void> {
-    if (citizen.record.status === "dead" || citizen.body.isDeceased()) {
+    if (citizen.body.isDeceased() || (this.config.SIM_PERMADEATH_ENABLED && citizen.record.status === "dead")) {
       citizen.record.status = "dead";
+      return;
+    }
+    if (citizen.body.isAwaitingRespawn()) {
+      citizen.record.status = "respawning";
+      this.store.upsertCitizen(citizen.record);
       return;
     }
 
@@ -209,6 +266,8 @@ export class AgentManager {
       return;
     }
 
+    const activeDirective = this.directives.activeFor(citizen.record.id);
+    const suggestions = this.directives.suggestionsFor(citizen.record.id);
     const llmDecision: HighLevelDecision | undefined = citizen.pendingLlm;
     citizen.pendingLlm = undefined;
     const now = Date.now();
@@ -216,6 +275,7 @@ export class AgentManager {
       this.config.LLM_ENABLED &&
       llmInFlight === 0 &&
       now - citizen.lastLlmAt > this.config.LLM_COOLDOWN_MS &&
+      !(activeDirective && activeDirective.mode !== "SUGGESTION") &&
       (assignedNeeds.length > 1 || (observation.food ?? 20) < 12 || Boolean(observation.nearby.find((e) => e.hostile)));
 
     if (llmDue) {
@@ -239,7 +299,10 @@ export class AgentManager {
           occupation: citizen.record.occupation,
           inventory: observation.inventory.map((i) => `${i.name} x${i.count}`),
           settlementNeeds: settlement.needs,
-          memories: memories.map((m) => m.content),
+          memories: [
+            ...suggestions.map((item) => `Human suggestion: ${item.rawText}`),
+            ...memories.map((m) => m.content),
+          ],
           nearbyCitizens: observation.players.map((p) => p.username),
           gameFacts,
         })
@@ -291,6 +354,15 @@ export class AgentManager {
       llmGoal: llmDecision?.goal,
       llmReason: llmDecision?.reason,
       projectStatus: this.runtime.project?.status,
+      humanDirective:
+        activeDirective?.intent && activeDirective.mode !== "SUGGESTION"
+          ? {
+              id: activeDirective.id,
+              intent: activeDirective.intent,
+              mode: activeDirective.mode,
+              args: activeDirective.args,
+            }
+          : undefined,
     });
     citizen.lastPlan = plan;
     citizen.record.currentGoal = plan.goal;
@@ -450,27 +522,72 @@ export class AgentManager {
   }
 
   private handleDeathEvent(event: SimEvent): void {
-    const id = event.citizenId;
-    if (!id) return;
-    const position = asVec3(event.payload.position);
-    const first = this.store.markDeceased(id, event.timestamp, position);
-    const citizen = this.citizens.get(id);
-    if (citizen) {
-      citizen.abort?.abort();
-      citizen.busy = false;
-      citizen.body.markDeceased();
-      citizen.record.status = "dead";
-      citizen.record.diedAt = event.timestamp;
-      citizen.record.deathPosition = position;
-      citizen.record.currentTask = undefined;
-      citizen.record.currentAction = undefined;
-      citizen.record.reason = "deceased";
-    }
-    this.runtime.releaseCitizen(id);
-    this.store.clearReservations(id);
-    if (!first) {
+    if (!this.config.SIM_PERMADEATH_ENABLED) {
+      this.handleBodyDied(event);
       return;
     }
+    const citizen = this.citizens.get(event.citizenId ?? "");
+    applyTerminalDeath({ event, store: this.store, runtime: this.runtime, citizen });
+    if (citizen) this.directives.cancelForCitizen(citizen.record.id, "terminal_death");
+  }
+
+  private handleBodyDied(event: SimEvent): void {
+    const citizen = this.citizens.get(event.citizenId ?? "");
+    if (!citizen) return;
+    applyTemporaryBodyDeath({ citizen, store: this.store, runtime: this.runtime });
+    this.directives.cancelForCitizen(citizen.record.id, "body_died");
+    this.store.upsertCitizen(citizen.record);
+  }
+
+  private handleRespawned(event: SimEvent): void {
+    const citizen = this.citizens.get(event.citizenId ?? "");
+    if (!citizen) return;
+    applyBodyRespawn(citizen);
+    this.store.upsertCitizen(citizen.record);
+  }
+
+  issueDirective(input: { target: string; mode: DirectiveMode; instruction: string; selectedIds?: string[] }) {
+    const result = this.directives.issue({
+      ...input,
+      citizens: [...this.citizens.values()].map((c) => ({ id: c.record.id, name: c.record.name })),
+    });
+    if (result.ok && input.mode === "ADMIN_OVERRIDE") {
+      for (const directive of result.directives) {
+        for (const id of directive.targetIds) {
+          const citizen = this.citizens.get(id);
+          if (!citizen) continue;
+          citizen.abort?.abort();
+          citizen.body.stopPathfinding();
+          citizen.busy = false;
+          this.runtime.releaseCitizen(id);
+        }
+      }
+    }
+    return result;
+  }
+
+  cancelDirective(id: string) {
+    return this.directives.cancel(id);
+  }
+
+  stopCitizen(nameOrId: string) {
+    const citizen =
+      this.citizens.get(nameOrId) ??
+      [...this.citizens.values()].find((c) => c.record.name.toLowerCase() === nameOrId.toLowerCase());
+    if (!citizen) return { ok: false as const, reason: "Citizen not found", status: 404 };
+    citizen.abort?.abort();
+    citizen.body.stopPathfinding();
+    citizen.busy = false;
+    this.runtime.releaseCitizen(citizen.record.id);
+    this.directives.cancelForCitizen(citizen.record.id, "stopped by human");
+    citizen.record.currentTask = undefined;
+    citizen.record.reason = "stopped by human; replanning";
+    this.store.upsertCitizen(citizen.record);
+    return { ok: true as const, citizenId: citizen.record.id };
+  }
+
+  listDirectives(): HumanDirective[] {
+    return this.directives.list();
   }
 
   private notePendingDrop(event: SimEvent): void {
@@ -553,16 +670,23 @@ export class AgentManager {
         inventory: c.body.inventory(),
         connected: c.body.connected,
         busy: c.busy,
+        connectionHealth: c.body.connectionTelemetry().health,
       };
     });
     const rawEvents = this.events.getRecent(80);
     const settlement = this.store.getSettlement();
     const inventories = citizens.map((c) => c.inventory);
     const inventoryView = deriveSettlementInventory(inventories, settlement.storageContents, this.runtime.reservations);
+    const loop = this.loop.snapshot();
+    const paths = pathMetrics();
     this.snapshot = {
       updatedAt: new Date().toISOString(),
       population: this.citizens.size,
       activeBots: citizens.filter((c) => c.connected).length,
+      runId: this.runId,
+      permadeath: this.config.SIM_PERMADEATH_ENABLED,
+      humanDirectivesEnabled: this.config.HUMAN_DIRECTIVES_ENABLED,
+      developmentMode: !this.config.SIM_PERMADEATH_ENABLED,
       citizens,
       settlement,
       project: this.runtime.project,
@@ -570,12 +694,22 @@ export class AgentManager {
       workers: citizens
         .filter((c) => c.status !== "dead")
         .map((c) => ({ name: c.name, task: c.currentTask ?? "idle", occupation: c.occupation })),
+      directives: this.directives.list(20),
       events: rawEvents,
       presentedEvents: rawEvents.map((event) => formatSimEvent(event, names)),
       memories: citizens.flatMap((c) => this.store.getMemories(c.id, 5)),
       relationships: citizens.flatMap((c) => this.store.listRelationships(c.id)),
       llmCalls: this.store.recentLlmCalls(30),
-      performance: this.performance(),
+      performance: {
+        ...this.performance(),
+        eventLoopLagMs: loop.lagMs,
+        worstEventLoopLagMs: loop.worstLagMs,
+        pathAttempts: paths.attempts,
+        pathSuccess: paths.success,
+        pathTimeouts: paths.timeout,
+        pathStuck: paths.stuck,
+        congestionYields: paths.yields,
+      },
     };
   }
 }
@@ -584,17 +718,37 @@ export type DashboardSnapshot = {
   updatedAt: string;
   population: number;
   activeBots: number;
-  citizens: Array<CitizenRecord & { inventory: Array<{ name: string; count: number }>; connected: boolean; busy: boolean }>;
+  runId?: string;
+  permadeath?: boolean;
+  humanDirectivesEnabled?: boolean;
+  developmentMode?: boolean;
+  citizens: Array<
+    CitizenRecord & {
+      inventory: Array<{ name: string; count: number }>;
+      connected: boolean;
+      busy: boolean;
+      connectionHealth?: string;
+    }
+  >;
   settlement: SettlementState;
   project?: SettlementProject;
   inventoryView?: SettlementInventoryView;
   workers?: Array<{ name: string; task: string; occupation?: string }>;
+  directives?: HumanDirective[];
   events: SimEvent[];
   presentedEvents: PresentedEvent[];
   memories: ReturnType<CivilizationStore["getMemories"]>;
   relationships: ReturnType<CivilizationStore["listRelationships"]>;
   llmCalls: Array<Record<string, unknown>>;
-  performance: PerformanceSnapshot;
+  performance: PerformanceSnapshot & {
+    eventLoopLagMs?: number;
+    worstEventLoopLagMs?: number;
+    pathAttempts?: number;
+    pathSuccess?: number;
+    pathTimeouts?: number;
+    pathStuck?: number;
+    congestionYields?: number;
+  };
 };
 
 function emptySnapshot(): DashboardSnapshot {
@@ -632,13 +786,6 @@ function emptySnapshot(): DashboardSnapshot {
       reconnectAttempts: 0,
     },
   };
-}
-
-function asVec3(value: unknown): Vec3 | undefined {
-  if (!value || typeof value !== "object") return undefined;
-  const pos = value as { x?: unknown; y?: unknown; z?: unknown };
-  if (typeof pos.x !== "number" || typeof pos.y !== "number" || typeof pos.z !== "number") return undefined;
-  return { x: pos.x, y: pos.y, z: pos.z };
 }
 
 function delay(ms: number): Promise<void> {

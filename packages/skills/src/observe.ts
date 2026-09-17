@@ -49,3 +49,36 @@ export async function findBlock(
   }
   return fail("BLOCK_NOT_FOUND", `No ${names.join("/")} within ${maxDistance} blocks`, Date.now() - started, true);
 }
+
+export function findBlockCandidates(
+  ctx: SkillContext,
+  names: string[],
+  maxDistance = 32,
+  count = 20,
+): Array<{ name: string; position: Vec3 }> {
+  const bot = ctx.bot;
+  const ids = names
+    .map((name) => bot.registry.blocksByName[name]?.id)
+    .filter((id): id is number => typeof id === "number");
+  if (ids.length === 0) return [];
+  const positions = bot.findBlocks({
+    matching: (block) => {
+      if (!block?.position || !ids.includes(block.type)) return false;
+      const position = { x: block.position.x, y: block.position.y, z: block.position.z };
+      if (ctx.body.unreachable.has(position)) return false;
+      if (ctx.skipBlock?.(position)) return false;
+      return true;
+    },
+    maxDistance,
+    count,
+  });
+  const result: Array<{ name: string; position: Vec3 }> = [];
+  for (const pos of positions) {
+    const block = bot.blockAt(pos);
+    if (!block) continue;
+    const position = { x: block.position.x, y: block.position.y, z: block.position.z };
+    if (ctx.skipBlock?.(position)) continue;
+    result.push({ name: block.name, position });
+  }
+  return result;
+}

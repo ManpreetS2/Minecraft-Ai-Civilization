@@ -11,6 +11,7 @@ import {
 import {
   attack,
   collectItem,
+  collectResource,
   craftItem,
   depositItems,
   dropItem,
@@ -20,7 +21,9 @@ import {
   mineBlock,
   moveTo,
   observeNearby,
+  obtainItem,
   placeBlock,
+  returnToSettlement,
   wander,
   withdrawItems,
   type SkillContext,
@@ -103,6 +106,12 @@ export async function executePlan(
       break;
     case "shareItem":
       result = await shareFoodNearby(ctx, events);
+      break;
+    case "obtainItem":
+      result = await obtainItem(ctx, plan.item ?? plan.goal ?? "wooden_pickaxe");
+      break;
+    case "returnToSettlement":
+      result = await returnToSettlement(ctx, store.getSettlement().origin ?? store.getSettlement().storage);
       break;
     case "mineBlock":
     default:
@@ -262,9 +271,13 @@ async function gatherByTask(ctx: SkillContext, task: string, runtime: Settlement
       }
     }
     await equipBestTool(ctx, "pickaxe");
+    const collected = await collectResource(ctx, ["stone", "cobblestone", "deepslate"], 1, 48);
+    if (collected.success) return collected;
     return mineClaimed(ctx, ["stone", "cobblestone", "deepslate"], runtime, "ore");
   }
   await equipBestTool(ctx, "axe");
+  const collected = await collectResource(ctx, [...LOG_BLOCK_NAMES], 1, 48);
+  if (collected.success) return collected;
   return mineClaimed(ctx, LOG_BLOCK_NAMES, runtime, "tree");
 }
 

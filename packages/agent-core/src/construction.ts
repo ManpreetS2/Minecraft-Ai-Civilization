@@ -1,7 +1,7 @@
 import { createEvent, type ActionResult, type EventBus, type Vec3 } from "@civ/shared";
 import { craftItem, placeBlock, type SkillContext } from "@civ/skills";
 import { Vec3 as Vec3Class } from "vec3";
-import { nextUnplaced, starterHut } from "./blueprint.js";
+import { nextUnplaced, starterHut, starterHutSize } from "./blueprint.js";
 import { cellClaimKey } from "./claims.js";
 import {
   blocksForStage,
@@ -14,7 +14,7 @@ import {
 } from "./projects.js";
 import { bagFromItems, nextCraftStep, PLANKS } from "./recipes.js";
 import type { SettlementRuntime } from "./settlement-runtime.js";
-import { candidateOrigins, evaluateSite, isProtectedBlock } from "./site.js";
+import { candidateOrigins, evaluateSite, isProtectedBlock, pickBestSite } from "./site.js";
 import type { CivilizationStore } from "./store.js";
 import { rememberWorkstation } from "./workstations.js";
 
@@ -235,8 +235,11 @@ function chooseSite(ctx: SkillContext): Vec3 | undefined {
   const from = ctx.body.position();
   if (!from) return undefined;
   const getBlock = (pos: Vec3) => ctx.bot.blockAt(new Vec3Class(Math.floor(pos.x), Math.floor(pos.y), Math.floor(pos.z)))?.name;
+  const size = starterHutSize();
+  const best = pickBestSite(from, size.width, size.depth, getBlock, 40);
+  if (best && !isProtectedBlock(getBlock(best.origin))) return best.origin;
   const scored = candidateOrigins(from, 40)
-    .map((origin) => ({ origin, evaluation: evaluateSite(origin, 5, 5, getBlock) }))
+    .map((origin) => ({ origin, evaluation: evaluateSite(origin, size.width, size.depth, getBlock) }))
     .filter((entry) => entry.evaluation.ok)
     .sort((a, b) => b.evaluation.score - a.evaluation.score);
   for (const entry of scored) {

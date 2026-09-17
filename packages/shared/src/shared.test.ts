@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 import { fail, ok } from "./action-result.js";
 import { loadConfig } from "./config.js";
 import { createEvent, EventBus } from "./events.js";
-import { formatSimEvent, relationshipPercent } from "./format-event.js";
+import { formatSimEvent, presentEvent } from "./format-event.js";
+import { relationshipPercent } from "./friendly-names.js";
 import { distance, vec3 } from "./vec3.js";
 
 describe("action result helpers", () => {
@@ -62,7 +63,7 @@ describe("event presentation", () => {
       ),
     );
     expect(failed.headline).toBe("Ava couldn't gather wood.");
-    expect(failed.subtext).toBe("Movement timed out near X 6, Y 75, Z 44.");
+    expect(failed.subtext).toMatch(/Movement stopped after no progress was made/);
     expect(failed.kind).toBe("failure");
 
     const connected = formatSimEvent(createEvent("CitizenConnected", {}, "citizen_theo"));
@@ -78,7 +79,20 @@ describe("event presentation", () => {
       createEvent("LLMDecisionMade", { goal: "gather_food", reason: "Hunger is low" }, "citizen_atlas"),
     );
     expect(llm.headline).toBe("Atlas reconsidered what to do.");
-    expect(llm.subtext).toMatch(/Goal: gather food/);
+    expect(llm.subtext).toMatch(/Goal: Gather food/);
+    expect(llm.icon).toBe("🧠");
+    expect(llm.importance).toBe("NORMAL");
+  });
+
+  it("falls back for unknown events without crashing", () => {
+    const presented = presentEvent({
+      type: "ResourceLocated",
+      timestamp: new Date().toISOString(),
+      citizenId: "citizen_atlas",
+      payload: { x: 1 },
+    });
+    expect(presented.headline).toBe("Atlas: Resource located.");
+    expect(presented.technical.type).toBe("ResourceLocated");
   });
 
   it("keeps raw event data in technical details", () => {

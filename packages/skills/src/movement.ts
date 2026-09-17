@@ -1,4 +1,4 @@
-import { followPlayer, moveToPosition, startFollowing } from "@civ/minecraft-adapter";
+import { followPlayer, navigationBackend, startFollowing } from "@civ/minecraft-adapter";
 import { fail, ok, type ActionResult, type Vec3 } from "@civ/shared";
 import type { SkillContext } from "./context.js";
 
@@ -7,8 +7,7 @@ export async function moveTo(
   target: Vec3,
   range = 1.5,
 ): Promise<ActionResult<{ position: Vec3; distance: number }>> {
-  return moveToPosition(ctx.bot, target, {
-    range,
+  return navigationBackend().navigateNear(ctx.bot, target, range, {
     timeoutMs: ctx.timeoutMs ?? 22_000,
     signal: ctx.signal,
   });

@@ -8,6 +8,7 @@ import {
   movedEnough,
   recoveryAttempts,
 } from "./path-recovery.js";
+import { noteYield, occupantNear, occupancyYieldCount, registerOccupancy } from "./occupancy.js";
 
 const require = createRequire(import.meta.url);
 const pathfinderModule = require("mineflayer-pathfinder") as {
@@ -30,6 +31,10 @@ type MovementSettings = {
   infiniteLiquidDropdownDistance: boolean;
   dontMineUnderFallingBlock: boolean;
   blocksCantBreak: Set<number>;
+  entityCost?: number;
+  liquidCost?: number;
+  digCost?: number;
+  placeCost?: number;
 };
 
 export type PathfinderApi = {
@@ -37,11 +42,16 @@ export type PathfinderApi = {
   setGoal: (goal: unknown, dynamic?: boolean) => void;
   stop: () => void;
   goto: (goal: unknown) => Promise<void>;
+  getPathTo?: (movements: MovementSettings, goal: unknown, timeout?: number) => { status?: string; cost?: number };
 };
 
 const configured = new WeakMap<Bot, { api: PathfinderApi; scaffoldKey: string }>();
 let activePaths = 0;
 let lastPathMs = 0;
+let pathAttempts = 0;
+let pathSuccess = 0;
+let pathTimeout = 0;
+let pathStuck = 0;
 
 export function activePathCount(): number {
   return activePaths;
@@ -49,6 +59,24 @@ export function activePathCount(): number {
 
 export function lastPathDurationMs(): number {
   return lastPathMs;
+}
+
+export function pathMetrics(): {
+  attempts: number;
+  success: number;
+  timeout: number;
+  stuck: number;
+  yields: number;
+  active: number;
+} {
+  return {
+    attempts: pathAttempts,
+    success: pathSuccess,
+    timeout: pathTimeout,
+    stuck: pathStuck,
+    yields: occupancyYieldCount(),
+    active: activePaths,
+  };
 }
 
 function botPathfinder(bot: Bot): PathfinderApi {
@@ -82,6 +110,10 @@ export function configureMovements(bot: Bot): PathfinderApi {
   movements.infiniteLiquidDropdownDistance = false;
   movements.dontMineUnderFallingBlock = true;
   movements.scafoldingBlocks = scaffold;
+  movements.entityCost = 8;
+  movements.liquidCost = 8;
+  movements.digCost = 10;
+  movements.placeCost = 8;
   for (const name of PROTECTED_BLOCK_NAMES) {
     const id = bot.registry.blocksByName[name]?.id;
     if (typeof id === "number") movements.blocksCantBreak.add(id);
@@ -111,6 +143,10 @@ export async function moveToPosition(
   const started = Date.now();
   const budget = options.timeoutMs ?? 22_000;
   const recover = options.recover !== false;
+  const waitStart = Date.now();
+  while (activePaths >= 3 && Date.now() - waitStart < 4_000) {
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
   const attempts = recover
     ? recoveryAttempts(target, options.range ?? 2, 3)
     : [{ x: target.x, y: target.y, z: target.z, range: options.range ?? 2 }];
@@ -141,9 +177,15 @@ async function attemptGoto(
   options: { timeoutMs: number; signal?: AbortSignal },
 ): Promise<ActionResult<{ position: Vec3; distance: number }>> {
   const started = Date.now();
+  pathAttempts += 1;
   if (options.signal?.aborted) return abortedResult(0);
   if (!bot.entity?.position) {
     return fail("NOT_CONNECTED", "Bot is not spawned", Date.now() - started);
+  }
+  const occupied = occupantNear({ x: target.x, y: target.y, z: target.z }, bot.username, 1.2);
+  if (occupied) {
+    noteYield();
+    await new Promise((resolve) => setTimeout(resolve, 350));
   }
 
   const pf = configureMovements(bot);
@@ -194,9 +236,11 @@ async function attemptGoto(
       return fail("PATH_BLOCKED", `no path to ${fmt(target)}${extra}`, duration, true);
     }
     if (message === "STUCK") {
+      pathStuck += 1;
       return fail("PATH_FAILED", `stuck heading to ${fmt(target)}`, duration, true);
     }
     if (lower.includes("timeout") || pathStatus === "timeout") {
+      pathTimeout += 1;
       return fail("TIMEOUT", `moveTo timed out heading to ${fmt(target)}`, duration, true);
     }
     if (lower.includes("place") || lower.includes("scaffold")) {
@@ -225,6 +269,8 @@ async function attemptGoto(
   if (dist > target.range + 2) {
     return fail("VERIFY_FAILED", `goal unreachable; finished ${dist.toFixed(1)} from ${fmt(target)}`, Date.now() - started, true);
   }
+  registerOccupancy(bot.username, current);
+  pathSuccess += 1;
   return ok({ position: current, distance: dist }, Date.now() - started);
 }
 

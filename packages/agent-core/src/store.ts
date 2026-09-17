@@ -11,6 +11,7 @@ import {
   type SettlementState,
   type SimEvent,
   type Vec3,
+  type HumanDirective,
 } from "@civ/shared";
 
 const SCHEMA = `
@@ -109,6 +110,17 @@ CREATE TABLE IF NOT EXISTS llm_calls (
   reason TEXT,
   error TEXT
 );
+
+CREATE TABLE IF NOT EXISTS sim_meta (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS human_directives (
+  id TEXT PRIMARY KEY,
+  json TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
 `;
 
 export class CivilizationStore {
@@ -135,6 +147,10 @@ export class CivilizationStore {
     if (!settlementNames.has("project_json")) this.db.exec(`ALTER TABLE settlement ADD COLUMN project_json TEXT`);
     if (!settlementNames.has("workstations_json")) this.db.exec(`ALTER TABLE settlement ADD COLUMN workstations_json TEXT`);
     if (!settlementNames.has("storage_contents_json")) this.db.exec(`ALTER TABLE settlement ADD COLUMN storage_contents_json TEXT`);
+    this.db.exec(`CREATE TABLE IF NOT EXISTS sim_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)`);
+    this.db.exec(
+      `CREATE TABLE IF NOT EXISTS human_directives (id TEXT PRIMARY KEY, json TEXT NOT NULL, created_at TEXT NOT NULL)`,
+    );
   }
 
   markDeceased(id: string, at = new Date().toISOString(), position?: Vec3): boolean {
@@ -154,8 +170,48 @@ export class CivilizationStore {
     return this.getCitizen(id)?.status === "dead";
   }
 
+  restoreLivingIdentity(id: string, reason = "development identity restored"): boolean {
+    const existing = this.getCitizen(id);
+    if (!existing) return false;
+    this.db
+      .prepare(
+        `UPDATE citizens SET status = 'offline', died_at = NULL, death_x = NULL, death_y = NULL, death_z = NULL, reason = ?
+         WHERE id = ?`,
+      )
+      .run(reason, id);
+    return true;
+  }
+
   close(): void {
     this.db.close();
+  }
+
+  getMeta(key: string): string | undefined {
+    const row = this.db.prepare(`SELECT value FROM sim_meta WHERE key = ?`).get(key) as { value: string } | undefined;
+    return row?.value;
+  }
+
+  setMeta(key: string, value: string): void {
+    this.db.prepare(`INSERT INTO sim_meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value`).run(key, value);
+  }
+
+  saveDirective(directive: HumanDirective): void {
+    this.db
+      .prepare(`INSERT INTO human_directives (id, json, created_at) VALUES (?, ?, ?) ON CONFLICT(id) DO UPDATE SET json = excluded.json`)
+      .run(directive.id, JSON.stringify(directive), directive.createdAt);
+  }
+
+  getDirective(id: string): HumanDirective | undefined {
+    const row = this.db.prepare(`SELECT json FROM human_directives WHERE id = ?`).get(id) as { json: string } | undefined;
+    if (!row) return undefined;
+    return JSON.parse(row.json) as HumanDirective;
+  }
+
+  listDirectives(limit = 40): HumanDirective[] {
+    const rows = this.db
+      .prepare(`SELECT json FROM human_directives ORDER BY created_at DESC LIMIT ?`)
+      .all(limit) as Array<{ json: string }>;
+    return rows.map((row) => JSON.parse(row.json) as HumanDirective);
   }
 
   private seed(): void {
