@@ -47,7 +47,8 @@ export function shouldBlacklistTarget(code: string): boolean {
     code === "WORLD_CHANGED" ||
     code === "TARGET_GONE" ||
     code === "TARGET_CHANGED" ||
-    code === "STUCK"
+    code === "STUCK" ||
+    code === "NAV_NO_INITIAL_PROGRESS"
   );
 }
 

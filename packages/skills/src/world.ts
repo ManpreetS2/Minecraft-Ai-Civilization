@@ -58,19 +58,33 @@ export async function sleep(ctx: SkillContext, preferred?: Vec3): Promise<Action
     return fail("HOSTILE_NEARBY", "Hostiles are too close to sleep", Date.now() - started, true);
   }
   if (!found.success) {
-    return fail("NO_BED", "No bed nearby", Date.now() - started, true);
+    return fail("BED_MISSING", "No bed nearby", Date.now() - started, true);
   }
   const move = await navigationBackend().navigateToInteractWithBlock(ctx.bot, found.data.position, {
     timeoutMs: ctx.timeoutMs ?? 12_000,
     signal: ctx.signal,
   });
-  if (!move.success) return move;
+  if (!move.success) {
+    return fail("BED_UNREACHABLE", move.error, Date.now() - started, true);
+  }
+  const here = bot.entity?.position;
+  if (here) {
+    const onBed = Math.floor(here.x) === Math.floor(found.data.position.x) && Math.floor(here.z) === Math.floor(found.data.position.z);
+    if (onBed) {
+      const step = {
+        x: found.data.position.x + 1,
+        y: found.data.position.y,
+        z: found.data.position.z,
+      };
+      await navigationBackend().navigateToPosition(ctx.bot, step, { range: 1.2, timeoutMs: 4_000, signal: ctx.signal });
+    }
+  }
   const bed = bot.findBlock({
     matching: (b) => b.name.endsWith("_bed"),
     maxDistance: 4,
   });
   if (!bed) {
-    return fail("NO_BED", "Bed vanished", Date.now() - started, true);
+    return fail("BED_MISSING", "Bed vanished", Date.now() - started, true);
   }
   await lookAtPosition(ctx, found.data.position);
   try {
@@ -81,15 +95,26 @@ export async function sleep(ctx: SkillContext, preferred?: Vec3): Promise<Action
     if (lower.includes("occupied")) {
       return fail("BED_OCCUPIED", message, Date.now() - started, true);
     }
-    if (lower.includes("night") || lower.includes("thunder")) {
+    if (lower.includes("night") || lower.includes("thunder") || lower.includes("day")) {
       return fail("NOT_SLEEP_TIME", message, Date.now() - started, true);
     }
     if (lower.includes("monster") || lower.includes("hostile")) {
       return fail("HOSTILE_NEARBY", message, Date.now() - started, true);
     }
+    if (lower.includes("not sleeping") || lower.includes("too far") || lower.includes("can't sleep") || lower.includes("cannot sleep")) {
+      return fail("INTERACTION_FAILED", message, Date.now() - started, true);
+    }
     return fail("SLEEP_FAILED", message, Date.now() - started, true);
   }
-  return ok({ rested: Boolean(bot.isSleeping) || true }, Date.now() - started);
+  if (!bot.isSleeping) {
+    return fail("INTERACTION_FAILED", "Mineflayer sleep returned but bot is not sleeping", Date.now() - started, true);
+  }
+  try {
+    await bot.wake();
+  } catch {
+    // already awake is fine
+  }
+  return ok({ rested: true }, Date.now() - started);
 }
 
 export async function attack(

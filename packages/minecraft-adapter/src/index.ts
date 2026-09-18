@@ -4,6 +4,7 @@ export { BodyLock, DuplicateBodyError, pidAlive } from "./body-lock.js";
 export {
   activePathCount,
   configureMovements,
+  invalidateMovementCache,
   followPlayer,
   lastPathDurationMs,
   loadPathfinder,
@@ -16,6 +17,15 @@ export {
   startFollowing,
   type MovementProfile,
 } from "./pathing.js";
+export {
+  chooseStandingDestination,
+  formatTerrainReport,
+  inspectLocalTerrain,
+  localEscape,
+  localEscapeCells,
+  type LocalTerrainReport,
+  type TerrainKind,
+} from "./local-escape.js";
 export { TargetBlacklist, cellKey, isProtectedFromPathfinder, movedEnough, nearbyOffsets, recoveryAttempts, shouldBlacklistTarget } from "./path-recovery.js";
 export { occupancyYieldCount, occupantNear, registerOccupancy, clearOccupancy } from "./occupancy.js";
 export { deriveConnectionHealth, emptyTelemetry, isKeepaliveTimeout, type ConnectionTelemetry } from "./connection-health.js";
@@ -41,3 +51,4 @@ export {
 export { probeReachability, scoreResourceTarget } from "./path-probe.js";
 export { rankResourceTargets, pickBestResourceTarget, type ResourceCandidate } from "./targets.js";
 export { NAV_SCENARIOS, backendsUnderTest, describeHarness, type NavBenchmarkRow } from "./nav-benchmark.js";
+export { loadToolPlugin, equipToolForBlock } from "./tool-plugin.js";

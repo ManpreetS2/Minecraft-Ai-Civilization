@@ -58,7 +58,14 @@ const envSchema = z.object({
 
 export type AppConfig = z.infer<typeof envSchema>;
 
-export const RESERVED_MECHANICS_PROBE_NAMES = ["MechProbe", "CivPathProbe"] as const;
+export const RESERVED_MECHANICS_PROBE_NAMES = [
+  "MechProbe",
+  "MechProbeB",
+  "CivPathProbe",
+  "MindcraftProbe",
+  "PhoenixProbe",
+  "CollectblockProbe",
+] as const;
 
 export function isMechanicsProbeUsername(name: string | undefined): boolean {
   if (!name) return false;

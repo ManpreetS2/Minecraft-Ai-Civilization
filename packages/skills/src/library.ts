@@ -3,12 +3,12 @@ import { navigationBackend } from "@civ/minecraft-adapter";
 import { Vec3 as Vec3Class } from "vec3";
 import type { SkillContext } from "./context.js";
 import { findBlock } from "./observe.js";
-import { collectItem } from "./gather.js";
 import { depositItems, withdrawItems, equipItem } from "./inventory.js";
 import { mineBlock } from "./gather.js";
 import { placeBlock } from "./world.js";
 import { eatFood } from "./inventory.js";
 import { openDoor } from "./doors.js";
+import { pickupDroppedItem, transferItemToCitizen } from "./inventory-service.js";
 
 export async function navigateTo(ctx: SkillContext, target: Vec3) {
   return navigationBackend().navigateToPosition(ctx.bot, target, { timeoutMs: ctx.timeoutMs, signal: ctx.signal });
@@ -23,7 +23,7 @@ export async function approachBlock(ctx: SkillContext, block: Vec3) {
 }
 
 export async function collectItemDrop(ctx: SkillContext, itemName?: string) {
-  return collectItem(ctx, itemName, 8);
+  return pickupDroppedItem(ctx, itemName, 8);
 }
 
 export async function breakBlock(ctx: SkillContext, names: string[]) {
@@ -51,8 +51,16 @@ export async function withdrawItem(ctx: SkillContext, itemName: string, count = 
 }
 
 export async function transferItem(ctx: SkillContext, itemName: string, count = 1) {
-  return withdrawItems(ctx, itemName, count);
+  return fail(
+    "INVALID_ARGUMENT",
+    "Physical citizen transfer requires a recipient body. Use transferItemToCitizen.",
+    0,
+    false,
+    { item: itemName, count },
+  );
 }
+
+export { transferItemToCitizen, pickupDroppedItem };
 
 export async function returnToSettlement(ctx: SkillContext, origin?: Vec3) {
   if (!origin) return fail("TARGET_UNREACHABLE", "No settlement origin", 0, true);

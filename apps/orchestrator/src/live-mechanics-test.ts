@@ -1,20 +1,36 @@
 import { loadEnv } from "./env.js";
 import { loadConfig, isMechanicsProbeUsername } from "@civ/shared";
-import { findReachableInteractionPosition, MinecraftBody, moveToPosition, NORMAL_NAVIGATION_CAN_DIG } from "@civ/minecraft-adapter";
+import { findReachableInteractionPosition, formatTerrainReport, inspectLocalTerrain, localEscape, MinecraftBody, moveToPosition, NORMAL_NAVIGATION_CAN_DIG } from "@civ/minecraft-adapter";
 import { minecraftKnowledge } from "@civ/minecraft-knowledge";
 import {
-  collectItem,
+  canReceive,
   collectResource,
+  compactInventoryFacts,
+  clearReservations,
+  depositItem,
   depositItems,
+  dropItem,
+  dropStack,
   eatFood,
+  equipItem,
   evaluateFunctionalPlacement,
   findBlock,
+  findStacks,
+  freeCapacity,
+  heldItem,
   inventoryCount,
   listInventory,
   obtainItem,
   openDoor,
+  pickupDroppedItem,
   placeBlock,
+  reserveItems,
+  snapshotInventory,
   sleep,
+  setQuickBarSlot,
+  transferItemToCitizen,
+  unequip,
+  withdrawItem,
   withdrawItems,
   worldGetterFromBot,
   type SkillContext,
@@ -152,6 +168,9 @@ async function main(): Promise<void> {
   console.log(`NORMAL_NAVIGATION_CAN_DIG=${NORMAL_NAVIGATION_CAN_DIG}`);
   console.log(`oak_door recipe exists: ${knowledge.recipeExists("oak_door")}`);
   if (mechanicsFilter) console.log(`MECHANICS_TEST_FILTER=${mechanicsFilter}`);
+  if (process.env.MECHANICS_COLLECT_BACKEND) {
+    console.log(`MECHANICS_COLLECT_BACKEND=${process.env.MECHANICS_COLLECT_BACKEND}`);
+  }
 
   const body = new MinecraftBody({
     username,
@@ -179,6 +198,10 @@ async function main(): Promise<void> {
   const origin = body.position();
   if (!origin) throw new Error("No spawn position");
   console.log(`spawn ${origin.x.toFixed(1)} ${origin.y.toFixed(1)} ${origin.z.toFixed(1)} food=${bot.food}`);
+  const spawnReport = inspectLocalTerrain(bot);
+  if (spawnReport) {
+    console.log(`  terrain ${formatTerrainReport(spawnReport)}`);
+  }
   const results: CaseResult[] = [];
   const printResults = (extra?: string) => {
     if (extra) console.error(extra);
@@ -201,45 +224,132 @@ async function main(): Promise<void> {
   if (rcon) {
     await rcon.command(`op ${username}`).catch(() => undefined);
     await rcon.command("difficulty easy").catch(() => undefined);
+    await rcon.command(`effect give ${username} minecraft:saturation 8 255 true`).catch(() => undefined);
   }
 
-  const beforeNav = snapshotSolids(bot, origin, 8);
+  async function assertNoBroken(before: Map<string, string>, label: string): Promise<void> {
+    const broken = brokenSolids(bot, before);
+    if (broken.length > 0) {
+      throw new Error(`${label}: unrelated blocks became air: ${broken.slice(0, 8).join("; ")}`);
+    }
+  }
+
+  async function tpTo(x: number, y: number, z: number): Promise<void> {
+    if (!rcon) throw new Error("SKIP RCON required for nav fixture teleport");
+    await rcon.command(`tp ${username} ${x} ${y} ${z}`);
+    await wait(1_600);
+  }
 
   results.push(
-    await runCase("walk 15-25 blocks without mining", async () => {
-      const dirs = [
-        { x: 16, z: 0 },
-        { x: -16, z: 0 },
-        { x: 0, z: 16 },
-        { x: 0, z: -16 },
-        { x: 10, z: 10 },
-        { x: 8, z: 0 },
-        { x: 0, z: 8 },
-      ];
-      let lastError = "no walk attempted";
-      for (const dir of dirs) {
-        const dest = { x: origin.x + dir.x, y: origin.y, z: origin.z + dir.z };
-        const result = await moveToPosition(bot, dest, { range: 3, timeoutMs: 8_000, recover: true });
-        if (result.success) {
-          lastError = "";
-          break;
-        }
-        lastError = `${result.code} ${result.error}`;
-      }
-      const here = body.position();
-      const broken = brokenSolids(bot, beforeNav);
-      if (broken.length > 0) {
-        throw new Error(`unrelated blocks became air: ${broken.slice(0, 8).join("; ")}`);
-      }
-      const dist = here ? Math.hypot(here.x - origin.x, here.z - origin.z) : 0;
-      console.log(`  walk moved ${dist.toFixed(1)} blocks; solids broken=0 (${lastError || "ok"})`);
-      if (dist < 6) {
-        console.log("  no 6-block walkable route from this pad; random-mining check still passed");
-      }
+    await runCase("inspect spawn neighborhood", async () => {
+      const report = inspectLocalTerrain(bot);
+      if (!report) throw new Error("no terrain report");
+      console.log(`  spawn kind=${report.kind} ${report.reason}`);
     }),
   );
 
-  await moveToPosition(bot, origin, { range: 4, timeoutMs: 12_000, recover: false });
+  results.push(
+    await runCase("recover from 1-block pit without mining", async () => {
+      if (!rcon) throw new Error("SKIP RCON required to build pit fixture");
+      await rcon.command("fill 174 89 134 190 89 156 grass_block");
+      await rcon.command("fill 174 90 134 190 93 156 air");
+      await rcon.command("setblock 186 88 148 dirt");
+      await rcon.command("setblock 186 89 148 air");
+      await rcon.command("setblock 185 88 148 grass_block");
+      await rcon.command("setblock 185 89 148 oak_slab[type=bottom]");
+      await tpTo(186.5, 89.0, 148.5);
+      const before = snapshotSolids(bot, body.position() ?? { x: 186.5, y: 89, z: 148.5 }, 4);
+      const start = body.position();
+      if (!start) throw new Error("lost body in pit");
+      const report = inspectLocalTerrain(bot);
+      console.log(`  pit ${report ? formatTerrainReport(report) : "unloaded"}`);
+      const escaped = await localEscape(bot, { timeoutMs: 8_000 });
+      let here = body.position();
+      let dist = here ? Math.hypot(here.x - start.x, here.y - start.y, here.z - start.z) : 0;
+      if (dist < 0.6) {
+        const rim = { x: 185.5, y: 90, z: 148.5 };
+        const walked = await moveToPosition(bot, rim, { range: 1.2, timeoutMs: 10_000, recover: false });
+        here = body.position();
+        dist = here ? Math.hypot(here.x - start.x, here.y - start.y, here.z - start.z) : 0;
+        if (dist < 0.6 && !walked.success) {
+          const escapeDetail = escaped.success ? "" : `${escaped.code} ${escaped.error}`;
+          throw new Error(`${escapeDetail || `${walked.code} ${walked.error}`} dist=${dist.toFixed(2)}`);
+        }
+      }
+      bot.clearControlStates();
+      await assertNoBroken(before, "pit");
+      const endKind = inspectLocalTerrain(bot)?.kind;
+      if (dist < 0.6 || endKind === "walled_pit" || endKind === "deep_pit") {
+        throw new Error(`still in pit dist=${dist.toFixed(2)} kind=${endKind ?? "?"} onGround=${bot.entity?.onGround}`);
+      }
+      console.log(
+        `  pit escape moved ${dist.toFixed(2)} kind=${report?.kind ?? "?"} (${escaped.success ? "escape" : escaped.code})`,
+      );
+    }),
+  );
+
+  results.push(
+    await runCase("walk open flat terrain without mining", async () => {
+      if (!rcon) throw new Error("SKIP RCON required for open pad");
+      await rcon.command("fill 174 89 134 190 89 156 grass_block");
+      await rcon.command("fill 174 90 134 190 93 156 air");
+      await tpTo(177.5, 90.0, 137.5);
+      const start = body.position();
+      if (!start) throw new Error("no pad position");
+      const before = snapshotSolids(bot, start, 10);
+      const dest = { x: start.x + 12, y: start.y, z: start.z + 12 };
+      const result = await moveToPosition(bot, dest, { range: 2.5, timeoutMs: 16_000, recover: true });
+      const here = body.position();
+      const dist = here ? Math.hypot(here.x - start.x, here.z - start.z) : 0;
+      await assertNoBroken(before, "open pad");
+      console.log(`  open walk ${dist.toFixed(1)} blocks (${result.success ? "ok" : `${result.code} ${result.error}`})`);
+      if (dist < 8) throw new Error(`open terrain displacement ${dist.toFixed(1)} < 8`);
+    }),
+  );
+
+  results.push(
+    await runCase("walk village/uneven terrain without mining", async () => {
+      if (!rcon) throw new Error("SKIP RCON required for uneven pad");
+      await rcon.command("fill 174 89 134 190 89 156 grass_block");
+      await rcon.command("fill 174 90 134 190 93 156 air");
+      await rcon.command("setblock 179 90 140 dirt_path");
+      await rcon.command("setblock 180 90 141 oak_slab[type=bottom]");
+      await rcon.command("setblock 181 90 142 oak_stairs[facing=east]");
+      await tpTo(176.5, 90.0, 138.5);
+      const start = body.position();
+      if (!start) throw new Error("no uneven position");
+      const before = snapshotSolids(bot, start, 8);
+      const dest = { x: start.x + 10, y: start.y, z: start.z + 8 };
+      const result = await moveToPosition(bot, dest, { range: 3, timeoutMs: 16_000, recover: true });
+      const here = body.position();
+      const dist = here ? Math.hypot(here.x - start.x, here.z - start.z) : 0;
+      await assertNoBroken(before, "uneven");
+      console.log(`  uneven walk ${dist.toFixed(1)} blocks (${result.success ? "ok" : `${result.code} ${result.error}`})`);
+      if (dist < 6) throw new Error(`uneven displacement ${dist.toFixed(1)} < 6 (${result.success ? "ok" : `${result.code} ${result.error}`})`);
+    }),
+  );
+
+  results.push(
+    await runCase("walk 15-25 blocks without mining", async () => {
+      if (!rcon) throw new Error("SKIP RCON required");
+      await rcon.command("fill 174 89 134 190 89 156 grass_block");
+      await rcon.command("fill 174 90 134 190 93 156 air");
+      await tpTo(176.5, 90.0, 136.5);
+      const start = body.position();
+      if (!start) throw new Error("no walk position");
+      const before = snapshotSolids(bot, start, 8);
+      const dest = { x: start.x + 14, y: start.y, z: start.z + 2 };
+      const result = await moveToPosition(bot, dest, { range: 3, timeoutMs: 16_000, recover: true });
+      const here = body.position();
+      await assertNoBroken(before, "spawn walk");
+      const dist = here ? Math.hypot(here.x - start.x, here.z - start.z) : 0;
+      console.log(`  long walk moved ${dist.toFixed(1)} blocks; solids broken=0 (${result.success ? "ok" : `${result.code} ${result.error}`})`);
+      if (dist < 8) throw new Error(`long walk displacement ${dist.toFixed(1)} < 8`);
+    }),
+  );
+
+  await tpTo(178.5, 90.0, 140.5).catch(() => undefined);
+  await moveToPosition(bot, body.position() ?? origin, { range: 4, timeoutMs: 8_000, recover: true });
 
   results.push(
     await runCase("reject open-field bed/door/table without valid context", async () => {
@@ -553,68 +663,222 @@ async function main(): Promise<void> {
 
   results.push(
     await runCase("sleep if valid time", async () => {
-      await runCommand(bot, rcon, "gamerule doMobSpawning false");
-      await runCommand(bot, rcon, "time set 18000");
-      await wait(1_500);
-      let slept = await sleep(ctx, pad.bed);
-      if (!slept.success && slept.code === "SLEEP_FAILED") {
-        await wait(800);
-        slept = await sleep(ctx, pad.bed);
+      if (!rcon) throw new Error("SKIP RCON required for bed fixture");
+      await rcon.command("gamerule doMobSpawning false");
+      await rcon.command("gamerule doDaylightCycle false");
+      const stand = body.position();
+      if (!stand) throw new Error("no position for bed");
+      const x = Math.floor(stand.x) + 6;
+      const y = Math.floor(stand.y);
+      const z = Math.floor(stand.z) + 3;
+      await rcon.command(`fill ${x - 1} ${y - 1} ${z - 1} ${x + 3} ${y + 3} ${z + 2} air`);
+      await rcon.command(`fill ${x - 1} ${y - 1} ${z - 1} ${x + 3} ${y - 1} ${z + 2} oak_planks`);
+      await rcon.command(`fill ${x - 1} ${y} ${z - 1} ${x - 1} ${y + 1} ${z + 2} oak_planks`);
+      await rcon.command(`fill ${x + 3} ${y} ${z - 1} ${x + 3} ${y + 1} ${z + 2} oak_planks`);
+      await rcon.command(`fill ${x - 1} ${y} ${z - 1} ${x + 3} ${y + 1} ${z - 1} oak_planks`);
+      await rcon.command(`fill ${x - 1} ${y + 2} ${z - 1} ${x + 3} ${y + 2} ${z + 2} oak_planks`);
+      await rcon.command(`setblock ${x} ${y} ${z} minecraft:red_bed[facing=east,part=foot]`);
+      await rcon.command(`setblock ${x + 1} ${y} ${z} minecraft:red_bed[facing=east,part=head]`);
+      const bedPos = { x, y, z };
+      const ready = await waitForNamedBlock(bot, bedPos, ["red_bed"], 4_000);
+      if (!ready) throw new Error("BED_MISSING dedicated bed not visible");
+      pad.bed = bedPos;
+      const standing = findReachableInteractionPosition(bot, bedPos);
+      if (standing) {
+        await moveToPosition(bot, standing, { range: 1.2, timeoutMs: 8_000, recover: true });
       }
-      await runCommand(bot, rcon, "time set day");
-      await runCommand(bot, rcon, "gamerule doMobSpawning true");
+      await rcon.command("time set 18000");
+      const nightDeadline = Date.now() + 4_000;
+      while (Date.now() < nightDeadline) {
+        const t = bot.time?.timeOfDay ?? 0;
+        if (t >= 13_000 && t < 23_000) break;
+        await wait(200);
+      }
+      console.log(`  timeOfDay=${bot.time?.timeOfDay} isSleeping=${bot.isSleeping} standing=${standing ? `${standing.x},${standing.y},${standing.z}` : "none"}`);
+      const slept = await sleep(ctx, bedPos);
+      const wasSleeping = slept.success;
+      await rcon.command("time set day");
+      await rcon.command("gamerule doDaylightCycle true");
+      await rcon.command("gamerule doMobSpawning true");
       if (!slept.success) {
-        if (
-          slept.code === "NOT_SLEEP_TIME" ||
-          slept.code === "NO_BED" ||
-          slept.code === "HOSTILE_NEARBY" ||
-          slept.code === "TIMEOUT" ||
-          slept.code === "NO_INTERACTION_POSITION" ||
-          slept.code === "TARGET_UNREACHABLE" ||
-          slept.code === "SLEEP_FAILED"
-        ) {
-          throw new Error(`SKIP ${slept.code} ${slept.error}`);
-        }
         throw new Error(`${slept.code} ${slept.error}`);
       }
+      if (!wasSleeping) throw new Error("INTERACTION_FAILED sleep did not report rest");
     }),
   );
 
   results.push(
     await runCase("pickup nearby drop if present", async () => {
-      const stick = ctx.bot.inventory.items().find((item) => item.name === "stick") ?? ctx.bot.inventory.items()[0];
-      if (stick) {
-        const before = inventoryCount(ctx, stick.name);
-        try {
-          await ctx.bot.toss(stick.type, null, 1);
-          await wait(600);
-        } catch {
-          // fall through to summon
-        }
-        if (inventoryCount(ctx, stick.name) >= before) {
-          const pos = body.position();
-          if (pos) {
-            await runCommand(
-              bot,
-              rcon,
-              `execute at ${username} run summon minecraft:item ~ ~1 ~ {Item:{id:"minecraft:stick",count:1}}`,
-            );
-            await wait(700);
-          }
-        }
-      } else {
-        const pos = body.position();
-        if (pos) {
-          await runCommand(
-            bot,
-            rcon,
-            `execute at ${username} run summon minecraft:item ~ ~1 ~ {Item:{id:"minecraft:stick",count:1}}`,
-          );
-          await wait(700);
+      const beforeStick = inventoryCount(ctx, "stick");
+      await runCommand(
+        bot,
+        rcon,
+        `execute at ${username} run summon minecraft:item ~ ~0.2 ~ {PickupDelay:0,Item:{id:"minecraft:stick",count:1}}`,
+      );
+      await wait(1_200);
+      if (inventoryCount(ctx, "stick") > beforeStick) return;
+      const collected = await pickupDroppedItem(ctx, "stick", 8);
+      if (!collected.success) throw new Error(`${collected.code} ${collected.error}`);
+      if (inventoryCount(ctx, "stick") <= beforeStick) {
+        throw new Error("VERIFY_FAILED stick count did not increase after pickup");
+      }
+    }),
+  );
+
+  results.push(
+    await runCase("construct approved 3-plank shelter wall", async () => {
+      await runCommand(bot, rcon, `give ${username} oak_planks 16`);
+      await wait(400);
+      const pos = body.position() ?? origin;
+      const ox = Math.floor(pos.x) + 6;
+      const oy = Math.floor(pos.y);
+      const oz = Math.floor(pos.z) + 6;
+      await runCommand(bot, rcon, `fill ${ox} ${oy} ${oz} ${ox + 1} ${oy + 1} ${oz} air`);
+      await wait(250);
+      const cells = [
+        { x: ox, y: oy, z: oz },
+        { x: ox + 1, y: oy, z: oz },
+        { x: ox, y: oy + 1, z: oz },
+      ];
+      for (const cell of cells) {
+        const placed = await placeBlock(ctx, "oak_planks", cell, { purpose: "shelter_blueprint" });
+        if (!placed.success) throw new Error(`${placed.code} ${placed.error}`);
+        const block = blockAt(bot, cell.x, cell.y, cell.z);
+        if (block?.name !== "oak_planks") {
+          throw new Error(`VERIFY_FAILED expected oak_planks at ${cell.x},${cell.y},${cell.z} got ${block?.name ?? "none"}`);
         }
       }
-      const collected = await collectItem(ctx, undefined, 8);
-      if (!collected.success) throw new Error(`${collected.code} ${collected.error}`);
+    }),
+  );
+
+  results.push(
+    await runCase("authoritative inventory snapshot/drop/equip/capacity", async () => {
+      if (!rcon) throw new Error("SKIP RCON required for inventory fixtures");
+      await rcon.command(`clear ${username}`);
+      await wait(500);
+      let snap = snapshotInventory(ctx);
+      console.log(`  empty stacks=${snap.stacks.length} freeSlots=${snap.freeSlots}`);
+      if (snap.counts.oak_log) throw new Error(`expected empty oak_log, have ${snap.counts.oak_log}`);
+
+      await rcon.command(`give ${username} oak_log 64`);
+      await wait(700);
+      snap = snapshotInventory(ctx);
+      const logStack = findStacks(ctx, "oak_log")[0];
+      if ((snap.counts.oak_log ?? 0) !== 64) throw new Error(`oak_log count ${snap.counts.oak_log} != 64`);
+      if (!logStack || logStack.stackSize !== 64) throw new Error(`oak_log stackSize ${logStack?.stackSize} != 64`);
+      const facts = compactInventoryFacts(ctx);
+      if (!facts.lines.includes("oak_log: 64")) throw new Error(`compact facts missing oak_log: ${facts.lines.join("; ")}`);
+
+      const droppedFive = await dropItem(ctx, "oak_log", 5, "DEV_TEST");
+      if (!droppedFive.success) throw new Error(`${droppedFive.code} ${droppedFive.error}`);
+      if (inventoryCount(ctx, "oak_log") !== 59) throw new Error(`after drop 5 have ${inventoryCount(ctx, "oak_log")}`);
+
+      const remaining = findStacks(ctx, "oak_log")[0];
+      if (!remaining) throw new Error("remaining oak_log stack missing");
+      const dumped = await dropStack(ctx, remaining, "DEV_TEST");
+      if (!dumped.success) throw new Error(`${dumped.code} ${dumped.error}`);
+      if (inventoryCount(ctx, "oak_log") !== 0) throw new Error(`expected 0 oak_log after stack drop, have ${inventoryCount(ctx, "oak_log")}`);
+      await wait(500);
+      const picked = await pickupDroppedItem(ctx, "oak_log", 12);
+      if (!picked.success) {
+        await wait(2_000);
+        const recovered = inventoryCount(ctx, "oak_log");
+        if (recovered > 0) {
+          console.log(`  pickup via Minecraft auto-collect recovered=${recovered}`);
+        } else {
+          throw new Error(`${picked.code} ${picked.error}`);
+        }
+      } else if (inventoryCount(ctx, "oak_log") < 1) {
+        throw new Error("pickup did not increase oak_log");
+      }
+
+      await rcon.command(`give ${username} wooden_pickaxe 1`);
+      await wait(400);
+      const equipped = await equipItem(ctx, "wooden_pickaxe");
+      if (!equipped.success) throw new Error(`${equipped.code} ${equipped.error}`);
+      if (heldItem(ctx)?.name !== "wooden_pickaxe") throw new Error(`held ${heldItem(ctx)?.name ?? "nothing"}`);
+      const emptied = await unequip(ctx, "hand");
+      if (!emptied.success) throw new Error(`${emptied.code} ${emptied.error}`);
+      const slot = await setQuickBarSlot(ctx, 1);
+      if (!slot.success) throw new Error(`${slot.code} ${slot.error}`);
+
+      reserveItems(ctx, "shelter-logs", "oak_log", Math.max(1, inventoryCount(ctx, "oak_log") - 1), "shelter");
+      const reservedDrop = await dropItem(ctx, "oak_log", inventoryCount(ctx, "oak_log"), "DISCARD");
+      if (reservedDrop.success) throw new Error("drop consumed reserved oak_log");
+      if (reservedDrop.code !== "ITEM_RESERVED" && reservedDrop.code !== "ITEM_NOT_FOUND") {
+        throw new Error(`expected ITEM_RESERVED, got ${reservedDrop.code}`);
+      }
+      clearReservations(ctx);
+
+      await rcon.command(`give ${username} cobblestone 16`);
+      await wait(400);
+      const stand = body.position() ?? origin;
+      const chestPos = pad.chest ?? { x: Math.floor(stand.x) + 2, y: Math.floor(stand.y), z: Math.floor(stand.z) };
+      if (!pad.chest) {
+        await rcon.command(`setblock ${chestPos.x} ${chestPos.y} ${chestPos.z} chest`);
+        await wait(400);
+      }
+      const citizenBefore = inventoryCount(ctx, "cobblestone");
+      const deposited = await depositItem(ctx, "cobblestone", 10, chestPos);
+      if (!deposited.success) throw new Error(`${deposited.code} ${deposited.error}`);
+      if (inventoryCount(ctx, "cobblestone") !== citizenBefore - deposited.data.deposited) {
+        throw new Error("deposit citizen delta mismatch");
+      }
+      const withdrawn = await withdrawItem(ctx, "cobblestone", 5, chestPos);
+      if (!withdrawn.success) throw new Error(`${withdrawn.code} ${withdrawn.error}`);
+
+      await rcon.command(`clear ${username}`);
+      await wait(300);
+      for (let i = 0; i < 36 && freeCapacity(ctx, "cobblestone") > 0; i += 1) {
+        await rcon.command(`give ${username} cobblestone 64`);
+        await wait(80);
+      }
+      await wait(400);
+      if (freeCapacity(ctx, "oak_log") !== 0) {
+        throw new Error(`expected 0 oak_log capacity, got ${freeCapacity(ctx, "oak_log")} freeSlots=${snapshotInventory(ctx).freeSlots}`);
+      }
+      if (canReceive(ctx, "oak_log", 1)) throw new Error("full inventory still reports canReceive oak_log");
+      const refused = await withdrawItem(ctx, "cobblestone", 1, chestPos);
+      if (refused.success) throw new Error("withdraw succeeded while inventory was full");
+      if (refused.code !== "INVENTORY_FULL") throw new Error(`expected INVENTORY_FULL, got ${refused.code}`);
+      console.log(`  capacity oak_log=${freeCapacity(ctx, "oak_log")} cobble=${inventoryCount(ctx, "cobblestone")}`);
+    }),
+  );
+
+  results.push(
+    await runCase("authoritative probe-to-probe transfer", async () => {
+      if (!rcon) throw new Error("SKIP RCON required for transfer fixtures");
+      const peerName = "MechProbeB";
+      if (!isMechanicsProbeUsername(peerName)) throw new Error("MechProbeB must stay a reserved probe name");
+      const peer = new MinecraftBody({
+        username: peerName,
+        config: { ...config, MINECRAFT_USERNAME: peerName },
+        reconnect: false,
+        allowRespawn: true,
+      });
+      const connected = await peer.connect();
+      if (!connected.success) {
+        throw new Error(`SKIP peer connect ${connected.code} ${connected.error}`);
+      }
+      try {
+        await wait(1500);
+        const peerBot = peer.requireBot();
+        const peerCtx: SkillContext = { body: peer, bot: peerBot, timeoutMs: 20_000 };
+        const here = body.position() ?? origin;
+        await rcon.command(`tp ${peerName} ${here.x.toFixed(1)} ${here.y.toFixed(1)} ${here.z.toFixed(1)}`);
+        await rcon.command(`clear ${username}`);
+        await rcon.command(`clear ${peerName}`);
+        clearReservations(ctx);
+        clearReservations(peerCtx);
+        await rcon.command(`give ${username} oak_log 12`);
+        await wait(800);
+        const result = await transferItemToCitizen(ctx, peerCtx, "oak_log", 8);
+        if (!result.success) throw new Error(`${result.code} ${result.error}`);
+        if (inventoryCount(ctx, "oak_log") !== 4) throw new Error(`giver has ${inventoryCount(ctx, "oak_log")} != 4`);
+        if (inventoryCount(peerCtx, "oak_log") !== 8) throw new Error(`receiver has ${inventoryCount(peerCtx, "oak_log")} != 8`);
+      } finally {
+        await peer.disconnect("inventory-transfer-peer");
+      }
     }),
   );
 
@@ -646,12 +910,24 @@ async function main(): Promise<void> {
 
 function wantedCase(name: string): boolean {
   const filter = (process.env.MECHANICS_TEST_FILTER ?? "").trim().toLowerCase();
-  if (!filter || filter === "all") return true;
+  if (!filter) {
+    return !/authoritative inventory|authoritative probe-to-probe/.test(name);
+  }
+  if (filter === "all") return true;
   if (filter === "crafting") {
     return /log ->|stone pickaxe|oak_door|inspect inventory|reuse existing crafting/.test(name);
   }
   if (filter === "nav" || filter === "navigation") {
-    return /walk |standing cell/.test(name);
+    return /inspect spawn|pit |open flat|village\/uneven|walk 15-25|standing cell|open wooden door/.test(name);
+  }
+  if (filter === "sleep") {
+    return /sleep |open-field/.test(name);
+  }
+  if (filter === "collectblock") {
+    return /log ->|mine intended stone/.test(name);
+  }
+  if (filter === "inventory" || filter === "transfer") {
+    return /authoritative inventory|authoritative probe-to-probe|chest deposit/.test(name);
   }
   if (filter === "doorway") {
     return /oak_door|open-field|doorway/.test(name);

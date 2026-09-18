@@ -41,6 +41,18 @@ export function translateError(error?: string, task?: unknown): TranslatedError 
   if (/INVENTORY_FULL|inventory is full/i.test(text)) {
     return { subtext: "Inventory is full." };
   }
+  if (/TRANSFER_INCOMPLETE/i.test(text)) {
+    return { subtext: "The item left one inventory but did not arrive in the intended inventory." };
+  }
+  if (/ITEM_RESERVED/i.test(text)) {
+    return { subtext: "Those items are reserved for another task." };
+  }
+  if (/RECIPIENT_FULL/i.test(text)) {
+    return { subtext: "The other inventory cannot hold that many items." };
+  }
+  if (/DROP_FAILED|PICKUP_FAILED/i.test(text)) {
+    return { subtext: "The physical drop or pickup did not complete." };
+  }
   if (/timed out after \d+ milliseconds|keepalive|client timed out|econnreset|socket hang up/i.test(text)) {
     return {
       headline: "lost connection to the Minecraft server",

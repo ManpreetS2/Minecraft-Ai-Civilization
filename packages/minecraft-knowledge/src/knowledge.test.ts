@@ -204,6 +204,9 @@ describe("block interaction and entity knowledge", () => {
     expect(knowledge.isFood("cooked_beef")).toBe(true);
     expect(knowledge.foodValue("bread")).toBeGreaterThan(0);
     expect(knowledge.isTool("wooden_pickaxe")).toBe(true);
+    expect(knowledge.stackSize("oak_log")).toBe(64);
+    expect(knowledge.stackSize("snowball")).toBe(16);
+    expect(knowledge.stackSize("wooden_pickaxe")).toBe(1);
     expect(knowledge.canHarvest("stone", undefined)).toBe(false);
     expect(knowledge.canHarvest("stone", "wooden_pickaxe")).toBe(true);
     expect(knowledge.preferredToolForInventory("stone", [{ name: "wooden_pickaxe", count: 1 }, { name: "oak_log", count: 3 }])).toBe(

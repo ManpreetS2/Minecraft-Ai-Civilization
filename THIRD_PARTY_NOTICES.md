@@ -20,21 +20,22 @@ This project reuses and adapts open-source Minecraft bot libraries. Copied or wr
 
 - Repository: https://github.com/PrismarineJS/mineflayer-collectblock
 - License: MIT
-- What we use: Evaluated as a collection pattern (path → tool → mine → pickup). Not loaded as a plugin that owns simulation state. Equivalent verified skill: `collectResource`, which still enforces target blacklist, occupancy, timeouts, and inventory verification.
+- What we use: **Spiked live, not loaded in production.** Isolated MechProbe run with `MECHANICS_COLLECT_BACKEND=collectblock` passed oak/stone on a sky pad (~2.6s stone). Rejected as the production gather path: `collect()` sets `canDig=true` / `dontCreateFlow=false` / `dontMineUnderFallingBlock=false`, and `mineBlock` always calls `equipForBlock(..., { getFromChest: true })`. Constructor still uses `new Movements(bot, minecraft-data(version))`. Keep our SAFE approach + dig + pickup. See `docs/BODY-ENGINE-BAKEOFF.md`.
 - Copyright: PrismarineJS contributors
 
 ## PrismarineJS / mineflayer-tool
 
 - Repository: https://github.com/PrismarineJS/mineflayer-tool
 - License: MIT
-- What we use: Evaluated `equipForBlock` ranking pattern (axe for logs, pickaxe for stone, shovel for dirt). Implemented locally in `@civ/skills` `equipForBlock` so missing-tool failures stay structured (`MISSING_TOOL`) and do not bypass our skill result schema.
+- What we use: Loaded as `bot.tool.equipForBlock(block, { requireHarvest: true, getFromChest: false })` from `@civ/minecraft-adapter` `equipToolForBlock` (`tool-plugin.ts`). Knowledge-layer `equipForBlock` remains the structured `MISSING_TOOL` fallback when the plugin has no Block object or throws a non-NoItem error.
+- Commit/package: npm `mineflayer-tool@1.2.0`.
 - Copyright: PrismarineJS contributors
 
 ## mindcraft-bots / mindcraft
 
 - Repository: https://github.com/mindcraft-bots/mindcraft
 - License: MIT
-- What we adapt: Bounded skill patterns from `src/agent/library/skills.js` — go-to-position, nearest-block selection, collect-block, place-block, and craft-recipe flows. We do **not** import Mindcraft's arbitrary code-generation or unconstrained LLM action execution. Citizens may only run approved verified skills.
+- What we adapt: Bounded skill patterns from `src/agent/library/skills.js` (commit `5f3acc87b479864124173de444f31fa5538f94a6`) — go-to-position, nearest-block selection, collect-block, place-block, and craft-recipe flows. Pathfinder patch `patches/mineflayer-pathfinder+2.4.5.patch` was inspected live; we adopted `canOpenDoors=true` in `configureMovements` only. We do **not** vendor the rest of that node_modules patch (lava-as-walkable, vine climbing, 0.175 arrival, trapdoor climbers) and do **not** import Mindcraft's arbitrary code-generation. Citizens may only run approved verified skills.
 - Copyright: mindcraft-bots contributors
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:

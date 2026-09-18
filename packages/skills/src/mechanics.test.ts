@@ -9,6 +9,8 @@ describe("mechanics skill classification", () => {
     expect(classifySkill(fail("MISSING_INGREDIENT", "Need oak planks", 1, true))).toBe("PREREQUISITE_MISSING");
     expect(classifySkill(fail("UNKNOWN_ITEM", "Unknown item diamond_dirt_sword", 1, false))).toBe("PREREQUISITE_MISSING");
     expect(classifySkill(fail("INVENTORY_FULL", "Inventory is full", 1, true))).toBe("PREREQUISITE_MISSING");
+    expect(classifySkill(fail("ITEM_RESERVED", "planks reserved", 1, true))).toBe("PREREQUISITE_MISSING");
+    expect(classifySkill(fail("RECIPIENT_FULL", "maya full", 1, true))).toBe("PREREQUISITE_MISSING");
     expect(classifySkill(fail("CANCELLED", "preempted", 1, false))).toBe("INTERRUPTED");
   });
 });
@@ -32,5 +34,7 @@ describe("recipe existence vs craftability", () => {
     expect(classifySkill(fail("MISSING_INGREDIENT", "Need oak planks", 1, true))).toBe("PREREQUISITE_MISSING");
     expect(classifySkill(fail("UNKNOWN_RECIPE", "no such recipe", 1, false))).toBe("PREREQUISITE_MISSING");
     expect(classifySkill(fail("PURPOSELESS_PLACEMENT", "open field bed", 1, false))).toBe("BLOCKED");
+    expect(classifySkill(fail("BED_UNREACHABLE", "cannot reach bed", 1, true))).toBe("BLOCKED");
+    expect(classifySkill(fail("NAV_NO_INITIAL_PROGRESS", "no first step", 1, true))).toBe("BLOCKED");
   });
 });

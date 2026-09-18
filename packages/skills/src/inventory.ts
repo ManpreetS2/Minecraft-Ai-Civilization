@@ -5,83 +5,39 @@ import { Vec3 as Vec3Class } from "vec3";
 import type { SkillContext } from "./context.js";
 import { findBlock } from "./observe.js";
 import { lookAtPosition } from "./look.js";
+import {
+  availableUnreservedCount,
+  countItem,
+  depositItem,
+  edibleItems,
+  equipItem as equipThroughInventory,
+  withdrawItem,
+} from "./inventory-service.js";
 
-function countItem(ctx: SkillContext, name: string): number {
-  const knowledge = minecraftKnowledge();
-  const n = knowledge.normalizeItemName(name) || name;
-  return ctx.bot.inventory
-    .items()
-    .filter((item) => item.name === n || knowledge.normalizeItemName(item.name) === n)
-    .reduce((sum, item) => sum + item.count, 0);
-}
+export {
+  availableUnreservedCount,
+  buildingItems,
+  canFitDrop,
+  canReceive,
+  clearReservations,
+  compactInventoryFacts,
+  countItem,
+  edibleItems,
+  findInventoryItem,
+  findStacks,
+  freeCapacity,
+  hasItem,
+  heldItem,
+  inventorySpace,
+  listInventory,
+  releaseReservation,
+  reserveItems,
+  snapshotInventory,
+  toolsOwned,
+} from "./inventory-service.js";
 
 export function inventoryCount(ctx: SkillContext, name: string): number {
   return countItem(ctx, name);
-}
-
-export function hasItem(ctx: SkillContext, name: string, count = 1): boolean {
-  return inventoryCount(ctx, name) >= count;
-}
-
-export function listInventory(ctx: SkillContext): Array<{ name: string; count: number }> {
-  const bag: Record<string, number> = {};
-  for (const item of ctx.bot.inventory.items()) {
-    bag[item.name] = (bag[item.name] ?? 0) + item.count;
-  }
-  return Object.entries(bag).map(([name, count]) => ({ name, count }));
-}
-
-export function inventorySpace(ctx: SkillContext): number {
-  const inv = ctx.bot.inventory;
-  const start = typeof inv.inventoryStart === "number" ? inv.inventoryStart : 9;
-  const end = typeof inv.inventoryEnd === "number" ? inv.inventoryEnd : 44;
-  let empty = 0;
-  for (let i = start; i <= end; i += 1) {
-    if (!inv.slots[i]) empty += 1;
-  }
-  return empty;
-}
-
-export function canFitDrop(ctx: SkillContext, names: string[]): boolean {
-  if (inventorySpace(ctx) > 0) return true;
-  const knowledge = minecraftKnowledge();
-  const wanted = new Set(names.map((name) => knowledge.normalizeItemName(name) || name));
-  return ctx.bot.inventory.items().some((item) => {
-    if (!wanted.has(item.name)) return false;
-    const max = item.stackSize ?? 64;
-    return item.count < max;
-  });
-}
-
-export function edibleItems(ctx: SkillContext): Array<{ name: string; count: number }> {
-  const knowledge = minecraftKnowledge();
-  return listInventory(ctx).filter((item) => knowledge.isFood(item.name));
-}
-
-export function toolsOwned(ctx: SkillContext): string[] {
-  const knowledge = minecraftKnowledge();
-  return listInventory(ctx)
-    .filter((item) => knowledge.isTool(item.name))
-    .map((item) => item.name);
-}
-
-export function buildingItems(ctx: SkillContext): Array<{ name: string; count: number }> {
-  return listInventory(ctx).filter(
-    (item) =>
-      item.name.endsWith("_planks") ||
-      item.name.endsWith("_log") ||
-      item.name === "cobblestone" ||
-      item.name === "dirt" ||
-      item.name === "crafting_table" ||
-      item.name.endsWith("_door"),
-  );
-}
-
-export function findInventoryItem(ctx: SkillContext, name: string): { name: string; count: number } | undefined {
-  const knowledge = minecraftKnowledge();
-  const n = knowledge.normalizeItemName(name) || name;
-  const found = ctx.bot.inventory.items().find((item) => item.name === n);
-  return found ? { name: found.name, count: found.count } : undefined;
 }
 
 export async function equipItem(
@@ -89,23 +45,9 @@ export async function equipItem(
   itemName: string,
   destination: "hand" | "head" | "torso" | "legs" | "feet" | "off-hand" = "hand",
 ): Promise<ActionResult<{ item: string }>> {
-  const started = Date.now();
-  const knowledge = minecraftKnowledge();
-  const name = knowledge.normalizeItemName(itemName) || itemName;
-  const item = ctx.bot.inventory.items().find((entry) => entry.name === name);
-  if (!item) {
-    return fail("ITEM_NOT_FOUND", `No ${name} in inventory`, Date.now() - started, true);
-  }
-  try {
-    await ctx.bot.equip(item, destination);
-  } catch (error) {
-    return fail("EQUIP_FAILED", error instanceof Error ? error.message : String(error), Date.now() - started, true);
-  }
-  const held = destination === "hand" ? ctx.bot.heldItem?.name : name;
-  if (destination === "hand" && held !== name) {
-    return fail("VERIFY_FAILED", `Expected to hold ${name}, holding ${held ?? "nothing"}`, Date.now() - started, true);
-  }
-  return ok({ item: name }, Date.now() - started);
+  const result = await equipThroughInventory(ctx, itemName, destination);
+  if (!result.success) return result;
+  return ok({ item: result.data.item }, result.durationMs);
 }
 
 export async function eatFood(ctx: SkillContext): Promise<ActionResult<{ item: string; food: number }>> {
@@ -140,34 +82,6 @@ export async function eatFood(ctx: SkillContext): Promise<ActionResult<{ item: s
 }
 
 export type ContainerTarget = Vec3;
-
-async function resolveContainer(
-  ctx: SkillContext,
-  preferred?: ContainerTarget,
-  names: string[] = ["chest", "barrel", "trapped_chest"],
-): Promise<ActionResult<{ position: Vec3 }>> {
-  const started = Date.now();
-  if (preferred) {
-    const block = ctx.bot.blockAt(new Vec3Class(Math.floor(preferred.x), Math.floor(preferred.y), Math.floor(preferred.z)));
-    if (!block || !names.includes(block.name)) {
-      return fail("CONTAINER_NOT_FOUND", "Preferred container is missing", Date.now() - started, true);
-    }
-    const move = await navigationBackend().navigateToInteractWithBlock(ctx.bot, preferred, {
-      timeoutMs: ctx.timeoutMs ?? 12_000,
-      signal: ctx.signal,
-    });
-    if (!move.success) return move;
-    return ok({ position: preferred }, Date.now() - started);
-  }
-  const found = await findBlock(ctx, names, 16);
-  if (!found.success) return found;
-  const move = await navigationBackend().navigateToInteractWithBlock(ctx.bot, found.data.position, {
-    timeoutMs: ctx.timeoutMs ?? 12_000,
-    signal: ctx.signal,
-  });
-  if (!move.success) return move;
-  return ok({ position: found.data.position }, Date.now() - started);
-}
 
 type MineflayerRecipe = {
   requiresTable?: boolean;
@@ -487,6 +401,20 @@ export async function craftItem(
   for (const recipe of pool) {
     const resultCount = Math.max(1, recipe.result?.count ?? (knowledge.getRecipeOutputCount(name) || 1));
     const crafts = Math.max(1, Math.ceil(count / resultCount));
+    for (const [id, amount] of recipeIngredientIds(recipe)) {
+      const ingredientName = bot.registry.items[id]?.name;
+      if (!ingredientName) continue;
+      const need = amount * crafts;
+      if (availableUnreservedCount(ctx, ingredientName) < need) {
+        return fail(
+          "ITEM_RESERVED",
+          `${ingredientName.replaceAll("_", " ")} is reserved and cannot be used to craft ${name.replaceAll("_", " ")}.`,
+          Date.now() - started,
+          true,
+          { item: name, missing: ingredientName, missingCount: need },
+        );
+      }
+    }
     const beforeNow = countItem(ctx, name);
     try {
       await withDelayedActivate(bot, () =>
@@ -531,44 +459,30 @@ export async function depositItems(
   container?: ContainerTarget,
 ): Promise<ActionResult<{ deposited: number; contents: Record<string, number>; position: Vec3 }>> {
   const started = Date.now();
-  const bot = ctx.bot;
-  const found = await resolveContainer(ctx, container);
-  if (!found.success) return found;
-  const block = bot.blockAt(
-    new Vec3Class(Math.floor(found.data.position.x), Math.floor(found.data.position.y), Math.floor(found.data.position.z)),
-  );
-  if (!block || !["chest", "barrel", "trapped_chest"].includes(block.name)) {
-    return fail("CONTAINER_NOT_FOUND", "Container vanished", Date.now() - started, true);
+  const names = itemName
+    ? [itemName]
+    : ctx.bot.inventory.items().map((item) => item.name).filter(keepForStorage);
+  const unique = [...new Set(names)];
+  if (unique.length === 0) {
+    return fail("ITEM_NOT_FOUND", "Nothing to deposit", Date.now() - started, true);
   }
-  try {
-    const chest = await bot.openContainer(block);
-    const before = chest.containerItems().reduce((sum, i) => sum + i.count, 0);
-    const items = bot.inventory.items().filter((i) => (itemName ? i.name === itemName : keepForStorage(i.name)));
-    let deposited = 0;
-    for (const item of items) {
-      try {
-        await chest.deposit(item.type, null, item.count);
-        deposited += item.count;
-      } catch {
-        // slot conflict; continue
-      }
+  let deposited = 0;
+  let position: Vec3 | undefined;
+  const contents: Record<string, number> = {};
+  for (const name of unique) {
+    const result = await depositItem(ctx, name, undefined, container ?? position);
+    if (!result.success) {
+      if (deposited === 0) return result;
+      break;
     }
-    const contents: Record<string, number> = {};
-    for (const item of chest.containerItems()) {
-      contents[item.name] = (contents[item.name] ?? 0) + item.count;
-    }
-    const after = chest.containerItems().reduce((sum, i) => sum + i.count, 0);
-    chest.close();
-    if (deposited === 0 && after <= before) {
-      return fail("DEPOSIT_FAILED", "No items moved into container", Date.now() - started, true);
-    }
-    return ok(
-      { deposited: Math.max(deposited, after - before), contents, position: found.data.position },
-      Date.now() - started,
-    );
-  } catch (error) {
-    return fail("CONTAINER_BUSY", error instanceof Error ? error.message : String(error), Date.now() - started, true);
+    deposited += result.data.deposited;
+    position = result.data.position;
+    contents[name] = result.data.containerAfter;
   }
+  if (deposited === 0 || !position) {
+    return fail("DEPOSIT_FAILED", "No items moved into container", Date.now() - started, true);
+  }
+  return ok({ deposited, contents, position }, Date.now() - started);
 }
 
 export async function withdrawItems(
@@ -577,38 +491,12 @@ export async function withdrawItems(
   count = 1,
   container?: ContainerTarget,
 ): Promise<ActionResult<{ item: string; count: number; contents: Record<string, number> }>> {
-  const started = Date.now();
-  const bot = ctx.bot;
-  const found = await resolveContainer(ctx, container);
-  if (!found.success) return found;
-  const block = bot.blockAt(
-    new Vec3Class(Math.floor(found.data.position.x), Math.floor(found.data.position.y), Math.floor(found.data.position.z)),
+  const result = await withdrawItem(ctx, itemName, count, container);
+  if (!result.success) return result;
+  return ok(
+    { item: result.data.item, count: result.data.count, contents: { [result.data.item]: result.data.containerAfter } },
+    result.durationMs,
   );
-  if (!block) {
-    return fail("CONTAINER_NOT_FOUND", "Container vanished", Date.now() - started, true);
-  }
-  const before = countItem(ctx, itemName);
-  try {
-    const chest = await bot.openContainer(block);
-    const stack = chest.containerItems().find((i) => i.name === itemName);
-    if (!stack) {
-      chest.close();
-      return fail("ITEM_NOT_FOUND", `Container has no ${itemName}`, Date.now() - started, true);
-    }
-    await chest.withdraw(stack.type, null, Math.min(count, stack.count));
-    const contents: Record<string, number> = {};
-    for (const item of chest.containerItems()) {
-      contents[item.name] = (contents[item.name] ?? 0) + item.count;
-    }
-    chest.close();
-    const after = countItem(ctx, itemName);
-    if (after <= before) {
-      return fail("VERIFY_FAILED", `Withdraw of ${itemName} did not increase inventory`, Date.now() - started, true);
-    }
-    return ok({ item: itemName, count: after - before, contents }, Date.now() - started);
-  } catch (error) {
-    return fail("WITHDRAW_FAILED", error instanceof Error ? error.message : String(error), Date.now() - started, true);
-  }
 }
 
 function keepForStorage(name: string): boolean {

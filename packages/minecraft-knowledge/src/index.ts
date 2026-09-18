@@ -79,6 +79,14 @@ export class MinecraftKnowledge {
     return this.data.itemsByName[n];
   }
 
+  /** Authoritative max stack size from minecraft-data. */
+  stackSize(name: string): number {
+    const item = this.getItem(name);
+    if (!item) return 1;
+    if (typeof item.stackSize === "number" && item.stackSize > 0) return item.stackSize;
+    return 64;
+  }
+
   getBlock(name: string): McBlock | undefined {
     const n = this.normalizeBlockName(name);
     return this.data.blocksByName[n];

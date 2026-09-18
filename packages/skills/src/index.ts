@@ -4,8 +4,30 @@ export { observeNearby, findBlock, findBlockCandidates } from "./observe.js";
 export { mineBlock, collectItem, classifyStaleTarget } from "./gather.js";
 export { collectResource } from "./collect.js";
 export { obtainItem, recipeFor, missingPrerequisites, prerequisiteChain } from "./obtain.js";
-export { craftItem, eatFood, equipItem, depositItems, withdrawItems, inventoryCount, listInventory, hasItem, inventorySpace, edibleItems, toolsOwned, buildingItems, canFitDrop } from "./inventory.js";
-export { dropItem, approachAndCollect } from "./share.js";
+export {
+  craftItem,
+  eatFood,
+  equipItem,
+  depositItems,
+  withdrawItems,
+  inventoryCount,
+  listInventory,
+  hasItem,
+  inventorySpace,
+  edibleItems,
+  toolsOwned,
+  buildingItems,
+  canFitDrop,
+  snapshotInventory,
+  freeCapacity,
+  canReceive,
+  compactInventoryFacts,
+  reserveItems,
+  releaseReservation,
+  availableUnreservedCount,
+  clearReservations,
+} from "./inventory.js";
+export { dropItem, approachAndCollect, pickupDroppedItem } from "./share.js";
 export { attack, placeBlock, sleep } from "./world.js";
 export {
   evaluateFunctionalPlacement,
@@ -18,6 +40,18 @@ export { equipForBlock } from "./tools.js";
 export { openDoor, openFenceGate } from "./doors.js";
 export { classifySkill, type SkillStatus } from "./skill-result.js";
 export {
+  unequip,
+  dropStack,
+  depositItem,
+  withdrawItem,
+  setQuickBarSlot,
+  heldItem,
+  findStacks,
+  countItem,
+  transferItemToCitizen,
+} from "./inventory-service.js";
+export { ItemReservationBook } from "./inventory-reservations.js";
+export {
   navigateTo,
   navigateNear,
   approachBlock,
@@ -25,8 +59,6 @@ export {
   breakBlock,
   equipTool,
   openContainer,
-  depositItem,
-  withdrawItem,
   transferItem,
   returnToSettlement,
   assistProject,

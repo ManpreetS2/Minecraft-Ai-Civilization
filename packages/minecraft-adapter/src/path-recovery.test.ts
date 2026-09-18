@@ -29,6 +29,7 @@ describe("path recovery helpers", () => {
     expect(attempts.some((attempt) => attempt.y === 69)).toBe(true);
     expect(attempts.length).toBeGreaterThan(5);
     expect(shouldBlacklistTarget("TIMEOUT")).toBe(true);
+    expect(shouldBlacklistTarget("NAV_NO_INITIAL_PROGRESS")).toBe(true);
     expect(shouldBlacklistTarget("BLOCK_NOT_FOUND")).toBe(false);
   });
 });

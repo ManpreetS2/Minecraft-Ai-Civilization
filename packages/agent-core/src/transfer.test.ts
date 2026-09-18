@@ -15,12 +15,12 @@ describe("verified item transfer", () => {
     ).toBe(true);
     expect(
       confirmTransfer({
-        item: "bread",
-        count: 1,
-        giverBefore: 3,
-        giverAfter: 3,
+        item: "oak_log",
+        count: 8,
+        giverBefore: 12,
+        giverAfter: 4,
         receiverBefore: 0,
-        receiverAfter: 1,
+        receiverAfter: 7,
       }),
     ).toBe(false);
   });

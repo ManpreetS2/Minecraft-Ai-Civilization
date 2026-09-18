@@ -37,7 +37,8 @@ Optional filters (MechProbe only):
 
 ```
 MECHANICS_TEST_FILTER=crafting pnpm --filter @civ/orchestrator mechanics
-MECHANICS_TEST_FILTER=nav pnpm --filter @civ/orchestrator mechanics
+MECHANICS_TEST_FILTER=inventory pnpm --filter @civ/orchestrator mechanics
+```
 MECHANICS_CRAFT_DEBUG=true pnpm --filter @civ/orchestrator mechanics
 ```
 
@@ -82,39 +83,36 @@ Never mark LIVE VERIFIED from a unit test.
 
 Latest green run: `pnpm --filter @civ/orchestrator mechanics` on 2026-09-17 against Paper 1.21.11 at 127.0.0.1:25565. Probe `MechProbe`. RCON connected. World was **not** reset. Exit code 0.
 
-Spawn `223.5 60.0 184.7` (hole / tight pad). `NORMAL_NAVIGATION_CAN_DIG=false`. `oak_door recipe exists: true` (minecraft-data 1.21.11). Doorway fixture waited for two-high walls + approach floor: **doorway place PASS**.
+Sky-pad fixtures around `178.5 90.0 140.5`. `NORMAL_NAVIGATION_CAN_DIG=false`. `oak_door recipe exists: true`. Sleep verified `bot.isSleeping` after Mineflayer `sleep`, then `wake`.
 
 ```
-- PASS walk 15-25 blocks without mining (51905ms)
-      no unrelated solids became air; this spawn was stuck (0.0 blocks, PATH_FAILED)
+- PASS recover from 1-block pit without mining (2269ms)
+      slab step-out + local escape, 2.88 blocks, solids unchanged
+- PASS walk open flat terrain without mining — 15.6 blocks
+- PASS walk village/uneven terrain without mining — 9.9 blocks (path/slab/stairs)
+- PASS walk 15-25 blocks without mining — 11.0 blocks, solids broken=0
 - PASS reject open-field bed/door/table without valid context
 - PASS reuse existing crafting table instead of dumping another
 - PASS standing cell differs from target stone block
 - PASS open wooden door
 - PASS inspect inventory
-- PASS log -> planks -> sticks -> table -> wooden pickaxe (3183ms)
-- PASS mine intended stone and collect cobble (14370ms)
-- PASS craft stone pickaxe (1369ms)
-- PASS logs -> oak_door (no NO_RECIPE) (2738ms)
-- PASS chest deposit/withdraw (685ms)
-- PASS eat if hungry (9573ms)
-- SKIP sleep if valid time (9333ms) SKIP SLEEP_FAILED bot is not sleeping
-- PASS pickup nearby drop if present (1150ms)
+- PASS log -> planks -> sticks -> table -> wooden pickaxe
+- PASS mine intended stone and collect cobble
+- PASS craft stone pickaxe
+- PASS logs -> oak_door (no NO_RECIPE)
+- PASS chest deposit/withdraw
+- PASS eat if hungry
+- PASS sleep if valid time (isSleeping verified, then wake)
+- PASS pickup nearby drop if present
 ```
 
-Same-day supporting runs (same Paper world, not reset):
-
-- Walk 14.1 blocks with solids broken=0 (better spawn at `229.5 65.0 195.5`).
-- Sleep PASS (2549ms) when a reachable bed existed.
-- Wooden pickaxe originally failed `PREREQUISITE_MISSING` / cherry_planks-first recipes on `94aeff7`; fixed on `2f2e176` and re-verified PASS.
-- Stone pickaxe originally hung on Mineflayer `_syncWindow` / `updateSlot:0` on `94aeff7`; bounded sync then re-verified PASS.
+Zero-displacement at the original village hole (`~223.5 60 184.7`) is a **stone well / deep_pit**: `canDig=false` must fail fast rather than excavate. Open grass, village slabs/stairs, and a 1-block depression with a step-out lip recover by walking/stepping/jumping.
 
 **Not a claim of general “Minecraft capable.”** These are specific verified actions on one probe body.
 
 Remaining live gaps:
 
-1. Hole/tight-pad navigation: `canDig=false` correctly refuses to mine out, so a 16-block walk can stay at displacement 0 (`PATH_FAILED`). Interaction uses ranked cells + `GoalLookAtBlock` / `GoalGetToBlock` (stone mine PASS).
-2. Sleep needs a reachable standing cell beside the bed; SKIP is not a PASS.
-3. Fence gates, furnace, attack/flee, swim, climb were not live-tested in this suite.
+1. Four-walled full-block 1×1 wells: Mineflayer jump-up onto a 1.0 lip is unreliable vs Paper 1.21.11; escape uses a same-Y step (slab) or fail-fast. Do not mine the village.
+2. Fence gates, furnace, attack/flee, swim, climb were not live-tested in this suite.
 
 Do not mark LIVE PAPER VERIFIED from unit tests alone.

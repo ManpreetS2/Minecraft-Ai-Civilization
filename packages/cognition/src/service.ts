@@ -419,7 +419,7 @@ function compactInventory(items: WorldView["inventory"]): string[] {
   return items
     .filter((i) => i.count > 0)
     .slice(0, 12)
-    .map((i) => `${i.name} x${i.count}`);
+    .map((i) => `${i.name}: ${i.count}`);
 }
 
 function fallbackContext(req: DecideRequest, ctx?: CognitionContext): CognitionContext {

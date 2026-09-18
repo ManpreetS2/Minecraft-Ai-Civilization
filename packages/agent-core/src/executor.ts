@@ -559,12 +559,12 @@ async function shareFoodNearby(ctx: SkillContext, events: EventBus): Promise<Act
     return observeNearby(ctx);
   }
   const before = ctx.bot.inventory.items().filter((i) => i.name === food.name).reduce((s, i) => s + i.count, 0);
-  const dropped = await dropItem(ctx, food.name, 1);
+  const dropped = await dropItem(ctx, food.name, 1, "TRANSFER");
   if (!dropped.success) return dropped;
   events.emit(
     createEvent(
-      "ItemTransferred",
-      { item: food.name, count: dropped.data.count, pending: true, receiverHint: nearby[0]?.username },
+      "ItemDropped",
+      { item: food.name, count: dropped.data.count, purpose: "TRANSFER", pending: true, receiverHint: nearby[0]?.username, gift: false },
       ctx.citizenId,
     ),
   );

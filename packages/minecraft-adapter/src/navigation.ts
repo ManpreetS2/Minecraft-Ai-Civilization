@@ -2,7 +2,7 @@ import type { Bot } from "mineflayer";
 import { fail, type ActionResult, type Vec3 } from "@civ/shared";
 import { followPlayer, moveToGetToBlock, moveToLookAtBlock, moveToPosition } from "./pathing.js";
 import { probeReachability } from "./path-probe.js";
-import { rankedInteractionPositions } from "./interaction.js";
+import { findReachablePlacementPosition, rankedInteractionPositions } from "./interaction.js";
 
 export type NavigationBackend = {
   readonly name: string;
@@ -56,7 +56,8 @@ export class MineflayerPathfinderBackend implements NavigationBackend {
     return last;
   }
   navigateToPlaceBlock(bot: Bot, target: Vec3, options?: { timeoutMs?: number; signal?: AbortSignal }) {
-    return moveToPosition(bot, target, { range: 3, ...options });
+    const standing = findReachablePlacementPosition(bot, target) ?? target;
+    return moveToPosition(bot, standing, { range: 2, ...options });
   }
   followEntity(bot: Bot, username: string, options?: { timeoutMs?: number; signal?: AbortSignal }) {
     return followPlayer(bot, username, options);

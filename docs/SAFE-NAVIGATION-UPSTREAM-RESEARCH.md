@@ -63,7 +63,7 @@ Do **not** install a second pathfinder. Do **not** enable collectblock’s movem
 ## Tests
 
 - Unit: `NORMAL_NAVIGATION_CAN_DIG === false`; excavation profile is the only `canDig`.
-- Live MechProbe: walk on open terrain ≥ ~8 blocks, solids snapshot unchanged; hole spawn must fail-fast (`STUCK`/`PATH_FAILED`) without breaking blocks.
+- Live MechProbe: walk on open terrain ≥ ~8 blocks, solids snapshot unchanged; 1-block depression steps out without mining; deep stone wells fail-fast (`PATH_BLOCKED` / `NAV_NO_INITIAL_PROGRESS`) without breaking blocks.
 
 ## One-line recommendation
 

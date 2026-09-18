@@ -18,6 +18,7 @@ export function buildDeliberationMessages(
     "priority must be a number from 0 to 1, not a word such as high.",
     "Choose exactly one high-level goal. Do not choose block-level actions, paths, or specific trees.",
     "Do not invent world facts or claim actions that are not in the evidence.",
+    "Inventory summary is physical Mineflayer state. Do not invent carried items, counts, or equipment.",
     "If Relevant Minecraft facts are present, treat them as engine truth, not memories.",
     "Do not assign personality labels such as brave, kind, or hateful.",
     "Do not include chain-of-thought.",

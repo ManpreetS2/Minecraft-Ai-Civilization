@@ -404,7 +404,11 @@ export class MinecraftBody extends EventEmitter {
       if (!this.allowRespawn) {
         this.markDeceased();
         this.events?.emit(
-          createEvent("CitizenDied", { username: this.username, position: this.position(), terminal: true }, this.citizenId),
+          createEvent(
+            "CitizenDied",
+            { username: this.username, position: this.position(), terminal: true, inventory: this.inventory(), droppedByMinecraft: true },
+            this.citizenId,
+          ),
         );
         this.emit("death");
         void this.disconnect("citizen-deceased");
@@ -413,7 +417,11 @@ export class MinecraftBody extends EventEmitter {
       this.awaitingRespawn = true;
       this.emit("death");
       this.events?.emit(
-        createEvent("CitizenBodyDied", { username: this.username, position: this.position(), terminal: false }, this.citizenId),
+        createEvent(
+          "CitizenBodyDied",
+          { username: this.username, position: this.position(), terminal: false, inventory: this.inventory(), droppedByMinecraft: true },
+          this.citizenId,
+        ),
       );
       try {
         bot.respawn();

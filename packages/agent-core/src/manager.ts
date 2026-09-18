@@ -95,7 +95,7 @@ export class AgentManager {
       if (event.type === "CitizenDied") this.handleDeathEvent(event);
       if (event.type === "CitizenBodyDied") this.handleBodyDied(event);
       if (event.type === "CitizenRespawned") this.handleRespawned(event);
-      if (event.type === "ItemTransferred") this.notePendingDrop(event);
+      if (event.type === "ItemTransferred" || event.type === "ItemDropped") this.notePendingDrop(event);
     });
   }
 

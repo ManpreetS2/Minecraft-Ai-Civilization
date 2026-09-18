@@ -245,6 +245,38 @@ export function presentEvent(event: PresentableEvent, names: Record<string, stri
         count,
       };
     }
+    case "ItemDropped": {
+      const count = Number(payload.count ?? 1);
+      const purpose = typeof payload.purpose === "string" ? payload.purpose : "DISCARD";
+      return {
+        ...base,
+        headline: `${name} dropped ${count} ${friendlyItem(payload.item ?? payload.name, count)} (${purpose}).`,
+        subtext: "This is a physical drop, not a completed gift.",
+        kind: "info",
+        count,
+      };
+    }
+    case "ItemPickedUp": {
+      const count = Number(payload.collected ?? payload.count ?? 1);
+      return {
+        ...base,
+        headline: `${name} picked up ${count} ${friendlyItem(payload.item ?? payload.name, count)}.`,
+        kind: "info",
+        count,
+      };
+    }
+    case "ResourceTransferred": {
+      const count = Number(payload.count ?? 1);
+      const item = friendlyItem(payload.item ?? payload.name, count);
+      const receiver = citizenDisplayName(String(payload.to ?? payload.receiver ?? payload.other ?? ""), names);
+      return {
+        ...base,
+        headline: `${count} ${item} moved from ${name} to ${receiver}.`,
+        subtext: "Verified physical inventory delta. Not a social gift.",
+        kind: "info",
+        count,
+      };
+    }
     case "ItemTransferred":
     case "ItemTransferCompleted": {
       const count = Number(payload.count ?? 1);
