@@ -136,6 +136,11 @@ export async function obtainItem(
 
     const step = analysis.next;
     if (!step) break;
+    if (process.env.MECHANICS_CRAFT_DEBUG === "true") {
+      console.log(
+        `[MechProbe craft] target=${name} depth=${depth} step=${step.kind}:${"item" in step ? step.item : ""} inv=${JSON.stringify(held)} missing=${JSON.stringify(analysis.missingIngredients)}`,
+      );
+    }
     if (step.kind === "gather") {
       const collected = await collectResource(ctx, collectBlocks(step.item), Math.max(1, step.count), 64);
       if (!collected.success) return collected;

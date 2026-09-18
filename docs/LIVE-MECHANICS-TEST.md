@@ -33,6 +33,16 @@ Requires Paper reachable at `MINECRAFT_HOST:MINECRAFT_PORT`. Does not start sett
 MECHANICS_PROBE_KEEP_ALIVE=true pnpm --filter @civ/orchestrator mechanics
 ```
 
+Optional filters (MechProbe only):
+
+```
+MECHANICS_TEST_FILTER=crafting pnpm --filter @civ/orchestrator mechanics
+MECHANICS_TEST_FILTER=nav pnpm --filter @civ/orchestrator mechanics
+MECHANICS_CRAFT_DEBUG=true pnpm --filter @civ/orchestrator mechanics
+```
+
+`crafting` covers log → planks/sticks/table/wooden_pickaxe, stone_pickaxe, oak_door, inventory inspect, and table reuse. Craft debug prints target/recipe/inventory only for MechProbe.
+
 ## Sequence
 
 1. Walk 15–25 blocks on ordinary terrain. Snapshot solids. **PASS** if unrelated blocks were not replaced with air.
@@ -72,40 +82,39 @@ Never mark LIVE VERIFIED from a unit test.
 
 Latest green run: `pnpm --filter @civ/orchestrator mechanics` on 2026-09-17 against Paper 1.21.11 at 127.0.0.1:25565. Probe `MechProbe`. RCON connected. World was **not** reset. Exit code 0.
 
-Spawn `223.7 61.0 184.3` (hole / tight pad). `NORMAL_NAVIGATION_CAN_DIG=false`. `oak_door recipe exists: true` (minecraft-data 1.21.11).
+Spawn `223.5 60.0 184.7` (hole / tight pad). `NORMAL_NAVIGATION_CAN_DIG=false`. `oak_door recipe exists: true` (minecraft-data 1.21.11). Doorway fixture waited for two-high walls + approach floor: **doorway place PASS**.
 
 ```
-- PASS walk 15-25 blocks without mining (73186ms)
+- PASS walk 15-25 blocks without mining (51905ms)
       no unrelated solids became air; this spawn was stuck (0.0 blocks, PATH_FAILED)
 - PASS reject open-field bed/door/table without valid context
 - PASS reuse existing crafting table instead of dumping another
 - PASS standing cell differs from target stone block
 - PASS open wooden door
 - PASS inspect inventory
-- PASS log -> planks -> sticks -> table -> wooden pickaxe (14566ms)
-- PASS mine intended stone and collect cobble (38699ms)
-- PASS craft stone pickaxe (12053ms)
-- PASS logs -> oak_door (no NO_RECIPE) (13031ms)
-- PASS chest deposit/withdraw (22752ms)
-- PASS eat if hungry (9597ms)
-- SKIP sleep if valid time (1509ms) SKIP NO_INTERACTION_POSITION
-- PASS pickup nearby drop if present (885ms)
+- PASS log -> planks -> sticks -> table -> wooden pickaxe (3183ms)
+- PASS mine intended stone and collect cobble (14370ms)
+- PASS craft stone pickaxe (1369ms)
+- PASS logs -> oak_door (no NO_RECIPE) (2738ms)
+- PASS chest deposit/withdraw (685ms)
+- PASS eat if hungry (9573ms)
+- SKIP sleep if valid time (9333ms) SKIP SLEEP_FAILED bot is not sleeping
+- PASS pickup nearby drop if present (1150ms)
 ```
 
 Same-day supporting runs (same Paper world, not reset):
 
 - Walk 14.1 blocks with solids broken=0 (better spawn at `229.5 65.0 195.5`).
 - Sleep PASS (2549ms) when a reachable bed existed.
-- Wooden pickaxe originally failed `PREREQUISITE_MISSING` / cherry_planks-first recipes; fixed then re-verified PASS.
-- Stone pickaxe originally hung on Mineflayer `_syncWindow` / `updateSlot:0`; bounded sync then re-verified PASS.
+- Wooden pickaxe originally failed `PREREQUISITE_MISSING` / cherry_planks-first recipes on `94aeff7`; fixed on `2f2e176` and re-verified PASS.
+- Stone pickaxe originally hung on Mineflayer `_syncWindow` / `updateSlot:0` on `94aeff7`; bounded sync then re-verified PASS.
 
 **Not a claim of general “Minecraft capable.”** These are specific verified actions on one probe body.
 
 Remaining live gaps:
 
-1. Hole/tight-pad navigation: `canDig=false` correctly refuses to mine out, so walk distance can be 0.
+1. Hole/tight-pad navigation: `canDig=false` correctly refuses to mine out, so a 16-block walk can stay at displacement 0 (`PATH_FAILED`). Interaction uses ranked cells + `GoalLookAtBlock` / `GoalGetToBlock` (stone mine PASS).
 2. Sleep needs a reachable standing cell beside the bed; SKIP is not a PASS.
-3. Freestanding door rejection works; placing into a constructed doorway still often returns `PURPOSELESS_PLACEMENT`.
-4. Fence gates, furnace, attack/flee, swim, climb were not live-tested in this suite.
+3. Fence gates, furnace, attack/flee, swim, climb were not live-tested in this suite.
 
 Do not mark LIVE PAPER VERIFIED from unit tests alone.

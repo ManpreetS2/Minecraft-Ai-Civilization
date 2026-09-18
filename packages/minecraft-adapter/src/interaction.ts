@@ -64,26 +64,40 @@ export function isWalkableStanding(bot: Bot, pos: Vec3): boolean {
 }
 
 export function interactionCandidates(bot: Bot, block: Vec3, radius = 2): Vec3[] {
-  const y = Math.floor(block.y);
+  const bx = Math.floor(block.x);
+  const by = Math.floor(block.y);
+  const bz = Math.floor(block.z);
   const spots: Vec3[] = [];
-  for (const offset of nearbyOffsets(radius)) {
-    const pos = { x: Math.floor(block.x) + offset.x, y, z: Math.floor(block.z) + offset.z };
-    if (isWalkableStanding(bot, pos)) spots.push(pos);
+  const seen = new Set<string>();
+  for (const dy of [0, 1, -1]) {
+    for (const offset of nearbyOffsets(radius)) {
+      const pos = { x: bx + offset.x, y: by + dy, z: bz + offset.z };
+      const key = `${pos.x},${pos.y},${pos.z}`;
+      if (seen.has(key)) continue;
+      if (!isWalkableStanding(bot, pos)) continue;
+      seen.add(key);
+      spots.push(pos);
+    }
   }
   return spots;
 }
 
-export function findReachableInteractionPosition(bot: Bot, block: Vec3, radius = 2): Vec3 | undefined {
+export function rankedInteractionPositions(bot: Bot, block: Vec3, radius = 2): Vec3[] {
   const origin = bot.entity?.position;
-  const scored = interactionCandidates(bot, block, radius)
+  return interactionCandidates(bot, block, radius)
     .filter((pos) => !occupantNear(pos, bot.username, 0.8))
     .map((pos) => {
       const dx = origin ? pos.x - origin.x : 0;
+      const dy = origin ? pos.y - origin.y : 0;
       const dz = origin ? pos.z - origin.z : 0;
-      return { pos, dist: dx * dx + dz * dz };
+      return { pos, dist: dx * dx + dy * dy + dz * dz };
     })
-    .sort((a, b) => a.dist - b.dist);
-  return scored[0]?.pos;
+    .sort((a, b) => a.dist - b.dist)
+    .map((entry) => entry.pos);
+}
+
+export function findReachableInteractionPosition(bot: Bot, block: Vec3, radius = 2): Vec3 | undefined {
+  return rankedInteractionPositions(bot, block, radius)[0];
 }
 
 export function findReachableMiningPosition(bot: Bot, block: Vec3): Vec3 | undefined {

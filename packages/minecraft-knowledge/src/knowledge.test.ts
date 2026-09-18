@@ -152,6 +152,17 @@ describe("authoritative recipe resolution", () => {
     expect(knowledge.canCraft({ cobblestone: 3, stick: 2 }, ["crafting_table"], "stone_pickaxe")).toBe(true);
   });
 
+  it("does not choose cherry_planks for a wooden pickaxe when oak is in inventory", () => {
+    const dataOrder = knowledge.getRecipes("wooden_pickaxe");
+    expect(dataOrder.length).toBeGreaterThan(1);
+    const chosen = knowledge.getRecipe("wooden_pickaxe", { oak_planks: 8, stick: 4 });
+    expect(chosen?.ingredients.cherry_planks).toBeUndefined();
+    expect(chosen?.ingredients.any_planks ?? chosen?.ingredients.oak_planks).toBe(3);
+    const fromLogs = knowledge.analyzeObtain("wooden_pickaxe", { oak_log: 16 }, ["crafting_table"]);
+    expect(fromLogs.next).toMatchObject({ kind: "craft", item: "oak_planks" });
+    expect(fromLogs.next && "item" in fromLogs.next ? fromLogs.next.item : undefined).not.toBe("wooden_pickaxe");
+  });
+
   it("resolves the chest recipe using available planks, not a random wood variant", () => {
     const analysis = knowledge.analyzeObtain("chest", { oak_planks: 8 }, ["crafting_table"]);
     expect(analysis.chosen?.ingredients.any_planks ?? analysis.chosen?.ingredients.oak_planks).toBe(8);

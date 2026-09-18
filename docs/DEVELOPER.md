@@ -76,6 +76,15 @@ op Kai
 
 or set `spawn-protection=0` in `server/server.properties` and restart Paper.
 
+## Paper RCON (one-shot)
+
+```
+pnpm --filter @civ/orchestrator rcon "list"
+pnpm --filter @civ/orchestrator rcon "time query daytime"
+```
+
+Uses `127.0.0.1:25575` and the mechanics RCON password. This is a developer CLI, not a citizen skill.
+
 ## LLM
 
 Cognition is optional. Intended local routine model: `qwen3.5:9b` via `OLLAMA_ROUTINE_MODEL`. `qwen3.5:4b` remains a faster bring-up option. Deep reflection (`OLLAMA_REFLECTION_MODEL=gpt-oss:20b`) is off unless `OLLAMA_REFLECTION_ENABLED=true` and the model is actually available.

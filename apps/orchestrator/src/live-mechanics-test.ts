@@ -143,12 +143,15 @@ async function main(): Promise<void> {
     throw new Error(`${username} is reserved for citizens. Use MECHANICS_PROBE_USERNAME=MechProbe`);
   }
 
+  const mechanicsFilter = (process.env.MECHANICS_TEST_FILTER ?? "").trim().toLowerCase();
+
   console.log("TEST-ONLY MECHANICS PROBE");
   console.log("Not a citizen. No cognition, relationships, settlement population, or citizen memories.");
   console.log(`username=${username} keepAlive=${config.MECHANICS_PROBE_KEEP_ALIVE}`);
   console.log(`Minecraft knowledge version: ${knowledge.version}`);
   console.log(`NORMAL_NAVIGATION_CAN_DIG=${NORMAL_NAVIGATION_CAN_DIG}`);
   console.log(`oak_door recipe exists: ${knowledge.recipeExists("oak_door")}`);
+  if (mechanicsFilter) console.log(`MECHANICS_TEST_FILTER=${mechanicsFilter}`);
 
   const body = new MinecraftBody({
     username,
@@ -216,7 +219,7 @@ async function main(): Promise<void> {
       let lastError = "no walk attempted";
       for (const dir of dirs) {
         const dest = { x: origin.x + dir.x, y: origin.y, z: origin.z + dir.z };
-        const result = await moveToPosition(bot, dest, { range: 3, timeoutMs: 10_000, recover: false });
+        const result = await moveToPosition(bot, dest, { range: 3, timeoutMs: 8_000, recover: true });
         if (result.success) {
           lastError = "";
           break;
@@ -471,15 +474,25 @@ async function main(): Promise<void> {
         const x = Math.floor(stand.x) + 4;
         const y = Math.floor(stand.y);
         const z = Math.floor(stand.z);
+        await rcon.command(`fill ${x} ${y} ${z - 1} ${x} ${y + 1} ${z + 1} air`);
+        await rcon.command(`setblock ${x} ${y - 1} ${z} minecraft:oak_planks`);
+        await rcon.command(`setblock ${x} ${y - 1} ${z + 1} minecraft:oak_planks`);
+        await rcon.command(`setblock ${x} ${y - 1} ${z - 1} minecraft:oak_planks`);
         await rcon.command(`setblock ${x - 1} ${y} ${z} minecraft:oak_planks`);
         await rcon.command(`setblock ${x + 1} ${y} ${z} minecraft:oak_planks`);
         await rcon.command(`setblock ${x - 1} ${y + 1} ${z} minecraft:oak_planks`);
         await rcon.command(`setblock ${x + 1} ${y + 1} ${z} minecraft:oak_planks`);
-        await wait(400);
+        const wallsReady =
+          (await waitForNamedBlock(bot, { x: x - 1, y, z }, ["oak_planks"], 3_000)) &&
+          (await waitForNamedBlock(bot, { x: x + 1, y, z }, ["oak_planks"], 3_000)) &&
+          (await waitForNamedBlock(bot, { x: x - 1, y: y + 1, z }, ["oak_planks"], 3_000)) &&
+          (await waitForNamedBlock(bot, { x: x + 1, y: y + 1, z }, ["oak_planks"], 3_000));
         const doorway = { x, y, z };
         const placed = await placeBlock(ctx, "oak_door", doorway, { purpose: "doorway" });
         if (!placed.success) {
-          console.log(`  doorway place: ${placed.code} ${placed.error}`);
+          console.log(`  doorway place: ${placed.code} ${placed.error}${wallsReady ? "" : " (walls not in bot chunk yet)"}`);
+        } else {
+          console.log("  doorway place: PASS");
         }
       }
     }),
@@ -631,8 +644,26 @@ async function main(): Promise<void> {
   process.exit(failed.length ? 1 : 0);
 }
 
+function wantedCase(name: string): boolean {
+  const filter = (process.env.MECHANICS_TEST_FILTER ?? "").trim().toLowerCase();
+  if (!filter || filter === "all") return true;
+  if (filter === "crafting") {
+    return /log ->|stone pickaxe|oak_door|inspect inventory|reuse existing crafting/.test(name);
+  }
+  if (filter === "nav" || filter === "navigation") {
+    return /walk |standing cell/.test(name);
+  }
+  if (filter === "doorway") {
+    return /oak_door|open-field|doorway/.test(name);
+  }
+  return name.toLowerCase().includes(filter);
+}
+
 async function runCase(name: string, fn: () => Promise<void>): Promise<CaseResult> {
   const started = Date.now();
+  if (!wantedCase(name)) {
+    return { name, passed: false, detail: "SKIP filter", durationMs: 0 };
+  }
   try {
     await fn();
     return { name, passed: true, detail: "", durationMs: Date.now() - started };

@@ -9,12 +9,26 @@ export type RecoveryAttempt = { x: number; y: number; z: number; range: number }
 export function recoveryAttempts(target: Vec3, range = 2, adjacent = 4): RecoveryAttempt[] {
   const attempts: RecoveryAttempt[] = [
     { x: target.x, y: target.y, z: target.z, range },
-    { x: target.x, y: target.y, z: target.z, range: Math.max(range + 1, 3) },
+    { x: target.x, y: target.y, z: target.z, range: Math.max(range + 1, 4) },
+    { x: target.x, y: target.y + 1, z: target.z, range: Math.max(range, 2) },
+    { x: target.x, y: target.y - 1, z: target.z, range: Math.max(range, 2) },
   ];
   for (const offset of nearbyOffsets(2).slice(0, adjacent)) {
     attempts.push({
       x: target.x + offset.x,
       y: target.y,
+      z: target.z + offset.z,
+      range: 1.5,
+    });
+    attempts.push({
+      x: target.x + offset.x,
+      y: target.y + 1,
+      z: target.z + offset.z,
+      range: 1.5,
+    });
+    attempts.push({
+      x: target.x + offset.x,
+      y: target.y - 1,
       z: target.z + offset.z,
       range: 1.5,
     });

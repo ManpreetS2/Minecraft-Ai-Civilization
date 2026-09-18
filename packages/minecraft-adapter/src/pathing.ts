@@ -19,6 +19,7 @@ const pathfinderModule = require("mineflayer-pathfinder") as {
     GoalNear: new (x: number, y: number, z: number, range: number) => unknown;
     GoalFollow: new (entity: unknown, range: number) => unknown;
     GoalGetToBlock: new (x: number, y: number, z: number) => unknown;
+    GoalLookAtBlock: new (pos: { x: number; y: number; z: number }, world: unknown, options?: { reach?: number }) => unknown;
   };
 };
 const { pathfinder, Movements, goals } = pathfinderModule;
@@ -202,26 +203,63 @@ async function attemptGoto(
   target: { x: number; y: number; z: number; range: number },
   options: { timeoutMs: number; signal?: AbortSignal },
 ): Promise<ActionResult<{ position: Vec3; distance: number }>> {
-  const started = Date.now();
-  pathAttempts += 1;
   if (options.signal?.aborted) return abortedResult(0);
   if (!bot.entity?.position) {
-    return fail("NOT_CONNECTED", "Bot is not spawned", Date.now() - started);
+    return fail("NOT_CONNECTED", "Bot is not spawned", 0);
   }
   const occupied = occupantNear({ x: target.x, y: target.y, z: target.z }, bot.username, 1.2);
   if (occupied) {
     noteYield();
     await new Promise((resolve) => setTimeout(resolve, 350));
   }
-
-  const pf = configureMovements(bot);
   const goal = new goals.GoalNear(
     Math.floor(target.x),
     Math.floor(target.y),
     Math.floor(target.z),
     Math.max(1, Math.floor(target.range)),
   );
+  return runGoto(bot, goal, target, options);
+}
 
+export async function moveToLookAtBlock(
+  bot: Bot,
+  block: Vec3,
+  options: { timeoutMs?: number; signal?: AbortSignal; reach?: number } = {},
+): Promise<ActionResult<{ position: Vec3; distance: number }>> {
+  const started = Date.now();
+  if (!bot.entity?.position) {
+    return fail("NOT_CONNECTED", "Bot is not spawned", Date.now() - started);
+  }
+  const goal = new goals.GoalLookAtBlock(
+    new Vec3Class(Math.floor(block.x), Math.floor(block.y), Math.floor(block.z)),
+    bot.world,
+    { reach: options.reach ?? 4.5 },
+  );
+  return runGoto(bot, goal, { ...block, range: options.reach ?? 4.5 }, { timeoutMs: options.timeoutMs ?? 12_000, signal: options.signal });
+}
+
+export async function moveToGetToBlock(
+  bot: Bot,
+  block: Vec3,
+  options: { timeoutMs?: number; signal?: AbortSignal } = {},
+): Promise<ActionResult<{ position: Vec3; distance: number }>> {
+  const goal = new goals.GoalGetToBlock(Math.floor(block.x), Math.floor(block.y), Math.floor(block.z));
+  return runGoto(bot, goal, { ...block, range: 2 }, { timeoutMs: options.timeoutMs ?? 12_000, signal: options.signal });
+}
+
+async function runGoto(
+  bot: Bot,
+  goal: unknown,
+  target: { x: number; y: number; z: number; range?: number },
+  options: { timeoutMs: number; signal?: AbortSignal },
+): Promise<ActionResult<{ position: Vec3; distance: number }>> {
+  const started = Date.now();
+  pathAttempts += 1;
+  if (options.signal?.aborted) return abortedResult(0);
+  if (!bot.entity?.position) {
+    return fail("NOT_CONNECTED", "Bot is not spawned", Date.now() - started);
+  }
+  const pf = configureMovements(bot);
   let pathStatus = "running";
   const onUpdate = (result: { status?: string }) => {
     if (result.status) pathStatus = result.status;
@@ -295,7 +333,8 @@ async function attemptGoto(
   }
   const current = { x: pos.x, y: pos.y, z: pos.z };
   const dist = distance(current, { x: target.x, y: target.y, z: target.z });
-  if (dist > target.range + 2) {
+  const allowed = (target.range ?? 4.5) + 2;
+  if (dist > allowed) {
     return fail("VERIFY_FAILED", `goal unreachable; finished ${dist.toFixed(1)} from ${fmt(target)}`, Date.now() - started, true);
   }
   registerOccupancy(bot.username, current);
@@ -330,7 +369,7 @@ function startStallWatch(
       if (movedEnough(last, now, 0.4)) {
         last = now;
         lastMove = Date.now();
-      } else if (Date.now() - lastMove > 7_000) {
+      } else if (Date.now() - lastMove > 4_000) {
         cancel();
         reject(new Error("STUCK"));
       }

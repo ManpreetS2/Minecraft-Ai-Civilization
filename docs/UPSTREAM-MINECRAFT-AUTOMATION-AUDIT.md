@@ -17,12 +17,12 @@ This project stays on **Paper 1.21.11** with Mineflayer bodies. Do not move to F
 
 | | |
 | --- | --- |
-| Current implementation | `MineflayerPathfinderBackend` in `@civ/minecraft-adapter`. Movement profiles: `SAFE_NAVIGATION`, `RESOURCE_APPROACH`, `CONTROLLED_EXCAVATION`. Normal navigation `canDig=false`. |
+| Current implementation | `MineflayerPathfinderBackend` in `@civ/minecraft-adapter`. Movement profiles: `SAFE_NAVIGATION`, `RESOURCE_APPROACH`, `CONTROLLED_EXCAVATION`. Normal navigation `canDig=false`. Interaction path: ranked standing cells → `GoalNear` → `GoalLookAtBlock` → `GoalGetToBlock`, then y±1 recovery / temporary blacklist. |
 | Upstream equivalent | [mineflayer-pathfinder](https://github.com/PrismarineJS/mineflayer-pathfinder) (MIT). Optional experimental Baritone adapter. |
 | Decision | **WRAP** pathfinder. **KEEP** profiles, protected-block lists, occupancy, interaction standing cells, recovery/blacklist. |
 | Reason | Pathfinder is the navigation backend. Digging during ordinary walks is a civilization bug, not a library default we want. |
 | License | MIT |
-| Integration risks | Pathfinder `canDig=true` silently mines terrain. We force it off except controlled excavation. |
+| Integration risks | Pathfinder `canDig=true` silently mines terrain. We force it off except controlled excavation. Never restore random mining to unstick a citizen. |
 
 ### Interaction standing cells
 

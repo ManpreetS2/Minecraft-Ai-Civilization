@@ -25,7 +25,9 @@ describe("path recovery helpers", () => {
     const attempts = recoveryAttempts({ x: 10, y: 70, z: 4 }, 2, 3);
     expect(attempts[0]).toEqual({ x: 10, y: 70, z: 4, range: 2 });
     expect(attempts[1]?.range).toBeGreaterThan(2);
-    expect(attempts.length).toBe(5);
+    expect(attempts.some((attempt) => attempt.y === 71)).toBe(true);
+    expect(attempts.some((attempt) => attempt.y === 69)).toBe(true);
+    expect(attempts.length).toBeGreaterThan(5);
     expect(shouldBlacklistTarget("TIMEOUT")).toBe(true);
     expect(shouldBlacklistTarget("BLOCK_NOT_FOUND")).toBe(false);
   });

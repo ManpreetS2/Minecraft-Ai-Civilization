@@ -42,4 +42,15 @@ describe("interaction standing cells", () => {
     const candidates = interactionCandidates(bot, target);
     expect(candidates.every((cell) => !(cell.x === target.x && cell.y === target.y && cell.z === target.z))).toBe(true);
   });
+
+  it("includes y+1 standing cells when a step exists beside the target", () => {
+    const cells = grassPadWithLog();
+    cells["4,64,4"] = { name: "dirt", boundingBox: "block" };
+    cells["4,65,4"] = { name: "air", boundingBox: "empty" };
+    cells["4,66,4"] = { name: "air", boundingBox: "empty" };
+    const bot = fakeBot(cells);
+    const target = { x: 5, y: 64, z: 5 };
+    const candidates = interactionCandidates(bot, target);
+    expect(candidates.some((cell) => cell.x === 4 && cell.y === 65 && cell.z === 4)).toBe(true);
+  });
 });

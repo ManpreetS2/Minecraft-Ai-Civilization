@@ -8,6 +8,8 @@ export {
   lastPathDurationMs,
   loadPathfinder,
   moveToPosition,
+  moveToLookAtBlock,
+  moveToGetToBlock,
   movementAllowsDig,
   NORMAL_NAVIGATION_CAN_DIG,
   pathMetrics,
@@ -33,6 +35,7 @@ export {
   findReachablePlacementPosition,
   hasHeadroom,
   interactionCandidates,
+  rankedInteractionPositions,
   isWalkableStanding,
 } from "./interaction.js";
 export { probeReachability, scoreResourceTarget } from "./path-probe.js";

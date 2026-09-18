@@ -1,8 +1,8 @@
 import type { Bot } from "mineflayer";
 import { fail, type ActionResult, type Vec3 } from "@civ/shared";
-import { followPlayer, moveToPosition } from "./pathing.js";
+import { followPlayer, moveToGetToBlock, moveToLookAtBlock, moveToPosition } from "./pathing.js";
 import { probeReachability } from "./path-probe.js";
-import { findReachableInteractionPosition } from "./interaction.js";
+import { rankedInteractionPositions } from "./interaction.js";
 
 export type NavigationBackend = {
   readonly name: string;
@@ -25,9 +25,35 @@ export class MineflayerPathfinderBackend implements NavigationBackend {
     return moveToPosition(bot, target, { ...options, range });
   }
   async navigateToInteractWithBlock(bot: Bot, block: Vec3, options?: { timeoutMs?: number; signal?: AbortSignal }) {
-    const standing = findReachableInteractionPosition(bot, block);
-    if (!standing) return fail("NO_INTERACTION_POSITION", "No standing cell for that block", 0, true);
-    return moveToPosition(bot, standing, { range: 1.5, timeoutMs: options?.timeoutMs, signal: options?.signal });
+    const budget = options?.timeoutMs ?? 16_000;
+    const started = Date.now();
+    const cells = rankedInteractionPositions(bot, block, 2).slice(0, 6);
+    let last = fail("NO_INTERACTION_POSITION", "No standing cell for that block", 0, true) as ActionResult<{
+      position: Vec3;
+      distance: number;
+    }>;
+    for (const standing of cells) {
+      const remaining = budget - (Date.now() - started);
+      if (remaining < 600) break;
+      last = await moveToPosition(bot, standing, {
+        range: 1.5,
+        timeoutMs: Math.min(6_000, remaining),
+        signal: options?.signal,
+        recover: false,
+      });
+      if (last.success) return last;
+      if (last.code === "CANCELLED" || last.code === "NOT_CONNECTED") return last;
+    }
+    const remaining = budget - (Date.now() - started);
+    if (remaining >= 800) {
+      last = await moveToLookAtBlock(bot, block, { timeoutMs: Math.min(8_000, remaining), signal: options?.signal });
+      if (last.success) return last;
+    }
+    const leftover = budget - (Date.now() - started);
+    if (leftover >= 800) {
+      last = await moveToGetToBlock(bot, block, { timeoutMs: Math.min(6_000, leftover), signal: options?.signal });
+    }
+    return last;
   }
   navigateToPlaceBlock(bot: Bot, target: Vec3, options?: { timeoutMs?: number; signal?: AbortSignal }) {
     return moveToPosition(bot, target, { range: 3, ...options });

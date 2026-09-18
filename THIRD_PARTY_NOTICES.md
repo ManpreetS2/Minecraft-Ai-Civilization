@@ -63,19 +63,57 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 - What we use: Harvestability / dig and tool facts consumed through Mineflayer block objects and our knowledge layer.
 - Copyright: PrismarineJS contributors
 
-## PrismarineJS / mineflayer-auto-eat
+## linkle69 / mineflayer-auto-eat
 
-- Repository: https://github.com/PrismarineJS/mineflayer-auto-eat
+- Package: `mineflayer-auto-eat` 5.0.3 (npm)
+- Repository: https://github.com/linkle69/mineflayer-auto-eat
 - License: MIT
-- What we use: Evaluated as physical food-selection/eating mechanics. Not loaded as a plugin. Planner still decides WHEN eating is appropriate; `eatFood` performs consume + hunger verification.
-- Copyright: PrismarineJS contributors
+- What we use: Evaluated as physical food-selection/eating mechanics. **Not loaded.** `PrismarineJS/mineflayer-auto-eat` GitHub is 404; current maintainer is linkle69. Planner still decides WHEN eating is appropriate; `eatFood` performs consume + hunger verification. Do not call `enableAuto()`.
+- Copyright: Rocco A / Linkle / contributors
 
 ## CybersharpX / Phoenix
 
 - Repository: https://github.com/CybersharpX/Phoenix
-- License: not vendored; reference only
-- What we use: Architectural study of WorldModel, TaskTree, obtainItem, recovery. No Phoenix source is copied into this repository.
+- License: MIT (LICENSE file verified 2026-09-17)
+- Classification: **REFERENCE ONLY** (architecture). Optional later: stuck/missing-ingredient *patterns* with notice. **No Phoenix source is copied** into this repository. Do not use `CraftingManager.placeCraftingTable` (dumps a table at `position.offset(1,0,0)`). Do not use `recipesFor(...)[0]` (cherry-plank first on 1.21.11).
+- Copyright: CybersharpX / Phoenix contributors
 
-## Not used
+## PrismarineJS / mineflayer-statemachine
+
+- Repository: https://github.com/PrismarineJS/mineflayer-statemachine
+- License: MIT
+- Classification: REFERENCE ONLY. Not loaded. Do not convert the civilization orchestrator to nested FSM plugins.
+
+## PrismarineJS / mineflayer-pvp
+
+- Repository: https://github.com/PrismarineJS/mineflayer-pvp
+- License: MIT
+- Classification: REFERENCE / later WRAP candidate for basic engagement. Must never override deterministic creeper flee.
+
+## yuniko-software / minecraft-mcp-server
+
+- Repository: https://github.com/yuniko-software/minecraft-mcp-server
+- License: Apache-2.0
+- Classification: evaluated as a **development harness** only. Not adopted. MechProbe CLI (`pnpm --filter @civ/orchestrator mechanics`) already covers isolated mechanics. Do not expose citizens as MCP-controlled agents.
+
+## Boyan253 / minemind
+
+- Repository: https://github.com/Boyan253/minemind
+- License: MIT
+- Classification: REFERENCE ONLY. Forge 1.20.1 stack. Do not install.
+
+## MineDojo / Voyager
+
+- Repository: https://github.com/MineDojo/Voyager
+- License: MIT
+- Classification: REFERENCE ONLY (skill reuse, execution error feedback). Do **not** import generated-code execution. Citizens stay on bounded approved skills.
+
+## AltoClef (Fabric)
+
+- Classification: REFERENCE ONLY (nested tasks, unreachable tracking, preemption). Do not install Fabric. Phoenix is the MIT Mineflayer analogue of this architecture. Original AltoClef license is not treated as a runtime dependency.
+
+## Not used / do not copy
 
 - `nuxdie/baritone-ts` (AGPL-3.0) is **not** copied or vendored. No AGPL navigation code is included in this repository.
+- MineColonies and similar colony mods are **not** the civilization engine.
+- Mindcraft unconstrained LLM code execution is **not** imported (MIT skill *patterns* only, with notice above).

@@ -71,6 +71,8 @@ describe("semantic functional placement", () => {
   it("allows a door only in a two-block wall opening", () => {
     const getBlock = grid({
       "5,63,10": "oak_planks",
+      "5,63,9": "oak_planks",
+      "5,63,11": "oak_planks",
       "4,64,10": "oak_planks",
       "4,65,10": "oak_planks",
       "6,64,10": "oak_planks",
@@ -83,6 +85,21 @@ describe("semantic functional placement", () => {
       getBlock,
     });
     expect(decision.ok).toBe(true);
+  });
+
+  it("rejects two side planks that are not a full doorway", () => {
+    const getBlock = grid({
+      "5,63,10": "oak_planks",
+      "4,64,10": "oak_planks",
+      "6,64,10": "oak_planks",
+    });
+    const decision = evaluateFunctionalPlacement({
+      item: "oak_door",
+      purpose: "doorway",
+      position: { x: 5, y: 64, z: 10 },
+      getBlock,
+    });
+    expect(decision.ok).toBe(false);
   });
 
   it("allows a bed under a roof with head support", () => {

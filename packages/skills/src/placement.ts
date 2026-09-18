@@ -100,9 +100,32 @@ function isDoorwayOpening(
 ): boolean {
   if (!isReplaceableCell(getBlock(x, y, z)) || !isReplaceableCell(getBlock(x, y + 1, z))) return false;
   if (!isSolidCell(getBlock(x, y - 1, z))) return false;
-  const eastWest = isSolidCell(getBlock(x + 1, y, z)) && isSolidCell(getBlock(x - 1, y, z));
-  const northSouth = isSolidCell(getBlock(x, y, z + 1)) && isSolidCell(getBlock(x, y, z - 1));
-  return eastWest || northSouth;
+  const eastWest =
+    isSolidCell(getBlock(x + 1, y, z)) &&
+    isSolidCell(getBlock(x - 1, y, z)) &&
+    isSolidCell(getBlock(x + 1, y + 1, z)) &&
+    isSolidCell(getBlock(x - 1, y + 1, z));
+  const northSouth =
+    isSolidCell(getBlock(x, y, z + 1)) &&
+    isSolidCell(getBlock(x, y, z - 1)) &&
+    isSolidCell(getBlock(x, y + 1, z + 1)) &&
+    isSolidCell(getBlock(x, y + 1, z - 1));
+  if (!eastWest && !northSouth) return false;
+  const approaches = eastWest
+    ? [
+        { x, y, z: z + 1 },
+        { x, y, z: z - 1 },
+      ]
+    : [
+        { x: x + 1, y, z },
+        { x: x - 1, y, z },
+      ];
+  return approaches.some(
+    (cell) =>
+      isReplaceableCell(getBlock(cell.x, cell.y, cell.z)) &&
+      isReplaceableCell(getBlock(cell.x, cell.y + 1, cell.z)) &&
+      isSolidCell(getBlock(cell.x, cell.y - 1, cell.z)),
+  );
 }
 
 function isInteriorish(
