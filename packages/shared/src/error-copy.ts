@@ -69,6 +69,15 @@ export function translateError(error?: string, task?: unknown): TranslatedError 
       subtext: `Movement stopped after no progress was made${near}.`,
     };
   }
+  if (/MISSING_FUEL|WORKSTATION_UNAVAILABLE/i.test(text)) {
+    return { subtext: "A furnace or fuel was not available." };
+  }
+  if (/LADDER_FAILED/i.test(text)) {
+    return { subtext: "Climbing that ladder did not produce a real height change." };
+  }
+  if (/CROP_IMMATURE/i.test(text)) {
+    return { subtext: "That crop is not mature yet." };
+  }
   if (/PATH_BLOCKED|no path/i.test(text)) {
     return { subtext: "Couldn't find a safe path there." };
   }

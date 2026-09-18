@@ -54,6 +54,10 @@ const envSchema = z.object({
     .default("false")
     .transform((v) => v === "true"),
   MECHANICS_PROBE_USERNAME: z.string().default("MechProbe"),
+  MECHANICS_PROBE_PRESERVE_FIXTURES: z
+    .enum(["true", "false"])
+    .default("false")
+    .transform((v) => v === "true"),
 });
 
 export type AppConfig = z.infer<typeof envSchema>;

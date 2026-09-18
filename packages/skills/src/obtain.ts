@@ -67,6 +67,8 @@ function collectBlocks(item: string): string[] {
   if (item.endsWith("_log") || item === "oak_log" || item === "any_log") return [...LOG_BLOCK_NAMES];
   if (item === "cobblestone" || item === "stone") return STONE;
   if (item === "coal") return ["coal_ore", "deepslate_coal_ore"];
+  if (item === "raw_iron" || item === "iron_ore") return ["iron_ore", "deepslate_iron_ore"];
+  if (item === "raw_gold" || item === "gold_ore") return ["gold_ore", "deepslate_gold_ore"];
   return [item];
 }
 
@@ -77,6 +79,8 @@ function isGatherable(item: string): boolean {
     item === "cobblestone" ||
     item === "stone" ||
     item === "coal" ||
+    item === "raw_iron" ||
+    item === "iron_ore" ||
     item === "wheat"
   );
 }

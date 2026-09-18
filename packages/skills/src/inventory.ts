@@ -34,6 +34,8 @@ export {
   reserveItems,
   snapshotInventory,
   toolsOwned,
+  durabilityFromItem,
+  toolDurabilityFacts,
 } from "./inventory-service.js";
 
 export function inventoryCount(ctx: SkillContext, name: string): number {

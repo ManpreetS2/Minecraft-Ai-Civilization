@@ -105,5 +105,27 @@ export function findReachableMiningPosition(bot: Bot, block: Vec3): Vec3 | undef
 }
 
 export function findReachablePlacementPosition(bot: Bot, position: Vec3): Vec3 | undefined {
-  return findReachableInteractionPosition(bot, position, 3);
+  const bx = Math.floor(position.x);
+  const by = Math.floor(position.y);
+  const bz = Math.floor(position.z);
+  const origin = bot.entity?.position;
+  const spots: Array<{ pos: Vec3; dist: number; reach: number }> = [];
+  const seen = new Set<string>();
+  for (let dy = -4; dy <= 1; dy += 1) {
+    for (const offset of nearbyOffsets(3)) {
+      const pos = { x: bx + offset.x, y: by + dy, z: bz + offset.z };
+      const key = `${pos.x},${pos.y},${pos.z}`;
+      if (seen.has(key)) continue;
+      if (!isWalkableStanding(bot, pos)) continue;
+      const reach = Math.hypot(pos.x + 0.5 - (bx + 0.5), pos.y + 1.6 - (by + 0.5), pos.z + 0.5 - (bz + 0.5));
+      if (reach > 4.5) continue;
+      seen.add(key);
+      const dx = origin ? pos.x - origin.x : 0;
+      const ddy = origin ? pos.y - origin.y : 0;
+      const dz = origin ? pos.z - origin.z : 0;
+      spots.push({ pos, dist: dx * dx + ddy * ddy + dz * dz, reach });
+    }
+  }
+  spots.sort((a, b) => a.dist - b.dist || a.reach - b.reach);
+  return spots[0]?.pos ?? findReachableInteractionPosition(bot, position, 3);
 }

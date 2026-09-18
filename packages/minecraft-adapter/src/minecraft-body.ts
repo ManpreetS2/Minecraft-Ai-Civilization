@@ -177,7 +177,7 @@ export class MinecraftBody extends EventEmitter {
       auth: this.config.MINECRAFT_AUTH_MODE === "offline" ? "offline" : "microsoft",
       version: this.config.MINECRAFT_VERSION,
       hideErrors: true,
-      checkTimeoutInterval: 30_000,
+      checkTimeoutInterval: 180_000,
     };
 
     return await new Promise((resolve) => {

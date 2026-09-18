@@ -246,7 +246,10 @@ export async function placeBlock(
     }
   }
   if (!placed) {
-    return fail("PLACE_FAILED", `Could not place ${name}: ${lastError}`, Date.now() - started, true);
+    const adj = neighbors
+      .map((n) => `${Math.floor(n.x)},${Math.floor(n.y)},${Math.floor(n.z)}=${bot.blockAt(n)?.name ?? "null"}`)
+      .join(" ");
+    return fail("PLACE_FAILED", `Could not place ${name}: ${lastError} adj=${adj}`, Date.now() - started, true);
   }
   const after = bot.blockAt(dest);
   if (!after || after.name === "air") {

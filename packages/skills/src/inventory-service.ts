@@ -247,6 +247,16 @@ export function compactInventoryFacts(ctx: SkillContext): CompactCarriedFacts {
   });
 }
 
+async function syncInventory(bot: Bot): Promise<void> {
+  const window = bot.currentWindow ?? bot.inventory;
+  const sync = (bot as unknown as { _syncWindow?: (window: unknown) => Promise<void> })._syncWindow;
+  if (typeof sync !== "function") return;
+  try {
+    await Promise.race([sync.call(bot, window), wait(800)]);
+  } catch {
+    // 1.21.11 may not answer a dummy click
+  }
+}
 async function waitForCount(
   ctx: SkillContext,
   name: string,
@@ -474,8 +484,13 @@ export async function pickupDroppedItem(
       if (!move.success) continue;
     }
     reached += 1;
-    await wait(2_200);
-    const mid = name ? countItem(ctx, name) : ctx.bot.inventory.items().reduce((sum, item) => sum + item.count, 0);
+    await wait(600);
+    let mid = name ? countItem(ctx, name) : ctx.bot.inventory.items().reduce((sum, item) => sum + item.count, 0);
+    if (mid <= before) {
+      await wait(1_800);
+      await syncInventory(ctx.bot);
+      mid = name ? countItem(ctx, name) : ctx.bot.inventory.items().reduce((sum, item) => sum + item.count, 0);
+    }
     if (mid > before) break;
   }
   await wait(500);
@@ -658,18 +673,29 @@ export async function transferItemToCitizen(
     releaseReservation(giver, reservationId);
     return fail("NOT_CONNECTED", "Both bodies must be spawned for a transfer", Date.now() - started, true);
   }
-  const meet = {
-    x: (giverPos.x + receiverPos.x) / 2,
-    y: (giverPos.y + receiverPos.y) / 2,
-    z: (giverPos.z + receiverPos.z) / 2,
-  };
-  const movedGiver = await moveTo(giver, meet, 2.5);
-  const movedReceiver = await moveTo(receiver, meet, 2.5);
-  if (!movedGiver.success && !movedReceiver.success) {
-    releaseReservation(giver, reservationId);
-    return fail("TARGET_UNREACHABLE", "Could not bring both bodies into transfer range", Date.now() - started, true);
+  const distApart = Math.hypot(giverPos.x - receiverPos.x, giverPos.y - receiverPos.y, giverPos.z - receiverPos.z);
+  if (distApart > 3.5) {
+    const meet = {
+      x: (giverPos.x + receiverPos.x) / 2,
+      y: (giverPos.y + receiverPos.y) / 2,
+      z: (giverPos.z + receiverPos.z) / 2,
+    };
+    const movedGiver = await moveTo(giver, meet, 2.5);
+    const movedReceiver = await moveTo(receiver, meet, 2.5);
+    if (!movedGiver.success && !movedReceiver.success) {
+      releaseReservation(giver, reservationId);
+      return fail("TARGET_UNREACHABLE", "Could not bring both bodies into transfer range", Date.now() - started, true);
+    }
   }
-  await lookAtPosition(giver, receiver.body.position() ?? meet);
+  const giverNow = giver.body.position();
+  const receiverNow = receiver.body.position();
+  if (giverNow && receiverNow) {
+    const close = Math.hypot(giverNow.x - receiverNow.x, giverNow.z - receiverNow.z);
+    if (close > 2.2) {
+      await moveTo(receiver, { x: giverNow.x + 1, y: giverNow.y, z: giverNow.z }, 1.5);
+    }
+  }
+  await lookAtPosition(giver, receiver.body.position() ?? giverNow ?? giverPos);
   releaseReservation(giver, reservationId);
   const giverBefore = countItem(giver, name);
   const receiverBefore = countItem(receiver, name);
@@ -680,7 +706,10 @@ export async function transferItemToCitizen(
       item: name,
     });
   }
-  const picked = await pickupDroppedItem(receiver, name, 8);
+  giver.bot.setControlState("back", true);
+  await wait(350);
+  giver.bot.clearControlStates();
+  const picked = await pickupDroppedItem(receiver, name, 16);
   const giverAfter = countItem(giver, name);
   const receiverAfter = countItem(receiver, name);
   if (
@@ -754,6 +783,31 @@ export function toolsOwned(ctx: SkillContext): string[] {
   return listInventory(ctx)
     .filter((item) => knowledge.isTool(item.name))
     .map((item) => item.name);
+}
+
+export type ToolDurabilityFact = {
+  tool: string;
+  remaining?: number;
+  max?: number;
+  nearBreaking: boolean;
+  known: boolean;
+};
+
+export function durabilityFromItem(item: { name: string; durabilityUsed?: number; maxDurability?: number }): ToolDurabilityFact {
+  const max = item.maxDurability;
+  const used = item.durabilityUsed;
+  if (typeof max !== "number" || typeof used !== "number" || max <= 0) {
+    return { tool: item.name, nearBreaking: false, known: false };
+  }
+  const remaining = Math.max(0, max - used);
+  return { tool: item.name, remaining, max, nearBreaking: remaining / max < 0.12, known: true };
+}
+
+export function toolDurabilityFacts(ctx: SkillContext): ToolDurabilityFact[] {
+  return ctx.bot.inventory
+    .items()
+    .filter((item) => /_(pickaxe|axe|sword|hoe|shovel|helmet|chestplate|leggings|boots)$/.test(item.name))
+    .map((item) => durabilityFromItem(item));
 }
 
 export function buildingItems(ctx: SkillContext): Array<{ name: string; count: number }> {

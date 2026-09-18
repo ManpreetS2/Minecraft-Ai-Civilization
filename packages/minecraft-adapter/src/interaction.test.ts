@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Bot } from "mineflayer";
-import { findReachableInteractionPosition, interactionCandidates, isWalkableStanding } from "./interaction.js";
+import { findReachableInteractionPosition, findReachablePlacementPosition, interactionCandidates, isWalkableStanding } from "./interaction.js";
 
 function fakeBot(
   cells: Record<string, { name: string; boundingBox: string }>,
@@ -52,5 +52,14 @@ describe("interaction standing cells", () => {
     const target = { x: 5, y: 64, z: 5 };
     const candidates = interactionCandidates(bot, target);
     expect(candidates.some((cell) => cell.x === 4 && cell.y === 65 && cell.z === 4)).toBe(true);
+  });
+
+  it("places high wall/roof cells from the ground instead of pathing to the target Y", () => {
+    const cells = grassPadWithLog();
+    const bot = fakeBot(cells, { x: 3.5, y: 64, z: 3.5 });
+    const standing = findReachablePlacementPosition(bot, { x: 5, y: 66, z: 5 });
+    expect(standing).toBeDefined();
+    expect(standing?.y).toBe(64);
+    expect(standing?.x === 5 && standing?.z === 5).toBe(false);
   });
 });

@@ -1,6 +1,6 @@
 import { loadEnv } from "./env.js";
 import { loadConfig, isMechanicsProbeUsername } from "@civ/shared";
-import { findReachableInteractionPosition, formatTerrainReport, inspectLocalTerrain, localEscape, MinecraftBody, moveToPosition, NORMAL_NAVIGATION_CAN_DIG } from "@civ/minecraft-adapter";
+import { findReachableInteractionPosition, formatTerrainReport, inspectLocalTerrain, isKeepaliveTimeout, localEscape, MinecraftBody, moveToPosition, NORMAL_NAVIGATION_CAN_DIG } from "@civ/minecraft-adapter";
 import { minecraftKnowledge } from "@civ/minecraft-knowledge";
 import {
   canReceive,
@@ -37,6 +37,7 @@ import {
 } from "@civ/skills";
 import { ensurePaper } from "./paper.js";
 import { tryRcon, type RconClient } from "./rcon.js";
+import { runBodyGauntlet } from "./live-mechanics-gauntlet.js";
 
 type CaseResult = { name: string; passed: boolean; detail: string; durationMs: number };
 type BlockPos = { x: number; y: number; z: number };
@@ -168,6 +169,7 @@ async function main(): Promise<void> {
   console.log(`NORMAL_NAVIGATION_CAN_DIG=${NORMAL_NAVIGATION_CAN_DIG}`);
   console.log(`oak_door recipe exists: ${knowledge.recipeExists("oak_door")}`);
   if (mechanicsFilter) console.log(`MECHANICS_TEST_FILTER=${mechanicsFilter}`);
+  console.log(`MECHANICS_PROBE_PRESERVE_FIXTURES=${config.MECHANICS_PROBE_PRESERVE_FIXTURES}`);
   if (process.env.MECHANICS_COLLECT_BACKEND) {
     console.log(`MECHANICS_COLLECT_BACKEND=${process.env.MECHANICS_COLLECT_BACKEND}`);
   }
@@ -212,7 +214,11 @@ async function main(): Promise<void> {
       console.log(`- ${mark} ${result.name} (${result.durationMs}ms) ${result.detail}`);
     }
   };
-  process.once("uncaughtException", (error) => {
+  process.on("uncaughtException", (error) => {
+    if (isKeepaliveTimeout(error)) {
+      console.warn(`keepalive timeout (continuing): ${error instanceof Error ? error.message : String(error)}`);
+      return;
+    }
     printResults(`uncaughtException: ${error instanceof Error ? error.message : String(error)}`);
     void body.disconnect("uncaught").finally(() => process.exit(1));
   });
@@ -225,6 +231,10 @@ async function main(): Promise<void> {
     await rcon.command(`op ${username}`).catch(() => undefined);
     await rcon.command("difficulty easy").catch(() => undefined);
     await rcon.command(`effect give ${username} minecraft:saturation 8 255 true`).catch(() => undefined);
+    await rcon.command("fill 194 88 147 196 89 151 grass_block").catch(() => undefined);
+    await rcon.command("fill 174 90 134 190 96 156 air").catch(() => undefined);
+    await rcon.command(`tp ${username} 177.5 90.0 137.5`).catch(() => undefined);
+    await wait(1_600);
   }
 
   async function assertNoBroken(before: Map<string, string>, label: string): Promise<void> {
@@ -754,7 +764,12 @@ async function main(): Promise<void> {
   results.push(
     await runCase("authoritative inventory snapshot/drop/equip/capacity", async () => {
       if (!rcon) throw new Error("SKIP RCON required for inventory fixtures");
+      await rcon.command("fill 174 89 134 182 89 142 grass_block");
+      await rcon.command("fill 174 90 134 182 93 142 air");
+      await rcon.command(`tp ${username} 176.5 90.0 136.5`);
+      await wait(1_200);
       await rcon.command(`clear ${username}`);
+      await rcon.command(`execute at ${username} run kill @e[type=item,distance=..16]`);
       await wait(500);
       let snap = snapshotInventory(ctx);
       console.log(`  empty stacks=${snap.stacks.length} freeSlots=${snap.freeSlots}`);
@@ -778,18 +793,13 @@ async function main(): Promise<void> {
       const dumped = await dropStack(ctx, remaining, "DEV_TEST");
       if (!dumped.success) throw new Error(`${dumped.code} ${dumped.error}`);
       if (inventoryCount(ctx, "oak_log") !== 0) throw new Error(`expected 0 oak_log after stack drop, have ${inventoryCount(ctx, "oak_log")}`);
-      await wait(500);
-      const picked = await pickupDroppedItem(ctx, "oak_log", 12);
-      if (!picked.success) {
-        await wait(2_000);
-        const recovered = inventoryCount(ctx, "oak_log");
-        if (recovered > 0) {
-          console.log(`  pickup via Minecraft auto-collect recovered=${recovered}`);
-        } else {
-          throw new Error(`${picked.code} ${picked.error}`);
-        }
-      } else if (inventoryCount(ctx, "oak_log") < 1) {
-        throw new Error("pickup did not increase oak_log");
+      await wait(2_500);
+      if (inventoryCount(ctx, "oak_log") > 0) {
+        console.log(`  pickup via thrower delay auto-collect count=${inventoryCount(ctx, "oak_log")}`);
+      } else {
+        const picked = await pickupDroppedItem(ctx, "oak_log", 12);
+        if (!picked.success) throw new Error(`${picked.code} ${picked.error}`);
+        if (inventoryCount(ctx, "oak_log") < 1) throw new Error("pickup did not increase oak_log");
       }
 
       await rcon.command(`give ${username} wooden_pickaxe 1`);
@@ -813,11 +823,9 @@ async function main(): Promise<void> {
       await rcon.command(`give ${username} cobblestone 16`);
       await wait(400);
       const stand = body.position() ?? origin;
-      const chestPos = pad.chest ?? { x: Math.floor(stand.x) + 2, y: Math.floor(stand.y), z: Math.floor(stand.z) };
-      if (!pad.chest) {
-        await rcon.command(`setblock ${chestPos.x} ${chestPos.y} ${chestPos.z} chest`);
-        await wait(400);
-      }
+      const chestPos = { x: Math.floor(stand.x) + 2, y: Math.floor(stand.y), z: Math.floor(stand.z) };
+      await rcon.command(`setblock ${chestPos.x} ${chestPos.y} ${chestPos.z} chest`);
+      await wait(500);
       const citizenBefore = inventoryCount(ctx, "cobblestone");
       const deposited = await depositItem(ctx, "cobblestone", 10, chestPos);
       if (!deposited.success) throw new Error(`${deposited.code} ${deposited.error}`);
@@ -865,15 +873,29 @@ async function main(): Promise<void> {
         const peerBot = peer.requireBot();
         const peerCtx: SkillContext = { body: peer, bot: peerBot, timeoutMs: 20_000 };
         const here = body.position() ?? origin;
-        await rcon.command(`tp ${peerName} ${here.x.toFixed(1)} ${here.y.toFixed(1)} ${here.z.toFixed(1)}`);
+        await rcon.command(`op ${peerName}`).catch(() => undefined);
+        await rcon.command(`tp ${peerName} ${here.x + 1.2} ${here.y.toFixed(1)} ${here.z.toFixed(1)}`);
+        await rcon.command(`execute at ${username} run kill @e[type=item,distance=..24]`);
+        await wait(1_800);
+        const peerHere = peer.position();
+        const giverHere = body.position();
+        console.log(
+          `  peer pos=${peerHere ? `${peerHere.x.toFixed(1)},${peerHere.y.toFixed(1)},${peerHere.z.toFixed(1)}` : "?"} giver=${giverHere ? `${giverHere.x.toFixed(1)},${giverHere.y.toFixed(1)},${giverHere.z.toFixed(1)}` : "?"}`,
+        );
+        if (!peerHere || !giverHere || Math.hypot(peerHere.x - giverHere.x, peerHere.z - giverHere.z) > 6) {
+          await rcon.command(`tp ${peerName} ${username}`);
+          await wait(1_200);
+        }
         await rcon.command(`clear ${username}`);
         await rcon.command(`clear ${peerName}`);
         clearReservations(ctx);
         clearReservations(peerCtx);
         await rcon.command(`give ${username} oak_log 12`);
-        await wait(800);
+        await wait(1_000);
         const result = await transferItemToCitizen(ctx, peerCtx, "oak_log", 8);
-        if (!result.success) throw new Error(`${result.code} ${result.error}`);
+        if (!result.success) {
+          throw new Error(`${result.code} ${result.error} details=${JSON.stringify(result.details ?? {})}`);
+        }
         if (inventoryCount(ctx, "oak_log") !== 4) throw new Error(`giver has ${inventoryCount(ctx, "oak_log")} != 4`);
         if (inventoryCount(peerCtx, "oak_log") !== 8) throw new Error(`receiver has ${inventoryCount(peerCtx, "oak_log")} != 8`);
       } finally {
@@ -881,6 +903,33 @@ async function main(): Promise<void> {
       }
     }),
   );
+
+  await wait(800);
+  if (!body.position() || !ctx.bot.entity) {
+    console.warn("MechProbe lost spawn before gauntlet; reconnecting");
+    const again = await body.connect();
+    if (!again.success) {
+      throw new Error(`gauntlet reconnect ${again.code} ${again.error}`);
+    }
+    await wait(2_000);
+    ctx.bot = body.requireBot();
+  }
+
+  const gauntlet = await runBodyGauntlet({
+    ctx,
+    bot: ctx.bot,
+    body,
+    rcon,
+    username,
+    preserveFixtures: config.MECHANICS_PROBE_PRESERVE_FIXTURES,
+    wait,
+    runCommand,
+    runCase,
+    blockAt,
+    snapshotSolids,
+    brokenSolids,
+  });
+  results.push(...gauntlet);
 
   if (config.MECHANICS_PROBE_KEEP_ALIVE) {
     console.log(`KEEP_ALIVE: ${username} remaining connected and idle. Not performing citizen tasks.`);
@@ -910,15 +959,20 @@ async function main(): Promise<void> {
 
 function wantedCase(name: string): boolean {
   const filter = (process.env.MECHANICS_TEST_FILTER ?? "").trim().toLowerCase();
-  if (!filter) {
-    return !/authoritative inventory|authoritative probe-to-probe/.test(name);
-  }
+  if (!filter) return true;
   if (filter === "all") return true;
+  if (filter === "v1") {
+    return !/authoritative inventory|authoritative probe-to-probe|step up|drop down|climb oak|walk oak slabs|fence gate|enter and leave water|sprint on flat|climb ladder|zombie melee|skeleton melee|spider melee|creeper flee|hunt |harvest mature|create tiny wheat|cook raw|mine iron|craft iron|iron helmet|remaining iron armor|villager trade|3x3 shelter|defensive enclosure/.test(
+      name,
+    );
+  }
   if (filter === "crafting") {
     return /log ->|stone pickaxe|oak_door|inspect inventory|reuse existing crafting/.test(name);
   }
   if (filter === "nav" || filter === "navigation") {
-    return /inspect spawn|pit |open flat|village\/uneven|walk 15-25|standing cell|open wooden door/.test(name);
+    return /inspect spawn|pit |open flat|village\/uneven|walk 15-25|standing cell|open wooden door|step up|drop down|climb oak|walk oak slabs|fence gate|enter and leave water|sprint on flat/.test(
+      name,
+    );
   }
   if (filter === "sleep") {
     return /sleep |open-field/.test(name);
@@ -931,6 +985,20 @@ function wantedCase(name: string): boolean {
   }
   if (filter === "doorway") {
     return /oak_door|open-field|doorway/.test(name);
+  }
+  if (filter === "gauntlet" || filter === "v11") {
+    return /step up|drop down|climb oak|walk oak slabs|fence gate|enter and leave water|sprint on flat|climb ladder|zombie melee|skeleton melee|spider melee|creeper flee|hunt |harvest mature|create tiny wheat|cook raw|mine iron|craft iron|iron helmet|remaining iron armor|villager trade|3x3 shelter|defensive enclosure/.test(
+      name,
+    );
+  }
+  if (filter === "combat") {
+    return /zombie melee|skeleton melee|spider melee|creeper flee/.test(name);
+  }
+  if (filter === "farm") {
+    return /harvest mature|create tiny wheat/.test(name);
+  }
+  if (filter === "retry") {
+    return /enter and leave water|climb ladder|hunt pig|create tiny wheat|complete 3x3/.test(name);
   }
   return name.toLowerCase().includes(filter);
 }

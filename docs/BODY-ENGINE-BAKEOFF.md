@@ -120,4 +120,10 @@ civilization goal
 
 **BODY ENGINE V1.** Citizens stay offline until a later reconnect.
 
+## Body Engine V1.1
+
+Survival / combat / farming / industry / construction added on MechProbe without replacing V1. Matrix: `docs/MINECRAFT-BODY-CAPABILITY-MATRIX.md`.
+
+Still **not** V1.1-complete: live ladder climb and water exit fail on Paper 1.21.11 physics. Inventory, iron line, combat, hunting, wheat, furnace, armor, villager trade, 3x3 shelter, and 5x5 enclosure did pass live.
+
 Citizens stay offline until this stack live-passes the acceptance list on MechProbe.

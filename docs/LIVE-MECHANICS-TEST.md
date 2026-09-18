@@ -38,9 +38,14 @@ Optional filters (MechProbe only):
 ```
 MECHANICS_TEST_FILTER=crafting pnpm --filter @civ/orchestrator mechanics
 MECHANICS_TEST_FILTER=inventory pnpm --filter @civ/orchestrator mechanics
-```
+MECHANICS_TEST_FILTER=gauntlet pnpm --filter @civ/orchestrator mechanics
+MECHANICS_TEST_FILTER=v1 pnpm --filter @civ/orchestrator mechanics
 MECHANICS_CRAFT_DEBUG=true pnpm --filter @civ/orchestrator mechanics
 ```
+
+Default (no filter) runs Body Engine V1 **and** the V1.1 gauntlet, including the previously skipped inventory/drop/transfer suite.
+
+`MECHANICS_PROBE_PRESERVE_FIXTURES=true` leaves the isolated course (nav / ladder / combat pen / farm / furnace / build pads around x192–218, z134–168) for visual inspection. Default restores air above the grass pad after the gauntlet. MechProbe is never a citizen.
 
 `crafting` covers log → planks/sticks/table/wooden_pickaxe, stone_pickaxe, oak_door, inventory inspect, and table reuse. Craft debug prints target/recipe/inventory only for MechProbe.
 
@@ -110,9 +115,21 @@ Zero-displacement at the original village hole (`~223.5 60 184.7`) is a **stone 
 
 **Not a claim of general “Minecraft capable.”** These are specific verified actions on one probe body.
 
+## Body Engine V1.1 live (2026-09-18)
+
+V1 chain plus inventory/transfer **PASS** on a clean pad (21/21 before a later keepalive from MechProbeB). Gauntlet (`MECHANICS_TEST_FILTER=gauntlet` and retries) against the same Paper 1.21.11 world, no reset:
+
+PASS: step, drop, stairs, slabs, gate, sprint, zombie/skeleton/spider, creeper flee, hunt cow/pig/chicken, wheat harvest+replant, farm plot, cook beef, smelt iron, iron pickaxe/sword/axe, full iron armor equip, villager trade, 3x3 shelter, 5x5 enclosure.
+
+FAIL (honest): **leave water**, **ladder up**, **ladder down**. Bounded `climbLadder` exists; prismarine-physics on 1.21.11 produced ~0 Y displacement. Pathfinder climbables remain unused in practice.
+
+Authoritative matrix: `docs/MINECRAFT-BODY-CAPABILITY-MATRIX.md`.
+
+Citizens stay offline.
+
 Remaining live gaps:
 
 1. Four-walled full-block 1×1 wells: Mineflayer jump-up onto a 1.0 lip is unreliable vs Paper 1.21.11; escape uses a same-Y step (slab) or fail-fast. Do not mine the village.
-2. Fence gates, furnace, attack/flee, swim, climb were not live-tested in this suite.
+2. Water exit and ladder climb: Paper/Mineflayer 1.21.11 physics. Do not mark PASS from the skill existing.
 
 Do not mark LIVE PAPER VERIFIED from unit tests alone.

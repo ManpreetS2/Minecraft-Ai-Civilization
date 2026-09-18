@@ -26,6 +26,8 @@ export {
   releaseReservation,
   availableUnreservedCount,
   clearReservations,
+  durabilityFromItem,
+  toolDurabilityFacts,
 } from "./inventory.js";
 export { dropItem, approachAndCollect, pickupDroppedItem } from "./share.js";
 export { attack, placeBlock, sleep } from "./world.js";
@@ -39,6 +41,19 @@ export {
 export { equipForBlock } from "./tools.js";
 export { openDoor, openFenceGate } from "./doors.js";
 export { classifySkill, type SkillStatus } from "./skill-result.js";
+export { climbLadder } from "./climb.js";
+export { attackHostile, fleeCreeper, huntAnimal, isAttackAllowed } from "./combat.js";
+export { harvestCrop, plantCrop, tillAndPlant, isMatureCrop, CROP_BLOCKS, type CropKind } from "./farm.js";
+export { smeltItem, preferredFuel } from "./furnace.js";
+export { tradeWithVillager } from "./trade.js";
+export {
+  executeStructure,
+  verifyStructure,
+  probeShelter,
+  probeFort,
+  classifyStructureBlock,
+  type StructurePlan,
+} from "./structure.js";
 export {
   unequip,
   dropStack,
