@@ -52,6 +52,33 @@ export function hasHeadroom(bot: Bot, pos: Vec3): boolean {
   return isAirLike(head.name, head.boundingBox) || head.boundingBox !== "block";
 }
 
+export const BLOCK_INTERACT_REACH = 4.5;
+
+const CROP_BLOCK_NAMES = new Set(["wheat", "carrots", "potatoes", "beetroots"]);
+
+export function blockInteractDistance(bot: Bot, block: Vec3): number | undefined {
+  const pos = bot.entity?.position;
+  if (!pos) return undefined;
+  const eyeY = pos.y + ((bot.entity as { eyeHeight?: number }).eyeHeight ?? 1.62);
+  return Math.hypot(
+    pos.x - (Math.floor(block.x) + 0.5),
+    eyeY - (Math.floor(block.y) + 0.5),
+    pos.z - (Math.floor(block.z) + 0.5),
+  );
+}
+
+export function isWithinBlockReach(bot: Bot, block: Vec3, reach = BLOCK_INTERACT_REACH): boolean {
+  const dist = blockInteractDistance(bot, block);
+  return dist !== undefined && dist <= reach;
+}
+
+function isFarmPlotStanding(bot: Bot, pos: Vec3): boolean {
+  const below = botBlock(bot, pos.x, pos.y - 1, pos.z);
+  if (below?.name === "farmland") return true;
+  const feet = botBlock(bot, pos.x, pos.y, pos.z);
+  return Boolean(feet && CROP_BLOCK_NAMES.has(feet.name));
+}
+
 export function canStandOn(bot: Bot, pos: Vec3): boolean {
   const below = botBlock(bot, pos.x, pos.y - 1, pos.z);
   if (!below) return false;
@@ -85,7 +112,7 @@ export function interactionCandidates(bot: Bot, block: Vec3, radius = 2): Vec3[]
 export function rankedInteractionPositions(bot: Bot, block: Vec3, radius = 2): Vec3[] {
   const origin = bot.entity?.position;
   return interactionCandidates(bot, block, radius)
-    .filter((pos) => !occupantNear(pos, bot.username, 0.8))
+    .filter((pos) => !occupantNear(pos, bot.username, 0.8) && !isFarmPlotStanding(bot, pos))
     .map((pos) => {
       const dx = origin ? pos.x - origin.x : 0;
       const dy = origin ? pos.y - origin.y : 0;

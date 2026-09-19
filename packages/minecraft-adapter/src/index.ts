@@ -38,8 +38,11 @@ export {
   type NavigationBackend,
 } from "./navigation.js";
 export {
+  BLOCK_INTERACT_REACH,
+  blockInteractDistance,
   canOccupyFeet,
   canStandOn,
+  isWithinBlockReach,
   findReachableInteractionPosition,
   findReachableMiningPosition,
   findReachablePlacementPosition,

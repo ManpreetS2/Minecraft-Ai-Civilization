@@ -13,6 +13,8 @@ export type PlannedTask = {
   occupation?: string;
   directiveId?: string;
   item?: string;
+  target?: { x: number; y: number; z: number };
+  count?: number;
 };
 
 export type WorkRole = "wood" | "food" | "stone" | "tools" | "build";
@@ -326,4 +328,22 @@ export function assignWorkRoles(citizenIds: string[]): Map<string, WorkRole> {
     map.set(id, ROLES[index % ROLES.length] ?? "wood");
   });
   return map;
+}
+
+/** Roster jobs for legacy tests. Experiment 1 keeps assignRoles false so nobody is given a permanent job. */
+export function experimentWorkAssignment(
+  citizenIds: string[],
+  needs: SettlementNeed[],
+  assignRoles: boolean,
+): { roles: Map<string, WorkRole>; assignedNeeds: Map<string, SettlementNeed[]> } {
+  if (!assignRoles) {
+    return {
+      roles: new Map(),
+      assignedNeeds: new Map(citizenIds.map((id) => [id, []])),
+    };
+  }
+  return {
+    roles: assignWorkRoles(citizenIds),
+    assignedNeeds: assignSettlementNeeds(citizenIds, needs),
+  };
 }

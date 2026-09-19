@@ -480,7 +480,7 @@ export async function pickupDroppedItem(
     if (!pos) continue;
     const dist = origin ? origin.distanceTo(pos) : 99;
     if (dist > 1.6) {
-      const move = await moveTo(ctx, { x: pos.x, y: pos.y, z: pos.z }, 0.8);
+      const move = await moveTo(ctx, { x: pos.x, y: pos.y, z: pos.z }, 2);
       if (!move.success) continue;
     }
     reached += 1;

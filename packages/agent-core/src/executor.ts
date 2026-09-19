@@ -18,12 +18,14 @@ import {
   eatFood,
   findBlock,
   flee,
+  harvestCrop,
   mineBlock,
   observeNearby,
   obtainItem,
   placeBlock,
   returnToSettlement,
   withdrawItems,
+  workFarmPlot,
   type PlacementIntent,
   type SkillContext,
 } from "@civ/skills";
@@ -44,7 +46,6 @@ import {
 } from "./workstations.js";
 
 const FOOD_MOBS = new Set(["cow", "pig", "chicken", "sheep", "mooshroom"]);
-const CROP_BLOCKS = ["wheat", "carrots", "potatoes", "beetroots"];
 
 export async function executePlan(
   ctx: SkillContext,
@@ -94,6 +95,26 @@ export async function executePlan(
     case "gatherFood":
       result = await gatherFood(ctx, store, events);
       break;
+    case "workFarmPlot": {
+      if (!plan.target) {
+        result = {
+          success: false,
+          code: "INVALID_ARGUMENT",
+          error: "workFarmPlot requires a citizen-chosen farm origin",
+          durationMs: 0,
+          retryable: false,
+        };
+        break;
+      }
+      result = await workFarmPlot(ctx, {
+        origin: plan.target,
+        size: 3,
+        seedStorage: knownChest(ctx, store),
+        cropStorage: knownChest(ctx, store),
+        maxHarvest: plan.count,
+      });
+      break;
+    }
     case "craftItem":
       result = await executeCraftChain(ctx, craftTarget(ctx, plan), store, events, runtime);
       break;
@@ -325,11 +346,9 @@ async function gatherFood(ctx: SkillContext, store: CivilizationStore, events: E
     if (withdrawn.success) return withdrawn;
   }
 
-  const mature = await findMatureCrop(ctx);
-  if (mature.success) {
-    const mined = await mineBlock(ctx, CROP_BLOCKS, 24);
-    if (mined.success) await collectItem(ctx, undefined, 8);
-    return mined;
+  for (const kind of ["wheat", "carrots", "potatoes", "beetroots"] as const) {
+    const harvested = await harvestCrop(ctx, kind);
+    if (harvested.success) return harvested;
   }
 
   const berries = await findBlock(ctx, ["sweet_berry_bush"], 20);
@@ -358,9 +377,9 @@ async function gatherFood(ctx: SkillContext, store: CivilizationStore, events: E
     return obtainItem(ctx, "bread", 1);
   }
 
-  const farther = await findBlock(ctx, [...CROP_BLOCKS, "sweet_berry_bush"], 48);
+  const farther = await findBlock(ctx, ["sweet_berry_bush"], 48);
   if (farther.success) {
-    const mined = await mineBlock(ctx, [...CROP_BLOCKS, "sweet_berry_bush"], 48);
+    const mined = await mineBlock(ctx, ["sweet_berry_bush"], 48);
     if (mined.success) await collectItem(ctx, undefined, 8);
     return mined;
   }
@@ -372,20 +391,6 @@ async function gatherFood(ctx: SkillContext, store: CivilizationStore, events: E
     durationMs: 0,
     retryable: true,
   };
-}
-
-async function findMatureCrop(ctx: SkillContext): Promise<ActionResult<{ name: string; position: Vec3 }>> {
-  const found = await findBlock(ctx, CROP_BLOCKS, 24);
-  if (!found.success) return found;
-  const block = ctx.bot.blockAt(
-    new Vec3Class(found.data.position.x, found.data.position.y, found.data.position.z),
-  );
-  const age = Number((block as { getProperties?: () => { age?: number } } | null)?.getProperties?.().age ?? 7);
-  if (age < 7) {
-    ctx.body.unreachable.mark(found.data.position, 12_000);
-    return findBlock(ctx, CROP_BLOCKS, 24);
-  }
-  return found;
 }
 
 async function depositToSettlement(

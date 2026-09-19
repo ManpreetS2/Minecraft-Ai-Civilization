@@ -1,8 +1,8 @@
 import type { Bot } from "mineflayer";
-import { fail, type ActionResult, type Vec3 } from "@civ/shared";
+import { fail, ok, type ActionResult, type Vec3 } from "@civ/shared";
 import { followPlayer, moveToGetToBlock, moveToLookAtBlock, moveToPosition } from "./pathing.js";
 import { probeReachability } from "./path-probe.js";
-import { findReachablePlacementPosition, rankedInteractionPositions } from "./interaction.js";
+import { blockInteractDistance, findReachablePlacementPosition, isWithinBlockReach, rankedInteractionPositions } from "./interaction.js";
 
 export type NavigationBackend = {
   readonly name: string;
@@ -16,6 +16,12 @@ export type NavigationBackend = {
   stop(bot: Bot): void;
 };
 
+function currentReachResult(bot: Bot, block: Vec3) {
+  if (!isWithinBlockReach(bot, block)) return undefined;
+  const pos = bot.entity!.position;
+  return ok({ position: { x: pos.x, y: pos.y, z: pos.z }, distance: blockInteractDistance(bot, block) ?? 0 });
+}
+
 export class MineflayerPathfinderBackend implements NavigationBackend {
   readonly name: string = "mineflayer-pathfinder";
   navigateToPosition(bot: Bot, target: Vec3, options?: { range?: number; timeoutMs?: number; signal?: AbortSignal }) {
@@ -27,6 +33,8 @@ export class MineflayerPathfinderBackend implements NavigationBackend {
   async navigateToInteractWithBlock(bot: Bot, block: Vec3, options?: { timeoutMs?: number; signal?: AbortSignal }) {
     const budget = options?.timeoutMs ?? 16_000;
     const started = Date.now();
+    const already = currentReachResult(bot, block);
+    if (already) return already;
     const cells = rankedInteractionPositions(bot, block, 2).slice(0, 6);
     let last = fail("NO_INTERACTION_POSITION", "No standing cell for that block", 0, true) as ActionResult<{
       position: Vec3;
@@ -42,18 +50,22 @@ export class MineflayerPathfinderBackend implements NavigationBackend {
         recover: false,
       });
       if (last.success) return last;
+      const reached = currentReachResult(bot, block);
+      if (reached) return reached;
       if (last.code === "CANCELLED" || last.code === "NOT_CONNECTED") return last;
     }
     const remaining = budget - (Date.now() - started);
     if (remaining >= 800) {
       last = await moveToLookAtBlock(bot, block, { timeoutMs: Math.min(8_000, remaining), signal: options?.signal });
       if (last.success) return last;
+      const reached = currentReachResult(bot, block);
+      if (reached) return reached;
     }
     const leftover = budget - (Date.now() - started);
     if (leftover >= 800) {
       last = await moveToGetToBlock(bot, block, { timeoutMs: Math.min(6_000, leftover), signal: options?.signal });
     }
-    return last;
+    return currentReachResult(bot, block) ?? last;
   }
   navigateToPlaceBlock(bot: Bot, target: Vec3, options?: { timeoutMs?: number; signal?: AbortSignal }) {
     const standing = findReachablePlacementPosition(bot, target) ?? target;

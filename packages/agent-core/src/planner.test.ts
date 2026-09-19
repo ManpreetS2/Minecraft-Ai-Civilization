@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { BodyObservation, SettlementState } from "@civ/shared";
-import { assignSettlementNeeds, planCitizen } from "./planner.js";
+import { assignSettlementNeeds, experimentWorkAssignment, planCitizen } from "./planner.js";
 
 const emptySettlement = (): SettlementState => ({
   id: "settlement_first",
@@ -182,5 +182,44 @@ describe("assignSettlementNeeds", () => {
     expect(assigned.get("a")).toEqual(["NEED_FOOD"]);
     expect(assigned.get("b")).toEqual(["NEED_WOOD"]);
     expect(assigned.get("c")).toEqual(["NEED_STONE"]);
+  });
+});
+
+describe("experimentWorkAssignment", () => {
+  it("does not assign roster jobs when disabled", () => {
+    const result = experimentWorkAssignment(
+      ["citizen_atlas", "citizen_maya", "citizen_theo", "citizen_ava", "citizen_kai"],
+      ["NEED_FOOD", "NEED_WOOD", "NEED_STONE", "NEED_TOOLS", "NEED_HOUSING"],
+      false,
+    );
+    expect(result.roles.size).toBe(0);
+    expect(result.assignedNeeds.get("citizen_atlas")).toEqual([]);
+    expect(result.assignedNeeds.get("citizen_maya")).toEqual([]);
+  });
+
+  it("preserves legacy roster jobs when enabled", () => {
+    const result = experimentWorkAssignment(
+      ["citizen_atlas", "citizen_maya", "citizen_theo", "citizen_ava", "citizen_kai"],
+      ["NEED_FOOD", "NEED_WOOD"],
+      true,
+    );
+    expect(result.roles.get("citizen_atlas")).toBe("wood");
+    expect(result.roles.get("citizen_maya")).toBe("food");
+    expect(result.assignedNeeds.get("citizen_atlas")).toEqual(["NEED_FOOD"]);
+    expect(result.assignedNeeds.get("citizen_maya")).toEqual(["NEED_WOOD"]);
+  });
+});
+
+describe("planCitizen without assigned jobs", () => {
+  it("does not farm from settlement NEED_FOOD unless hungry or assigned", () => {
+    const planned = planCitizen({
+      citizenId: "citizen_ava",
+      observation: obs({ food: 20, inventory: [{ name: "wooden_pickaxe", count: 1 }] }),
+      settlement: { ...emptySettlement(), needs: ["NEED_FOOD"], wood: 4, shelterComplete: true },
+      assignedNeeds: [],
+    });
+    expect(planned.action).not.toBe("gatherFood");
+    expect(planned.action).not.toBe("workFarmPlot");
+    expect(planned.reason).not.toMatch(/Assigned to obtain food/);
   });
 });

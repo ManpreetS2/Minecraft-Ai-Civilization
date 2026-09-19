@@ -72,6 +72,7 @@ export async function eatFood(ctx: SkillContext): Promise<ActionResult<{ item: s
   try {
     await ctx.bot.equip(stack, "hand");
     await ctx.bot.consume();
+    await new Promise((resolve) => setTimeout(resolve, 800));
   } catch (error) {
     return fail("EAT_FAILED", error instanceof Error ? error.message : String(error), Date.now() - started, true);
   }

@@ -43,7 +43,31 @@ export { openDoor, openFenceGate } from "./doors.js";
 export { classifySkill, type SkillStatus } from "./skill-result.js";
 export { climbLadder } from "./climb.js";
 export { attackHostile, fleeCreeper, huntAnimal, isAttackAllowed } from "./combat.js";
-export { harvestCrop, plantCrop, tillAndPlant, isMatureCrop, CROP_BLOCKS, type CropKind } from "./farm.js";
+export {
+  harvestCrop,
+  harvestCropAt,
+  harvestPlot,
+  inspectFarm,
+  evaluateFarmPreconditions,
+  workFarmPlot,
+  plantCrop,
+  tillAndPlant,
+  tillAndPlantPlot,
+  tillSoil,
+  findTillablePlot,
+  inspectCrop,
+  isMatureCrop,
+  cropAge,
+  cropKindFromBlock,
+  plotCells,
+  selectHydratedPlot,
+  soilHydratedByWater,
+  CROP_BLOCKS,
+  TILLABLE_SOIL,
+  type CropKind,
+  type FarmInspection,
+  type FarmWorkRequest,
+} from "./farm.js";
 export { smeltItem, preferredFuel } from "./furnace.js";
 export { tradeWithVillager } from "./trade.js";
 export {

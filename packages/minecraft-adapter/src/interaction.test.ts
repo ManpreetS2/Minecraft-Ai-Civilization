@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Bot } from "mineflayer";
-import { findReachableInteractionPosition, findReachablePlacementPosition, interactionCandidates, isWalkableStanding } from "./interaction.js";
+import { findReachableInteractionPosition, findReachablePlacementPosition, interactionCandidates, isWalkableStanding, rankedInteractionPositions } from "./interaction.js";
 
 function fakeBot(
   cells: Record<string, { name: string; boundingBox: string }>,
@@ -61,5 +61,20 @@ describe("interaction standing cells", () => {
     expect(standing).toBeDefined();
     expect(standing?.y).toBe(64);
     expect(standing?.x === 5 && standing?.z === 5).toBe(false);
+  });
+
+  it("does not rank farmland or wheat as harvest standing cells", () => {
+    const cells: Record<string, { name: string; boundingBox: string }> = {};
+    for (let x = 20; x <= 22; x += 1) {
+      for (let z = 238; z <= 242; z += 1) {
+        cells[`${x},68,${z}`] = { name: z >= 240 ? "farmland" : "grass_block", boundingBox: "block" };
+        cells[`${x},69,${z}`] = { name: z >= 240 ? "wheat" : "air", boundingBox: "empty" };
+        cells[`${x},70,${z}`] = { name: "air", boundingBox: "empty" };
+      }
+    }
+    const bot = fakeBot(cells, { x: 20.5, y: 69, z: 238.5 });
+    const ranked = rankedInteractionPositions(bot, { x: 21, y: 69, z: 241 });
+    expect(ranked.some((pos) => pos.z >= 240)).toBe(false);
+    expect(ranked.some((pos) => pos.z === 238 || pos.z === 239)).toBe(true);
   });
 });
