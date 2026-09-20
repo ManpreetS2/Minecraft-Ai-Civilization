@@ -83,6 +83,6 @@ async function handle(
 }
 
 function json(res: ServerResponse, value: unknown): void {
-  res.writeHead(200, { "content-type": "application/json", "access-control-allow-origin": "*" });
+  res.writeHead(200, { "content-type": "application/json" });
   res.end(JSON.stringify(value));
 }
