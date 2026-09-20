@@ -1,123 +1,241 @@
 # Minecraft AI Civilization
 
-**A persistent, multi-agent society experiment inside Minecraft.**
+**A research-focused multi-agent simulation exploring autonomous societies inside Minecraft.**
 
-What happens when five AI citizens share a world, remember their experiences, and make their own choices? This project explores that question through a real Minecraft server, persistent agent state, bounded game actions, and observable outcomes—not scripted stories presented as emergent behavior.
+![Status](https://img.shields.io/badge/status-active_development-2563EB)
+![Minecraft](https://img.shields.io/badge/Minecraft_Java-1.21.11-56A86D)
+![TypeScript](https://img.shields.io/badge/TypeScript-3178C6)
+![SQLite](https://img.shields.io/badge/SQLite-003B57)
 
-![Status: experimental](https://img.shields.io/badge/status-experimental-orange) ![Minecraft Java](https://img.shields.io/badge/Minecraft_Java-1.21.11-56A86D) ![TypeScript](https://img.shields.io/badge/TypeScript-monorepo-3178C6)
+What happens when persistent AI agents share a world, remember their experiences, and make decisions independently?
 
-> **Current status:** An experimental five-citizen prototype is available in this repository. The independent, citizen-led society described below is the **research direction**, not a claim that autonomous civilization, long-term households, or an economy already work. Live behavior depends on the local Paper world and must be verified in-game.
+Minecraft AI Civilization is an experimental system for studying that question inside a shared Minecraft world. The project combines AI decision-making, persistent agent state, real game interaction, and observable social behavior.
 
-## The experiment
+The goal is not to script a village full of bots. It is to build the infrastructure through which individual citizens can survive, communicate, cooperate, disagree, and eventually develop a society through their own interactions.
 
-**Option A — a small starter village in a spacious, mostly vanilla world.** The human supplies an accessible settlement with homes, beds, a modest farm, shared storage, real starting resources, and room to expand. Five persistent citizens—**Atlas, Maya, Theo, Ava, and Kai**—then interact within it.
+> **Current status:** Individual Minecraft agent capabilities have passed isolated live tests, including farming, home navigation, personal storage, and bounded mining. The complete five-citizen autonomous simulation is still under integration and reliability testing. Recent local development is ahead of the code published in this repository.
 
-The starting village is explicitly **human-provided**. It is not credited to the AI. Citizens should eventually choose their own activities, relationships, living arrangements, and future building projects rather than receive preset jobs, leadership, or social outcomes.
+## Overview
 
-| Experimental principle | What it means |
+The first experiment centers on five persistent citizens:
+
+**Atlas · Maya · Theo · Ava · Kai**
+
+They share one Minecraft world and begin in a small, functional starter settlement. The initial houses, farm, and basic supplies are provided by the experimenter so that the first study can focus on physical reliability, independent decisions, and social interaction.
+
+The citizens are intended to develop their own goals and relationships rather than begin with assigned occupations, predetermined friendships, or a scripted social structure.
+
+The project is guided by four engineering principles:
+
+| Principle | Approach |
 | --- | --- |
-| Individual agency | Each citizen forms intentions from its own needs, observations, memories, and interactions. A shared shortage is information, not an order from a central AI. |
-| Physical accountability | Items, buildings, farming, and mining count only when verified in the Minecraft world or inventories. Generated narration is not proof of success. |
-| Limited knowledge | Citizens should not know hidden ores, unopened chest contents, or another citizen's private state without actually observing or learning about them. |
-| Human as contractor | Citizens may propose a building, choose a site, and accept or reject a quote. The human may install an approved vanilla-block structure, but this must be logged as human construction. |
-| Measurable experiments | Record the initial world, provided supplies, interventions, failures, and observed interactions. Avoid scripting an outcome and calling it emergent. |
+| Individual autonomy | Each citizen should choose what to do using its own needs, observations, memories, and experiences. |
+| Persistent identity | A citizen's identity and history remain separate from its temporary Minecraft connection or model inference session. |
+| Physical grounding | Actions are executed through Minecraft and checked against actual world and inventory state. |
+| Observable results | Experiments distinguish what an agent intended, what physically occurred, and what the human supplied or changed. |
 
-### World and construction direction
-
-- Start with a reproducible, survival-friendly plains/valley area near a forest, river, and accessible natural resources. Keep paths, doors, beds, and storage usable by the bot bodies.
-- Provide three simple starter houses with at least five reachable beds, a small farm, shared crafting/storage, and open plots. Record the seed, gamerules, inventories, and all human-provided structures.
-- Later, let citizens **request** a house, farm, warehouse, or automation service. A construction contract should record its cost, accepted terms, owner, physical placement, and verified completion.
-- Allow optional human-installed, vanilla-mechanics automation only with real inputs and measurable real output. A hopper farm must not create imaginary resources or be reported as independent AI labor.
-
-**The contractor catalog, citizen-chosen construction, economic settlement, and automation workflows are planned—not delivered features of this public prototype.**
+The long-term research question is whether increasingly complex cooperation, specialization, relationships, economies, and institutions can emerge from these individual interactions.
 
 ## Architecture
 
-The core distinction is **what a citizen chooses** versus **how a Minecraft body executes it**.
+The system separates **citizen decision-making** from **physical Minecraft execution**.
 
 ```text
-              Paper 1.21.11 — shared Minecraft world
-                             │ observations
+                  SHARED MINECRAFT WORLD
+                       Paper Server
+                             │
+                       Observations
                              ▼
-                    Citizen state / goals
-                       │             ▲
-           high-level intention   verified result
-                       ▼             │
-              Planner + bounded skills
+                      CITIZEN STATE
+                  Identity · Needs · Memory
                              │
-                      Mineflayer body
+                     High-level intention
+                             ▼
+                      TASK PLANNING
+                    Bounded skill selection
                              │
-                     Real world action
+                             ▼
+                      MINEFLAYER BODY
+                 Navigation · Item interaction
+                    Gathering · Crafting
                              │
-                  Inventory / block checks
+                             ▼
+                     RESULT VERIFICATION
+                  World state · Inventory
+                             │
+                             ▼
+                    PERSISTENCE & EVENTS
+                       SQLite · Logs
 
-     SQLite: identities · settlement · memories · events
-     Optional Ollama: high-level decision support
-     Local dashboard: state · actions · events · performance
+                 Local Observer Dashboard
 ```
 
-Routine movement and interaction should use deterministic skills rather than spending an LLM call on every block. The longer-term design is for each citizen's persistent identity and experience to inform its own decisions; the model is a temporary reasoning tool, not the citizen's memory or an omniscient manager.
+### Independent citizens
 
-**Current implementation boundary:** The checked-in code has deterministic survival/task planning and shared settlement needs, plus optional local Ollama deliberation. Fully independent citizen-owned choices, reliable physical autonomy, and richer social memory remain development goals.
+The target architecture gives each citizen its own persistent state, limited knowledge, and decision-making context.
 
-## What is implemented vs. planned
+A citizen decides **what** it wants to accomplish and **why**. The physical execution layer determines **how** to carry out that intention using bounded Minecraft skills.
 
-| In this repository | Target / not yet established |
+The current public prototype includes deterministic task planning and optional LLM-assisted decisions. Fully independent, citizen-owned goal selection across the complete five-agent simulation is still being integrated.
+
+### Physical execution
+
+Mineflayer connects active agents to the same Minecraft server. A deterministic skill layer handles movement, navigation, gathering, crafting, inventory interaction, and other game actions.
+
+This separation avoids relying on language-model inference for every movement or block interaction.
+
+Actions follow a verification-oriented workflow:
+
+```text
+Intention → Plan → Execute → Observe → Verify
+                                      │
+                           Success or recovery
+```
+
+An action is not considered successful simply because a model reports that it succeeded. The system must inspect the relevant Minecraft state, such as the block changed, item collected, or inventory updated.
+
+### Persistent state and cognition
+
+SQLite provides persistence for citizen identities, settlement records, events, memories, and relationships in the public prototype.
+
+The longer-term cognition architecture will use each citizen's own observations and retrieved memories to support high-level choices. Routine physical tasks can continue through deterministic execution without a continuously running language model for every citizen.
+
+The intended separation is:
+
+**World truth ≠ citizen observation ≠ citizen belief.**
+
+A citizen should not know the contents of an unopened chest or the location of hidden ore merely because that information exists on the server.
+
+## Development progress
+
+Development is currently focused on making individual Minecraft skills reliable before integrating them into a stable, independently acting group.
+
+### Local live-test milestones
+
+The following results are documented in the project's **September 19, 2026 local development checkpoint**. They were obtained in separate, controlled tests—not in a completed five-citizen civilization run.
+
+| Capability | Documented result |
 | --- | --- |
-| TypeScript/pnpm workspace, five-citizen orchestrator, single-citizen CLI | A verified, independently deciding five-citizen society across a multi-day live run |
-| Paper/Mineflayer integration, bounded action and planning modules | Reliable end-to-end doors, own-home navigation, sleeping, mining, farming, and coordinated resource transfers |
-| SQLite records for citizens, settlement state, events, memories, and relationships | Citizen-selected households, permissions-aware personal storage, changing beliefs, and lasting social institutions |
-| Optional Ollama decision provider and local observer dashboard | Citizen-requested human construction, physical automation, market contracts, and multi-settlement economy |
+| Farming and food handling | A single bot planted, grew, harvested, and replanted a nine-cell wheat plot, collected eight wheat, and completed bread crafting, storage transfer, and eating. Crop growth was accelerated during this test; normal tick speed was restored afterward. |
+| Home navigation and storage | A single bot traveled to its assigned home, passed through an already-open door, used its designated bed and personal chest, and retained its home claim after reconnecting. Access to another home's chest was denied, and a missing bed produced an explicit failure. |
+| Natural-ore mining | A single bot observed and mined one naturally generated exposed coal ore, picked up the coal, and deposited it in an approved chest. The test used a provided wooden pickaxe; no ore or coal was artificially created for the result. |
 
-These are code-level capabilities and targets; they do **not** imply that every action succeeds in a real world. A successful unit test is not a live Minecraft acceptance test. Local experimental work described in the design plan may be ahead of the public branch.
+These tests demonstrate specific physical capabilities. They do **not** establish autonomous job selection, general cave exploration, reliable navigation across all terrain, or coordinated five-citizen survival.
 
-## Next milestone
+**Public repository note:** The latest local farming, home, mining, and fishing implementations are not all present in the current public branch. The table above reports local development results, not functionality guaranteed by a fresh clone of this repository.
 
-1. **Set up a reproducible starter world.** Record terrain, starting buildings/resources, server rules, and human interventions.
-2. **Validate one physical bot.** Test traversable doors, safe path recovery, known/unknown storage interactions, actual item pickup, eating, sleeping, and honest failure reporting.
-3. **Run five citizens together.** Observe at least three Minecraft days without repeated human rescue. Capture real inventory/world changes, conversations and recipients, decisions, failures, model latency, and server performance.
-4. **Document an actual social interaction.** A request, response, cooperation, disagreement, or verified resource transfer counts; invented dialogue does not.
-5. **Expand in controlled stages.** Only after the baseline works, test one citizen-requested building and one physically producing automated farm. A separate wilderness-from-zero experiment comes later.
+### In progress
 
-**Long-term research:** Individual households, contracts, trade, culture, institutions, migration, and multiple communities in the same world. The proposed ceiling is **100 persistent living citizens**, using selective physical simulation rather than 100 continuously running LLMs. This is an architectural target, **not current capacity**.
-
-## Run locally
-
-**Requirements:** Minecraft Java Edition **1.21.11**, Java **21**, Node.js **22+**, pnpm, and the matching Paper server jar. The Paper jar, author's world, local database, logs, and credentials are not included.
-
-1. Follow the [local Paper setup instructions](server/README.md), place the matching jar at `server/paper.jar`, copy the example server configuration, and accept the Minecraft EULA yourself.
-2. Copy `.env.example` to `.env` and review the settings.
-3. Run `pnpm install`.
-4. Start Paper with `server/start.bat`, then run `pnpm sim:start` in another terminal. The documented auto-start option is also available.
-5. Connect the Minecraft Java client to `127.0.0.1:25565`; open the observer at `http://127.0.0.1:3000`.
-
-Set up a compatible local Ollama model and enable `LLM_ENABLED=true` if you want optional model deliberation. The included deterministic/heuristic path can run without it.
-
-**Security:** The example server uses offline authentication for local bot testing. Keep the Minecraft server and dashboard **loopback-only**; do not port-forward or expose either to the internet.
-
-| Command | Purpose |
+| Area | Current development focus |
 | --- | --- |
-| `pnpm sim:start` | Run the local prototype and dashboard |
-| `pnpm atlas` | Run the single-citizen CLI |
-| `pnpm build` / `pnpm typecheck` | Compile / check TypeScript |
-| `pnpm lint` / `pnpm test` | Lint / run automated tests |
+| Navigation | Reliable one-block jumping, closed-door interaction, safe hazard avoidance, and recovery from blocked or unsafe routes. |
+| Daily routines | Time-aware return from work to a citizen's own home and bed. |
+| Resource skills | Integrating farming and mining with citizen decisions; live-testing fishing and related item handling. |
+| Multi-agent execution | Running separate physical bodies concurrently with distinct identities, possessions, and goals. |
+| Social behavior | Connecting individual intentions, memory, communication, and verified interactions without scripting the outcome. |
 
-### Codebase
+Fishing, several movement-recovery behaviors, and return-home routines have local implementations or unit tests but do not yet have complete live-test evidence. In particular, the documented one-block landing and lava-detour tests exposed failures that still require correction.
 
-- [`apps/orchestrator`](apps/orchestrator) — simulation loop, local dashboard server, single-citizen CLI.
-- [`apps/dashboard`](apps/dashboard) — local observer UI.
-- [`packages/agent-core`](packages/agent-core) — citizen records, SQLite, planning, and execution.
-- [`packages/minecraft-adapter`](packages/minecraft-adapter) and [`packages/skills`](packages/skills) — bot bodies, navigation, bounded Minecraft actions.
-- [`packages/cognition`](packages/cognition), [`packages/memory`](packages/memory), [`packages/society`](packages/society) — cognition, memory, and social modules.
+### Next milestone
 
-See [architecture](docs/ARCHITECTURE.md), [original MVP notes](docs/MVP.md), and [developer setup](docs/DEVELOPER.md). The updated **Option A** research direction above supersedes any older implied milestone order in those documents.
+The immediate objective is a reproducible **five-citizen survival and social experiment lasting at least three Minecraft days** without repeated human rescue.
 
-## Demo and research evidence
+Before that run, the project must establish safe physical execution, reliable return-home behavior, and concurrent interaction between distinct citizens.
 
-**Gameplay footage and an experiment log are still to be added.** Only real captures from the running Minecraft environment should be presented as evidence. Concept art and starter-village layouts are design illustrations—not screenshots of AI-built structures.
+The first experiment will record actual world and inventory changes, citizen communication, failures, intervention history, persistence, and performance. Successful social behavior must be observed—not manufactured for a demonstration.
 
-When documenting a run, distinguish citizen intention from completed action, human-installed infrastructure from AI work, and observed results from unverified model claims.
+## Technology
 
-## Credits
+| Technology | Purpose |
+| --- | --- |
+| TypeScript / Node.js | Agent orchestration, simulation logic, and skill integration |
+| Minecraft Java / Paper | Shared simulation environment |
+| Mineflayer | Physical Minecraft agent interface |
+| SQLite / better-sqlite3 | Persistent citizen and simulation state |
+| Ollama | Optional local high-level model inference |
+| Zod | Structured data validation |
+| HTTP / WebSockets | Local observer dashboard and live updates |
+| Vitest | Automated testing |
+| pnpm | Monorepo and dependency management |
 
-Independent research/portfolio project; not affiliated with Mojang or Microsoft. Built with or informed by [Paper](https://papermc.io/), [Mineflayer / PrismarineJS](https://github.com/PrismarineJS/mineflayer), [Ollama](https://ollama.com/), [Generative Agents](https://github.com/joonspk-research/generative_agents), and [Project Sid](https://arxiv.org/abs/2411.00114). External research findings are not presented as results of this simulation.
+The project follows a local-first development approach. Minecraft execution, persistence, and optional inference can run on the development machine without maintaining a separate graphical Minecraft client or model instance for every citizen.
+
+## Getting started
+
+The public repository contains the experimental simulation foundation. It does not include the author's local world, test fixtures, runtime database, Paper server JAR, or unmerged local development work.
+
+**Requirements:** Minecraft Java Edition 1.21.11, Java 21, Node.js 22+, pnpm, and a matching Paper server build. Ollama is optional.
+
+```bash
+git clone https://github.com/ManpreetS2/minecraft-ai-civilization.git
+cd minecraft-ai-civilization
+pnpm install
+```
+
+Follow the [Paper server setup guide](server/README.md) to configure the local server and accept the Minecraft EULA.
+
+Copy `.env.example` to `.env`, review the configuration, and start the Paper server. Then run:
+
+```bash
+pnpm sim:start
+```
+
+Connect to Minecraft at `127.0.0.1:25565` and open the observer dashboard at `http://127.0.0.1:3000`.
+
+The repository also provides a single-citizen developer CLI:
+
+```bash
+pnpm atlas
+```
+
+For development checks, use `pnpm build`, `pnpm typecheck`, `pnpm lint`, and `pnpm test`.
+
+**Security:** The example server uses offline authentication for local bot development. Keep the Minecraft server and observer dashboard restricted to your own machine. Do not expose this development configuration to the public internet.
+
+## Future development plan
+
+**The systems below are research and implementation goals, not features demonstrated by the current public repository.** Each stage depends on verifying the previous stage in the actual Minecraft world.
+
+| Stage | Planned milestone |
+| --- | --- |
+| **1 — First settlement** | Stabilize five independent citizens in the shared starter village; verify everyday survival skills, persistent identities, truthful communication, and a multi-day social baseline. |
+| **2 — Personal lives** | Let citizens choose their own homes and housemates, use their own beds and storage, remember significant events, form relationships, develop preferences, and change their goals through experience. |
+| **3 — Building and livelihoods** | Let citizens propose new homes, farms, and infrastructure. They may build physically or commission optional human-installed structures; ownership, cost, real materials, and the human's contribution are recorded separately. |
+| **4 — Economy and institutions** | Explore finite resource production, ownership, barter and negotiated prices, voluntary work contracts, and an authoritative ledger. Later, communities may form treasuries or their own decision-making institutions rather than receiving a predefined government or economy. |
+| **5 — Multiple settlements and history** | Allow citizens to migrate, trade, cooperate, disagree, and transmit stories, customs, and institutional history across distinct communities in the same world. |
+| **6 — Scaling** | Progress from a proven five-citizen run to 10–25, then 25–50, and eventually **up to 100 persistent living citizens**, with the number of simultaneously physical bots governed by measured performance. |
+
+### Long-term research direction
+
+**Citizen minds.** Each citizen should retain a distinct identity, selective memories, limited perceptions, evolving relationships, learned behavior, personal commitments, and its own interpretation of events. The LLM supports meaningful high-level choices; deterministic skills carry out physical actions. A citizen's memory should survive reconnection or replacement of the model serving an inference request.
+
+**A society that is not pre-scripted.** Occupations, household arrangements, cooperation, disagreements, social norms, markets, leadership, and cultural practices should develop from individual choices and shared experiences. The simulation should not assign a compulsory farmer, leader, religion, or institutional outcome to make the story appear more advanced.
+
+**A physical economy.** Buildings, farms, mining operations, item transfers, automation, and paid work must correspond to real Minecraft materials, items, or verified changes. The human may supply optional construction or automation as a recorded contractor, but human-installed infrastructure must never be presented as AI-built labor. Any future currency or contract system must prevent duplicated payments and imaginary resources.
+
+**Persistent history.** The long-term design includes adult households, migration, deaths, changing relationships, and history carried forward by surviving citizens and records. New citizens would arrive as adults; reproduction and childhood simulation are outside the planned scope. A confirmed citizen death would be distinct from a disconnect, with development-time death behavior configured and documented separately.
+
+**Scaling without 100 simultaneous LLMs.** The proposed ceiling is **100 living persistent citizens** across one shared world. The research plan is to keep identities and history persistent while eventually using a smaller set of fully physical Minecraft bodies for relevant nearby activity and lower-detail simulation where appropriate. Any simulated activity must be distinguished from actions physically performed in Minecraft. This is a scaling objective, **not current demonstrated capacity**.
+
+A separate wilderness-from-zero study may follow the controlled starter-village experiment. It will not be presented as equivalent to the first run, where the experimenter supplied initial shelter and resources.
+
+## Demo
+
+*Gameplay footage and a documented five-citizen experiment will be added after the current integration milestone.*
+
+Only real Minecraft captures and verified experiment results will be presented as demonstrations. Human-provided structures and resources will be identified separately from agent-executed work.
+
+## References and attribution
+
+This is an independent research and portfolio project, not affiliated with Mojang or Microsoft.
+
+The system uses or draws on the following technologies and research:
+
+- [Mineflayer / PrismarineJS](https://github.com/PrismarineJS/mineflayer) — Minecraft bot interfaces and supporting libraries.
+- [PaperMC](https://papermc.io/) — Minecraft server infrastructure.
+- [Ollama](https://ollama.com/) — Local model inference.
+- [Generative Agents](https://github.com/joonspk-research/generative_agents) — Memory, reflection, and planning research.
+- [Project Sid](https://arxiv.org/abs/2411.00114) — Research into large-scale agent-based social simulation.
+- [Mindcraft](https://github.com/mindcraft-bots/mindcraft) — Studied as a Minecraft agent implementation reference; not presented as the source of this project's farming or mining implementations.
+
+Referenced research findings are not claimed as results of this simulation.
