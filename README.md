@@ -8,7 +8,7 @@ Minecraft AI Civilization is an experimental, local-first multi-agent simulation
 
 > **Project status:** The public repository contains an **experimental five-citizen prototype** built around Paper, Mineflayer, TypeScript, SQLite, a deterministic planner, optional local Ollama cognition, and a local observer dashboard. **Option A is the current design direction, not a list of finished features.** Some mechanics and tests discussed in the project's design documents are being developed or evaluated locally and have not been verified in this public GitHub revision. A self-sustaining, multi-generation society has **not** been demonstrated.
 
-## 🌍 Option A: start with a world, not a civilization
+## 🌍 World: start with a world, not a civilization
 
 Instead of giving the agents a giant modpack, a preassigned city, or a scripted government, the first experiment uses **spacious, mostly vanilla survival terrain** and a small **human-provided starter settlement**. The human supplies a workable environment and optional infrastructure; the citizens decide what happens afterward.
 
