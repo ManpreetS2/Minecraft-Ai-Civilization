@@ -16,7 +16,7 @@ async function main(): Promise<void> {
   }
 
   const manager = new AgentManager(config);
-  const dashboard = await startDashboardServer(manager, "0.0.0.0", config.DASHBOARD_PORT);
+  const dashboard = await startDashboardServer(manager, config.DASHBOARD_HOST, config.DASHBOARD_PORT);
   await manager.start();
 
   console.log("");
