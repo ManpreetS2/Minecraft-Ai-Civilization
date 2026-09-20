@@ -6,6 +6,7 @@
 #
 # online-mode=false is required so Mineflayer bots can use offline usernames.
 # This is private/local only. Do not expose this server to the public internet.
+# Bind to loopback so offline-auth bots and world data are not available over the LAN.
 
 difficulty=easy
 enable-rcon=false
@@ -21,7 +22,7 @@ online-mode=false
 player-idle-timeout=0
 pvp=true
 query.port=25565
-server-ip=
+server-ip=127.0.0.1
 server-port=25565
 simulation-distance=10
 # Non-ops cannot place/break within this radius of world spawn.
