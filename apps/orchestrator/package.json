@@ -11,7 +11,13 @@
     "reset-dev": "tsx src/reset-dev.ts",
     "terrain": "tsx src/terrain-test.ts",
     "mechanics": "tsx src/live-mechanics-test.ts",
+    "mechanics:demo": "tsx src/live-mechanics-demo.ts",
     "mechanics:farm": "tsx src/live-farm-test.ts",
+    "mechanics:home": "tsx src/live-home-test.ts",
+    "mechanics:move": "tsx src/live-movement-test.ts",
+    "mechanics:mine": "tsx src/live-mine-test.ts",
+    "mechanics:fish": "tsx src/live-fish-test.ts",
+    "mechanics:two-probe": "tsx src/live-two-probe-test.ts",
     "rcon": "tsx src/rcon-once.ts",
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit"

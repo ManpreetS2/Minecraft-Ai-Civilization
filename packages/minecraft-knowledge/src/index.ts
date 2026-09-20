@@ -53,6 +53,7 @@ import {
   type InteractionType,
 } from "./classify.js";
 import { looksLikeItemName, normalizeBlockName, normalizeItemName } from "./names.js";
+import { getOreProfile, oreSearchHints, resolveOreResource } from "./ores.js";
 import { nightRisk, sleepFacts, type SleepFacts, type SleepQuery } from "./sleep.js";
 
 export class MinecraftKnowledge {
@@ -351,6 +352,19 @@ export class MinecraftKnowledge {
     }
     if (goal.includes("door") || goal.includes("shelter") || goal.includes("build")) {
       facts.push(...this.factsForObtain("oak_door", inv, tableNearby ? ["crafting_table"] : []));
+      facts.push("A usable nearby shelter should be used or improved before building another.");
+    }
+    if (query.nearbyStructures?.length) {
+      facts.push(`Known nearby structures: ${query.nearbyStructures.join(", ")}.`);
+    }
+    const oreGoal = resolveOreResource(goal) ?? (goal.startsWith("mine_") ? resolveOreResource(goal.slice(5)) : undefined);
+    if (oreGoal) {
+      facts.push(...oreSearchHints(oreGoal));
+      const profile = getOreProfile(oreGoal);
+      const bag = query.inventory ?? [];
+      if (profile && !bag.some((item) => item.name.includes("pickaxe") && this.canHarvest(profile.blocks[0] ?? "stone", item.name))) {
+        facts.push(`Need a ${profile.requiredPickaxeTier} pickaxe or better to harvest ${profile.displayName}.`);
+      }
     }
     if (goal.includes("night") || goal.includes("shelter")) {
       facts.push("Night increases hostile-mob risk; it does not force a single action.");
@@ -423,6 +437,25 @@ export { interpretVillageFeature, villageChestImpliesOwnership } from "./village
 export { normalizeItemName, normalizeBlockName, friendlyName } from "./names.js";
 export { sleepFacts } from "./sleep.js";
 export type { SleepFacts, SleepQuery } from "./sleep.js";
+export {
+  ORE_RESOURCES,
+  getOreProfile,
+  resolveOreResource,
+  oreBlocksFor,
+  oreDropsFor,
+  requiredPickaxeTier,
+  pickaxeMeetsTier,
+  pickaxeTierRank,
+  recommendedPickaxeItem,
+  isOreResource,
+  isYInOreRange,
+  isYInPreferredSearchBand,
+  biomeSupportsOre,
+  biomeBonusForOre,
+  oreSearchHints,
+  listOreProfiles,
+} from "./ores.js";
+export type { OreResource, OreProfile, PickaxeTier, OreSearchApproach, OreGenerationBatch } from "./ores.js";
 export type {
   CraftPlanStep,
   IngredientBag,
@@ -433,3 +466,48 @@ export type {
   TimePeriod,
   InteractionType,
 };
+export {
+  STRUCTURE_TYPES,
+  BUILD_STAGES,
+  MATERIAL_CATEGORIES,
+  BASIC_SHELTER_ID,
+  SMALL_HOUSE_ID,
+  listBlueprints,
+  getBlueprint,
+  defaultBlueprintFor,
+  starterBlueprints,
+  createLearnedBlueprint,
+  nextBlueprintVersion,
+  expandBlueprint,
+  resolveMaterials,
+  chooseMaterial,
+  concreteBlock,
+  blockMatchesPlan,
+  evaluateBlueprintSite,
+  validateExpandedStructure,
+  chooseExistingStructure,
+  rotateOffset,
+  rotatedFootprint,
+  worldPosition,
+  nextBuildStage,
+  migrateLegacyStage,
+  countMaterials,
+  blocksForStage,
+  isShelterType,
+  isReplaceableName,
+} from "./structures.js";
+export type {
+  StructureType,
+  BuildStage,
+  Cardinal,
+  MaterialCategory,
+  StructureBlueprint,
+  PlannedBlock,
+  ExpandedBlueprint,
+  ResolvedMaterials,
+  KnownStructureRecord,
+  SiteCheck,
+  StaticValidation,
+  StructureValidationCode,
+  StructureFeature,
+} from "./structures.js";

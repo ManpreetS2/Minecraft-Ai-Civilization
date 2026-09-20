@@ -13,6 +13,7 @@ export type RelevantQuery = {
   hasPickaxe?: boolean;
   hasCraftingTableNearby?: boolean;
   timeOfDay?: number;
+  nearbyStructures?: string[];
 };
 
 export function compactFacts(facts: string[], limit = 8): string[] {

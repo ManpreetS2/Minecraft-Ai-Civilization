@@ -16,6 +16,10 @@ const envSchema = z.object({
     .enum(["true", "false"])
     .default("false")
     .transform((v) => v === "true"),
+  SIM_ASSIGN_WORK_ROLES: z
+    .enum(["true", "false"])
+    .default("false")
+    .transform((v) => v === "true"),
   HUMAN_DIRECTIVES_ENABLED: z
     .enum(["true", "false"])
     .default("true")
@@ -69,6 +73,13 @@ export const RESERVED_MECHANICS_PROBE_NAMES = [
   "MindcraftProbe",
   "PhoenixProbe",
   "CollectblockProbe",
+  "FarmProbe",
+  "HomeProbe",
+  "HomeProbeB",
+  "MineProbe",
+  "MineProbeB",
+  "FishProbe",
+  "FishProbeB",
 ] as const;
 
 export function isMechanicsProbeUsername(name: string | undefined): boolean {

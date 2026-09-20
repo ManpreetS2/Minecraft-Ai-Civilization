@@ -8,7 +8,27 @@ import { countItem } from "./inventory-service.js";
 import { lookAtPosition } from "./look.js";
 
 const FURNACES = ["furnace", "smoker", "blast_furnace"];
-const FUELS = ["coal", "charcoal", "oak_planks", "spruce_planks", "birch_planks", "stick"];
+const FUELS = ["lava_bucket", "coal_block", "blaze_rod", "coal", "charcoal", "dried_kelp_block", "oak_planks", "spruce_planks", "birch_planks", "stick"];
+
+/** Vanilla smelts completed by one unit of fuel. Game table, not a copied routine. */
+export function smeltsPerFuelUnit(name: string): number {
+  if (name === "lava_bucket") return 100;
+  if (name === "coal_block") return 80;
+  if (name === "dried_kelp_block") return 20;
+  if (name === "blaze_rod") return 12;
+  if (name === "coal" || name === "charcoal") return 8;
+  if (name === "stick") return 0.5;
+  if (name.endsWith("_log") || name.endsWith("_wood") || name.endsWith("_stem") || name.endsWith("_hyphae") || name.endsWith("_planks")) {
+    return 1.5;
+  }
+  return 0;
+}
+
+export function fuelUnitsNeeded(fuelName: string, smeltCount: number): number {
+  const per = smeltsPerFuelUnit(fuelName);
+  if (per <= 0) return Number.POSITIVE_INFINITY;
+  return Math.max(1, Math.ceil(smeltCount / per));
+}
 
 type FurnaceWindow = {
   fuelItem: () => { name: string; count: number; type: number } | null;
@@ -17,6 +37,8 @@ type FurnaceWindow = {
   putInput: (type: number, metadata: number | null, count: number) => Promise<unknown>;
   putFuel: (type: number, metadata: number | null, count: number) => Promise<unknown>;
   takeOutput: () => Promise<unknown>;
+  takeInput?: () => Promise<unknown>;
+  takeFuel?: () => Promise<unknown>;
   close: () => void;
 };
 
@@ -75,7 +97,8 @@ export async function smeltItem(
     furnace = (await ctx.bot.openFurnace(block)) as unknown as FurnaceWindow;
     await furnace.putInput(inType, null, count);
     if (!furnace.fuelItem()) {
-      await furnace.putFuel(fuelType, null, Math.min(count, countItem(ctx, fuel)));
+      const units = Math.min(countItem(ctx, fuel), fuelUnitsNeeded(fuel, count));
+      await furnace.putFuel(fuelType, null, units);
     }
     const deadline = Date.now() + Math.min(ctx.timeoutMs ?? 30_000, 25_000);
     while (Date.now() < deadline) {
@@ -89,6 +112,8 @@ export async function smeltItem(
       return fail("SMELT_FAILED", `${inName} did not produce ${outName} in time`, Date.now() - started, true);
     }
     await furnace.takeOutput();
+    if (furnace.inputItem() && furnace.takeInput) await furnace.takeInput();
+    if (furnace.fuelItem() && furnace.takeFuel) await furnace.takeFuel();
     furnace.close();
   } catch (error) {
     try {

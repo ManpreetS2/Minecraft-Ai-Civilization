@@ -78,6 +78,36 @@ export function translateError(error?: string, task?: unknown): TranslatedError 
   if (/CROP_IMMATURE/i.test(text)) {
     return { subtext: "That crop is not mature yet." };
   }
+  if (/UNSAFE_EXCAVATION/i.test(text)) {
+    return { subtext: "That dig was refused as unsafe." };
+  }
+  if (/SEARCH_EXHAUSTED/i.test(text)) {
+    return { subtext: "No visible ore was found in the allowed search." };
+  }
+  if (/CLAIM_CONFLICT/i.test(text)) {
+    return { subtext: "That bed or personal chest is already claimed." };
+  }
+  if (/ACCESS_DENIED/i.test(text)) {
+    return { subtext: "That storage belongs to someone else." };
+  }
+  if (/HOME_MISSING/i.test(text)) {
+    return { subtext: "This citizen has not claimed a home." };
+  }
+  if (/HOME_INACCESSIBLE/i.test(text)) {
+    return { subtext: "The claimed home is blocked or missing. Ownership was not reassigned." };
+  }
+  if (/SITE_UNSUITABLE/i.test(text)) {
+    return { subtext: "That build site is not suitable; another location should be chosen." };
+  }
+  if (/ENTRANCE_BLOCKED|INTERIOR_UNREACHABLE|ROOF_INCOMPLETE|WORKSTATION_UNREACHABLE|STRUCTURE_INCOMPLETE/i.test(text)) {
+    return { subtext: "The structure is present but not yet usable." };
+  }
+  if (/TARGET_DEAD/i.test(text)) {
+    return { subtext: "The target died or was destroyed. That is not merely out of range." };
+  }
+  if (/ENTITY_REMOVED/i.test(text)) {
+    return { subtext: "The target despawned or was removed. That is not merely out of range." };
+  }
   if (/PATH_BLOCKED|no path/i.test(text)) {
     return { subtext: "Couldn't find a safe path there." };
   }

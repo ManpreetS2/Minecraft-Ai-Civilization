@@ -5,6 +5,31 @@ export { mineBlock, collectItem, classifyStaleTarget } from "./gather.js";
 export { collectResource } from "./collect.js";
 export { obtainItem, recipeFor, missingPrerequisites, prerequisiteChain } from "./obtain.js";
 export {
+  mineKnownOre,
+  evaluateMiningRequest,
+  evaluateExcavation,
+  classifyOreTarget,
+  assertPermittedStorage,
+  clampMiningBounds,
+  isOreExposed,
+  hasLineOfSight,
+  isWithinMiningBounds,
+  MINING_RADIUS_CAP,
+  MINING_ACTION_CAP,
+  type MiningRequest,
+  type MiningDecision,
+  type OreSighting,
+} from "./mine.js";
+export {
+  planOreSearch,
+  proposeBoundedTunnel,
+  refuseUncontrolledStripMine,
+  searchWaypointAtBand,
+  TUNNEL_LENGTH_CAP,
+  type OreSearchPlan,
+  type TunnelProposal,
+} from "./ore-search.js";
+export {
   craftItem,
   eatFood,
   equipItem,
@@ -68,7 +93,21 @@ export {
   type FarmInspection,
   type FarmWorkRequest,
 } from "./farm.js";
-export { smeltItem, preferredFuel } from "./furnace.js";
+export {
+  fishAtShore,
+  evaluateFishingRequest,
+  findShoreCasts,
+  clampFishingBounds,
+  fishingCatchCount,
+  snapshotCatchCounts,
+  fishingHomeStop,
+  FISHING_RADIUS_CAP,
+  FISHING_CAST_CAP,
+  type FishingRequest,
+  type FishingDecision,
+  type ShoreCast,
+} from "./fish.js";
+export { smeltItem, preferredFuel, smeltsPerFuelUnit, fuelUnitsNeeded } from "./furnace.js";
 export { tradeWithVillager } from "./trade.js";
 export {
   executeStructure,
@@ -78,6 +117,20 @@ export {
   classifyStructureBlock,
   type StructurePlan,
 } from "./structure.js";
+export {
+  createBuildSession,
+  advanceBlueprintBuild,
+  resumeBlueprintBuild,
+  validateBuiltStructure,
+  selectBlueprintSite,
+  decideStructureAction,
+  scanRecognizedStructures,
+  knownFromSession,
+  revalidateSession,
+  type BuildSession,
+  type BuildAdvance,
+} from "./blueprint-build.js";
+export type { KnownStructureRecord } from "@civ/minecraft-knowledge";
 export {
   unequip,
   dropStack,
