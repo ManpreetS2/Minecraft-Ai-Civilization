@@ -38,7 +38,7 @@ Op yourself from the Paper console if needed:
 op <your-username>
 ```
 
-Known human username from this world's usercache: `Shadowskiii1`.
+Use your own Minecraft Java username. Do not commit real usercache records, player identifiers, or world/player data.
 
 ## Atlas CLI
 
