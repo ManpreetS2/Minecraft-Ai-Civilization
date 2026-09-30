@@ -166,3 +166,18 @@ See also `docs/CLOUD_TO_MAIN_TRANSPLANT.md`.
 - Water state machine session tests
 - Action-trace invariants (redaction, correlation, no tick spam)
 - Launcher guard matrix (world-lab DB / localhost / count 0)
+
+---
+
+## Cloud Pass 3 — Brain / memory / decision quality
+
+**UNIT PASS** / **IMPLEMENTED / LIVE UNVERIFIED** — no Minecraft, no LIVE claims.
+
+- Cognition input contract with token/size guards
+- Structured WHAT/WHY decision schema (rejects movement instructions)
+- Citizen-specific memory retrieval + learned-behavior evidence model
+- Asymmetric relationship beliefs + commitments (verified-complete only)
+- Decision cooldowns, speech `requiresResponse`, cost routing categories
+- Mood kept separate from world facts / beliefs
+- `CitizenBrain` facade + multi-citizen synthetic scenarios A–H
+- **Not wired into AgentManager** on this branch (transplant risk: main-PC cognition may differ)

@@ -194,3 +194,40 @@ Outstanding after transplant:
 5. **E.** Real runtime curfew → own-home sleep
 6. **F.** Guarded one-citizen WORLD-LAB session
 7. **G.** Optional NVIDIA endpoint smoke test
+8. **H.** Wire `CitizenBrain` into main-PC manager tick (manual) — do not assume identical cognition branch
+
+---
+
+## H. Cloud Pass 3 — Brain / memory / decision quality
+
+| Field | Detail |
+| --- | --- |
+| **FEATURE** | Cognition input contract, structured WHAT/WHY decisions, memory retrieval, learned behavior, asymmetric relationships, commitments, cooldowns, speech gating, cost routing, mood separation, cognition tracing, multi-citizen scenarios |
+| **NEW FILES (SAFE_TO_CHERRY_PICK if absent)** | `packages/shared/src/brain-types.ts`; `packages/cognition/src/{input,decision-schema,commitments,cooldown,routing,psychology,cognition-trace,brain}.ts` + `brain.test.ts`; `packages/memory/src/{retrieve,learned-behavior}.ts`; `packages/society/src/relationship-belief.ts` (+ test) |
+| **EXISTING FILES MODIFIED (REQUIRES_MANUAL_TRANSPLANT)** | `packages/cognition/src/index.ts`, `packages/cognition/package.json`; `packages/memory/src/index.ts`; `packages/society/src/index.ts`; `packages/shared/src/{index,events}.ts` |
+| **DB SCHEMA CHANGES** | None (in-memory / injectable; main-PC must persist commitments/beliefs if desired) |
+| **RUNTIME BEHAVIOR CHANGES** | **Not wired into AgentManager tick on this branch** — facade + unit scenarios only. Physical skills / planner HOW path unchanged. |
+| **EXPECTED MERGE CONFLICT AREAS** | **HIGH** for cognition `index.ts`, memory `index.ts`, society speech director, any main-PC psychology/memory systems |
+
+### Pass 3 SAFE_TO_CHERRY_PICK_DIRECTLY
+
+- `packages/shared/src/brain-types.ts`
+- `packages/cognition/src/input.ts`
+- `packages/cognition/src/decision-schema.ts`
+- `packages/cognition/src/commitments.ts`
+- `packages/cognition/src/cooldown.ts`
+- `packages/cognition/src/routing.ts`
+- `packages/cognition/src/psychology.ts`
+- `packages/cognition/src/cognition-trace.ts`
+- `packages/cognition/src/brain.ts` (+ `brain.test.ts`)
+- `packages/memory/src/retrieve.ts`
+- `packages/memory/src/learned-behavior.ts`
+- `packages/society/src/relationship-belief.ts` (+ test)
+
+### Pass 3 REQUIRES_MANUAL_TRANSPLANT
+
+- `packages/cognition/src/index.ts` / `package.json` (new deps `@civ/memory`, `@civ/society`)
+- `packages/memory/src/index.ts` (export surface)
+- `packages/society/src/index.ts` (requiresResponse + belief exports)
+- `packages/shared/src/index.ts` / `events.ts`
+- Any main-PC `manager.ts` / cognition v2 wiring
