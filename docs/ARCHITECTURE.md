@@ -43,6 +43,27 @@ Decision-making in three layers:
 
 The LLM must never steer movement every tick.
 
+LLM calls go through a provider-neutral path:
+
+```text
+Citizen cognition → ModelRouter → ProviderAdapter
+  (Ollama | Gemini | NVIDIA NIM / OpenAI-compatible | heuristic)
+```
+
+Planner, memory, and social code must not import provider-specific clients. Fallback, timeout, abort, and rate-limit handling live in `ModelRouter`.
+
+### Property safety
+
+A citizen seeing a block or chest does **not** grant access. `PropertyRegistry` / permission checks gate container access, claimed beds, protected home blocks, fixture chests, and unauthorized door destruction independently of planner intent.
+
+### Action tracing
+
+Preferred non-tick span sequence:
+
+```text
+DECISION → PLAN → SKILL_START → SKILL_RESULT → WORLD_VERIFICATION → MEMORY/EVENT UPDATE
+```
+
 ## Scaling (architected, not implemented at population scale)
 
 Persistent citizen count is independent of:
