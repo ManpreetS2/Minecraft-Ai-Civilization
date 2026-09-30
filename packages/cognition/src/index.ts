@@ -1,7 +1,9 @@
 import type { AppConfig } from "@civ/shared";
 import { resolveLlmModel } from "@civ/shared";
+import { GeminiProvider } from "./gemini.js";
 import { HeuristicProvider } from "./heuristic.js";
 import { OllamaProvider } from "./ollama.js";
+import { OpenAiCompatibleProvider } from "./openai-compatible.js";
 import type { ProviderAdapter } from "./provider.js";
 import { ModelRouter } from "./router.js";
 import type { CognitionProvider } from "./schema.js";
@@ -16,6 +18,26 @@ export function createProviderAdapter(
     case "ollama":
     case "llamacpp":
       return new OllamaProvider(config.OLLAMA_HOST, model);
+    case "nvidia":
+      return new OpenAiCompatibleProvider({
+        name: "nvidia",
+        baseUrl: config.NVIDIA_BASE_URL,
+        apiKey: config.NVIDIA_API_KEY,
+        model,
+      });
+    case "openai_compatible":
+      return new OpenAiCompatibleProvider({
+        name: "openai_compatible",
+        baseUrl: config.OPENAI_COMPAT_BASE_URL ?? "http://127.0.0.1:8000/v1",
+        apiKey: config.OPENAI_COMPAT_API_KEY,
+        model,
+      });
+    case "gemini":
+      return new GeminiProvider({
+        apiKey: config.GEMINI_API_KEY,
+        model,
+        baseUrl: config.GEMINI_BASE_URL,
+      });
     case "heuristic":
     case "none":
     default:
@@ -29,6 +51,12 @@ function resolveModelFor(
 ): string {
   if (config.LLM_MODEL?.trim()) return config.LLM_MODEL.trim();
   switch (provider) {
+    case "nvidia":
+      return config.NVIDIA_MODEL;
+    case "gemini":
+      return config.GEMINI_MODEL;
+    case "openai_compatible":
+      return config.OPENAI_COMPAT_MODEL ?? "unknown";
     case "heuristic":
     case "none":
       return "heuristic";
@@ -66,7 +94,9 @@ export function createCognition(config: AppConfig): CognitionProvider {
 
 export { HeuristicProvider } from "./heuristic.js";
 export { OllamaProvider } from "./ollama.js";
-export { ModelRouter, resolveFallback } from "./router.js";
+export { OpenAiCompatibleProvider } from "./openai-compatible.js";
+export { GeminiProvider } from "./gemini.js";
+export { ModelRouter } from "./router.js";
 export { LlmProviderError, isLlmProviderError } from "./errors.js";
 export type {
   ProviderAdapter,
@@ -77,6 +107,7 @@ export type {
   ModelRouterOptions,
 } from "./provider.js";
 export { normalizeProviderResult, redactSecrets } from "./provider.js";
+export { resolveFallback } from "./router.js";
 export {
   DecisionSchema,
   extractJson,
