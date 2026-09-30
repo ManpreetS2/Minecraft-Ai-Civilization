@@ -18,19 +18,17 @@ export function createMemory(
   };
 }
 
-export function retrieveRelevant(
-  memories: MemoryRecord[],
-  query: string,
-  limit = 5,
-): MemoryRecord[] {
-  const terms = query.toLowerCase().split(/\W+/).filter(Boolean);
-  return [...memories]
-    .map((memory) => {
-      const hay = memory.content.toLowerCase();
-      const hits = terms.reduce((sum, term) => sum + (hay.includes(term) ? 1 : 0), 0);
-      return { memory, score: hits + memory.importance };
-    })
-    .sort((a, b) => b.score - a.score)
-    .slice(0, limit)
-    .map((entry) => entry.memory);
-}
+export {
+  retrieveRelevant,
+  retrieveRelevantMemories,
+  scoreMemories,
+  type MemoryQuery,
+  type ScoredMemory,
+} from "./retrieve.js";
+
+export {
+  summarizeLearnedBehavior,
+  applyContradictoryEvidence,
+  type BehaviorEvidence,
+  type LearnedBehaviorOptions,
+} from "./learned-behavior.js";
