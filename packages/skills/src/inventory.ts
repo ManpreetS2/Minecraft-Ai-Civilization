@@ -2,6 +2,7 @@ import { fail, ok, type ActionResult, FOOD_ITEM_NAMES } from "@civ/shared";
 import type { SkillContext } from "./context.js";
 import { moveTo } from "./movement.js";
 import { findBlock } from "./observe.js";
+import { checkPropertyPermission, permissionFailure } from "./property.js";
 
 function countItem(ctx: SkillContext, name: string): number {
   return ctx.bot.inventory
@@ -101,6 +102,18 @@ export async function depositItems(
   const found = await findBlock(ctx, ["chest", "barrel", "trapped_chest"], 16);
   if (!found.success) {
     return fail("CONTAINER_NOT_FOUND", "No chest/barrel nearby", Date.now() - started, true);
+  }
+  if (ctx.propertyRegistry && ctx.citizenId) {
+    const permission = checkPropertyPermission(ctx.propertyRegistry, {
+      citizenId: ctx.citizenId,
+      action: "access_container",
+      target: found.data.position,
+      blockName: found.data.name,
+      allowCommunalStorage: true,
+    });
+    if (!permission.allowed) {
+      return permissionFailure(permission, Date.now() - started);
+    }
   }
   const move = await moveTo(ctx, found.data.position, 3);
   if (!move.success) return move;
