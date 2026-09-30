@@ -29,6 +29,20 @@ describe("config", () => {
     expect(cfg.MINECRAFT_VERSION).toBe("1.21.11");
     expect(cfg.MINECRAFT_AUTH_MODE).toBe("offline");
     expect(cfg.LLM_ENABLED).toBe(false);
+    expect(cfg.SIM_ASSIGN_WORK_ROLES).toBe(false);
+    expect(cfg.NVIDIA_BASE_URL).toBe("https://integrate.api.nvidia.com/v1");
+  });
+
+  it("accepts nvidia provider + fallback model knobs without requiring keys", () => {
+    const cfg = loadConfig({
+      LLM_PROVIDER: "nvidia",
+      LLM_MODEL: "meta/llama-3.1-8b-instruct",
+      LLM_FALLBACK_PROVIDER: "ollama",
+      LLM_FALLBACK_MODEL: "qwen3.5:4b",
+      NVIDIA_API_KEY: "",
+    });
+    expect(cfg.LLM_PROVIDER).toBe("nvidia");
+    expect(cfg.LLM_FALLBACK_PROVIDER).toBe("ollama");
   });
 });
 

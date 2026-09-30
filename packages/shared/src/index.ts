@@ -1,4 +1,5 @@
 export * from "./action-result.js";
+export * from "./action-trace.js";
 export * from "./async.js";
 export * from "./config.js";
 export * from "./events.js";
