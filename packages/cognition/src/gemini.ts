@@ -1,27 +1,33 @@
 import { LlmProviderError } from "./errors.js";
+import { formatPrompt } from "./ollama.js";
 import {
   normalizeProviderResult,
   type NormalizedCognitionResult,
   type ProviderAdapter,
   type ProviderChatRequest,
 } from "./provider.js";
-import type { CognitionPrompt, CognitionProvider, HighLevelDecision } from "./schema.js";
 import { extractJson, validateDecision } from "./schema.js";
 
-export class OllamaProvider implements CognitionProvider, ProviderAdapter {
-  readonly name = "ollama";
+export type GeminiConfig = {
+  apiKey?: string;
+  model: string;
+  baseUrl?: string;
+};
+
+/**
+ * Google Gemini generateContent adapter.
+ * Kept behind ProviderAdapter so planner code never imports Gemini specifics.
+ */
+export class GeminiProvider implements ProviderAdapter {
+  readonly name = "gemini";
   readonly model: string;
+  private readonly apiKey?: string;
+  private readonly baseUrl: string;
 
-  constructor(
-    private readonly host: string,
-    model: string,
-  ) {
-    this.model = model;
-  }
-
-  async decide(prompt: CognitionPrompt, timeoutMs = 45_000): Promise<HighLevelDecision> {
-    const result = await this.complete({ prompt, timeoutMs });
-    return result.decision;
+  constructor(config: GeminiConfig) {
+    this.apiKey = config.apiKey;
+    this.model = config.model;
+    this.baseUrl = (config.baseUrl ?? "https://generativelanguage.googleapis.com/v1beta").replace(/\/$/, "");
   }
 
   async complete(request: ProviderChatRequest): Promise<NormalizedCognitionResult> {
@@ -33,27 +39,40 @@ export class OllamaProvider implements CognitionProvider, ProviderAdapter {
     const timer = setTimeout(() => controller.abort(), timeoutMs);
 
     try {
-      const response = await fetch(`${this.host.replace(/\/$/, "")}/api/chat`, {
+      if (!this.apiKey) {
+        throw new LlmProviderError({
+          kind: "config",
+          message: "gemini missing GEMINI_API_KEY configuration",
+          provider: this.name,
+          model: this.model,
+          retryable: false,
+          latencyMs: Date.now() - started,
+        });
+      }
+
+      const url = `${this.baseUrl}/models/${encodeURIComponent(this.model)}:generateContent?key=${encodeURIComponent(this.apiKey)}`;
+      const response = await fetch(url, {
         method: "POST",
         headers: { "content-type": "application/json" },
         signal: controller.signal,
         body: JSON.stringify({
-          model: this.model,
-          stream: false,
-          format: "json",
-          think: false,
-          options: { temperature: 0.2, num_predict: 96 },
-          messages: [
-            {
-              role: "system",
-              content:
-                'You are a high-level advisor for one Minecraft citizen. Reply with JSON only: {"goal","priority","reason"}. Do not include hidden chain-of-thought. Reason must be one short sentence.',
-            },
+          contents: [
             {
               role: "user",
-              content: formatPrompt(request.prompt),
+              parts: [
+                {
+                  text:
+                    'You are a high-level advisor for one Minecraft citizen. Reply with JSON only: {"goal","priority","reason"}.\n\n' +
+                    formatPrompt(request.prompt),
+                },
+              ],
             },
           ],
+          generationConfig: {
+            temperature: 0.2,
+            maxOutputTokens: 128,
+            responseMimeType: "application/json",
+          },
         }),
       });
 
@@ -61,7 +80,7 @@ export class OllamaProvider implements CognitionProvider, ProviderAdapter {
       if (response.status === 429) {
         throw new LlmProviderError({
           kind: "rate_limited",
-          message: "ollama rate limited",
+          message: "gemini rate limited",
           provider: this.name,
           model: this.model,
           status: 429,
@@ -70,8 +89,8 @@ export class OllamaProvider implements CognitionProvider, ProviderAdapter {
       }
       if (!response.ok) {
         throw new LlmProviderError({
-          kind: "provider_error",
-          message: `Ollama HTTP ${response.status}`,
+          kind: response.status === 401 || response.status === 403 ? "auth" : "provider_error",
+          message: `gemini HTTP ${response.status}`,
           provider: this.name,
           model: this.model,
           status: response.status,
@@ -81,18 +100,21 @@ export class OllamaProvider implements CognitionProvider, ProviderAdapter {
       }
 
       const body = (await response.json()) as {
-        message?: { content?: string };
-        prompt_eval_count?: number;
-        eval_count?: number;
+        candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+        usageMetadata?: {
+          promptTokenCount?: number;
+          candidatesTokenCount?: number;
+          totalTokenCount?: number;
+        };
       };
-      const content = body.message?.content ?? "";
+      const content = body.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
       let decision;
       try {
         decision = validateDecision(extractJson(content));
       } catch (error) {
         throw new LlmProviderError({
           kind: "invalid_output",
-          message: error instanceof Error ? error.message : "Invalid ollama JSON",
+          message: error instanceof Error ? error.message : "Invalid gemini JSON",
           provider: this.name,
           model: this.model,
           latencyMs,
@@ -107,12 +129,9 @@ export class OllamaProvider implements CognitionProvider, ProviderAdapter {
         provider: this.name,
         model: this.model,
         latencyMs,
-        promptTokens: body.prompt_eval_count,
-        completionTokens: body.eval_count,
-        totalTokens:
-          body.prompt_eval_count !== undefined && body.eval_count !== undefined
-            ? body.prompt_eval_count + body.eval_count
-            : undefined,
+        promptTokens: body.usageMetadata?.promptTokenCount,
+        completionTokens: body.usageMetadata?.candidatesTokenCount,
+        totalTokens: body.usageMetadata?.totalTokenCount,
       });
     } catch (error) {
       if (error instanceof LlmProviderError) throw error;
@@ -141,17 +160,4 @@ export class OllamaProvider implements CognitionProvider, ProviderAdapter {
       request.signal?.removeEventListener("abort", onAbort);
     }
   }
-}
-
-export function formatPrompt(prompt: CognitionPrompt): string {
-  return [
-    `Citizen: ${prompt.citizenName}`,
-    `Health: ${prompt.health ?? "unknown"} Hunger: ${prompt.hunger ?? "unknown"}`,
-    `Occupation: ${prompt.occupation ?? "unassigned"}`,
-    `Inventory: ${prompt.inventory.slice(0, 12).join(", ") || "empty"}`,
-    `Settlement needs: ${prompt.settlementNeeds.join(", ") || "none"}`,
-    `Nearby citizens: ${prompt.nearbyCitizens.join(", ") || "none"}`,
-    `Relevant memories: ${prompt.memories.slice(0, 5).join(" | ") || "none"}`,
-    "Choose the single most useful high-level goal.",
-  ].join("\n");
 }
