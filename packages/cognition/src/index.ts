@@ -118,4 +118,42 @@ export {
   type CognitionProvider,
   type HighLevelDecision,
 } from "./schema.js";
+export {
+  StructuredDecisionSchema,
+  validateStructuredDecision,
+  tryValidateStructuredDecision,
+  parseStructuredDecisionFromText,
+  toLegacyDecision,
+  looksLikeMovementInstruction,
+  PRIMARY_GOALS,
+  type StructuredDecision,
+  type PrimaryGoal,
+} from "./decision-schema.js";
+export {
+  buildCognitionInput,
+  cognitionInputToPromptLines,
+  stableSerialize,
+  COGNITION_INPUT_MAX_CHARS,
+  COGNITION_INPUT_MAX_MEMORIES,
+  type CognitionInput,
+  type BuildCognitionInputArgs,
+} from "./input.js";
+export {
+  createCommitment,
+  completeCommitment,
+  updateCommitmentStatus,
+  expireCommitments,
+  activeCommitmentsFor,
+} from "./commitments.js";
+export { shouldReconsiderDecision, type CooldownState, type CooldownDecision } from "./cooldown.js";
+export {
+  classifyDecisionCategory,
+  emptyUsageStats,
+  recordUsage,
+  type RoutingContext,
+  type CognitionUsageStats,
+} from "./routing.js";
+export { updateMood, separateWorldBeliefEmotion, type MoodEvent } from "./psychology.js";
+export { CitizenBrain, type BrainObserveArgs, type BrainDecisionResult } from "./brain.js";
+export { formatCognitionTrace, assertNoSecretsInTrace, type CognitionTrace } from "./cognition-trace.js";
 export { resolveLlmModel };

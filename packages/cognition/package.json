@@ -13,7 +13,9 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@civ/memory": "workspace:*",
     "@civ/shared": "workspace:*",
+    "@civ/society": "workspace:*",
     "zod": "^3.25.76"
   }
 }
