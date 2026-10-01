@@ -7,6 +7,7 @@ import type {
   LearnedDimension,
   RelationshipBelief,
 } from "@civ/shared";
+import { parseCommitmentPayload } from "@civ/shared";
 import {
   completeCommitment,
   createCommitment,
@@ -15,6 +16,18 @@ import {
 } from "@civ/cognition";
 import { summarizeLearnedBehavior, type BehaviorEvidence } from "@civ/memory";
 import { applyBeliefEvent, blankBelief, type BeliefEvent } from "@civ/society";
+import {
+  matchItemTransferCommitment,
+  progressFromLedger,
+  type CommitmentProgressView,
+} from "./commitment-predicate.js";
+import {
+  beliefEffectKey,
+  learnedEvidenceId,
+  memoryIdForTransfer,
+  progressLedgerId,
+  type BeliefEffectRole,
+} from "./event-provenance.js";
 import type { CivilizationStore } from "./store.js";
 
 export type BrainEffectKind =
@@ -25,6 +38,14 @@ export type BrainEffectKind =
   | "cognition_state"
   | "composite";
 
+export type PendingReconsiderSignal =
+  | "REQUEST_PENDING"
+  | "COMMITMENT_CONFLICT"
+  | "TASK_FAILURE"
+  | "GOAL_INVALIDATED"
+  | "SURVIVAL_CHANGED"
+  | "MAJOR_RELATIONSHIP";
+
 export type VerifiedTransferBrainEvent = {
   eventId: string;
   type: "ItemTransferred";
@@ -34,7 +55,14 @@ export type VerifiedTransferBrainEvent = {
   /** Citizen who received the item. */
   receiverCitizenId: string;
   item: string;
-  /** Commitment owned by giver that this transfer may complete. */
+  /** Verified positive integer quantity — never inferred from narration. */
+  quantity: number;
+  /**
+   * Optional candidate commitment ids. Predicates still decide match/progress.
+   * Passing an id never forces COMPLETE.
+   */
+  candidateCommitmentIds?: string[];
+  /** @deprecated Use candidateCommitmentIds — kept for Pass-4 call sites; still predicate-gated. */
   completesCommitmentId?: string;
   /** Optional learned-behavior dimensions for giver. */
   learned?: Array<{
@@ -53,7 +81,7 @@ export type VerifiedTransferBrainEvent = {
  * Minecraft inventory + SQLite are NOT one atomic transaction.
  */
 export class BrainPersistence {
-  constructor(private readonly store: CivilizationStore) {}
+  constructor(readonly store: CivilizationStore) {}
 
   withTransaction<T>(fn: () => T): T {
     return this.store.db.transaction(fn)();
@@ -264,28 +292,34 @@ export class BrainPersistence {
   }
 
   /**
-   * Apply directional belief event idempotently by eventId+observer+subject.
-   * Returns previous belief unchanged if duplicate.
+   * Apply directional belief event idempotently.
+   * `sourceEventId` is the verified Minecraft event; `effectRole` distinguishes
+   * multiple directional effects from the same source without inventing MC events.
    */
   applyBeliefEventPersistent(
-    eventId: string,
+    sourceEventId: string,
     event: BeliefEvent,
+    effectRole: BeliefEffectRole = "direct",
   ): { belief: RelationshipBelief; applied: boolean } {
+    const effectKey = beliefEffectKey(sourceEventId, effectRole);
     const inserted = this.store.db
       .prepare(
         `INSERT OR IGNORE INTO relationship_belief_evidence (
-          id, event_id, observer_citizen_id, subject_citizen_id, kind, first_person, detail, observed_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          id, event_id, observer_citizen_id, subject_citizen_id, kind, first_person, detail, observed_at,
+          source_event_id, effect_role
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
-        crypto.randomUUID(),
-        eventId,
+        effectKey,
+        effectKey,
         event.observerId,
         event.subjectId,
         event.kind,
         event.firstPerson ? 1 : 0,
         event.detail ?? null,
         event.at ?? new Date().toISOString(),
+        sourceEventId,
+        effectRole,
       );
     if (inserted.changes === 0) {
       const existing =
@@ -299,6 +333,177 @@ export class BrainPersistence {
     const next = applyBeliefEvent(base, event);
     this.saveRelationshipBelief(next);
     return { belief: next, applied: true };
+  }
+
+  // --- Commitment progress (reconstructable from verified event ledger) ---
+
+  listCommitmentProgressEvents(commitmentId: string): Array<{
+    sourceEventId: string;
+    quantity: number;
+    item: string;
+    appliedAt: string;
+  }> {
+    const rows = this.store.db
+      .prepare(
+        `SELECT source_event_id, quantity, item, applied_at
+         FROM commitment_progress_events
+         WHERE commitment_id = ?
+         ORDER BY applied_at ASC, source_event_id ASC`,
+      )
+      .all(commitmentId) as Array<{
+      source_event_id: string;
+      quantity: number;
+      item: string;
+      applied_at: string;
+    }>;
+    return rows.map((r) => ({
+      sourceEventId: r.source_event_id,
+      quantity: r.quantity,
+      item: r.item,
+      appliedAt: r.applied_at,
+    }));
+  }
+
+  getCommitmentProgress(commitmentId: string): CommitmentProgressView | undefined {
+    const commitment = this.getCommitment(commitmentId);
+    if (!commitment) return undefined;
+    const parsed = parseCommitmentPayload(commitment.payload);
+    const required =
+      parsed.ok && parsed.target.type === "item_transfer" ? parsed.target.quantity : 0;
+    const rows = this.listCommitmentProgressEvents(commitmentId);
+    return progressFromLedger(
+      commitmentId,
+      required,
+      rows.map((r) => ({ sourceEventId: r.sourceEventId, quantity: r.quantity })),
+    );
+  }
+
+  /**
+   * Credit verified transfer quantity toward matching commitments.
+   * Idempotent per (commitmentId, sourceEventId). Completes only when ledger sum >= required.
+   */
+  applyTransferToCommitments(transfer: {
+    eventId: string;
+    giverCitizenId: string;
+    receiverCitizenId: string;
+    item: string;
+    quantity: number;
+    timestamp: string;
+    candidateCommitmentIds?: string[];
+  }): { credited: Array<{ commitmentId: string; progress: CommitmentProgressView }>; completed: Commitment[] } {
+    if (!Number.isInteger(transfer.quantity) || transfer.quantity <= 0) {
+      throw new Error("transfer quantity must be a positive integer");
+    }
+    const candidates = new Set(transfer.candidateCommitmentIds ?? []);
+    const active = this.listActiveCommitments(transfer.giverCitizenId);
+    const considered = active.filter((c) => candidates.size === 0 || candidates.has(c.id));
+    const credited: Array<{ commitmentId: string; progress: CommitmentProgressView }> = [];
+    const completed: Commitment[] = [];
+
+    for (const commitment of considered) {
+      const match = matchItemTransferCommitment(commitment, transfer);
+      if (!match.matches) continue;
+
+      const ledgerId = progressLedgerId(commitment.id, transfer.eventId);
+      const inserted = this.store.db
+        .prepare(
+          `INSERT OR IGNORE INTO commitment_progress_events (
+            id, commitment_id, source_event_id, quantity, item, applied_at
+          ) VALUES (?, ?, ?, ?, ?, ?)`,
+        )
+        .run(
+          ledgerId,
+          commitment.id,
+          transfer.eventId,
+          match.creditedQuantity,
+          transfer.item,
+          transfer.timestamp,
+        );
+      if (inserted.changes === 0) {
+        const progress = this.getCommitmentProgress(commitment.id)!;
+        credited.push({ commitmentId: commitment.id, progress });
+        continue;
+      }
+
+      const progress = this.getCommitmentProgress(commitment.id)!;
+      credited.push({ commitmentId: commitment.id, progress });
+      const evidence = [
+        `transfer:${transfer.item}x${transfer.quantity}:${transfer.giverCitizenId}->${transfer.receiverCitizenId}`,
+        `event:${transfer.eventId}`,
+        `progress:${progress.delivered}/${progress.required}`,
+      ];
+      if (progress.complete) {
+        const done = this.completeCommitmentPersistent(
+          commitment.id,
+          evidence,
+          transfer.eventId,
+          transfer.timestamp,
+        );
+        if (done.ok) completed.push(done.commitment);
+      } else {
+        const updated: Commitment = {
+          ...commitment,
+          updatedAt: transfer.timestamp,
+          evidence: [...commitment.evidence, ...evidence],
+        };
+        this.upsertCommitment(updated);
+      }
+    }
+    return { credited, completed };
+  }
+
+  // --- Pending reconsideration signals ---
+
+  upsertPendingReconsideration(
+    citizenId: string,
+    signal: PendingReconsiderSignal,
+    detail?: string,
+    at = new Date().toISOString(),
+  ): void {
+    this.store.db
+      .prepare(
+        `INSERT INTO pending_reconsideration (citizen_id, signal, detail, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?)
+         ON CONFLICT(citizen_id, signal) DO UPDATE SET
+           detail = excluded.detail,
+           updated_at = excluded.updated_at`,
+      )
+      .run(citizenId, signal, detail ?? null, at, at);
+  }
+
+  listPendingReconsideration(citizenId: string): Array<{
+    signal: PendingReconsiderSignal;
+    detail?: string;
+    createdAt: string;
+    updatedAt: string;
+  }> {
+    const rows = this.store.db
+      .prepare(
+        `SELECT signal, detail, created_at, updated_at FROM pending_reconsideration
+         WHERE citizen_id = ? ORDER BY created_at ASC`,
+      )
+      .all(citizenId) as Array<{
+      signal: string;
+      detail: string | null;
+      created_at: string;
+      updated_at: string;
+    }>;
+    return rows.map((r) => ({
+      signal: r.signal as PendingReconsiderSignal,
+      detail: r.detail ?? undefined,
+      createdAt: r.created_at,
+      updatedAt: r.updated_at,
+    }));
+  }
+
+  clearPendingReconsideration(citizenId: string, signal?: PendingReconsiderSignal): void {
+    if (signal) {
+      this.store.db
+        .prepare(`DELETE FROM pending_reconsideration WHERE citizen_id = ? AND signal = ?`)
+        .run(citizenId, signal);
+      return;
+    }
+    this.store.db.prepare(`DELETE FROM pending_reconsideration WHERE citizen_id = ?`).run(citizenId);
   }
 
   /** Rebuild belief from stored evidence (ordered). Used for restart equivalence checks. */
@@ -429,71 +634,95 @@ export class BrainPersistence {
   /**
    * Apply a verified item-transfer event to brain tables in one SQLite transaction.
    * Idempotent on eventId. Does not touch Minecraft state.
+   * Commitment completion is predicate + progress gated — never forced by id alone.
    */
   applyVerifiedTransfer(event: VerifiedTransferBrainEvent): {
     applied: boolean;
     commitment?: Commitment;
+    progress?: CommitmentProgressView[];
   } {
+    if (!Number.isInteger(event.quantity) || event.quantity <= 0) {
+      throw new Error("VerifiedTransferBrainEvent.quantity must be a positive integer");
+    }
+
     return this.withTransaction(() => {
+      const candidateIds = [
+        ...(event.candidateCommitmentIds ?? []),
+        ...(event.completesCommitmentId ? [event.completesCommitmentId] : []),
+      ];
+
       if (this.hasAppliedEvent(event.eventId, "composite", event.giverCitizenId)) {
-        return { applied: false, commitment: event.completesCommitmentId
-          ? this.getCommitment(event.completesCommitmentId)
-          : undefined };
+        const progress = candidateIds
+          .map((id) => this.getCommitmentProgress(id))
+          .filter((p): p is CommitmentProgressView => Boolean(p));
+        return {
+          applied: false,
+          commitment: candidateIds[0] ? this.getCommitment(candidateIds[0]) : undefined,
+          progress,
+        };
       }
 
-      // Giver memory of giving
-      this.store.addMemory({
-        id: crypto.randomUUID(),
+      const qtyLabel = event.quantity === 1 ? event.item : `${event.quantity} ${event.item}`;
+
+      // Deterministic memory ids for replay equality.
+      this.store.addMemoryIdempotent({
+        id: memoryIdForTransfer(event.eventId, "giver"),
         citizenId: event.giverCitizenId,
         kind: "social",
-        content: `Gave ${event.item} to ${event.receiverCitizenId}`,
+        content: `Gave ${qtyLabel} to ${event.receiverCitizenId}`,
         importance: 0.7,
         createdAt: event.timestamp,
         relatedCitizenId: event.receiverCitizenId,
       });
-      // Receiver memory
-      this.store.addMemory({
-        id: crypto.randomUUID(),
+      this.store.addMemoryIdempotent({
+        id: memoryIdForTransfer(event.eventId, "receiver"),
         citizenId: event.receiverCitizenId,
         kind: "social",
-        content: `Received ${event.item} from ${event.giverCitizenId}`,
+        content: `Received ${qtyLabel} from ${event.giverCitizenId}`,
         importance: 0.75,
         createdAt: event.timestamp,
         relatedCitizenId: event.giverCitizenId,
       });
 
-      // Directional beliefs
-      this.applyBeliefEventPersistent(event.eventId, {
-        kind: "shared_resource",
-        observerId: event.giverCitizenId,
-        subjectId: event.receiverCitizenId,
-        detail: event.item,
-        at: event.timestamp,
-        firstPerson: true,
-      });
-      this.applyBeliefEventPersistent(`${event.eventId}:recv`, {
-        kind: "was_helped",
-        observerId: event.receiverCitizenId,
-        subjectId: event.giverCitizenId,
-        detail: event.item,
-        at: event.timestamp,
-        firstPerson: true,
-      });
+      // Directional beliefs share the SAME source verified event id.
+      this.applyBeliefEventPersistent(
+        event.eventId,
+        {
+          kind: "shared_resource",
+          observerId: event.giverCitizenId,
+          subjectId: event.receiverCitizenId,
+          detail: qtyLabel,
+          at: event.timestamp,
+          firstPerson: true,
+        },
+        "transfer_giver",
+      );
+      this.applyBeliefEventPersistent(
+        event.eventId,
+        {
+          kind: "was_helped",
+          observerId: event.receiverCitizenId,
+          subjectId: event.giverCitizenId,
+          detail: qtyLabel,
+          at: event.timestamp,
+          firstPerson: true,
+        },
+        "transfer_receiver",
+      );
 
-      let commitment: Commitment | undefined;
-      if (event.completesCommitmentId) {
-        const done = this.completeCommitmentPersistent(
-          event.completesCommitmentId,
-          [`transfer:${event.item}:${event.giverCitizenId}->${event.receiverCitizenId}`, `event:${event.eventId}`],
-          event.eventId,
-          event.timestamp,
-        );
-        if (done.ok) commitment = done.commitment;
-      }
+      const { completed, credited } = this.applyTransferToCommitments({
+        eventId: event.eventId,
+        giverCitizenId: event.giverCitizenId,
+        receiverCitizenId: event.receiverCitizenId,
+        item: event.item,
+        quantity: event.quantity,
+        timestamp: event.timestamp,
+        candidateCommitmentIds: candidateIds.length > 0 ? candidateIds : undefined,
+      });
 
       for (const learned of event.learned ?? []) {
         this.insertLearnedEvidence({
-          id: crypto.randomUUID(),
+          id: learnedEvidenceId(event.eventId, learned.citizenId, learned.dimension),
           eventId: event.eventId,
           citizenId: learned.citizenId,
           dimension: learned.dimension,
@@ -513,13 +742,20 @@ export class BrainPersistence {
         payload: {
           to: event.receiverCitizenId,
           item: event.item,
+          quantity: event.quantity,
           verified: true,
+          candidateCommitmentIds: candidateIds.length > 0 ? candidateIds : undefined,
+          learned: event.learned,
         },
       });
 
       this.markApplied(event.eventId, "composite", event.giverCitizenId, event.timestamp);
       this.markApplied(event.eventId, "composite", event.receiverCitizenId, event.timestamp);
-      return { applied: true, commitment };
+      return {
+        applied: true,
+        commitment: completed[0] ?? (candidateIds[0] ? this.getCommitment(candidateIds[0]) : undefined),
+        progress: credited.map((c) => c.progress),
+      };
     });
   }
 }

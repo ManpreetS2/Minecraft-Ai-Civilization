@@ -10,7 +10,11 @@ import {
   type RoutingContext,
   type StructuredDecision,
 } from "@civ/cognition";
-import type { BrainPersistence } from "./brain-persistence.js";
+import {
+  loadBudgetHistoryFromStore,
+  shouldCountTowardBudget,
+} from "./durable-budget.js";
+import type { BrainPersistence, PendingReconsiderSignal } from "./brain-persistence.js";
 
 export type AdapterObserveInput = {
   citizenId: string;
@@ -32,10 +36,17 @@ export type AdapterObserveInput = {
   lethalReflex?: boolean;
   /** Currently executing a valid deterministic skill. */
   executingValidSkill?: boolean;
+  /** True when at a safe skill boundary (can flush pending reconsider). */
+  atSkillBoundary?: boolean;
   /** Task / skill just failed. */
   taskFailed?: boolean;
-  /** Meaningful social request arrived. */
+  /**
+   * Direct/required meaningful social request (not ambient chatter).
+   * Must not be lost during long skills — queued if needed.
+   */
   meaningfulRequest?: boolean;
+  /** Ordinary ambient speech — does not interrupt work. */
+  ambientSpeech?: boolean;
   /** Commitment conflict detected. */
   commitmentConflict?: boolean;
   /** Major relationship event. */
@@ -44,6 +55,16 @@ export type AdapterObserveInput = {
   survivalChanged?: boolean;
   /** Current high-level goal invalidated. */
   goalInvalidated?: boolean;
+};
+
+export type GateDecision = {
+  category: DecisionCategory;
+  reason: string;
+  forceReconsider: boolean;
+  /** Skill may continue; pending signal was queued. */
+  queuedSignals: PendingReconsiderSignal[];
+  /** Lethal / safety path. */
+  lethal: boolean;
 };
 
 export type NormalizedIntention = {
@@ -62,15 +83,22 @@ export type NormalizedIntention = {
   validationOk: boolean;
   validationError?: string;
   skipReason?: string;
+  queuedSignals?: PendingReconsiderSignal[];
+  pendingSignals?: PendingReconsiderSignal[];
 };
 
 /**
  * Thin feature-flagged boundary between future AgentManager and CitizenBrain.
  * Does NOT execute Minecraft movement, mining, crafting, fishing, or job assignment.
+ *
+ * Reconsideration precedence:
+ * 1. lethal reflex → NO_LLM safety
+ * 2. failed / invalid / impossible current task → reconsider now
+ * 3. important direct social/commitment event → reconsider now OR queue if mid-skill
+ * 4. otherwise valid deterministic skill may continue without LLM
  */
 export class CitizenBrainAdapter {
   private readonly brain: CitizenBrain;
-  private readonly budgetHistory: BudgetCallRecord[] = [];
 
   constructor(
     private readonly config: AppConfig,
@@ -94,48 +122,163 @@ export class CitizenBrainAdapter {
     };
   }
 
-  /**
-   * Deterministic gate before CitizenBrain / provider.
-   * Returns NO_LLM for obvious reflexes and stable cooldown cases.
-   */
-  classifyGate(input: AdapterObserveInput): {
-    category: DecisionCategory;
-    reason: string;
-    forceReconsider: boolean;
-  } {
+  /** Durable budget history reconstructed from llm_calls. */
+  loadDurableBudgetHistory(): BudgetCallRecord[] {
+    return loadBudgetHistoryFromStore(this.persistence.store);
+  }
+
+  classifyGate(input: AdapterObserveInput): GateDecision {
+    const queuedSignals: PendingReconsiderSignal[] = [];
+    const at = new Date(input.now ?? Date.now()).toISOString();
+
+    // 1. Lethal reflex always wins.
     if (input.lethalReflex || input.routing.lethalDanger) {
-      return { category: "NO_LLM", reason: "immediate lethal reflex", forceReconsider: false };
-    }
-    if (input.executingValidSkill || input.routing.continuingObviousSkill) {
-      return { category: "NO_LLM", reason: "executing valid deterministic action", forceReconsider: false };
+      return {
+        category: "NO_LLM",
+        reason: "immediate lethal reflex",
+        forceReconsider: false,
+        queuedSignals,
+        lethal: true,
+      };
     }
 
-    const forceReconsider =
+    // Persist important signals before skill-continuation short-circuit.
+    if (input.taskFailed) {
+      this.persistence.upsertPendingReconsideration(input.citizenId, "TASK_FAILURE", undefined, at);
+      queuedSignals.push("TASK_FAILURE");
+    }
+    if (input.goalInvalidated) {
+      this.persistence.upsertPendingReconsideration(input.citizenId, "GOAL_INVALIDATED", undefined, at);
+      queuedSignals.push("GOAL_INVALIDATED");
+    }
+    if (input.meaningfulRequest) {
+      this.persistence.upsertPendingReconsideration(input.citizenId, "REQUEST_PENDING", undefined, at);
+      queuedSignals.push("REQUEST_PENDING");
+    }
+    if (input.commitmentConflict) {
+      this.persistence.upsertPendingReconsideration(input.citizenId, "COMMITMENT_CONFLICT", undefined, at);
+      queuedSignals.push("COMMITMENT_CONFLICT");
+    }
+    if (input.majorRelationshipEvent) {
+      this.persistence.upsertPendingReconsideration(input.citizenId, "MAJOR_RELATIONSHIP", undefined, at);
+      queuedSignals.push("MAJOR_RELATIONSHIP");
+    }
+    if (input.survivalChanged) {
+      this.persistence.upsertPendingReconsideration(input.citizenId, "SURVIVAL_CHANGED", undefined, at);
+      queuedSignals.push("SURVIVAL_CHANGED");
+    }
+    // ambientSpeech intentionally ignored for interruption
+
+    const pending = this.persistence.listPendingReconsideration(input.citizenId);
+    const hasTaskBreak =
       Boolean(input.taskFailed) ||
+      Boolean(input.goalInvalidated) ||
+      pending.some((p) => p.signal === "TASK_FAILURE" || p.signal === "GOAL_INVALIDATED");
+
+    // 2. Failed / invalid task → reconsider now (even mid-skill).
+    if (hasTaskBreak) {
+      const routed = classifyDecisionCategory({
+        ...input.routing,
+        continuingObviousSkill: false,
+        ordinaryChoice: false,
+      });
+      return {
+        category: routed.category === "NO_LLM" ? "ROUTINE" : routed.category,
+        reason: "task failed or goal invalidated — reconsider",
+        forceReconsider: true,
+        queuedSignals,
+        lethal: false,
+      };
+    }
+
+    const hasImportantSocial =
       Boolean(input.meaningfulRequest) ||
       Boolean(input.commitmentConflict) ||
       Boolean(input.majorRelationshipEvent) ||
-      Boolean(input.survivalChanged) ||
-      Boolean(input.goalInvalidated);
+      pending.some((p) =>
+        p.signal === "REQUEST_PENDING" ||
+        p.signal === "COMMITMENT_CONFLICT" ||
+        p.signal === "MAJOR_RELATIONSHIP",
+      );
 
+    const midSkill = Boolean(input.executingValidSkill || input.routing.continuingObviousSkill);
+    const atBoundary = Boolean(input.atSkillBoundary);
+
+    // 3. Important social/commitment while mid-skill → queue, continue skill (unless boundary).
+    if (midSkill && hasImportantSocial && !atBoundary) {
+      return {
+        category: "NO_LLM",
+        reason: "valid skill continues; important reconsideration queued",
+        forceReconsider: false,
+        queuedSignals,
+        lethal: false,
+      };
+    }
+
+    if (hasImportantSocial && (!midSkill || atBoundary)) {
+      const routed = classifyDecisionCategory({
+        ...input.routing,
+        continuingObviousSkill: false,
+        seriousRelationshipEvent: true,
+        ordinaryChoice: false,
+      });
+      return {
+        category: routed.category,
+        reason: "important direct social/commitment reconsideration",
+        forceReconsider: true,
+        queuedSignals,
+        lethal: false,
+      };
+    }
+
+    // Flush other pending at skill boundary
+    if (atBoundary && pending.length > 0) {
+      return {
+        category: "IMPORTANT",
+        reason: "skill boundary — flush pending reconsideration",
+        forceReconsider: true,
+        queuedSignals,
+        lethal: false,
+      };
+    }
+
+    // 4. Valid deterministic skill continuation
+    if (midSkill) {
+      return {
+        category: "NO_LLM",
+        reason: "executing valid deterministic action",
+        forceReconsider: false,
+        queuedSignals,
+        lethal: false,
+      };
+    }
+
+    const forceReconsider = Boolean(input.survivalChanged) || pending.some((p) => p.signal === "SURVIVAL_CHANGED");
     const routed = classifyDecisionCategory({
       ...input.routing,
-      seriousRelationshipEvent:
-        input.routing.seriousRelationshipEvent || Boolean(input.majorRelationshipEvent),
       ordinaryChoice: input.routing.ordinaryChoice && !forceReconsider,
     });
-
-    return { category: routed.category, reason: routed.reason, forceReconsider };
+    return {
+      category: routed.category,
+      reason: routed.reason,
+      forceReconsider,
+      queuedSignals,
+      lethal: false,
+    };
   }
 
-  /**
-   * Prepare + optionally finalize a deliberation.
-   * When feature flag is off, returns disabled stub without calling providers.
-   */
   deliberate(
     input: AdapterObserveInput,
     modelOutput?: unknown,
-    meta?: { provider?: string; model?: string; latencyMs?: number; tokenUsage?: number },
+    meta?: {
+      provider?: string;
+      model?: string;
+      latencyMs?: number;
+      tokenUsage?: number;
+      decisionId?: string;
+      ok?: boolean;
+      fallbackUsed?: boolean;
+    },
   ): NormalizedIntention {
     if (!this.enabled) {
       return {
@@ -157,6 +300,24 @@ export class CitizenBrainAdapter {
     const relationships = this.persistence.listRelationshipBeliefs(input.citizenId);
     const learned = this.persistence.summarizeLearned(input.citizenId, now);
     const gate = this.classifyGate(input);
+    const pending = this.persistence.listPendingReconsideration(input.citizenId);
+
+    if (gate.category === "NO_LLM" && !gate.forceReconsider) {
+      return {
+        citizenId: input.citizenId,
+        category: "NO_LLM",
+        llmCalled: false,
+        budgetExhausted: false,
+        featureEnabled: true,
+        highLevelGoalRestored: cogn?.currentHighLevelGoal,
+        physicalExecutionAssumed: false,
+        primaryGoal: cogn?.currentHighLevelGoal,
+        validationOk: true,
+        skipReason: gate.reason,
+        queuedSignals: gate.queuedSignals,
+        pendingSignals: pending.map((p) => p.signal),
+      };
+    }
 
     const cooldown = {
       citizenId: input.citizenId,
@@ -166,17 +327,20 @@ export class CitizenBrainAdapter {
       lastFailureAt: input.taskFailed ? now : undefined,
       majorEventAt: input.majorRelationshipEvent || input.commitmentConflict ? now : undefined,
       requestAt: input.meaningfulRequest ? now : undefined,
-      survivalSeverity: input.survivalChanged ? 0.9 : (input.hunger !== undefined ? (20 - input.hunger) / 20 : 0.2),
+      survivalSeverity: input.survivalChanged
+        ? 0.9
+        : input.hunger !== undefined
+          ? (20 - input.hunger) / 20
+          : 0.2,
       goalValid: !input.goalInvalidated && Boolean(cogn?.currentHighLevelGoal || !gate.forceReconsider),
     };
 
-    // Stable cooldown with no meaningful change → NO_LLM without provider.
     if (
       !gate.forceReconsider &&
-      gate.category !== "NO_LLM" &&
       cogn?.reconsiderAfter &&
       Date.parse(cogn.reconsiderAfter) > now &&
-      cogn.currentHighLevelGoal
+      cogn.currentHighLevelGoal &&
+      pending.length === 0
     ) {
       return {
         citizenId: input.citizenId,
@@ -219,20 +383,36 @@ export class CitizenBrainAdapter {
       routing: {
         ...input.routing,
         lethalDanger: Boolean(input.lethalReflex || input.routing.lethalDanger),
-        continuingObviousSkill: Boolean(input.executingValidSkill || input.routing.continuingObviousSkill),
+        continuingObviousSkill: gate.category === "NO_LLM" && !gate.forceReconsider,
         seriousRelationshipEvent:
           input.routing.seriousRelationshipEvent || Boolean(input.majorRelationshipEvent),
+        ordinaryChoice: input.routing.ordinaryChoice && !gate.forceReconsider,
       },
       cooldown,
       now,
     };
 
-    const prepared = this.brain.prepare(observe);
+    // Override prepare routing category via force path: build args so prepare sees non-NO_LLM when reconsidering
+    const prepared = this.brain.prepare({
+      ...observe,
+      routing: {
+        ...observe.routing,
+        continuingObviousSkill: false,
+        lethalDanger: false,
+      },
+      cooldown: {
+        ...cooldown,
+        goalValid: gate.forceReconsider ? false : cooldown.goalValid,
+      },
+    });
 
-    if (prepared.category === "NO_LLM" || !prepared.allowLlm) {
+    const category = gate.forceReconsider ? gate.category : prepared.category;
+    const allowLlm = category !== "NO_LLM" && (prepared.allowLlm || gate.forceReconsider);
+
+    if (!allowLlm) {
       return {
         citizenId: input.citizenId,
-        category: prepared.category === "NO_LLM" ? "NO_LLM" : prepared.category,
+        category,
         llmCalled: false,
         budgetExhausted: false,
         featureEnabled: true,
@@ -241,13 +421,15 @@ export class CitizenBrainAdapter {
         primaryGoal: cogn?.currentHighLevelGoal,
         validationOk: true,
         skipReason: prepared.cooldownReason,
+        pendingSignals: pending.map((p) => p.signal),
       };
     }
 
+    const budgetHistory = this.loadDurableBudgetHistory();
     const budget = checkModelBudget(
       input.citizenId,
-      prepared.category,
-      this.budgetHistory,
+      category,
+      budgetHistory,
       this.budgetConfig(),
       now,
       mcDay,
@@ -256,7 +438,7 @@ export class CitizenBrainAdapter {
     if (!budget.allowed) {
       return {
         citizenId: input.citizenId,
-        category: prepared.category,
+        category,
         llmCalled: false,
         budgetExhausted: true,
         featureEnabled: true,
@@ -265,14 +447,14 @@ export class CitizenBrainAdapter {
         primaryGoal: cogn?.currentHighLevelGoal,
         validationOk: true,
         skipReason: budget.reason,
+        pendingSignals: pending.map((p) => p.signal),
       };
     }
 
-    // Provider call is injected by caller via modelOutput — adapter never invents decisions.
     if (modelOutput === undefined) {
       return {
         citizenId: input.citizenId,
-        category: prepared.category,
+        category,
         llmCalled: false,
         budgetExhausted: false,
         featureEnabled: true,
@@ -280,8 +462,15 @@ export class CitizenBrainAdapter {
         physicalExecutionAssumed: false,
         validationOk: true,
         skipReason: "awaiting_provider",
+        pendingSignals: pending.map((p) => p.signal),
       };
     }
+
+    const preparedForFinalize = {
+      ...prepared,
+      category,
+      allowLlm: true,
+    };
 
     const result = this.brain.finalize(
       {
@@ -291,33 +480,97 @@ export class CitizenBrainAdapter {
         model: meta?.model,
         latencyMs: meta?.latencyMs,
         tokenUsage: meta?.tokenUsage,
+        fallbackUsed: meta?.fallbackUsed,
       },
-      prepared,
+      preparedForFinalize,
     );
 
-    if (result.llmCalled) {
-      this.budgetHistory.push({
-        citizenId: input.citizenId,
-        category: prepared.category,
-        atMs: now,
-        mcDay,
-      });
-    }
+    const decisionId = meta?.decisionId ?? crypto.randomUUID();
+    const ok = meta?.ok ?? result.validationOk;
+    const alreadyCounted = this.persistence.store.hasBudgetCountForDecision(decisionId);
+    const countsTowardBudget = shouldCountTowardBudget({
+      category,
+      ok: Boolean(ok && result.llmCalled),
+      alreadyCountedForDecision: alreadyCounted,
+    });
+
+    this.persistence.store.logLlmCall({
+      citizenId: input.citizenId,
+      latencyMs: meta?.latencyMs ?? 0,
+      ok: Boolean(ok),
+      goal: result.decision?.primaryGoal,
+      reason: result.decision?.reasonSummary ?? result.validationError,
+      error: result.validationOk ? undefined : result.validationError,
+      decisionCategory: category,
+      mcDay,
+      provider: meta?.provider,
+      model: meta?.model,
+      fallbackUsed: meta?.fallbackUsed,
+      decisionId,
+      countsTowardBudget,
+      timestamp: new Date(now).toISOString(),
+    });
 
     if (result.validationOk && result.decision) {
       this.persistDecisionState(input.citizenId, result, now);
+      // Clear handled pending signals after successful deliberation.
+      this.persistence.clearPendingReconsideration(input.citizenId);
     }
 
-    return normalizeResult(input.citizenId, result, cogn, false);
+    return {
+      ...normalizeResult(input.citizenId, result, cogn, false),
+      category,
+      pendingSignals: [],
+    };
   }
 
-  /** Record an in-memory budget call (tests / when provider invoked outside finalize). */
+  /**
+   * Record a durable budget-consuming LLM call (tests / external provider path).
+   * Retries must reuse decisionId so only one attempt counts.
+   */
+  recordDurableBudgetCall(entry: {
+    citizenId: string;
+    category: DecisionCategory;
+    atMs: number;
+    mcDay?: number;
+    decisionId?: string;
+    ok?: boolean;
+    provider?: string;
+    model?: string;
+    fallbackUsed?: boolean;
+    latencyMs?: number;
+  }): void {
+    if (entry.category === "NO_LLM") return;
+    const decisionId = entry.decisionId ?? crypto.randomUUID();
+    const ok = entry.ok ?? true;
+    const already = this.persistence.store.hasBudgetCountForDecision(decisionId);
+    const countsTowardBudget = shouldCountTowardBudget({
+      category: entry.category,
+      ok,
+      alreadyCountedForDecision: already,
+    });
+    this.persistence.store.logLlmCall({
+      citizenId: entry.citizenId,
+      latencyMs: entry.latencyMs ?? 0,
+      ok,
+      decisionCategory: entry.category,
+      mcDay: entry.mcDay ?? 0,
+      provider: entry.provider,
+      model: entry.model,
+      fallbackUsed: entry.fallbackUsed,
+      decisionId,
+      countsTowardBudget,
+      timestamp: new Date(entry.atMs).toISOString(),
+    });
+  }
+
+  /** @deprecated Use recordDurableBudgetCall — kept for Pass-4 tests. */
   recordBudgetCall(citizenId: string, category: DecisionCategory, atMs: number, mcDay = 0): void {
-    this.budgetHistory.push({ citizenId, category, atMs, mcDay });
+    this.recordDurableBudgetCall({ citizenId, category, atMs, mcDay });
   }
 
   getBudgetHistory(): readonly BudgetCallRecord[] {
-    return this.budgetHistory;
+    return this.loadDurableBudgetHistory();
   }
 
   private persistDecisionState(citizenId: string, result: BrainDecisionResult, now: number): void {

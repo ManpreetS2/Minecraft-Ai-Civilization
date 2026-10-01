@@ -2,7 +2,8 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { BRAIN_MIGRATION_V2, listAppliedMigrations } from "./brain-migrations.js";
+import { serializeCommitmentTarget } from "@civ/shared";
+import { BRAIN_MIGRATION_V2, BRAIN_MIGRATION_V3, listAppliedMigrations } from "./brain-migrations.js";
 import { BrainPersistence } from "./brain-persistence.js";
 import { CivilizationStore } from "./store.js";
 
@@ -16,14 +17,16 @@ function tempStore(name: string): { path: string; store: CivilizationStore; brai
 }
 
 describe("brain migrations (temp DB only)", () => {
-  it("applies brain_persistence_v2 idempotently and preserves citizens", () => {
+  it("applies brain v2+v3 idempotently and preserves citizens", () => {
     const { path, store } = tempStore("mig");
     expect(listAppliedMigrations(store.db)).toContain(BRAIN_MIGRATION_V2);
+    expect(listAppliedMigrations(store.db)).toContain(BRAIN_MIGRATION_V3);
     const before = store.getCitizens().map((c) => c.id);
     store.close();
 
     const again = new CivilizationStore(path);
     expect(listAppliedMigrations(again.db).filter((n) => n === BRAIN_MIGRATION_V2)).toHaveLength(1);
+    expect(listAppliedMigrations(again.db).filter((n) => n === BRAIN_MIGRATION_V3)).toHaveLength(1);
     expect(again.getCitizens().map((c) => c.id)).toEqual(before);
     again.close();
   });
@@ -56,6 +59,12 @@ describe("commitment persistence", () => {
       ownerCitizenId: "citizen_maya",
       counterpartyId: "citizen_atlas",
       goal: "deliver_bread",
+      payload: serializeCommitmentTarget({
+        type: "item_transfer",
+        item: "bread",
+        quantity: 1,
+        recipientCitizenId: "citizen_atlas",
+      }),
     });
     const eventId = "evt-transfer-1";
     const first = brain.applyVerifiedTransfer({
@@ -65,7 +74,8 @@ describe("commitment persistence", () => {
       giverCitizenId: "citizen_maya",
       receiverCitizenId: "citizen_atlas",
       item: "bread",
-      completesCommitmentId: c.id,
+      quantity: 1,
+      candidateCommitmentIds: [c.id],
       learned: [
         {
           citizenId: "citizen_maya",
@@ -86,7 +96,8 @@ describe("commitment persistence", () => {
       giverCitizenId: "citizen_maya",
       receiverCitizenId: "citizen_atlas",
       item: "bread",
-      completesCommitmentId: c.id,
+      quantity: 1,
+      candidateCommitmentIds: [c.id],
     });
     expect(second.applied).toBe(false);
     expect(brain.getCommitment(c.id)?.status).toBe("COMPLETED");
@@ -296,6 +307,12 @@ describe("event idempotency + transactions", () => {
       ownerCitizenId: "citizen_maya",
       counterpartyId: "citizen_atlas",
       goal: "deliver_bread",
+      payload: serializeCommitmentTarget({
+        type: "item_transfer",
+        item: "bread",
+        quantity: 1,
+        recipientCitizenId: "citizen_atlas",
+      }),
     });
     const eventId = "evt-restart-dup";
     brain.applyVerifiedTransfer({
@@ -305,7 +322,8 @@ describe("event idempotency + transactions", () => {
       giverCitizenId: "citizen_maya",
       receiverCitizenId: "citizen_atlas",
       item: "bread",
-      completesCommitmentId: c.id,
+      quantity: 1,
+      candidateCommitmentIds: [c.id],
       learned: [
         { citizenId: "citizen_maya", dimension: "help_tendency", direction: 1 },
       ],
@@ -323,7 +341,8 @@ describe("event idempotency + transactions", () => {
       giverCitizenId: "citizen_maya",
       receiverCitizenId: "citizen_atlas",
       item: "bread",
-      completesCommitmentId: c.id,
+      quantity: 1,
+      candidateCommitmentIds: [c.id],
       learned: [
         { citizenId: "citizen_maya", dimension: "help_tendency", direction: 1 },
       ],
@@ -340,6 +359,12 @@ describe("event idempotency + transactions", () => {
     const c = brain.createCommitmentPersistent({
       ownerCitizenId: "citizen_maya",
       goal: "deliver_bread",
+      payload: serializeCommitmentTarget({
+        type: "item_transfer",
+        item: "bread",
+        quantity: 1,
+        recipientCitizenId: "citizen_atlas",
+      }),
     });
     expect(() =>
       brain.withTransaction(() => {
