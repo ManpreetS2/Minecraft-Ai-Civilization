@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "description": "Autonomous artificial civilization in a shared Minecraft Java world",
+  "packageManager": "pnpm@10.33.3",
   "engines": {
     "node": ">=22"
   },
@@ -12,6 +13,8 @@
     "atlas": "pnpm --filter @civ/orchestrator atlas",
     "sim:start": "pnpm --filter @civ/orchestrator start",
     "world-lab:one-citizen": "pnpm --filter @civ/orchestrator world-lab:one-citizen",
+    "cloud:integration-check": "tsx scripts/cloud-integration-check.ts",
+    "cloud:db-copy-check": "tsx scripts/db-copy-check.ts",
     "build": "pnpm -r --if-present build",
     "typecheck": "pnpm -r --if-present typecheck",
     "lint": "eslint .",

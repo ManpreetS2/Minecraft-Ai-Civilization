@@ -57,3 +57,10 @@ export {
   type PreflightReport,
   type SchemaSnapshot,
 } from "./schema-preflight.js";
+export {
+  classifyDbPath,
+  inspectDbCopy,
+  migrateDbCopy,
+  formatDbCopyReport,
+  type DbCopyReport,
+} from "./db-copy-harness.js";

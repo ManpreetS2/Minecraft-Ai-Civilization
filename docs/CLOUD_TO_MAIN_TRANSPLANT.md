@@ -353,3 +353,22 @@ Adapter must **not** execute Minecraft skills, bypass planner, or mark world act
 4. If `INCOMPATIBLE`: stop and reconcile PKs/columns manually.  
 5. If `MANUAL_RECONCILE_REQUIRED`: review warnings (missing migrations/tables/budget cols).  
 6. Only then apply cloud migrations on another copy — never on production.
+
+---
+
+## K. Cloud Pass 6 — Final hardening / integration package
+
+**NOT a feature pass.** PR #3 remains **DRAFT — TRANSPLANT SOURCE, NOT DIRECT MAIN MERGE**.
+
+| Deliverable | Location |
+| --- | --- |
+| GitHub CI | `.github/workflows/ci.yml` |
+| Main-PC runbook | `docs/MAIN_PC_INTEGRATION_RUNBOOK.md` |
+| Transplant order | `docs/TRANSPLANT_ORDER.md` |
+| Public main comparison | `docs/PUBLIC_MAIN_COMPARISON.md` (**≠ main-PC proof**) |
+| Integration check | `pnpm cloud:integration-check` |
+| DB copy harness | `pnpm cloud:db-copy-check` / `db-copy-harness.ts` |
+| Reconciler dry report | `BrainReconciler.report()` / `dryRun: true` |
+| Cloud freeze | `docs/CLOUD_FREEZE.md` |
+
+Do **not** merge or retarget PR #3 to `main`. Follow the runbook on the real main-PC tree.

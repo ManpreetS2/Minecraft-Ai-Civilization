@@ -14,6 +14,19 @@ export type ReconciliationResult = {
   skippedAlreadyApplied: number;
   unsupported: number;
   failures: ReconciliationFailure[];
+  /** Present when dryRun=true — no writes performed. */
+  dryRun?: boolean;
+  wouldApply?: Array<{
+    eventId: string;
+    type: string;
+    giverCitizenId: string;
+    receiverCitizenId?: string;
+    item?: string;
+    quantity?: number;
+    candidateCommitmentIds?: string[];
+  }>;
+  alreadyApplied?: string[];
+  ambiguities?: Array<{ eventId: string; detail: string }>;
 };
 
 export type ReconcilerOptions = {
@@ -21,6 +34,11 @@ export type ReconcilerOptions = {
   batchSize?: number;
   /** Optional citizen filter for isolation. */
   citizenId?: string;
+  /**
+   * When true, inspect and report only — never write brain effects.
+   * Useful before enabling reconciliation on a copied main-PC DB.
+   */
+  dryRun?: boolean;
 };
 
 /**
@@ -37,6 +55,7 @@ export class BrainReconciler {
 
   reconcile(options: ReconcilerOptions = {}): ReconciliationResult {
     const batchSize = options.batchSize ?? 50;
+    const dryRun = Boolean(options.dryRun);
     const events = this.loadVerifiedCandidates(batchSize, options.citizenId);
     const result: ReconciliationResult = {
       examined: 0,
@@ -44,6 +63,10 @@ export class BrainReconciler {
       skippedAlreadyApplied: 0,
       unsupported: 0,
       failures: [],
+      dryRun,
+      wouldApply: dryRun ? [] : undefined,
+      alreadyApplied: dryRun ? [] : undefined,
+      ambiguities: dryRun ? [] : undefined,
     };
 
     // Deterministic replay order: timestamp ASC, id ASC
@@ -77,6 +100,32 @@ export class BrainReconciler {
       );
       if (already) {
         result.skippedAlreadyApplied += 1;
+        result.alreadyApplied?.push(parsed.event.eventId);
+        continue;
+      }
+
+      const receiverApplied = this.brain.hasAppliedEvent(
+        parsed.event.eventId,
+        "composite",
+        parsed.event.receiverCitizenId,
+      );
+      if (receiverApplied !== already) {
+        result.ambiguities?.push({
+          eventId: parsed.event.eventId,
+          detail: "giver/receiver brain_applied_events disagree — partial prior apply?",
+        });
+      }
+
+      if (dryRun) {
+        result.wouldApply?.push({
+          eventId: parsed.event.eventId,
+          type: parsed.event.type,
+          giverCitizenId: parsed.event.giverCitizenId,
+          receiverCitizenId: parsed.event.receiverCitizenId,
+          item: parsed.event.item,
+          quantity: parsed.event.quantity,
+          candidateCommitmentIds: parsed.event.candidateCommitmentIds,
+        });
         continue;
       }
 
@@ -94,6 +143,11 @@ export class BrainReconciler {
     }
 
     return result;
+  }
+
+  /** Convenience alias for report-only mode. */
+  report(options: Omit<ReconcilerOptions, "dryRun"> = {}): ReconciliationResult {
+    return this.reconcile({ ...options, dryRun: true });
   }
 
   private loadVerifiedCandidates(limit: number, citizenId?: string): SimEvent[] {
