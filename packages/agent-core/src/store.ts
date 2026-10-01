@@ -12,6 +12,7 @@ import {
   type SimEvent,
   type Vec3,
 } from "@civ/shared";
+import { applyBrainMigrations } from "./brain-migrations.js";
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -127,6 +128,7 @@ export class CivilizationStore {
     if (!names.has("death_x")) this.db.exec(`ALTER TABLE citizens ADD COLUMN death_x REAL`);
     if (!names.has("death_y")) this.db.exec(`ALTER TABLE citizens ADD COLUMN death_y REAL`);
     if (!names.has("death_z")) this.db.exec(`ALTER TABLE citizens ADD COLUMN death_z REAL`);
+    applyBrainMigrations(this.db);
   }
 
   markDeceased(id: string, at = new Date().toISOString(), position?: Vec3): boolean {
@@ -240,6 +242,34 @@ export class CivilizationStore {
         `INSERT INTO events (id, type, timestamp, citizen_id, payload) VALUES (?, ?, ?, ?, ?)`,
       )
       .run(event.id, event.type, event.timestamp, event.citizenId ?? null, JSON.stringify(event.payload));
+  }
+
+  /** Idempotent event append — returns false if event id already present. */
+  appendEventIdempotent(event: SimEvent): boolean {
+    const result = this.db
+      .prepare(
+        `INSERT OR IGNORE INTO events (id, type, timestamp, citizen_id, payload) VALUES (?, ?, ?, ?, ?)`,
+      )
+      .run(event.id, event.type, event.timestamp, event.citizenId ?? null, JSON.stringify(event.payload));
+    return result.changes > 0;
+  }
+
+  countLlmCallsForCitizen(
+    citizenId: string,
+    options: { sinceIso?: string; goalPrefix?: string } = {},
+  ): number {
+    if (options.sinceIso) {
+      const row = this.db
+        .prepare(
+          `SELECT COUNT(*) AS n FROM llm_calls WHERE citizen_id = ? AND timestamp >= ? AND ok = 1`,
+        )
+        .get(citizenId, options.sinceIso) as { n: number };
+      return row.n;
+    }
+    const row = this.db
+      .prepare(`SELECT COUNT(*) AS n FROM llm_calls WHERE citizen_id = ? AND ok = 1`)
+      .get(citizenId) as { n: number };
+    return row.n;
   }
 
   recentEvents(limit = 100): SimEvent[] {

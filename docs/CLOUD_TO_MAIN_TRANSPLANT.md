@@ -231,3 +231,76 @@ Outstanding after transplant:
 - `packages/society/src/index.ts` (requiresResponse + belief exports)
 - `packages/shared/src/index.ts` / `events.ts`
 - Any main-PC `manager.ts` / cognition v2 wiring
+
+---
+
+## I. Cloud Pass 4 — Brain persistence + thin runtime adapter
+
+| Field | Detail |
+| --- | --- |
+| **FEATURE** | Versioned SQLite brain persistence (commitments, directional relationship beliefs + evidence, learned behavior evidence, cognition state, event idempotency), transactional verified-transfer apply, thin `CitizenBrainAdapter` behind `CITIZEN_BRAIN_V2_ENABLED=false`, NO_LLM gate, per-citizen model budgets |
+| **NEW FILES** | `docs/BRAIN_PERSISTENCE_MAP.md`; `packages/agent-core/src/{brain-migrations,brain-persistence,citizen-brain-adapter}.ts` + tests; `packages/cognition/src/model-budget.ts` (+ test) |
+| **EXISTING FILES MODIFIED** | `packages/agent-core/src/{store,index}.ts`; `packages/cognition/src/{commitments,index,cognition-trace}.ts`; `packages/shared/src/{brain-types,config}.ts`; `.env.example`; this transplant doc |
+| **DB SCHEMA CHANGES** | **Yes** — migration `brain_persistence_v2` adds `commitments`, `relationship_beliefs`, `relationship_belief_evidence`, `learned_behavior_evidence`, `cognition_state`, `brain_applied_events`. Uses `schema_migrations`. Does **not** rebuild legacy `relationships` / `memories` / `events`. |
+| **ENV VARS** | `CITIZEN_BRAIN_V2_ENABLED` (default **false**), `LLM_MAX_CALLS_PER_CITIZEN_PER_MC_DAY`, `LLM_MAX_ROUTINE_CALLS_PER_WINDOW`, `LLM_ROUTINE_WINDOW_MS`, `LLM_MAX_DEEP_REFLECTION_CALLS_PER_MC_DAY`, optional `LLM_GLOBAL_MAX_CALLS_PER_MC_DAY` |
+| **RUNTIME BEHAVIOR CHANGES** | Adapter **not** wired into `AgentManager` tick. Flag default false. Physical skills / planner unchanged. |
+| **EXPECTED MERGE CONFLICT AREAS** | **HIGH** for `store.ts` / any main-PC DB layer; **MEDIUM** for `config.ts` / `.env.example`; adapter is additive |
+
+### BRAIN DATABASE CHANGES
+
+See `docs/BRAIN_PERSISTENCE_MAP.md`. New tables only; legacy `relationships` kept for planner scores. Authoritative Pass-3 beliefs live in `relationship_beliefs` (+ evidence).
+
+### REQUIRED MIGRATION ORDER
+
+1. Ensure baseline `CivilizationStore` schema (citizens/events/memories/relationships/…) exists.
+2. Apply death-column ad-hoc alters (existing cloud migrate).
+3. Apply `brain_persistence_v2` via `schema_migrations` (idempotent).
+4. Do **not** run against production `data/civilization.sqlite` from cloud tests.
+5. If main-PC schema differs: **stop and reconcile** — do not guess column renames.
+
+### FILES SAFE TO CHERRY PICK (Pass 4)
+
+- `docs/BRAIN_PERSISTENCE_MAP.md`
+- `packages/agent-core/src/brain-migrations.ts`
+- `packages/agent-core/src/brain-persistence.ts` (+ test) — if store API compatible
+- `packages/agent-core/src/citizen-brain-adapter.ts` (+ test)
+- `packages/cognition/src/model-budget.ts` (+ test)
+- `packages/shared/src/brain-types.ts` (additive fields)
+
+### FILES REQUIRING MANUAL MERGE
+
+- `packages/agent-core/src/store.ts` (migrate hook + `appendEventIdempotent` / `countLlmCallsForCitizen`)
+- `packages/agent-core/src/index.ts`
+- `packages/agent-core/src/manager.ts` — **integration point only; not auto-wired**
+- `packages/shared/src/config.ts`
+- `packages/cognition/src/index.ts` / `commitments.ts`
+- `.env.example`
+
+### MAIN-PC SCHEMA QUESTIONS
+
+1. Does main-PC already have `commitments` / belief / cognition tables under different names?
+2. Is `schema_migrations` already used with incompatible version numbering?
+3. Are `events.id` UUIDs shared across processes (idempotency key assumption)?
+4. Does main-PC `relationships` already encode asymmetric beliefs (avoid dual-write confusion)?
+5. Where should `CITIZEN_BRAIN_V2_ENABLED` be toggled for WORLD-LAB vs production?
+
+### RUNTIME FEATURE-FLAG INTEGRATION POINT
+
+```
+AgentManager / future runtime tick
+        ↓  if (config.CITIZEN_BRAIN_V2_ENABLED)
+CitizenBrainAdapter.deliberate(...)
+        ↓
+CitizenBrain.prepare / finalize
+        ↓
+ModelRouter (existing)
+```
+
+Adapter must **not** execute Minecraft skills, bypass planner, or mark world actions successful. Minecraft physical verification → then `BrainPersistence.applyVerifiedTransfer` (SQLite txn).
+
+### Anything touching existing main-PC database code
+
+- `CivilizationStore` constructor migrate path
+- New tables beside existing ones
+- `appendEventIdempotent` additive method
+- No destructive DROP/rebuild of legacy tables in this pass

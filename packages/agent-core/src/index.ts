@@ -14,3 +14,6 @@ export {
   type HousingPlan,
   type HousingWorld,
 } from "./housing.js";
+export { applyBrainMigrations, listAppliedMigrations, BRAIN_MIGRATION_V2 } from "./brain-migrations.js";
+export { BrainPersistence, type VerifiedTransferBrainEvent, type BrainEffectKind } from "./brain-persistence.js";
+export { CitizenBrainAdapter, type AdapterObserveInput, type NormalizedIntention } from "./citizen-brain-adapter.js";
