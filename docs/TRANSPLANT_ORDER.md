@@ -1,6 +1,6 @@
 # Transplant Order (Cloud Passes 1–5)
 
-**Branch tip:** `cursor/brain-persistence-07c8` @ `73c042989d2ba5b7f6c864f37db3d8c36106e187`  
+**Branch tip:** `cursor/brain-persistence-07c8` @ `863a7c5d55f7e61400db17f0bfd60caff3da36d3`  
 **Public main base for these commits:** `15c13c885a825deb0f83a9386f2270fb05711689`  
 **PR #3 base:** `cursor/cloud-dev-skeleton-07c8` — **not** main-PC `main`.
 
