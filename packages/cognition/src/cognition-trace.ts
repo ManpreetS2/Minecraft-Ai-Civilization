@@ -19,6 +19,8 @@ export type CognitionTrace = {
   validationOk: boolean;
   validationError?: string;
   reason?: string;
+  /** Set when LLM skipped because citizen/global model budget was exhausted. */
+  budgetExhausted?: boolean;
 };
 
 export function formatCognitionTrace(trace: CognitionTrace): string {

@@ -38,6 +38,14 @@ const envSchema = z.object({
   OLLAMA_HOST: z.string().default("http://127.0.0.1:11434"),
   OLLAMA_MODEL: z.string().default("llama3.1:8b"),
   LLM_COOLDOWN_MS: z.coerce.number().int().default(60_000),
+  /** Feature flag: thin CitizenBrain adapter. Default false — do not auto-enable. */
+  CITIZEN_BRAIN_V2_ENABLED: boolFromEnv,
+  LLM_MAX_CALLS_PER_CITIZEN_PER_MC_DAY: z.coerce.number().int().default(24),
+  LLM_MAX_ROUTINE_CALLS_PER_WINDOW: z.coerce.number().int().default(8),
+  LLM_ROUTINE_WINDOW_MS: z.coerce.number().int().default(600_000),
+  LLM_MAX_DEEP_REFLECTION_CALLS_PER_MC_DAY: z.coerce.number().int().default(4),
+  /** Optional global LLM call cap; omit / unset for per-citizen only. */
+  LLM_GLOBAL_MAX_CALLS_PER_MC_DAY: z.coerce.number().int().optional(),
   NVIDIA_API_KEY: z.string().optional(),
   NVIDIA_BASE_URL: z.string().default("https://integrate.api.nvidia.com/v1"),
   NVIDIA_MODEL: z.string().default("meta/llama-3.1-8b-instruct"),

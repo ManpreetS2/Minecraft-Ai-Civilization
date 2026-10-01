@@ -1,0 +1,53 @@
+name: CI
+
+# Cloud unit CI only — never launches Minecraft, Paper, RCON, or real LLM providers.
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - cursor/cloud-dev-skeleton-07c8
+      - cursor/brain-persistence-07c8
+      - "cursor/**"
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  typecheck-and-test:
+    name: typecheck + test
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      # Explicitly unset provider secrets so CI cannot accidentally depend on them.
+      NVIDIA_API_KEY: ""
+      GEMINI_API_KEY: ""
+      OPENAI_COMPAT_API_KEY: ""
+      LLM_ENABLED: "false"
+      CITIZEN_BRAIN_V2_ENABLED: "false"
+      AUTO_START_PAPER: "false"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Unit tests (mocks / temp DBs only)
+        run: pnpm test

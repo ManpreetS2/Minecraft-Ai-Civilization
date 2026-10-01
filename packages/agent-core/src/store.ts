@@ -12,6 +12,7 @@ import {
   type SimEvent,
   type Vec3,
 } from "@civ/shared";
+import { applyBrainMigrations } from "./brain-migrations.js";
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -127,6 +128,7 @@ export class CivilizationStore {
     if (!names.has("death_x")) this.db.exec(`ALTER TABLE citizens ADD COLUMN death_x REAL`);
     if (!names.has("death_y")) this.db.exec(`ALTER TABLE citizens ADD COLUMN death_y REAL`);
     if (!names.has("death_z")) this.db.exec(`ALTER TABLE citizens ADD COLUMN death_z REAL`);
+    applyBrainMigrations(this.db);
   }
 
   markDeceased(id: string, at = new Date().toISOString(), position?: Vec3): boolean {
@@ -242,6 +244,34 @@ export class CivilizationStore {
       .run(event.id, event.type, event.timestamp, event.citizenId ?? null, JSON.stringify(event.payload));
   }
 
+  /** Idempotent event append — returns false if event id already present. */
+  appendEventIdempotent(event: SimEvent): boolean {
+    const result = this.db
+      .prepare(
+        `INSERT OR IGNORE INTO events (id, type, timestamp, citizen_id, payload) VALUES (?, ?, ?, ?, ?)`,
+      )
+      .run(event.id, event.type, event.timestamp, event.citizenId ?? null, JSON.stringify(event.payload));
+    return result.changes > 0;
+  }
+
+  countLlmCallsForCitizen(
+    citizenId: string,
+    options: { sinceIso?: string; goalPrefix?: string } = {},
+  ): number {
+    if (options.sinceIso) {
+      const row = this.db
+        .prepare(
+          `SELECT COUNT(*) AS n FROM llm_calls WHERE citizen_id = ? AND timestamp >= ? AND ok = 1`,
+        )
+        .get(citizenId, options.sinceIso) as { n: number };
+      return row.n;
+    }
+    const row = this.db
+      .prepare(`SELECT COUNT(*) AS n FROM llm_calls WHERE citizen_id = ? AND ok = 1`)
+      .get(citizenId) as { n: number };
+    return row.n;
+  }
+
   recentEvents(limit = 100): SimEvent[] {
     const rows = this.db
       .prepare(`SELECT * FROM events ORDER BY timestamp DESC LIMIT ?`)
@@ -270,6 +300,25 @@ export class CivilizationStore {
         createdAt: memory.createdAt,
         relatedCitizenId: memory.relatedCitizenId ?? null,
       });
+  }
+
+  /** Idempotent memory insert by id — returns false if already present. */
+  addMemoryIdempotent(memory: MemoryRecord): boolean {
+    const result = this.db
+      .prepare(
+        `INSERT OR IGNORE INTO memories (id, citizen_id, kind, content, importance, created_at, related_citizen_id)
+         VALUES (@id, @citizenId, @kind, @content, @importance, @createdAt, @relatedCitizenId)`,
+      )
+      .run({
+        id: memory.id,
+        citizenId: memory.citizenId,
+        kind: memory.kind,
+        content: memory.content,
+        importance: memory.importance,
+        createdAt: memory.createdAt,
+        relatedCitizenId: memory.relatedCitizenId ?? null,
+      });
+    return result.changes > 0;
   }
 
   getMemories(citizenId: string, limit = 20): MemoryRecord[] {
@@ -446,22 +495,83 @@ export class CivilizationStore {
     goal?: string;
     reason?: string;
     error?: string;
+    decisionCategory?: string;
+    mcDay?: number;
+    provider?: string;
+    model?: string;
+    fallbackUsed?: boolean;
+    decisionId?: string;
+    countsTowardBudget?: boolean;
+    timestamp?: string;
+    id?: string;
   }): void {
     this.db
       .prepare(
-        `INSERT INTO llm_calls (id, citizen_id, timestamp, latency_ms, ok, goal, reason, error)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO llm_calls (
+          id, citizen_id, timestamp, latency_ms, ok, goal, reason, error,
+          decision_category, mc_day, provider, model, fallback_used, decision_id, counts_toward_budget
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
-        crypto.randomUUID(),
+        entry.id ?? crypto.randomUUID(),
         entry.citizenId ?? null,
-        new Date().toISOString(),
+        entry.timestamp ?? new Date().toISOString(),
         entry.latencyMs,
         entry.ok ? 1 : 0,
         entry.goal ?? null,
         entry.reason ?? null,
         entry.error ?? null,
+        entry.decisionCategory ?? null,
+        entry.mcDay ?? null,
+        entry.provider ?? null,
+        entry.model ?? null,
+        entry.fallbackUsed ? 1 : 0,
+        entry.decisionId ?? null,
+        entry.countsTowardBudget ? 1 : 0,
       );
+  }
+
+  hasBudgetCountForDecision(decisionId: string): boolean {
+    const row = this.db
+      .prepare(
+        `SELECT 1 AS ok FROM llm_calls WHERE decision_id = ? AND counts_toward_budget = 1 LIMIT 1`,
+      )
+      .get(decisionId) as { ok: number } | undefined;
+    return Boolean(row);
+  }
+
+  listBudgetConsumingLlmCalls(): Array<{
+    citizenId: string;
+    decisionCategory: import("@civ/shared").DecisionCategory;
+    timestamp: string;
+    mcDay: number;
+    decisionId: string | null;
+  }> {
+    const rows = this.db
+      .prepare(
+        `SELECT citizen_id, decision_category, timestamp, mc_day, decision_id
+         FROM llm_calls
+         WHERE counts_toward_budget = 1
+           AND ok = 1
+           AND citizen_id IS NOT NULL
+           AND decision_category IS NOT NULL
+           AND decision_category != 'NO_LLM'
+         ORDER BY timestamp ASC`,
+      )
+      .all() as Array<{
+      citizen_id: string;
+      decision_category: string;
+      timestamp: string;
+      mc_day: number | null;
+      decision_id: string | null;
+    }>;
+    return rows.map((r) => ({
+      citizenId: r.citizen_id,
+      decisionCategory: r.decision_category as import("@civ/shared").DecisionCategory,
+      timestamp: r.timestamp,
+      mcDay: r.mc_day ?? 0,
+      decisionId: r.decision_id,
+    }));
   }
 
   recentLlmCalls(limit = 50): Array<Record<string, unknown>> {

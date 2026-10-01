@@ -30,6 +30,8 @@ describe("config", () => {
     expect(cfg.MINECRAFT_AUTH_MODE).toBe("offline");
     expect(cfg.LLM_ENABLED).toBe(false);
     expect(cfg.SIM_ASSIGN_WORK_ROLES).toBe(false);
+    expect(cfg.CITIZEN_BRAIN_V2_ENABLED).toBe(false);
+    expect(cfg.LLM_MAX_CALLS_PER_CITIZEN_PER_MC_DAY).toBe(24);
     expect(cfg.NVIDIA_BASE_URL).toBe("https://integrate.api.nvidia.com/v1");
   });
 

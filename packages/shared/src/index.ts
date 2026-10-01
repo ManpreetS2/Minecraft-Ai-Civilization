@@ -2,6 +2,7 @@ export * from "./action-result.js";
 export * from "./action-trace.js";
 export * from "./async.js";
 export * from "./brain-types.js";
+export * from "./commitment-target.js";
 export * from "./config.js";
 export * from "./events.js";
 export * from "./format-event.js";

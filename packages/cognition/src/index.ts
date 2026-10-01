@@ -156,4 +156,12 @@ export {
 export { updateMood, separateWorldBeliefEmotion, type MoodEvent } from "./psychology.js";
 export { CitizenBrain, type BrainObserveArgs, type BrainDecisionResult } from "./brain.js";
 export { formatCognitionTrace, assertNoSecretsInTrace, type CognitionTrace } from "./cognition-trace.js";
+export {
+  checkModelBudget,
+  countCitizenBudgetUsage,
+  DEFAULT_MODEL_BUDGET,
+  type ModelBudgetConfig,
+  type BudgetCallRecord,
+  type BudgetDecision,
+} from "./model-budget.js";
 export { resolveLlmModel };

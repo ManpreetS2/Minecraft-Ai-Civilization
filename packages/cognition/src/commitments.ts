@@ -1,9 +1,11 @@
 import type { Commitment, CommitmentStatus } from "@civ/shared";
 
 export type CreateCommitmentInput = {
+  id?: string;
   ownerCitizenId: string;
   counterpartyId?: string;
   goal: string;
+  payload?: string;
   createdAt?: string;
   expiresAt?: string;
   reconsiderAt?: string;
@@ -11,12 +13,15 @@ export type CreateCommitmentInput = {
 };
 
 export function createCommitment(input: CreateCommitmentInput): Commitment {
+  const createdAt = input.createdAt ?? new Date().toISOString();
   return {
-    id: crypto.randomUUID(),
+    id: input.id ?? crypto.randomUUID(),
     ownerCitizenId: input.ownerCitizenId,
     counterpartyId: input.counterpartyId,
     goal: input.goal.trim(),
-    createdAt: input.createdAt ?? new Date().toISOString(),
+    payload: input.payload,
+    createdAt,
+    updatedAt: createdAt,
     status: "ACTIVE",
     evidence: [...(input.evidence ?? [])],
     expiresAt: input.expiresAt,
@@ -33,21 +38,34 @@ export function updateCommitmentStatus(
   commitment: Commitment,
   status: CommitmentStatus,
   evidence?: string,
+  failureReason?: string,
 ): Commitment {
   if (status === "COMPLETED") {
     throw new Error("Use completeCommitment() with verified evidence");
   }
+  const now = new Date().toISOString();
   return {
     ...commitment,
     status,
+    updatedAt: now,
+    failureReason: status === "FAILED" ? (failureReason ?? evidence) : commitment.failureReason,
     evidence: evidence ? [...commitment.evidence, evidence] : commitment.evidence,
   };
 }
 
+export type CompleteCommitmentOptions = {
+  completionEvidenceEventId?: string;
+  now?: string;
+};
+
 export function completeCommitment(
   commitment: Commitment,
   verifiedEvidence: string[],
+  options: CompleteCommitmentOptions = {},
 ): Commitment | { error: string } {
+  if (commitment.status === "COMPLETED") {
+    return { error: `Commitment already COMPLETED` };
+  }
   if (commitment.status !== "ACTIVE") {
     return { error: `Commitment not ACTIVE (${commitment.status})` };
   }
@@ -67,10 +85,18 @@ export function completeCommitment(
   if (!hasVerifiedMarker) {
     return { error: "Evidence lacks verification marker; not inventing success" };
   }
+  const fromEvidence = clean.find((e) => e.startsWith("event:"))?.slice("event:".length);
+  const completionEvidenceEventId = options.completionEvidenceEventId ?? fromEvidence;
+  if (!completionEvidenceEventId) {
+    return { error: "Refusing COMPLETE without completionEvidenceEventId" };
+  }
+  const now = options.now ?? new Date().toISOString();
   return {
     ...commitment,
     status: "COMPLETED",
+    updatedAt: now,
     completionEvidence: clean,
+    completionEvidenceEventId,
     evidence: [...commitment.evidence, ...clean],
   };
 }
@@ -80,7 +106,12 @@ export function expireCommitments(commitments: Commitment[], nowIso: string): Co
   return commitments.map((c) => {
     if (c.status !== "ACTIVE" || !c.expiresAt) return c;
     if (Date.parse(c.expiresAt) <= now) {
-      return { ...c, status: "EXPIRED" as const, evidence: [...c.evidence, `expired:${nowIso}`] };
+      return {
+        ...c,
+        status: "EXPIRED" as const,
+        updatedAt: nowIso,
+        evidence: [...c.evidence, `expired:${nowIso}`],
+      };
     }
     return c;
   });

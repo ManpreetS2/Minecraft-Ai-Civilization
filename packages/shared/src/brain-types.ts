@@ -14,12 +14,45 @@ export type Commitment = {
   ownerCitizenId: string;
   counterpartyId?: string;
   goal: string;
+  /** Bounded structured target JSON string when needed. */
+  payload?: string;
   createdAt: string;
+  updatedAt?: string;
   status: CommitmentStatus;
   evidence: string[];
   expiresAt?: string;
   reconsiderAt?: string;
   completionEvidence?: string[];
+  completionEvidenceEventId?: string;
+  failureReason?: string;
+};
+
+/** Persistable high-level cognition state only — never pathfinder/HTTP handles. */
+export type CognitionState = {
+  citizenId: string;
+  currentHighLevelGoal?: string;
+  goalStartedAt?: string;
+  lastDeliberationAt?: string;
+  reconsiderAfter?: string;
+  lastMajorEventId?: string;
+  lastDecisionCategory?: DecisionCategory;
+  moodLabel?: MoodAffect["label"];
+  moodIntensity?: number;
+  moodEvidenceCount?: number;
+  moodUpdatedAt?: string;
+  updatedAt: string;
+};
+
+export type LearnedBehaviorEvidenceRow = {
+  id: string;
+  eventId: string;
+  citizenId: string;
+  dimension: LearnedDimension;
+  direction: -1 | 1;
+  weight: number;
+  observedAt: string;
+  source: string;
+  confidence: number;
 };
 
 export type MoodAffect = {
