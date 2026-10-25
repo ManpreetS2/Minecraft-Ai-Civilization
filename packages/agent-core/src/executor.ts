@@ -49,6 +49,7 @@ export function persistConfirmed(result: ActionResult): boolean {
 /**
  * Episodic completion text, or undefined when we must not claim the goal was saved.
  * Physical success with persisted=false is not converted into a failure string.
+ * Intermediate shelter steps (complete !== true) never write "Completed build_shelter".
  */
 export function completionMemoryForTask(task: string, result: ActionResult): string | undefined {
   if (!result.success) {
@@ -62,6 +63,9 @@ export function completionMemoryForTask(task: string, result: ActionResult): str
     return `Newly gathered food${typeof gained === "number" ? ` (+${gained})` : ""}`;
   }
   if (task === "build_shelter") {
+    const complete =
+      result.data && typeof result.data === "object" && (result.data as { complete?: unknown }).complete === true;
+    if (!complete) return undefined;
     if (!persistConfirmed(result)) {
       return `Task build_shelter succeeded physically but was not persisted`;
     }

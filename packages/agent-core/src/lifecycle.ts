@@ -63,6 +63,12 @@ export class OperationTracker {
     const tracked = operation.finally(() => {
       this.pending.delete(tracked);
     });
+    // finally() re-rejects; handle it so drain accounting cannot surface as
+    // unhandledRejection while the tracker is still active.
+    void tracked.then(
+      () => undefined,
+      () => undefined,
+    );
     this.pending.add(tracked);
     return operation;
   }

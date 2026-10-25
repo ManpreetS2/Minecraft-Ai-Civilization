@@ -80,6 +80,49 @@ describe("OperationTracker", () => {
     expect(a.fullyDrained).toBe(true);
   });
 
+  it("does not create unhandled rejections when an active or draining op rejects", async () => {
+    const unhandled: unknown[] = [];
+    const onUnhandled = (reason: unknown) => {
+      unhandled.push(reason);
+    };
+    process.on("unhandledRejection", onUnhandled);
+    try {
+      const active = new OperationTracker();
+      let rejectActive!: (error: unknown) => void;
+      const activeOp = new Promise<never>((_, reject) => {
+        rejectActive = reject;
+      });
+      const activeTracked = active.track(activeOp);
+      expect(active.size).toBe(1);
+      rejectActive(new Error("active action failed"));
+      await expect(activeTracked).rejects.toThrow("active action failed");
+      await new Promise((r) => setImmediate(r));
+      await new Promise((r) => setImmediate(r));
+      expect(unhandled).toEqual([]);
+      expect(active.size).toBe(0);
+
+      const draining = new OperationTracker();
+      let rejectDraining!: (error: unknown) => void;
+      const drainingOp = new Promise<never>((_, reject) => {
+        rejectDraining = reject;
+      });
+      const drainingTracked = draining.track(drainingOp);
+      const drain = draining.drainAndClose(2_000);
+      expect(draining.isShuttingDown).toBe(true);
+      rejectDraining(new Error("drain action failed"));
+      await expect(drainingTracked).rejects.toThrow("drain action failed");
+      const result = await drain;
+      await new Promise((r) => setImmediate(r));
+      await new Promise((r) => setImmediate(r));
+      expect(unhandled).toEqual([]);
+      expect(result.fullyDrained).toBe(true);
+      expect(result.remaining).toBe(0);
+      expect(draining.size).toBe(0);
+    } finally {
+      process.off("unhandledRejection", onUnhandled);
+    }
+  });
+
   it("does not create unhandled rejections when discarded after close", async () => {
     const tracker = new OperationTracker();
     await tracker.drainAndClose();

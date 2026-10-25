@@ -29,6 +29,14 @@ describe("shelter completion honesty", () => {
     expect(completionMemoryForTask("build_shelter", durable)).toBe("Completed build_shelter");
   });
 
+  it("does not claim completion for a successful incomplete construction step", () => {
+    const intermediate = ok({ complete: false, persisted: true, placed: 3, total: 12 }, 8);
+    expect(intermediate.success).toBe(true);
+    expect(persistConfirmed(intermediate)).toBe(true);
+    const memory = completionMemoryForTask("build_shelter", intermediate);
+    expect(memory).toBeUndefined();
+  });
+
   it("does not convert physical success into a physical failure string", () => {
     const physical = ok({ complete: true, persisted: false }, 8);
     const memory = completionMemoryForTask("build_shelter", physical);
