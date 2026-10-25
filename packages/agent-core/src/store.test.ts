@@ -27,6 +27,15 @@ describe("CivilizationStore", () => {
     restored.close();
   });
 
+  it("safeRead returns closed instead of throwing after close", () => {
+    const dir = mkdtempSync(join(tmpdir(), "civ-"));
+    const path = join(dir, "read.sqlite");
+    const store = new CivilizationStore(path);
+    expect(store.safeRead("settlement", () => store.getSettlement()).ok).toBe(true);
+    store.close();
+    expect(store.safeRead("settlement", () => store.getSettlement())).toEqual({ ok: false, reason: "closed" });
+  });
+
   it("distinguishes closed skips from unexpected write errors", () => {
     const dir = mkdtempSync(join(tmpdir(), "civ-"));
     const path = join(dir, "closed.sqlite");

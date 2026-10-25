@@ -2,7 +2,8 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { createEvent, loadConfig } from "@civ/shared";
+import { MinecraftBody } from "@civ/minecraft-adapter";
+import { createEvent, fail, loadConfig, ok } from "@civ/shared";
 import { OperationTracker } from "./lifecycle.js";
 import { AgentManager } from "./manager.js";
 import { CivilizationStore } from "./store.js";
@@ -193,3 +194,189 @@ describe("AgentManager shutdown safety", () => {
     await fresh.stop();
   });
 });
+
+class ControllableBody extends MinecraftBody {
+  readonly connectGate = deferred<void>();
+  connectCalls = 0;
+  private online = false;
+  private aborted = false;
+
+  override get connected(): boolean {
+    return this.online;
+  }
+
+  override async connect() {
+    this.connectCalls += 1;
+    await this.connectGate.promise;
+    if (this.aborted || this.isDeceased()) {
+      this.online = false;
+      return fail("CANCELLED", "startup-interrupted", 0);
+    }
+    this.online = true;
+    return ok({ username: this.username }, 1);
+  }
+
+  override async disconnect(reason = "shutdown"): Promise<void> {
+    this.aborted = true;
+    this.online = false;
+    await super.disconnect(reason);
+  }
+}
+
+describe("tick/shutdown overlap", () => {
+  it("waits for a suspended tick and does not read SQLite after close", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "civ-tick-"));
+    const path = join(dir, "tick.sqlite");
+    const store = new CivilizationStore(path);
+    const entered = deferred<void>();
+    const resume = deferred<void>();
+    let readsAfterClose = 0;
+    const orig = store.getSettlement.bind(store);
+    store.getSettlement = () => {
+      if (!store.isOpen()) {
+        readsAfterClose += 1;
+        throw new Error("getSettlement after close");
+      }
+      return orig();
+    };
+
+    const manager = new AgentManager(testConfig(path), store, undefined, {
+      afterTickReads: async () => {
+        entered.resolve();
+        await resume.promise;
+      },
+    });
+    manager["running"] = true;
+    const tickP = manager["tick"]() as Promise<void>;
+    await entered.promise;
+    expect(store.isOpen()).toBe(true);
+
+    const stopP = manager.stop();
+    resume.resolve();
+    await tickP;
+    await stopP;
+
+    expect(store.isOpen()).toBe(false);
+    expect(readsAfterClose).toBe(0);
+    expect(manager.lastShutdownDrain()?.fullyDrained).toBe(true);
+  });
+
+  it("reports incomplete shutdown when a suspended tick outlives the drain timeout", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "civ-tick-"));
+    const path = join(dir, "tick-timeout.sqlite");
+    const store = new CivilizationStore(path);
+    const entered = deferred<void>();
+    const resume = deferred<void>();
+    let readsAfterClose = 0;
+    const orig = store.getSettlement.bind(store);
+    store.getSettlement = () => {
+      if (!store.isOpen()) {
+        readsAfterClose += 1;
+        throw new Error("getSettlement after close");
+      }
+      return orig();
+    };
+
+    const manager = new AgentManager(testConfig(path), store, undefined, {
+      drainTimeoutMs: 40,
+      afterTickReads: async () => {
+        entered.resolve();
+        await resume.promise;
+      },
+    });
+    manager["running"] = true;
+    const tickP = manager["tick"]() as Promise<void>;
+    await entered.promise;
+
+    await manager.stop();
+    expect(store.isOpen()).toBe(false);
+    expect(manager.lastShutdownDrain()?.timedOut).toBe(true);
+    expect(manager.lastShutdownDrain()?.fullyDrained).toBe(false);
+
+    resume.resolve();
+    await tickP;
+    expect(readsAfterClose).toBe(0);
+  });
+
+  it("does not overlap tick executions", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "civ-tick-"));
+    const path = join(dir, "overlap.sqlite");
+    const store = new CivilizationStore(path);
+    let concurrent = 0;
+    let maxConcurrent = 0;
+    const manager = new AgentManager(testConfig(path), store, undefined, {
+      beforeTick: async () => {
+        concurrent += 1;
+        maxConcurrent = Math.max(maxConcurrent, concurrent);
+        await new Promise((r) => setTimeout(r, 30));
+        concurrent -= 1;
+      },
+    });
+    manager["running"] = true;
+    await Promise.all([manager["tick"]() as Promise<void>, manager["tick"]() as Promise<void>]);
+    expect(maxConcurrent).toBe(1);
+    await manager.stop();
+  });
+});
+
+describe("startup connection/shutdown races", () => {
+  it("disconnects a late connection and does not leave the bot online", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "civ-conn-"));
+    const path = join(dir, "conn.sqlite");
+    const store = new CivilizationStore(path);
+    const bodies: ControllableBody[] = [];
+    const manager = new AgentManager(testConfig(path), store, undefined, {
+      bodyFactory: (options) => {
+        const body = new ControllableBody({ ...options, lockDir: dir });
+        bodies.push(body);
+        return body;
+      },
+    });
+
+    const startP = manager.start(1);
+    const deadline = Date.now() + 2_000;
+    while (bodies.length === 0 && Date.now() < deadline) {
+      await new Promise((r) => setTimeout(r, 5));
+    }
+    expect(bodies).toHaveLength(1);
+    expect(bodies[0]?.connectCalls).toBe(1);
+
+    const stopP = manager.stop();
+    bodies[0]?.connectGate.resolve();
+    await startP;
+    await stopP;
+
+    expect(bodies[0]?.connected).toBe(false);
+    expect(store.isOpen()).toBe(false);
+  });
+
+  it("does not start a second citizen connect after shutdown begins", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "civ-conn-"));
+    const path = join(dir, "conn2.sqlite");
+    const store = new CivilizationStore(path);
+    const bodies: ControllableBody[] = [];
+    const manager = new AgentManager(testConfig(path), store, undefined, {
+      bodyFactory: (options) => {
+        const body = new ControllableBody({ ...options, lockDir: dir });
+        bodies.push(body);
+        return body;
+      },
+    });
+
+    const startP = manager.start(2);
+    const deadline = Date.now() + 2_000;
+    while (bodies.length === 0 && Date.now() < deadline) {
+      await new Promise((r) => setTimeout(r, 5));
+    }
+    expect(bodies).toHaveLength(1);
+
+    const stopP = manager.stop();
+    bodies[0]?.connectGate.resolve();
+    await startP;
+    await stopP;
+
+    expect(bodies).toHaveLength(1);
+    expect(bodies[0]?.connected).toBe(false);
+  });
+});
+

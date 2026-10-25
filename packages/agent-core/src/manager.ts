@@ -1,4 +1,9 @@
-import { MinecraftBody, activePathCount, lastPathDurationMs } from "@civ/minecraft-adapter";
+import {
+  MinecraftBody,
+  activePathCount,
+  lastPathDurationMs,
+  type MinecraftBodyOptions,
+} from "@civ/minecraft-adapter";
 import { createCognition, type CognitionProvider, type HighLevelDecision } from "@civ/cognition";
 import { createMemory, retrieveRelevant } from "@civ/memory";
 import { applySocialEvent, sameWorkFamily, SocialDirector } from "@civ/society";
@@ -48,6 +53,17 @@ let llmInFlight = 0;
 let lastLlmMs = 0;
 let lastTaskMs = 0;
 
+export type AgentManagerHooks = {
+  /** Awaited after a tick is tracked, before any store reads (tests: suspend vs stop). */
+  beforeTick?: () => Promise<void>;
+  /** Awaited after the settlement read, before the citizen loop / snapshot. */
+  afterTickReads?: () => Promise<void>;
+  /** Injectable Mineflayer body factory — tests must not connect to a real server. */
+  bodyFactory?: (options: MinecraftBodyOptions) => MinecraftBody;
+  /** Override drain timeout (tests). */
+  drainTimeoutMs?: number;
+};
+
 export class AgentManager {
   readonly events = new EventBus(400);
   readonly store: CivilizationStore;
@@ -65,20 +81,30 @@ export class AgentManager {
   private stopPromise?: Promise<void>;
   private lastDrain?: DrainResult;
   private readonly ops = new OperationTracker();
+  private readonly hooks: AgentManagerHooks;
   private unsubscribeEvents?: () => void;
   private snapshot: DashboardSnapshot;
   private lastTickMs = 0;
+  private activeTick?: Promise<void>;
+  private emittingPersistenceError = false;
 
-  constructor(config: AppConfig, store?: CivilizationStore, cognition?: CognitionProvider) {
+  constructor(
+    config: AppConfig,
+    store?: CivilizationStore,
+    cognition?: CognitionProvider,
+    hooks: AgentManagerHooks = {},
+  ) {
     this.config = config;
     this.store = store ?? new CivilizationStore(resolveFromRoot(config.DATABASE_PATH));
     this.cognition = cognition ?? createCognition(config);
+    this.hooks = hooks;
     this.snapshot = emptySnapshot();
     this.unsubscribeEvents = this.events.on((event) => {
       if (!this.store.isOpen()) return;
       this.eventTimes.push(Date.now());
       const wrote = this.store.safeWrite("appendEvent", () => this.store.appendEvent(event));
       if (!wrote.ok && wrote.reason === "error") {
+        // Never emit another event here — persistence failures must not recurse.
         console.error(
           `[manager] unexpected event persistence failure: ${wrote.error instanceof Error ? wrote.error.message : String(wrote.error)}`,
         );
@@ -141,7 +167,8 @@ export class AgentManager {
           createdAt: new Date().toISOString(),
           status: "offline" as const,
         };
-        const body = new MinecraftBody({
+        const bodyFactory = this.hooks.bodyFactory ?? ((options) => new MinecraftBody(options));
+        const body = bodyFactory({
           username: identity.name,
           config: this.config,
           events: this.events,
@@ -163,15 +190,17 @@ export class AgentManager {
           continue;
         }
         if (!this.shouldContinueStartup()) break;
-        const result = await body.connect();
+        const connecting = body.connect();
+        void this.ops.track(connecting);
+        const result = await connecting;
         if (!this.shouldContinueStartup() || !this.store.isOpen()) {
-          if (result.success) await body.disconnect("startup-interrupted");
+          if (result.success || body.connected) await body.disconnect("startup-interrupted");
           break;
         }
         record.status = result.success ? "online" : "error";
         record.reason = result.success ? "connected" : result.error;
         this.persistCitizen(record);
-        await delay(1500);
+        await this.interruptibleDelay(1500);
       }
 
       if (!this.shouldContinueStartup()) {
@@ -211,7 +240,7 @@ export class AgentManager {
       citizen.abort?.abort();
     }
 
-    this.lastDrain = await this.ops.drainAndClose();
+    this.lastDrain = await this.ops.drainAndClose(this.hooks.drainTimeoutMs ?? 8_000);
     if (!this.lastDrain.fullyDrained) {
       console.warn(
         `[shutdown] drain incomplete: attempted=${this.lastDrain.attempted} remaining=${this.lastDrain.remaining} timedOut=${this.lastDrain.timedOut}`,
@@ -237,33 +266,38 @@ export class AgentManager {
     this.unsubscribeEvents = undefined;
   }
 
-  private reportWrite(label: string, result: StoreWriteResult): void {
-    if (result.ok || result.reason === "closed") return;
+  private reportWrite(label: string, result: StoreWriteResult): StoreWriteResult {
+    if (result.ok || result.reason === "closed") return result;
     console.error(`[manager] unexpected persistence failure (${label})`);
-    if (this.store.isOpen()) {
+    if (this.emittingPersistenceError || !this.store.isOpen()) return result;
+    this.emittingPersistenceError = true;
+    try {
       this.events.emit(
         createEvent("ErrorOccurred", {
           error: `Persistence failed (${label}): ${result.error instanceof Error ? result.error.message : String(result.error)}`,
           durable: false,
         }),
       );
+    } finally {
+      this.emittingPersistenceError = false;
     }
+    return result;
   }
 
-  private persistCitizen(record: CitizenRecord): void {
-    this.reportWrite("upsertCitizen", this.store.safeWrite("upsertCitizen", () => this.store.upsertCitizen(record)));
+  private persistCitizen(record: CitizenRecord): StoreWriteResult {
+    return this.reportWrite("upsertCitizen", this.store.safeWrite("upsertCitizen", () => this.store.upsertCitizen(record)));
   }
 
-  private persistMemory(...args: Parameters<CivilizationStore["addMemory"]>): void {
-    this.reportWrite("addMemory", this.store.safeWrite("addMemory", () => this.store.addMemory(...args)));
+  private persistMemory(...args: Parameters<CivilizationStore["addMemory"]>): StoreWriteResult {
+    return this.reportWrite("addMemory", this.store.safeWrite("addMemory", () => this.store.addMemory(...args)));
   }
 
-  private persistLlmCall(...args: Parameters<CivilizationStore["logLlmCall"]>): void {
-    this.reportWrite("logLlmCall", this.store.safeWrite("logLlmCall", () => this.store.logLlmCall(...args)));
+  private persistLlmCall(...args: Parameters<CivilizationStore["logLlmCall"]>): StoreWriteResult {
+    return this.reportWrite("logLlmCall", this.store.safeWrite("logLlmCall", () => this.store.logLlmCall(...args)));
   }
 
-  private persistRelationship(...args: Parameters<CivilizationStore["saveRelationship"]>): void {
-    this.reportWrite(
+  private persistRelationship(...args: Parameters<CivilizationStore["saveRelationship"]>): StoreWriteResult {
+    return this.reportWrite(
       "saveRelationship",
       this.store.safeWrite("saveRelationship", () => this.store.saveRelationship(...args)),
     );
@@ -274,17 +308,50 @@ export class AgentManager {
     this.events.emit(event);
   }
 
-  private async tick(): Promise<void> {
+  private async interruptibleDelay(ms: number): Promise<void> {
+    const until = Date.now() + ms;
+    while (Date.now() < until && this.shouldContinueStartup()) {
+      await delay(Math.min(50, until - Date.now()));
+    }
+  }
+
+  private tick(): Promise<void> {
+    if (this.activeTick) return this.activeTick;
+    if (!this.running || !this.ops.canAcceptWork() || !this.store.isOpen()) {
+      return Promise.resolve();
+    }
+    const work = this.runTick();
+    this.activeTick = this.ops
+      .track(work)
+      .then(
+        () => undefined,
+        () => undefined,
+      )
+      .finally(() => {
+        this.activeTick = undefined;
+      });
+    return this.activeTick;
+  }
+
+  private async runTick(): Promise<void> {
+    await this.hooks.beforeTick?.();
     if (!this.running || !this.ops.canAcceptWork() || !this.store.isOpen()) return;
+
     const started = Date.now();
     const online = [...this.citizens.values()].filter((c) => c.body.connected && !c.body.isDeceased());
-    const settlement = this.store.getSettlement();
+    const settlementRead = this.store.safeRead("getSettlement", () => this.store.getSettlement());
+    if (!settlementRead.ok) return;
+    const settlement = settlementRead.value;
     const assignments = assignSettlementNeeds(
       online.map((c) => c.record.id),
       settlement.needs,
     );
 
+    await this.hooks.afterTickReads?.();
+    if (!this.running || !this.store.isOpen()) return;
+
     for (const citizen of this.citizens.values()) {
+      if (!this.store.isOpen()) return;
       try {
         await this.tickCitizen(citizen, settlement, assignments.get(citizen.record.id) ?? []);
       } catch (error) {
@@ -305,6 +372,7 @@ export class AgentManager {
     this.lastTickMs = Date.now() - started;
     this.tickSamples.push(this.lastTickMs);
     if (this.tickSamples.length > 40) this.tickSamples.shift();
+    if (!this.store.isOpen()) return;
     this.refreshSnapshot();
   }
 
@@ -343,8 +411,9 @@ export class AgentManager {
       citizen.lastLlmAt = now;
       llmInFlight += 1;
       const started = Date.now();
-      const memories = this.store.isOpen()
-        ? retrieveRelevant(this.store.getMemories(citizen.record.id), assignedNeeds.join(" "), 5)
+      const memoryRead = this.store.safeRead("getMemories", () => this.store.getMemories(citizen.record.id));
+      const memories = memoryRead.ok
+        ? retrieveRelevant(memoryRead.value, assignedNeeds.join(" "), 5)
         : [];
       const decisionWork = this.cognition
         .decide({
@@ -527,9 +596,16 @@ export class AgentManager {
     });
 
     if (decision.applyRelationship && taskSucceeded) {
-      let rel = this.store.getRelationship(citizen.record.id, other.record.id);
-      rel = applySocialEvent(rel, trigger);
-      this.persistRelationship(rel);
+      const relRead = this.store.safeRead("getRelationship", () =>
+        this.store.getRelationship(citizen.record.id, other.record.id),
+      );
+      if (!relRead.ok) return;
+      const rel = applySocialEvent(relRead.value, trigger);
+      const wrote = this.persistRelationship(rel);
+      if (!wrote.ok) {
+        // Physical/social moment may have happened; do not claim a durable relationship change.
+        return;
+      }
       this.social.noteRelationshipApplied(citizen.record.name, other.record.name, trigger, task);
       this.emitIfLive(
         createEvent(
@@ -590,9 +666,11 @@ export class AgentManager {
     const now = Date.now();
     if (now - (this.lastProximityAt.get(pair) ?? 0) < 5 * 60_000) return;
     this.lastProximityAt.set(pair, now);
-    let rel = this.store.getRelationship(citizen.record.id, other.record.id);
-    rel = applySocialEvent(rel, "proximity");
-    this.persistRelationship(rel);
+    const relRead = this.store.safeRead("getRelationship", () =>
+      this.store.getRelationship(citizen.record.id, other.record.id),
+    );
+    if (!relRead.ok) return;
+    this.persistRelationship(applySocialEvent(relRead.value, "proximity"));
   }
 
   private handleDeathEvent(event: SimEvent): void {
@@ -654,6 +732,7 @@ export class AgentManager {
   }
 
   private refreshSnapshot(): void {
+    if (!this.store.isOpen()) return;
     const names: Record<string, string> = {};
     const citizens = [...this.citizens.values()].map((c) => {
       names[c.record.id] = c.record.name;
@@ -666,17 +745,24 @@ export class AgentManager {
       };
     });
     const rawEvents = this.events.getRecent(80);
+    const settlement = this.store.safeRead("snapshot.settlement", () => this.store.getSettlement());
+    const memories = this.store.safeRead("snapshot.memories", () => citizens.flatMap((c) => this.store.getMemories(c.id, 5)));
+    const relationships = this.store.safeRead("snapshot.relationships", () =>
+      citizens.flatMap((c) => this.store.listRelationships(c.id)),
+    );
+    const llmCalls = this.store.safeRead("snapshot.llmCalls", () => this.store.recentLlmCalls(30));
+    if (!settlement.ok || !memories.ok || !relationships.ok || !llmCalls.ok) return;
     this.snapshot = {
       updatedAt: new Date().toISOString(),
       population: this.citizens.size,
       activeBots: citizens.filter((c) => c.connected).length,
       citizens,
-      settlement: this.store.getSettlement(),
+      settlement: settlement.value,
       events: rawEvents,
       presentedEvents: rawEvents.map((event) => formatSimEvent(event, names)),
-      memories: citizens.flatMap((c) => this.store.getMemories(c.id, 5)),
-      relationships: citizens.flatMap((c) => this.store.listRelationships(c.id)),
-      llmCalls: this.store.recentLlmCalls(30),
+      memories: memories.value,
+      relationships: relationships.value,
+      llmCalls: llmCalls.value,
       performance: this.performance(),
     };
   }
@@ -745,3 +831,4 @@ function delay(ms: number): Promise<void> {
 }
 
 export { CivilizationStore } from "./store.js";
+

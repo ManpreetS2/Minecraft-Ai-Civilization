@@ -174,6 +174,11 @@ export class MinecraftBody extends EventEmitter {
       };
 
       bot.once("spawn", () => {
+        if (this.shuttingDown || this.deceased) {
+          this.teardownBot("shutdown-during-connect");
+          finish(fail("CANCELLED", `Connect cancelled for ${this.username}`, Date.now() - started));
+          return;
+        }
         this.spawned = true;
         this.reconnectAttempt = 0;
         this.emit("spawned");

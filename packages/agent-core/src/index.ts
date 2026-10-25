@@ -1,5 +1,5 @@
-export { AgentManager, type DashboardSnapshot } from "./manager.js";
-export { CivilizationStore, computeNeeds, type StoreWriteResult } from "./store.js";
+export { AgentManager, type DashboardSnapshot, type AgentManagerHooks } from "./manager.js";
+export { CivilizationStore, computeNeeds, type StoreWriteResult, type StoreReadResult } from "./store.js";
 export { assignSettlementNeeds, planCitizen, type PlannedTask } from "./planner.js";
 export { starterHut, materialList } from "./blueprint.js";
 export {
@@ -7,6 +7,7 @@ export {
   gatherFood,
   countInventoryFood,
   finalizeFoodGather,
+  persistConstructionProgress,
   type FoodGatherSuccess,
 } from "./executor.js";
 export {

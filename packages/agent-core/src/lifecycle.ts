@@ -46,6 +46,11 @@ export class OperationTracker {
     if (this.closed) {
       return Promise.reject(new Error("OperationTracker is closed"));
     }
+    // Refuse new work after shutdown begins so drain's snapshot cannot miss a
+    // late connect/tick. Callers still receive the original promise to cancel.
+    if (this.shuttingDown) {
+      return operation;
+    }
     const tracked = operation.finally(() => {
       this.pending.delete(tracked);
     });

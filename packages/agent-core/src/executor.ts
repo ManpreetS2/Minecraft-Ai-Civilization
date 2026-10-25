@@ -353,17 +353,17 @@ async function buildShelter(ctx: SkillContext, store: CivilizationStore): Promis
     }
     const completeWrite = store.safeWrite("saveSettlement:complete", () => store.saveSettlement(settlement));
     if (!completeWrite.ok) {
-      return fail(
-        "DATABASE_ERROR",
-        completeWrite.reason === "closed"
-          ? "Store closed while completing shelter"
-          : `Unexpected DB error while completing shelter: ${completeWrite.error instanceof Error ? completeWrite.error.message : String(completeWrite.error)}`,
+      return ok(
+        {
+          complete: true,
+          persisted: false,
+          persistReason: completeWrite.reason,
+        },
         0,
-        completeWrite.reason === "closed",
       );
     }
-    ctx.events?.emit(createEvent("ConstructionCompleted", { blueprint: hut.id }, ctx.citizenId));
-    return { success: true, data: { complete: true }, durationMs: 0 };
+    ctx.events?.emit(createEvent("ConstructionCompleted", { blueprint: hut.id, persisted: true }, ctx.citizenId));
+    return { success: true, data: { complete: true, persisted: true }, durationMs: 0 };
   }
 
   const itemName = next.block === "oak_door" ? "oak_door" : next.block;
@@ -388,10 +388,10 @@ async function buildShelter(ctx: SkillContext, store: CivilizationStore): Promis
   }
 
   const placed = await placeBlock(ctx, itemName === "oak_door" ? "oak_door" : itemName, next.position);
-  if (placed.success && store.isOpen()) {
-    store.safeWrite("saveSettlement:progress", () => {
+  if (placed.success) {
+    const durable = persistConstructionProgress(store, ctx.events, ctx.citizenId, () => {
       const current = store.getSettlement();
-      if (!current.construction) return;
+      if (!current.construction) return undefined;
       current.construction.placedBlocks = worldBlocks(hut, origin).filter((entry) => {
         const found = bot.blockAt(
           new Vec3Class(Math.floor(entry.position.x), Math.floor(entry.position.y), Math.floor(entry.position.z)),
@@ -399,16 +399,46 @@ async function buildShelter(ctx: SkillContext, store: CivilizationStore): Promis
         return Boolean(found && found.name === entry.block);
       }).length;
       store.saveSettlement(current);
-      ctx.events?.emit(
-        createEvent(
-          "ConstructionProgress",
-          { placed: current.construction.placedBlocks, total: current.construction.totalBlocks },
-          ctx.citizenId,
-        ),
-      );
+      return { placed: current.construction.placedBlocks, total: current.construction.totalBlocks };
     });
+    if (!durable.persisted) {
+      return ok(
+        { ...(typeof placed.data === "object" && placed.data ? placed.data : {}), persisted: false },
+        placed.durationMs,
+      );
+    }
   }
   return placed;
+}
+
+/**
+ * Persist construction progress, then announce only if the write succeeded.
+ * Physical placement may still be successful when this returns persisted=false.
+ */
+export function persistConstructionProgress(
+  store: CivilizationStore,
+  events: EventBus | undefined,
+  citizenId: string | undefined,
+  mutate: () => { placed: number; total: number } | undefined,
+): { persisted: boolean; write: ReturnType<CivilizationStore["safeWrite"]> } {
+  if (!store.isOpen()) {
+    return { persisted: false, write: { ok: false, reason: "closed" } };
+  }
+  let snapshot: { placed: number; total: number } | undefined;
+  const write = store.safeWrite("saveSettlement:progress", () => {
+    snapshot = mutate();
+  });
+  if (!write.ok || !snapshot) {
+    return { persisted: false, write };
+  }
+  events?.emit(
+    createEvent(
+      "ConstructionProgress",
+      { placed: snapshot.placed, total: snapshot.total, persisted: true },
+      citizenId,
+    ),
+  );
+  return { persisted: true, write };
 }
 
 function chooseOrigin(from: Vec3): Vec3 {

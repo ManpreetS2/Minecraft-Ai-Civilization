@@ -113,6 +113,11 @@ export type StoreWriteResult =
   | { ok: false; reason: "closed" }
   | { ok: false; reason: "error"; error: unknown };
 
+export type StoreReadResult<T> =
+  | { ok: true; value: T }
+  | { ok: false; reason: "closed" }
+  | { ok: false; reason: "error"; error: unknown };
+
 export class CivilizationStore {
   readonly db: Database.Database;
   private open = true;
@@ -128,6 +133,22 @@ export class CivilizationStore {
 
   isOpen(): boolean {
     return this.open;
+  }
+
+  /**
+   * Read without throwing after close. Unexpected read errors are not treated as data.
+   */
+  safeRead<T>(label: string, read: () => T): StoreReadResult<T> {
+    if (!this.open) {
+      return { ok: false, reason: "closed" };
+    }
+    try {
+      return { ok: true, value: read() };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(`[store] unexpected read error (${label}): ${message}`);
+      return { ok: false, reason: "error", error };
+    }
   }
 
   /**
