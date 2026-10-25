@@ -42,20 +42,29 @@ export class OperationTracker {
     return !this.closed;
   }
 
+  /**
+   * Watch an in-flight promise. Always returns the original `operation` so
+   * awaiters still see real connect/cognition/action failures.
+   *
+   * Never returns a synthetic rejection: discarded `void track(...)` handles
+   * cannot become unhandledRejection when the tracker is closed. Closed and
+   * shutting-down calls are not added to the drain set (incomplete drain stays honest).
+   */
   track<T>(operation: Promise<T>): Promise<T> {
-    if (this.closed) {
-      return Promise.reject(new Error("OperationTracker is closed"));
-    }
-    // Refuse new work after shutdown begins so drain's snapshot cannot miss a
-    // late connect/tick. Callers still receive the original promise to cancel.
-    if (this.shuttingDown) {
+    // Attach a listener so discarding this handle cannot surface as unhandled.
+    // Other awaiters of `operation` still observe the same rejection.
+    void operation.then(
+      () => undefined,
+      () => undefined,
+    );
+    if (this.closed || this.shuttingDown) {
       return operation;
     }
     const tracked = operation.finally(() => {
       this.pending.delete(tracked);
     });
     this.pending.add(tracked);
-    return tracked;
+    return operation;
   }
 
   /**

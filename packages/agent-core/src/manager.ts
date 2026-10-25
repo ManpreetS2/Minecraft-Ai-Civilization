@@ -21,7 +21,7 @@ import {
   type Vec3,
 } from "@civ/shared";
 import { assignSettlementNeeds, planCitizen, type PlannedTask } from "./planner.js";
-import { bodyContext, executePlan } from "./executor.js";
+import { bodyContext, completionMemoryForTask, executePlan, persistConfirmed } from "./executor.js";
 import { isDeferredGoal } from "./goal-dispatch.js";
 import { OperationTracker, type DrainResult } from "./lifecycle.js";
 import { CivilizationStore, type StoreWriteResult } from "./store.js";
@@ -515,6 +515,7 @@ export class AgentManager {
               {
                 task: plan.task,
                 success: result.success,
+                persisted: result.success ? persistConfirmed(result) : false,
                 code: result.success ? undefined : result.code,
                 error: result.success ? undefined : result.error,
               },
@@ -522,28 +523,10 @@ export class AgentManager {
             ),
           );
         }
-        if (!result.success) {
-          this.persistMemory(
-            createMemory(citizen.record.id, "episodic", `Task ${plan.task} failed: ${result.error}`, 0.45),
-          );
-        } else if (plan.task === "gather_food") {
-          const acquired =
-            result.data &&
-            typeof result.data === "object" &&
-            (result.data as { acquired?: unknown }).acquired === true;
-          if (acquired) {
-            const gained = (result.data as { foodGained?: number }).foodGained;
-            this.persistMemory(
-              createMemory(
-                citizen.record.id,
-                "episodic",
-                `Newly gathered food${typeof gained === "number" ? ` (+${gained})` : ""}`,
-                0.4,
-              ),
-            );
-          }
-        } else if (plan.task === "gather_wood" || plan.task === "build_shelter") {
-          this.persistMemory(createMemory(citizen.record.id, "episodic", `Completed ${plan.task}`, 0.4));
+        const memory = completionMemoryForTask(plan.task, result);
+        if (memory) {
+          const completedClaim = memory.startsWith("Completed ") || memory.startsWith("Newly gathered ");
+          this.persistMemory(createMemory(citizen.record.id, "episodic", memory, completedClaim ? 0.4 : 0.45));
         }
         this.maybeSocial(citizen, result.success);
       })

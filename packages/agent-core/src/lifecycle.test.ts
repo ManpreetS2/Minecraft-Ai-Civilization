@@ -80,6 +80,71 @@ describe("OperationTracker", () => {
     expect(a.fullyDrained).toBe(true);
   });
 
+  it("does not create unhandled rejections when discarded after close", async () => {
+    const tracker = new OperationTracker();
+    await tracker.drainAndClose();
+    const unhandled: unknown[] = [];
+    const onUnhandled = (reason: unknown) => {
+      unhandled.push(reason);
+    };
+    process.on("unhandledRejection", onUnhandled);
+    try {
+      let rejectConnect!: (error: unknown) => void;
+      let rejectCognition!: (error: unknown) => void;
+      let rejectAction!: (error: unknown) => void;
+      const connect = new Promise<never>((_, reject) => {
+        rejectConnect = reject;
+      });
+      const cognition = new Promise<never>((_, reject) => {
+        rejectCognition = reject;
+      });
+      const action = new Promise<never>((_, reject) => {
+        rejectAction = reject;
+      });
+      void tracker.track(connect);
+      void tracker.track(cognition);
+      void tracker.track(action);
+      rejectConnect(new Error("connect failed"));
+      rejectCognition(new Error("cognition failed"));
+      rejectAction(new Error("action failed"));
+      await new Promise((r) => setImmediate(r));
+      await new Promise((r) => setImmediate(r));
+      expect(unhandled).toEqual([]);
+      expect(tracker.size).toBe(0);
+      expect(tracker.isClosed).toBe(true);
+    } finally {
+      process.off("unhandledRejection", onUnhandled);
+    }
+  });
+
+  it("still surfaces operational failures to awaiters after close", async () => {
+    const tracker = new OperationTracker();
+    await tracker.drainAndClose();
+    let rejectOp!: (error: unknown) => void;
+    const cognition = new Promise<never>((_, reject) => {
+      rejectOp = reject;
+    });
+    const tracked = tracker.track(cognition);
+    rejectOp(new Error("cognition failed"));
+    await expect(tracked).rejects.toThrow("cognition failed");
+  });
+
+  it("does not count late rejected work as drained-in when already closed", async () => {
+    const tracker = new OperationTracker();
+    const result = await tracker.drainAndClose();
+    expect(result.fullyDrained).toBe(true);
+    let rejectAction!: (error: unknown) => void;
+    const action = new Promise<never>((_, reject) => {
+      rejectAction = reject;
+    });
+    void tracker.track(action);
+    rejectAction(new Error("late action"));
+    await expect(action).rejects.toThrow("late action");
+    expect(tracker.size).toBe(0);
+    const again = await tracker.drainAndClose();
+    expect(again.fullyDrained).toBe(true);
+  });
+
   it("times out without claiming fullyDrained and clears the timer", async () => {
     const tracker = new OperationTracker();
     const gate = deferred<void>();
@@ -377,6 +442,76 @@ describe("startup connection/shutdown races", () => {
 
     expect(bodies).toHaveLength(1);
     expect(bodies[0]?.connected).toBe(false);
+  });
+
+  it("rejected connect during shutdown is an awaited failure, not an unhandled rejection", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "civ-conn-"));
+    const path = join(dir, "conn-reject.sqlite");
+    const store = new CivilizationStore(path);
+    const bodies: ControllableBody[] = [];
+    const manager = new AgentManager(testConfig(path), store, undefined, {
+      bodyFactory: (options) => {
+        const body = new ControllableBody({ ...options, lockDir: dir });
+        bodies.push(body);
+        return body;
+      },
+    });
+
+    const startP = manager.start(1);
+    const deadline = Date.now() + 2_000;
+    while (bodies.length === 0 && Date.now() < deadline) {
+      await new Promise((r) => setTimeout(r, 5));
+    }
+    expect(bodies).toHaveLength(1);
+
+    const unhandled: unknown[] = [];
+    const onUnhandled = (reason: unknown) => {
+      unhandled.push(reason);
+    };
+    process.on("unhandledRejection", onUnhandled);
+    try {
+      const stopP = manager.stop();
+      bodies[0]?.connectGate.reject(new Error("socket hangup"));
+      await expect(startP).rejects.toThrow("socket hangup");
+      await stopP;
+      await new Promise((r) => setImmediate(r));
+      expect(unhandled).toEqual([]);
+    } finally {
+      process.off("unhandledRejection", onUnhandled);
+    }
+  });
+
+  it("discarded rejected cognition and action promises after stop are not unhandled", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "civ-conn-"));
+    const path = join(dir, "post-stop.sqlite");
+    const store = new CivilizationStore(path);
+    const manager = new AgentManager(testConfig(path), store);
+    await manager.stop();
+
+    const unhandled: unknown[] = [];
+    const onUnhandled = (reason: unknown) => {
+      unhandled.push(reason);
+    };
+    process.on("unhandledRejection", onUnhandled);
+    try {
+      let rejectCognition!: (error: unknown) => void;
+      let rejectAction!: (error: unknown) => void;
+      const cognition = new Promise<never>((_, reject) => {
+        rejectCognition = reject;
+      });
+      const action = new Promise<never>((_, reject) => {
+        rejectAction = reject;
+      });
+      void manager["ops"].track(cognition);
+      void manager["ops"].track(action);
+      rejectCognition(new Error("llm timeout"));
+      rejectAction(new Error("dig failed"));
+      await new Promise((r) => setImmediate(r));
+      await new Promise((r) => setImmediate(r));
+      expect(unhandled).toEqual([]);
+    } finally {
+      process.off("unhandledRejection", onUnhandled);
+    }
   });
 });
 

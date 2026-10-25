@@ -8,6 +8,8 @@ export {
   countInventoryFood,
   finalizeFoodGather,
   persistConstructionProgress,
+  persistConfirmed,
+  completionMemoryForTask,
   type FoodGatherSuccess,
 } from "./executor.js";
 export {

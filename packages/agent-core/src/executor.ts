@@ -37,6 +37,42 @@ export type FoodGatherSuccess = {
   source: string;
 };
 
+/** True when a successful action also confirmed its durable write (or had none to confirm). */
+export function persistConfirmed(result: ActionResult): boolean {
+  if (!result.success) return false;
+  const data = result.data;
+  if (!data || typeof data !== "object") return true;
+  if (!("persisted" in data)) return true;
+  return (data as { persisted?: unknown }).persisted !== false;
+}
+
+/**
+ * Episodic completion text, or undefined when we must not claim the goal was saved.
+ * Physical success with persisted=false is not converted into a failure string.
+ */
+export function completionMemoryForTask(task: string, result: ActionResult): string | undefined {
+  if (!result.success) {
+    return `Task ${task} failed: ${result.error}`;
+  }
+  if (task === "gather_food") {
+    const acquired =
+      result.data && typeof result.data === "object" && (result.data as { acquired?: unknown }).acquired === true;
+    if (!acquired) return undefined;
+    const gained = (result.data as { foodGained?: number }).foodGained;
+    return `Newly gathered food${typeof gained === "number" ? ` (+${gained})` : ""}`;
+  }
+  if (task === "build_shelter") {
+    if (!persistConfirmed(result)) {
+      return `Task build_shelter succeeded physically but was not persisted`;
+    }
+    return "Completed build_shelter";
+  }
+  if (task === "gather_wood") {
+    return "Completed gather_wood";
+  }
+  return undefined;
+}
+
 const PLANKS = ["oak_planks", "spruce_planks", "birch_planks", "jungle_planks", "acacia_planks", "dark_oak_planks"];
 const PICKAXES = ["wooden_pickaxe", "stone_pickaxe", "iron_pickaxe"];
 const FOOD_MOBS = new Set(["cow", "pig", "chicken", "sheep", "mooshroom"]);
@@ -111,6 +147,7 @@ export async function executePlan(
         action: plan.action,
         task: plan.task,
         success: result.success,
+        persisted: result.success ? persistConfirmed(result) : false,
         code: result.success ? undefined : result.code,
         error: result.success ? undefined : result.error,
         ...(foodMeta ? { food: foodMeta } : {}),

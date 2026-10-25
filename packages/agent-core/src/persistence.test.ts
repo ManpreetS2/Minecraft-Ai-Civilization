@@ -2,8 +2,8 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { EventBus, loadConfig, type Relationship } from "@civ/shared";
-import { persistConstructionProgress } from "./executor.js";
+import { EventBus, fail, loadConfig, ok, type Relationship } from "@civ/shared";
+import { completionMemoryForTask, persistConfirmed, persistConstructionProgress } from "./executor.js";
 import { AgentManager } from "./manager.js";
 import { CivilizationStore } from "./store.js";
 
@@ -12,6 +12,33 @@ function tmpStore(prefix: string): { store: CivilizationStore; path: string } {
   const path = join(dir, "t.sqlite");
   return { store: new CivilizationStore(path), path };
 }
+
+describe("shelter completion honesty", () => {
+  it("does not treat persisted=false as durable shelter completion", () => {
+    const physical = ok({ complete: true, persisted: false }, 12);
+    expect(physical.success).toBe(true);
+    expect(persistConfirmed(physical)).toBe(false);
+    const memory = completionMemoryForTask("build_shelter", physical);
+    expect(memory).not.toMatch(/completed build_shelter/i);
+    expect(memory).toMatch(/not persisted/i);
+  });
+
+  it("records durable completion only when persistence is confirmed", () => {
+    const durable = ok({ complete: true, persisted: true }, 12);
+    expect(persistConfirmed(durable)).toBe(true);
+    expect(completionMemoryForTask("build_shelter", durable)).toBe("Completed build_shelter");
+  });
+
+  it("does not convert physical success into a physical failure string", () => {
+    const physical = ok({ complete: true, persisted: false }, 8);
+    const memory = completionMemoryForTask("build_shelter", physical);
+    expect(memory).not.toMatch(/failed/i);
+    expect(persistConfirmed(fail("DATABASE_ERROR", "closed", 0))).toBe(false);
+    expect(completionMemoryForTask("build_shelter", fail("DATABASE_ERROR", "closed", 0))).toMatch(
+      /Task build_shelter failed/,
+    );
+  });
+});
 
 describe("persistence vs physical success", () => {
   it("does not emit ConstructionProgress when the settlement write fails", () => {
