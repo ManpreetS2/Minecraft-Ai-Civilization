@@ -110,6 +110,7 @@ CREATE TABLE IF NOT EXISTS llm_calls (
 
 export class CivilizationStore {
   readonly db: Database.Database;
+  private open = true;
 
   constructor(filePath: string) {
     mkdirSync(dirname(resolve(filePath)), { recursive: true });
@@ -118,6 +119,25 @@ export class CivilizationStore {
     this.db.exec(SCHEMA);
     this.migrate();
     this.seed();
+  }
+
+  isOpen(): boolean {
+    return this.open;
+  }
+
+  /** No-op when closed so late async callbacks cannot crash the process. */
+  safeWrite(label: string, write: () => void): boolean {
+    if (!this.open) {
+      console.warn(`[store] skipped write after close: ${label}`);
+      return false;
+    }
+    try {
+      write();
+      return true;
+    } catch (error) {
+      console.warn(`[store] write failed (${label}):`, error instanceof Error ? error.message : error);
+      return false;
+    }
   }
 
   private migrate(): void {
@@ -147,6 +167,8 @@ export class CivilizationStore {
   }
 
   close(): void {
+    if (!this.open) return;
+    this.open = false;
     this.db.close();
   }
 

@@ -27,6 +27,20 @@ describe("CivilizationStore", () => {
     restored.close();
   });
 
+  it("ignores writes after close without throwing", () => {
+    const dir = mkdtempSync(join(tmpdir(), "civ-"));
+    const path = join(dir, "closed.sqlite");
+    const store = new CivilizationStore(path);
+    store.close();
+    expect(store.isOpen()).toBe(false);
+    expect(
+      store.safeWrite("late", () => {
+        throw new Error("should not run");
+      }),
+    ).toBe(false);
+    store.close();
+  });
+
   it("records a Minecraft death once and keeps the identity deceased after reopen", () => {
     const dir = mkdtempSync(join(tmpdir(), "civ-"));
     const path = join(dir, "death.sqlite");
