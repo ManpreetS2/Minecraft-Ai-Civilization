@@ -108,6 +108,11 @@ CREATE TABLE IF NOT EXISTS llm_calls (
 );
 `;
 
+export type StoreWriteResult =
+  | { ok: true }
+  | { ok: false; reason: "closed" }
+  | { ok: false; reason: "error"; error: unknown };
+
 export class CivilizationStore {
   readonly db: Database.Database;
   private open = true;
@@ -125,18 +130,23 @@ export class CivilizationStore {
     return this.open;
   }
 
-  /** No-op when closed so late async callbacks cannot crash the process. */
-  safeWrite(label: string, write: () => void): boolean {
+  /**
+   * Persist with an explicit outcome.
+   * - `closed`: expected skip after shutdown (not an action success).
+   * - `error`: unexpected SQLite/runtime failure — callers must not treat as durable success.
+   */
+  safeWrite(label: string, write: () => void): StoreWriteResult {
     if (!this.open) {
       console.warn(`[store] skipped write after close: ${label}`);
-      return false;
+      return { ok: false, reason: "closed" };
     }
     try {
       write();
-      return true;
+      return { ok: true };
     } catch (error) {
-      console.warn(`[store] write failed (${label}):`, error instanceof Error ? error.message : error);
-      return false;
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(`[store] unexpected write error (${label}): ${message}`);
+      return { ok: false, reason: "error", error };
     }
   }
 

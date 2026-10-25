@@ -83,7 +83,7 @@ describe("goal dispatch", () => {
     expect(planned.task).toBe("gather_food");
   });
 
-  it("surfaces unsupported llm goals as observeNearby rather than mineBlock", () => {
+  it("surfaces unsupported llm goals as deferCapability rather than mineBlock", () => {
     const planned = planCitizen({
       citizenId: "citizen_atlas",
       observation: obs(),
@@ -93,7 +93,7 @@ describe("goal dispatch", () => {
       llmReason: "chaos",
     });
     expect(planned.task).toBe("unsupported_goal");
-    expect(planned.action).toBe("observeNearby");
+    expect(planned.action).toBe("deferCapability");
     expect(planned.action).not.toBe("mineBlock");
   });
 });

@@ -21,6 +21,15 @@ function deferred<T>(): {
   return { promise, resolve, reject };
 }
 
+function testConfig(path: string) {
+  return loadConfig({
+    DATABASE_PATH: path,
+    LLM_ENABLED: "false",
+    AUTO_START_PAPER: "false",
+    SIM_CITIZEN_COUNT: "0",
+  });
+}
+
 describe("OperationTracker", () => {
   it("drains deferred work before closing and blocks late writes", async () => {
     const tracker = new OperationTracker();
@@ -45,24 +54,43 @@ describe("OperationTracker", () => {
     gate.resolve("ok");
     await op;
     const result = await drain;
-    expect(result.drained).toBe(1);
+    expect(result.attempted).toBe(1);
+    expect(result.remaining).toBe(0);
     expect(result.timedOut).toBe(false);
+    expect(result.fullyDrained).toBe(true);
     expect(tracker.isClosed).toBe(true);
     expect(tracker.canWrite()).toBe(false);
     expect(wroteAfterClose).toBe(false);
 
     const again = await tracker.drainAndClose();
-    expect(again.drained).toBe(0);
+    expect(again.fullyDrained).toBe(true);
   });
 
-  it("times out drain without hanging forever", async () => {
+  it("shares one drain across concurrent callers", async () => {
     const tracker = new OperationTracker();
     const gate = deferred<void>();
     void tracker.track(gate.promise);
-    const result = await tracker.drainAndClose(50);
-    expect(result.timedOut).toBe(true);
-    expect(tracker.isClosed).toBe(true);
+    const first = tracker.drainAndClose(2_000);
+    const second = tracker.drainAndClose(2_000);
+    expect(second).toBe(first);
     gate.resolve();
+    const [a, b] = await Promise.all([first, second]);
+    expect(a).toEqual(b);
+    expect(a.fullyDrained).toBe(true);
+  });
+
+  it("times out without claiming fullyDrained and clears the timer", async () => {
+    const tracker = new OperationTracker();
+    const gate = deferred<void>();
+    void tracker.track(gate.promise);
+    const result = await tracker.drainAndClose(40);
+    expect(result.timedOut).toBe(true);
+    expect(result.fullyDrained).toBe(false);
+    expect(result.remaining).toBeGreaterThan(0);
+    expect(tracker.isClosed).toBe(true);
+    expect(tracker.canWrite()).toBe(false);
+    gate.resolve();
+    await Promise.resolve();
   });
 });
 
@@ -71,20 +99,13 @@ describe("AgentManager shutdown safety", () => {
     const dir = mkdtempSync(join(tmpdir(), "civ-shutdown-"));
     const path = join(dir, "shutdown.sqlite");
     const store = new CivilizationStore(path);
-    const config = loadConfig({
-      DATABASE_PATH: path,
-      LLM_ENABLED: "false",
-      AUTO_START_PAPER: "false",
-      SIM_CITIZEN_COUNT: "0",
-    });
-
     const decide = deferred<{ goal: "gather_food"; priority: number; reason: string }>();
     const cognition = {
       name: "test-deferred",
       decide: () => decide.promise,
     };
 
-    const manager = new AgentManager(config, store, cognition);
+    const manager = new AgentManager(testConfig(path), store, cognition);
     const lateWrite = manager["ops"].track(
       decide.promise.then((decision) => {
         manager["persistLlmCall"]({
@@ -105,8 +126,70 @@ describe("AgentManager shutdown safety", () => {
 
     expect(store.isOpen()).toBe(false);
     await expect(manager.stop()).resolves.toBeUndefined();
-    expect(store.safeWrite("should-skip", () => store.appendEvent(createEvent("ErrorOccurred", { error: "x" })))).toBe(
-      false,
+    expect(store.safeWrite("should-skip", () => store.appendEvent(createEvent("ErrorOccurred", { error: "x" })))).toEqual(
+      { ok: false, reason: "closed" },
     );
+  });
+
+  it("shares one shutdown across concurrent stop() calls", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "civ-shutdown-"));
+    const path = join(dir, "concurrent.sqlite");
+    const store = new CivilizationStore(path);
+    const gate = deferred<void>();
+    const manager = new AgentManager(testConfig(path), store);
+    void manager["ops"].track(gate.promise);
+
+    const first = manager.stop();
+    const second = manager.stop();
+    expect(second).toBe(first);
+    gate.resolve();
+    await Promise.all([first, second]);
+    expect(store.isOpen()).toBe(false);
+    const drain = manager.lastShutdownDrain();
+    expect(drain?.fullyDrained).toBe(true);
+  });
+
+  it("records incomplete drain when operations remain after timeout", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "civ-shutdown-"));
+    const path = join(dir, "timeout.sqlite");
+    const store = new CivilizationStore(path);
+    const gate = deferred<void>();
+    const manager = new AgentManager(testConfig(path), store);
+    void manager["ops"].track(gate.promise);
+
+    // Force a short drain by replacing drainAndClose on the tracker instance.
+    const original = manager["ops"].drainAndClose.bind(manager["ops"]);
+    manager["ops"].drainAndClose = (timeoutMs = 8_000) => original(Math.min(timeoutMs, 30));
+
+    await manager.stop();
+    const drain = manager.lastShutdownDrain();
+    expect(drain?.timedOut).toBe(true);
+    expect(drain?.fullyDrained).toBe(false);
+    expect(drain?.remaining).toBeGreaterThan(0);
+    expect(store.isOpen()).toBe(false);
+    gate.resolve();
+  });
+
+  it("rejects start after shutdown and interrupts startup acceptance", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "civ-shutdown-"));
+    const path = join(dir, "startup.sqlite");
+    const store = new CivilizationStore(path);
+    const manager = new AgentManager(testConfig(path), store);
+
+    await manager.stop();
+    await expect(manager.start(1)).rejects.toThrow(/shutting down|after stop/i);
+
+    const freshStore = new CivilizationStore(join(dir, "startup2.sqlite"));
+    const fresh = new AgentManager(testConfig(join(dir, "startup2.sqlite")), freshStore);
+    expect(fresh["shouldContinueStartup"]()).toBe(false);
+    // running=false initially
+    fresh["running"] = true;
+    expect(fresh["shouldContinueStartup"]()).toBe(true);
+    fresh["ops"].drainAndClose(1);
+    await Promise.resolve();
+    // After shutdown begins, startup must not continue.
+    expect(fresh["ops"].canAcceptWork()).toBe(false);
+    expect(fresh["shouldContinueStartup"]()).toBe(false);
+    await fresh.stop();
   });
 });

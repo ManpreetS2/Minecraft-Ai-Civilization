@@ -25,9 +25,17 @@ import {
   type SkillContext,
 } from "@civ/skills";
 import { materialList, nextUnplaced, starterHut, worldBlocks } from "./blueprint.js";
+import { deferredCapabilityResult } from "./goal-dispatch.js";
 import type { PlannedTask } from "./planner.js";
 import type { CivilizationStore } from "./store.js";
 import { Vec3 as Vec3Class } from "vec3";
+
+export type FoodGatherSuccess = {
+  acquired: true;
+  foodGained: number;
+  foodCount: number;
+  source: string;
+};
 
 const PLANKS = ["oak_planks", "spruce_planks", "birch_planks", "jungle_planks", "acacia_planks", "dark_oak_planks"];
 const PICKAXES = ["wooden_pickaxe", "stone_pickaxe", "iron_pickaxe"];
@@ -82,6 +90,9 @@ export async function executePlan(
     case "mineBlock":
       result = await gatherByTask(ctx, plan.task);
       break;
+    case "deferCapability":
+      result = deferredCapabilityResult(plan.task);
+      break;
     default:
       result = fail(
         "UNSUPPORTED_ACTION",
@@ -92,6 +103,7 @@ export async function executePlan(
       break;
   }
 
+  const foodMeta = foodResultMeta(result);
   events.emit(
     createEvent(
       result.success ? "ActionCompleted" : "ActionFailed",
@@ -101,15 +113,38 @@ export async function executePlan(
         success: result.success,
         code: result.success ? undefined : result.code,
         error: result.success ? undefined : result.error,
+        ...(foodMeta ? { food: foodMeta } : {}),
       },
       ctx.citizenId,
     ),
   );
 
-  if (result.success && ctx.citizenId) {
-    updateSettlementFromInventory(ctx, store);
+  // Only sync settlement resources when food was newly acquired or other actions succeeded.
+  if (result.success && ctx.citizenId && foodMeta?.acquired !== false) {
+    const sync = updateSettlementFromInventory(ctx, store);
+    if (sync && !sync.ok && sync.reason === "error") {
+      events.emit(
+        createEvent(
+          "ErrorOccurred",
+          {
+            error: `Settlement sync failed after ${plan.task}: ${sync.error instanceof Error ? sync.error.message : String(sync.error)}`,
+            durable: false,
+          },
+          ctx.citizenId,
+        ),
+      );
+    }
   }
   return result;
+}
+
+function foodResultMeta(result: ActionResult): { acquired: boolean; foodGained?: number; alreadyHadFood?: boolean } | undefined {
+  if (!result.success || !result.data || typeof result.data !== "object") return undefined;
+  const data = result.data as Record<string, unknown>;
+  if (data.acquired === true && typeof data.foodGained === "number") {
+    return { acquired: true, foodGained: data.foodGained };
+  }
+  return undefined;
 }
 
 async function gatherByTask(ctx: SkillContext, task: string): Promise<ActionResult> {
@@ -146,14 +181,19 @@ export function countInventoryFood(ctx: SkillContext): number {
 }
 
 /**
- * gather_food succeeds only when inventory food increases, or when food was
- * already held (documented precondition — eating is a separate eatFood task).
+ * gather_food succeeds only when inventory food newly increases.
+ * Already-owned food is FOOD_NOT_ACQUIRED (not credited as gathered).
  * Never treats log mining as food acquisition.
  */
 export async function gatherFood(ctx: SkillContext): Promise<ActionResult> {
   const foodBefore = countInventoryFood(ctx);
   if (foodBefore > 0) {
-    return ok({ alreadyHadFood: true, foodCount: foodBefore }, 0);
+    return fail(
+      "FOOD_NOT_ACQUIRED",
+      `Inventory already holds ${foodBefore} food; not credited as newly gathered (use eatFood to consume)`,
+      0,
+      false,
+    );
   }
 
   const berries = await findBlock(ctx, ["sweet_berry_bush"], 20);
@@ -191,7 +231,13 @@ export function finalizeFoodGather(
   const foodAfter = countInventoryFood(ctx);
   const gained = foodAfter - foodBefore;
   if (gained > 0) {
-    return ok({ foodGained: gained, foodCount: foodAfter, source }, attempt.durationMs);
+    const data: FoodGatherSuccess = {
+      acquired: true,
+      foodGained: gained,
+      foodCount: foodAfter,
+      source,
+    };
+    return ok(data, attempt.durationMs);
   }
   if (!attempt.success) {
     return attempt;
@@ -266,8 +312,16 @@ async function buildShelter(ctx: SkillContext, store: CivilizationStore): Promis
       placedBlocks: 0,
       complete: false,
     };
-    if (!store.safeWrite("saveSettlement:origin", () => store.saveSettlement(settlement))) {
-      return fail("DATABASE_ERROR", "Store closed while saving shelter origin", 0, true);
+    const originWrite = store.safeWrite("saveSettlement:origin", () => store.saveSettlement(settlement));
+    if (!originWrite.ok) {
+      return fail(
+        "DATABASE_ERROR",
+        originWrite.reason === "closed"
+          ? "Store closed while saving shelter origin"
+          : `Unexpected DB error while saving shelter origin: ${originWrite.error instanceof Error ? originWrite.error.message : String(originWrite.error)}`,
+        0,
+        originWrite.reason === "closed",
+      );
     }
     ctx.events?.emit(createEvent("ConstructionStarted", { origin, blueprint: hut.id }, ctx.citizenId));
   }
@@ -297,8 +351,16 @@ async function buildShelter(ctx: SkillContext, store: CivilizationStore): Promis
       settlement.construction.complete = true;
       settlement.construction.placedBlocks = hut.blocks.length;
     }
-    if (!store.safeWrite("saveSettlement:complete", () => store.saveSettlement(settlement))) {
-      return fail("DATABASE_ERROR", "Store closed while completing shelter", 0, true);
+    const completeWrite = store.safeWrite("saveSettlement:complete", () => store.saveSettlement(settlement));
+    if (!completeWrite.ok) {
+      return fail(
+        "DATABASE_ERROR",
+        completeWrite.reason === "closed"
+          ? "Store closed while completing shelter"
+          : `Unexpected DB error while completing shelter: ${completeWrite.error instanceof Error ? completeWrite.error.message : String(completeWrite.error)}`,
+        0,
+        completeWrite.reason === "closed",
+      );
     }
     ctx.events?.emit(createEvent("ConstructionCompleted", { blueprint: hut.id }, ctx.citizenId));
     return { success: true, data: { complete: true }, durationMs: 0 };
@@ -358,9 +420,12 @@ function chooseOrigin(from: Vec3): Vec3 {
   };
 }
 
-function updateSettlementFromInventory(ctx: SkillContext, store: CivilizationStore): void {
-  if (!store.isOpen()) return;
-  store.safeWrite("saveSettlement", () => {
+function updateSettlementFromInventory(
+  ctx: SkillContext,
+  store: CivilizationStore,
+): ReturnType<CivilizationStore["safeWrite"]> | undefined {
+  if (!store.isOpen()) return { ok: false, reason: "closed" };
+  return store.safeWrite("saveSettlement", () => {
     const settlement = store.getSettlement();
     const items = ctx.bot.inventory.items();
     const wood = items.filter((i) => i.name.endsWith("_log") || i.name.endsWith("_planks")).reduce((s, i) => s + i.count, 0);

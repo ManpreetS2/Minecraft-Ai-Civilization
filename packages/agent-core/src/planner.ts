@@ -78,9 +78,9 @@ export function planCitizen(input: PlannerInput): PlannedTask {
       return task(
         "idle",
         "unsupported_goal",
-        "observeNearby",
+        "deferCapability",
         "llm",
-        `Unsupported cognition goal '${dispatched.goal}'; surveying instead of inventing work`,
+        `Unsupported cognition goal '${dispatched.goal}' — refusing fabricated work`,
         0.25,
       );
     }
@@ -89,8 +89,10 @@ export function planCitizen(input: PlannerInput): PlannedTask {
       dispatched.task,
       dispatched.action,
       "llm",
-      llmReason,
-      0.8,
+      dispatched.deferred
+        ? `${llmReason} (deferred: no verified ${dispatched.task} capability in this build)`
+        : llmReason,
+      dispatched.deferred ? 0.2 : 0.8,
       dispatched.occupation,
     );
   }
