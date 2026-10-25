@@ -1,8 +1,10 @@
 import type { MinecraftBody } from "@civ/minecraft-adapter";
 import {
   createEvent,
+  fail,
   FOOD_ITEM_NAMES,
   LOG_BLOCK_NAMES,
+  ok,
   type ActionResult,
   type EventBus,
   type Vec3,
@@ -65,6 +67,9 @@ export async function executePlan(
     case "observeNearby":
       result = await observeNearby(ctx);
       break;
+    case "wander":
+      result = await wander(ctx, 28);
+      break;
     case "gatherFood":
       result = await gatherFood(ctx);
       break;
@@ -75,8 +80,15 @@ export async function executePlan(
       result = await buildShelter(ctx, store);
       break;
     case "mineBlock":
-    default:
       result = await gatherByTask(ctx, plan.task);
+      break;
+    default:
+      result = fail(
+        "UNSUPPORTED_ACTION",
+        `Unsupported action '${plan.action}' for task '${plan.task}' — refusing silent wood-mining fallback`,
+        0,
+        false,
+      );
       break;
   }
 
@@ -128,24 +140,68 @@ async function gatherByTask(ctx: SkillContext, task: string): Promise<ActionResu
   return mined;
 }
 
-async function gatherFood(ctx: SkillContext): Promise<ActionResult> {
+/** Count edible items currently in inventory (evidence for gather_food success). */
+export function countInventoryFood(ctx: SkillContext): number {
+  return ctx.bot.inventory.items().filter((i) => FOOD_ITEM_NAMES.has(i.name)).reduce((s, i) => s + i.count, 0);
+}
+
+/**
+ * gather_food succeeds only when inventory food increases, or when food was
+ * already held (documented precondition — eating is a separate eatFood task).
+ * Never treats log mining as food acquisition.
+ */
+export async function gatherFood(ctx: SkillContext): Promise<ActionResult> {
+  const foodBefore = countInventoryFood(ctx);
+  if (foodBefore > 0) {
+    return ok({ alreadyHadFood: true, foodCount: foodBefore }, 0);
+  }
+
   const berries = await findBlock(ctx, ["sweet_berry_bush"], 20);
   if (berries.success) {
-    return mineBlock(ctx, ["sweet_berry_bush"], 20);
+    const mined = await mineBlock(ctx, ["sweet_berry_bush"], 20);
+    if (mined.success) {
+      await collectItem(ctx, undefined, 8);
+    }
+    return finalizeFoodGather(ctx, foodBefore, mined, "sweet_berry_bush");
   }
+
   const animal = ctx.body.nearbyEntities(20).find((e) => FOOD_MOBS.has(e.name.toLowerCase()));
   if (animal) {
     const attacked = await attack(ctx, animal.id);
     if (attacked.success) {
       await collectItem(ctx, undefined, 10);
     }
-    return attacked;
+    return finalizeFoodGather(ctx, foodBefore, attacked, animal.name);
   }
-  const heldFood = ctx.bot.inventory.items().find((i) => FOOD_ITEM_NAMES.has(i.name));
-  if (heldFood) {
-    return eatFood(ctx);
+
+  return fail(
+    "FOOD_NOT_FOUND",
+    "No edible berries, food animals, or food items available — not mining wood as food",
+    0,
+    true,
+  );
+}
+
+export function finalizeFoodGather(
+  ctx: SkillContext,
+  foodBefore: number,
+  attempt: ActionResult,
+  source: string,
+): ActionResult {
+  const foodAfter = countInventoryFood(ctx);
+  const gained = foodAfter - foodBefore;
+  if (gained > 0) {
+    return ok({ foodGained: gained, foodCount: foodAfter, source }, attempt.durationMs);
   }
-  return mineBlock(ctx, LOG_BLOCK_NAMES, 48);
+  if (!attempt.success) {
+    return attempt;
+  }
+  return fail(
+    "FOOD_NOT_FOUND",
+    `Action at '${source}' completed but inventory food did not increase`,
+    attempt.durationMs,
+    true,
+  );
 }
 
 async function bootstrapTools(ctx: SkillContext): Promise<ActionResult> {
@@ -190,6 +246,9 @@ async function bootstrapTools(ctx: SkillContext): Promise<ActionResult> {
 }
 
 async function buildShelter(ctx: SkillContext, store: CivilizationStore): Promise<ActionResult> {
+  if (!store.isOpen()) {
+    return fail("DATABASE_ERROR", "Store closed before shelter build", 0, true);
+  }
   const settlement = store.getSettlement();
   const hut = starterHut();
   let origin = settlement.origin;
@@ -207,7 +266,9 @@ async function buildShelter(ctx: SkillContext, store: CivilizationStore): Promis
       placedBlocks: 0,
       complete: false,
     };
-    store.saveSettlement(settlement);
+    if (!store.safeWrite("saveSettlement:origin", () => store.saveSettlement(settlement))) {
+      return fail("DATABASE_ERROR", "Store closed while saving shelter origin", 0, true);
+    }
     ctx.events?.emit(createEvent("ConstructionStarted", { origin, blueprint: hut.id }, ctx.citizenId));
   }
 
@@ -236,7 +297,9 @@ async function buildShelter(ctx: SkillContext, store: CivilizationStore): Promis
       settlement.construction.complete = true;
       settlement.construction.placedBlocks = hut.blocks.length;
     }
-    store.saveSettlement(settlement);
+    if (!store.safeWrite("saveSettlement:complete", () => store.saveSettlement(settlement))) {
+      return fail("DATABASE_ERROR", "Store closed while completing shelter", 0, true);
+    }
     ctx.events?.emit(createEvent("ConstructionCompleted", { blueprint: hut.id }, ctx.citizenId));
     return { success: true, data: { complete: true }, durationMs: 0 };
   }
@@ -263,9 +326,10 @@ async function buildShelter(ctx: SkillContext, store: CivilizationStore): Promis
   }
 
   const placed = await placeBlock(ctx, itemName === "oak_door" ? "oak_door" : itemName, next.position);
-  if (placed.success) {
-    const current = store.getSettlement();
-    if (current.construction) {
+  if (placed.success && store.isOpen()) {
+    store.safeWrite("saveSettlement:progress", () => {
+      const current = store.getSettlement();
+      if (!current.construction) return;
       current.construction.placedBlocks = worldBlocks(hut, origin).filter((entry) => {
         const found = bot.blockAt(
           new Vec3Class(Math.floor(entry.position.x), Math.floor(entry.position.y), Math.floor(entry.position.z)),
@@ -280,7 +344,7 @@ async function buildShelter(ctx: SkillContext, store: CivilizationStore): Promis
           ctx.citizenId,
         ),
       );
-    }
+    });
   }
   return placed;
 }
@@ -295,17 +359,20 @@ function chooseOrigin(from: Vec3): Vec3 {
 }
 
 function updateSettlementFromInventory(ctx: SkillContext, store: CivilizationStore): void {
-  const settlement = store.getSettlement();
-  const items = ctx.bot.inventory.items();
-  const wood = items.filter((i) => i.name.endsWith("_log") || i.name.endsWith("_planks")).reduce((s, i) => s + i.count, 0);
-  const stone = items.filter((i) => i.name === "cobblestone" || i.name === "stone").reduce((s, i) => s + i.count, 0);
-  const food = items.filter((i) => FOOD_ITEM_NAMES.has(i.name)).reduce((s, i) => s + i.count, 0);
-  const tools = items.filter((i) => i.name.includes("pickaxe") || i.name.includes("_axe")).reduce((s, i) => s + i.count, 0);
-  settlement.wood = Math.max(settlement.wood, wood);
-  settlement.stone = Math.max(settlement.stone, stone);
-  settlement.food = Math.max(settlement.food, food);
-  settlement.tools = Math.max(settlement.tools, tools);
-  store.saveSettlement(settlement);
+  if (!store.isOpen()) return;
+  store.safeWrite("saveSettlement", () => {
+    const settlement = store.getSettlement();
+    const items = ctx.bot.inventory.items();
+    const wood = items.filter((i) => i.name.endsWith("_log") || i.name.endsWith("_planks")).reduce((s, i) => s + i.count, 0);
+    const stone = items.filter((i) => i.name === "cobblestone" || i.name === "stone").reduce((s, i) => s + i.count, 0);
+    const food = items.filter((i) => FOOD_ITEM_NAMES.has(i.name)).reduce((s, i) => s + i.count, 0);
+    const tools = items.filter((i) => i.name.includes("pickaxe") || i.name.includes("_axe")).reduce((s, i) => s + i.count, 0);
+    settlement.wood = Math.max(settlement.wood, wood);
+    settlement.stone = Math.max(settlement.stone, stone);
+    settlement.food = Math.max(settlement.food, food);
+    settlement.tools = Math.max(settlement.tools, tools);
+    store.saveSettlement(settlement);
+  });
 }
 
 export function bodyContext(body: MinecraftBody, signal?: AbortSignal, events?: EventBus, citizenId?: string): SkillContext | undefined {
