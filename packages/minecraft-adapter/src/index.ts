@@ -28,7 +28,15 @@ export {
 } from "./local-escape.js";
 export { TargetBlacklist, cellKey, isProtectedFromPathfinder, movedEnough, nearbyOffsets, recoveryAttempts, shouldBlacklistTarget } from "./path-recovery.js";
 export { occupancyYieldCount, occupantNear, registerOccupancy, clearOccupancy } from "./occupancy.js";
-export { deriveConnectionHealth, emptyTelemetry, isKeepaliveTimeout, type ConnectionTelemetry } from "./connection-health.js";
+export {
+  deriveConnectionHealth,
+  emptyTelemetry,
+  isKeepaliveTimeout,
+  isTransportReset,
+  keepalivePolicy,
+  armShutdownClient,
+  type ConnectionTelemetry,
+} from "./connection-health.js";
 export {
   navigationBackend,
   setNavigationBackend,

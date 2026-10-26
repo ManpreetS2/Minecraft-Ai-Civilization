@@ -24,6 +24,17 @@ import type { SettlementRuntime } from "./settlement-runtime.js";
 import type { CivilizationStore } from "./store.js";
 import { rememberWorkstation } from "./workstations.js";
 
+/** True when feet or head cell is water-like — building here drowned Atlas on Day 1. */
+export function standingInWater(bot: SkillContext["bot"]): boolean {
+  const pos = bot.entity?.position;
+  if (!pos) return false;
+  const base = new Vec3Class(Math.floor(pos.x), Math.floor(pos.y), Math.floor(pos.z));
+  const feet = bot.blockAt(base);
+  const head = bot.blockAt(base.offset(0, 1, 0));
+  const names = [feet?.name, head?.name].filter(Boolean) as string[];
+  return names.some((name) => name === "water" || name === "bubble_column" || name.endsWith("_water"));
+}
+
 export async function buildShelter(
   ctx: SkillContext,
   store: CivilizationStore,
@@ -33,6 +44,18 @@ export async function buildShelter(
   const project = loadProject(store, runtime);
   const hut = starterHut();
   const settlement = store.getSettlement();
+
+  // Day-1: build_shelter while feet/head in water ended in drowning. Refuse and let planner change strategy.
+  if (standingInWater(ctx.bot)) {
+    return {
+      success: false,
+      code: "HAZARD_BLOCKED",
+      error: "Cannot build shelter while standing in water",
+      durationMs: 0,
+      retryable: true,
+      details: { hazard: "water", nextTask: "seek_housing" },
+    };
+  }
 
   if (project.status === "COMPLETED" || settlement.shelterComplete) {
     if (!store.isOpen()) {

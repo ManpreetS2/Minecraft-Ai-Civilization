@@ -254,6 +254,10 @@ export class AgentManager {
         allowRespawn: !this.config.SIM_PERMADEATH_ENABLED,
         eventLoopLag: () => this.loop.lagMs,
       });
+      // Guarantee an `error` listener so transport faults stay observable without crashing Node.
+      body.on("error", (error) => {
+        console.warn(`[body] ${identity.name} error: ${error.message}`);
+      });
       if (record.status === "dead") {
         body.markDeceased();
       }

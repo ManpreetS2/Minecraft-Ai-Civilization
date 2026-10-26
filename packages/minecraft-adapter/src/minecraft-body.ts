@@ -274,8 +274,16 @@ export class MinecraftBody extends EventEmitter {
         this.telemetry.keepaliveTimeouts += 1;
         this.telemetry.reconnectReason = error instanceof Error ? error.message : String(error);
         this.spawned = false;
+        const message = error instanceof Error ? error.message : String(error);
+        const code =
+          error && typeof error === "object" && "code" in error
+            ? String((error as { code?: unknown }).code ?? "")
+            : "";
         try {
-          bot.emit("end", "keepalive-timeout");
+          bot.emit(
+            "end",
+            /ECONNRESET/i.test(`${code} ${message}`) ? "transport-reset" : "keepalive-timeout",
+          );
         } catch {
           // ignore
         }
@@ -551,17 +559,39 @@ export class MinecraftBody extends EventEmitter {
         this.telemetry.keepaliveTimeouts += 1;
         this.telemetry.reconnectReason = error.message;
         this.spawned = false;
+        this.events?.emit(
+          createEvent(
+            "ErrorOccurred",
+            {
+              username: this.username,
+              error: error.message,
+              code: (error as NodeJS.ErrnoException).code,
+              handled: "fail_active_task",
+            },
+            this.citizenId,
+          ),
+        );
         try {
-          bot.emit("end", "keepalive-timeout");
+          // Observable disconnect — must not become an unhandled EventEmitter error.
+          bot.emit("end", error.message.includes("ECONNRESET") || (error as NodeJS.ErrnoException).code === "ECONNRESET"
+            ? "transport-reset"
+            : "keepalive-timeout");
         } catch {
           // ignore
         }
         return;
       }
-      this.emit("error", error);
       this.events?.emit(
         createEvent("ErrorOccurred", { username: this.username, error: error.message }, this.citizenId),
       );
+      // Node crashes on EventEmitter 'error' with zero listeners; keep it observable instead.
+      if (this.listenerCount("error") > 0) {
+        this.emit("error", error);
+      } else {
+        this.spawned = false;
+        this.telemetry.reconnectReason = error.message;
+        this.emit("disconnected", error.message);
+      }
     });
 
     bot.on("end", (reason) => {
