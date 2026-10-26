@@ -13,6 +13,7 @@ import {
   type Vec3,
   type HumanDirective,
 } from "@civ/shared";
+import type { CitizenHome, HomeMembership, HomeRecord } from "./home-types.js";
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -121,10 +122,52 @@ CREATE TABLE IF NOT EXISTS human_directives (
   json TEXT NOT NULL,
   created_at TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS homes (
+  id TEXT PRIMARY KEY,
+  dimension TEXT NOT NULL DEFAULT 'overworld',
+  origin_x INTEGER NOT NULL,
+  origin_y INTEGER NOT NULL,
+  origin_z INTEGER NOT NULL,
+  entrance_x INTEGER,
+  entrance_y INTEGER,
+  entrance_z INTEGER,
+  household_chest_x INTEGER,
+  household_chest_y INTEGER,
+  household_chest_z INTEGER,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS home_memberships (
+  citizen_id TEXT PRIMARY KEY,
+  home_id TEXT NOT NULL,
+  bed_x INTEGER NOT NULL,
+  bed_y INTEGER NOT NULL,
+  bed_z INTEGER NOT NULL,
+  personal_chest_x INTEGER,
+  personal_chest_y INTEGER,
+  personal_chest_z INTEGER,
+  storage_access TEXT NOT NULL DEFAULT 'personal',
+  status TEXT NOT NULL DEFAULT 'active',
+  created_at TEXT NOT NULL,
+  FOREIGN KEY (home_id) REFERENCES homes(id)
+);
 `;
+
+export type StoreWriteResult =
+  | { ok: true }
+  | { ok: false; reason: "closed" }
+  | { ok: false; reason: "error"; error: unknown };
+
+export type StoreReadResult<T> =
+  | { ok: true; value: T }
+  | { ok: false; reason: "closed" }
+  | { ok: false; reason: "error"; error: unknown };
 
 export class CivilizationStore {
   readonly db: Database.Database;
+  private open = true;
 
   constructor(filePath: string) {
     mkdirSync(dirname(resolve(filePath)), { recursive: true });
@@ -133,6 +176,46 @@ export class CivilizationStore {
     this.db.exec(SCHEMA);
     this.migrate();
     this.seed();
+  }
+
+  isOpen(): boolean {
+    return this.open;
+  }
+
+  /**
+   * Read without throwing after close. Unexpected read errors are not treated as data.
+   */
+  safeRead<T>(label: string, read: () => T): StoreReadResult<T> {
+    if (!this.open) {
+      return { ok: false, reason: "closed" };
+    }
+    try {
+      return { ok: true, value: read() };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(`[store] unexpected read error (${label}): ${message}`);
+      return { ok: false, reason: "error", error };
+    }
+  }
+
+  /**
+   * Persist with an explicit outcome.
+   * - `closed`: expected skip after shutdown (not an action success).
+   * - `error`: unexpected SQLite/runtime failure — callers must not treat as durable success.
+   */
+  safeWrite(label: string, write: () => void): StoreWriteResult {
+    if (!this.open) {
+      console.warn(`[store] skipped write after close: ${label}`);
+      return { ok: false, reason: "closed" };
+    }
+    try {
+      write();
+      return { ok: true };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(`[store] unexpected write error (${label}): ${message}`);
+      return { ok: false, reason: "error", error };
+    }
   }
 
   private migrate(): void {
@@ -151,6 +234,47 @@ export class CivilizationStore {
     this.db.exec(
       `CREATE TABLE IF NOT EXISTS human_directives (id TEXT PRIMARY KEY, json TEXT NOT NULL, created_at TEXT NOT NULL)`,
     );
+    this.migrateHomes();
+  }
+
+  private migrateHomes(): void {
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS homes (
+        id TEXT PRIMARY KEY,
+        dimension TEXT NOT NULL DEFAULT 'overworld',
+        origin_x INTEGER NOT NULL,
+        origin_y INTEGER NOT NULL,
+        origin_z INTEGER NOT NULL,
+        entrance_x INTEGER,
+        entrance_y INTEGER,
+        entrance_z INTEGER,
+        household_chest_x INTEGER,
+        household_chest_y INTEGER,
+        household_chest_z INTEGER,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS home_memberships (
+        citizen_id TEXT PRIMARY KEY,
+        home_id TEXT NOT NULL,
+        bed_x INTEGER NOT NULL,
+        bed_y INTEGER NOT NULL,
+        bed_z INTEGER NOT NULL,
+        personal_chest_x INTEGER,
+        personal_chest_y INTEGER,
+        personal_chest_z INTEGER,
+        storage_access TEXT NOT NULL DEFAULT 'personal',
+        status TEXT NOT NULL DEFAULT 'active',
+        created_at TEXT NOT NULL,
+        FOREIGN KEY (home_id) REFERENCES homes(id)
+      );
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_home_bed_claimed
+        ON home_memberships(bed_x, bed_y, bed_z)
+        WHERE status IN ('active', 'displaced');
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_home_personal_chest_claimed
+        ON home_memberships(personal_chest_x, personal_chest_y, personal_chest_z)
+        WHERE status IN ('active', 'displaced') AND personal_chest_x IS NOT NULL;
+    `);
   }
 
   markDeceased(id: string, at = new Date().toISOString(), position?: Vec3): boolean {
@@ -183,6 +307,8 @@ export class CivilizationStore {
   }
 
   close(): void {
+    if (!this.open) return;
+    this.open = false;
     this.db.close();
   }
 
@@ -261,7 +387,7 @@ export class CivilizationStore {
         health = excluded.health,
         hunger = excluded.hunger,
         occupation = excluded.occupation,
-        home_id = excluded.home_id,
+        home_id = COALESCE(excluded.home_id, citizens.home_id),
         current_goal = excluded.current_goal,
         current_task = excluded.current_task,
         current_action = excluded.current_action,
@@ -516,6 +642,155 @@ export class CivilizationStore {
     ).map((row) => ({ kind: row.kind, resource: row.resource, citizenId: row.citizen_id }));
   }
 
+  getHome(id: string): HomeRecord | undefined {
+    const row = this.db.prepare(`SELECT * FROM homes WHERE id = ?`).get(id) as HomeRow | undefined;
+    return row ? mapHome(row) : undefined;
+  }
+
+  getMembership(citizenId: string): HomeMembership | undefined {
+    const row = this.db
+      .prepare(`SELECT * FROM home_memberships WHERE citizen_id = ? AND status != 'left'`)
+      .get(citizenId) as MembershipRow | undefined;
+    return row ? mapMembership(row) : undefined;
+  }
+
+  getCitizenHome(citizenId: string): CitizenHome | undefined {
+    const membership = this.getMembership(citizenId);
+    if (!membership) return undefined;
+    const home = this.getHome(membership.homeId);
+    if (!home) return undefined;
+    const members = (
+      this.db
+        .prepare(`SELECT citizen_id FROM home_memberships WHERE home_id = ? AND status != 'left' ORDER BY citizen_id`)
+        .all(membership.homeId) as Array<{ citizen_id: string }>
+    ).map((row) => row.citizen_id);
+    return { ...membership, dimension: home.dimension, origin: home.origin, entrance: home.entrance, householdChest: home.householdChest, members };
+  }
+
+  listHomeMembers(homeId: string): HomeMembership[] {
+    const rows = this.db
+      .prepare(`SELECT * FROM home_memberships WHERE home_id = ? AND status != 'left' ORDER BY citizen_id`)
+      .all(homeId) as MembershipRow[];
+    return rows.map(mapMembership);
+  }
+
+  bedClaimOwner(bed: Vec3): string | undefined {
+    const row = this.db
+      .prepare(
+        `SELECT citizen_id FROM home_memberships
+         WHERE bed_x = ? AND bed_y = ? AND bed_z = ? AND status IN ('active', 'displaced')`,
+      )
+      .get(Math.floor(bed.x), Math.floor(bed.y), Math.floor(bed.z)) as { citizen_id: string } | undefined;
+    return row?.citizen_id;
+  }
+
+  personalChestOwner(chest: Vec3): string | undefined {
+    const row = this.db
+      .prepare(
+        `SELECT citizen_id FROM home_memberships
+         WHERE personal_chest_x = ? AND personal_chest_y = ? AND personal_chest_z = ?
+           AND status IN ('active', 'displaced')`,
+      )
+      .get(Math.floor(chest.x), Math.floor(chest.y), Math.floor(chest.z)) as { citizen_id: string } | undefined;
+    return row?.citizen_id;
+  }
+
+  isClaimedPersonalChest(chest: Vec3): boolean {
+    return Boolean(this.personalChestOwner(chest));
+  }
+
+  writeHomeClaim(input: { home: HomeRecord; membership: HomeMembership; previousHomeId?: string }): void {
+    const run = this.db.transaction(() => {
+      const existingHome = this.getHome(input.home.id);
+      this.db
+        .prepare(
+          `INSERT INTO homes (
+            id, dimension, origin_x, origin_y, origin_z, entrance_x, entrance_y, entrance_z,
+            household_chest_x, household_chest_y, household_chest_z, created_at, updated_at
+          ) VALUES (
+            @id, @dimension, @originX, @originY, @originZ, @entranceX, @entranceY, @entranceZ,
+            @householdChestX, @householdChestY, @householdChestZ, @createdAt, @updatedAt
+          )
+          ON CONFLICT(id) DO UPDATE SET
+            dimension = excluded.dimension,
+            origin_x = excluded.origin_x,
+            origin_y = excluded.origin_y,
+            origin_z = excluded.origin_z,
+            entrance_x = COALESCE(excluded.entrance_x, homes.entrance_x),
+            entrance_y = COALESCE(excluded.entrance_y, homes.entrance_y),
+            entrance_z = COALESCE(excluded.entrance_z, homes.entrance_z),
+            household_chest_x = COALESCE(excluded.household_chest_x, homes.household_chest_x),
+            household_chest_y = COALESCE(excluded.household_chest_y, homes.household_chest_y),
+            household_chest_z = COALESCE(excluded.household_chest_z, homes.household_chest_z),
+            updated_at = excluded.updated_at`,
+        )
+        .run({
+          id: input.home.id,
+          dimension: input.home.dimension,
+          originX: Math.floor(input.home.origin.x),
+          originY: Math.floor(input.home.origin.y),
+          originZ: Math.floor(input.home.origin.z),
+          entranceX: input.home.entrance ? Math.floor(input.home.entrance.x) : null,
+          entranceY: input.home.entrance ? Math.floor(input.home.entrance.y) : null,
+          entranceZ: input.home.entrance ? Math.floor(input.home.entrance.z) : null,
+          householdChestX: input.home.householdChest ? Math.floor(input.home.householdChest.x) : null,
+          householdChestY: input.home.householdChest ? Math.floor(input.home.householdChest.y) : null,
+          householdChestZ: input.home.householdChest ? Math.floor(input.home.householdChest.z) : null,
+          createdAt: existingHome?.createdAt ?? input.home.createdAt,
+          updatedAt: input.home.updatedAt,
+        });
+
+      this.db
+        .prepare(
+          `INSERT INTO home_memberships (
+            citizen_id, home_id, bed_x, bed_y, bed_z, personal_chest_x, personal_chest_y, personal_chest_z,
+            storage_access, status, created_at
+          ) VALUES (
+            @citizenId, @homeId, @bedX, @bedY, @bedZ, @chestX, @chestY, @chestZ, @access, 'active', @createdAt
+          )
+          ON CONFLICT(citizen_id) DO UPDATE SET
+            home_id = excluded.home_id,
+            bed_x = excluded.bed_x,
+            bed_y = excluded.bed_y,
+            bed_z = excluded.bed_z,
+            personal_chest_x = excluded.personal_chest_x,
+            personal_chest_y = excluded.personal_chest_y,
+            personal_chest_z = excluded.personal_chest_z,
+            storage_access = excluded.storage_access,
+            status = 'active'`,
+        )
+        .run({
+          citizenId: input.membership.citizenId,
+          homeId: input.membership.homeId,
+          bedX: Math.floor(input.membership.bed.x),
+          bedY: Math.floor(input.membership.bed.y),
+          bedZ: Math.floor(input.membership.bed.z),
+          chestX: input.membership.personalChest ? Math.floor(input.membership.personalChest.x) : null,
+          chestY: input.membership.personalChest ? Math.floor(input.membership.personalChest.y) : null,
+          chestZ: input.membership.personalChest ? Math.floor(input.membership.personalChest.z) : null,
+          access: input.membership.storageAccess,
+          createdAt: input.membership.createdAt,
+        });
+
+      this.db.prepare(`UPDATE citizens SET home_id = ? WHERE id = ?`).run(input.membership.homeId, input.membership.citizenId);
+    });
+    run();
+  }
+
+  markHomeDisplaced(citizenId: string, _reason: string): void {
+    this.db
+      .prepare(`UPDATE home_memberships SET status = 'displaced' WHERE citizen_id = ? AND status = 'active'`)
+      .run(citizenId);
+  }
+
+  leaveHome(citizenId: string): void {
+    const run = this.db.transaction(() => {
+      this.db.prepare(`UPDATE home_memberships SET status = 'left' WHERE citizen_id = ? AND status != 'left'`).run(citizenId);
+      this.db.prepare(`UPDATE citizens SET home_id = NULL WHERE id = ?`).run(citizenId);
+    });
+    run();
+  }
+
   logLlmCall(entry: {
     citizenId?: string;
     latencyMs: number;
@@ -667,5 +942,64 @@ function mapCitizen(row: CitizenRow): CitizenRecord {
       row.death_x != null && row.death_y != null && row.death_z != null
         ? { x: row.death_x, y: row.death_y, z: row.death_z }
         : undefined,
+  };
+}
+
+type HomeRow = {
+  id: string;
+  dimension: string;
+  origin_x: number;
+  origin_y: number;
+  origin_z: number;
+  entrance_x: number | null;
+  entrance_y: number | null;
+  entrance_z: number | null;
+  household_chest_x: number | null;
+  household_chest_y: number | null;
+  household_chest_z: number | null;
+  created_at: string;
+  updated_at: string;
+};
+
+type MembershipRow = {
+  citizen_id: string;
+  home_id: string;
+  bed_x: number;
+  bed_y: number;
+  bed_z: number;
+  personal_chest_x: number | null;
+  personal_chest_y: number | null;
+  personal_chest_z: number | null;
+  storage_access: HomeMembership["storageAccess"];
+  status: HomeMembership["status"];
+  created_at: string;
+};
+
+function optionalCell(x: number | null, y: number | null, z: number | null): Vec3 | undefined {
+  if (x == null || y == null || z == null) return undefined;
+  return { x, y, z };
+}
+
+function mapHome(row: HomeRow): HomeRecord {
+  return {
+    id: row.id,
+    dimension: row.dimension,
+    origin: { x: row.origin_x, y: row.origin_y, z: row.origin_z },
+    entrance: optionalCell(row.entrance_x, row.entrance_y, row.entrance_z),
+    householdChest: optionalCell(row.household_chest_x, row.household_chest_y, row.household_chest_z),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function mapMembership(row: MembershipRow): HomeMembership {
+  return {
+    citizenId: row.citizen_id,
+    homeId: row.home_id,
+    bed: { x: row.bed_x, y: row.bed_y, z: row.bed_z },
+    personalChest: optionalCell(row.personal_chest_x, row.personal_chest_y, row.personal_chest_z),
+    storageAccess: row.storage_access,
+    status: row.status,
+    createdAt: row.created_at,
   };
 }

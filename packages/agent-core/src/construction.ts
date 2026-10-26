@@ -1,20 +1,26 @@
-import { createEvent, type ActionResult, type EventBus, type Vec3 } from "@civ/shared";
-import { obtainItem, placeBlock, type SkillContext } from "@civ/skills";
-import { Vec3 as Vec3Class } from "vec3";
-import { nextUnplaced, starterHut, starterHutSize } from "./blueprint.js";
-import { cellClaimKey } from "./claims.js";
+import { createEvent, type ActionResult, type EventBus } from "@civ/shared";
 import {
-  blocksForStage,
-  materialsReady,
-  nextStage,
-  scanBlueprint,
-  transitionProject,
-  type BuildStage,
-  type SettlementProject,
-} from "./projects.js";
+  advanceBlueprintBuild,
+  createBuildSession,
+  knownFromSession,
+  obtainItem,
+  scanRecognizedStructures,
+  type BuildSession,
+  type KnownStructureRecord,
+  type SkillContext,
+} from "@civ/skills";
+import {
+  BASIC_SHELTER_ID,
+  expandBlueprint,
+  getBlueprint,
+  resolveMaterials,
+  worldPosition,
+} from "@civ/minecraft-knowledge";
+import { Vec3 as Vec3Class } from "vec3";
+import { starterHut } from "./blueprint.js";
+import { materialsReady, scanBlueprint, transitionProject, type SettlementProject } from "./projects.js";
 import { bagFromItems, PLANKS } from "./recipes.js";
 import type { SettlementRuntime } from "./settlement-runtime.js";
-import { candidateOrigins, evaluateSite, isProtectedBlock, pickBestSite } from "./site.js";
 import type { CivilizationStore } from "./store.js";
 import { rememberWorkstation } from "./workstations.js";
 
@@ -26,48 +32,50 @@ export async function buildShelter(
 ): Promise<ActionResult> {
   const project = loadProject(store, runtime);
   const hut = starterHut();
+  const settlement = store.getSettlement();
 
-  if (project.status === "COMPLETED") {
-    const settlement = store.getSettlement();
-    settlement.shelterComplete = true;
-    settlement.housingCapacity = Math.max(settlement.housingCapacity, 5);
-    store.saveSettlement(settlement);
-    return { success: true, data: { complete: true }, durationMs: 0 };
-  }
-
-  if (!project.site) {
-    const site = chooseSite(ctx);
-    if (!site) {
-      runtime.project = transitionProject(project, { type: "failed", reason: "no viable site" });
-      persistProject(store, runtime);
-      events.emit(createEvent("SettlementProjectBlocked", { reason: "no viable site" }, ctx.citizenId));
-      return { success: false, code: "PATH_BLOCKED", error: "No viable shelter site", durationMs: 0, retryable: true };
+  if (project.status === "COMPLETED" || settlement.shelterComplete) {
+    if (!store.isOpen()) {
+      return { success: true, data: { complete: true, persisted: false, persistReason: "closed" }, durationMs: 0 };
     }
-    runtime.project = transitionProject(project, { type: "site_chosen", site });
-    const settlement = store.getSettlement();
-    settlement.origin = site;
-    settlement.construction = {
-      blueprintId: hut.id,
-      startedAt: runtime.project.startedAt,
-      totalBlocks: hut.blocks.length,
-      placedBlocks: 0,
-      complete: false,
+    settlement.shelterComplete = true;
+    settlement.housingCapacity = Math.max(settlement.housingCapacity, 4);
+    const write = store.safeWrite("saveSettlement:shelterAlreadyComplete", () => store.saveSettlement(settlement));
+    return {
+      success: true,
+      data: { complete: true, persisted: write.ok, persistReason: write.ok ? undefined : write.reason },
+      durationMs: 0,
     };
-    store.saveSettlement(settlement);
-    persistProject(store, runtime);
-    events.emit(createEvent("ConstructionStarted", { origin: site, blueprint: hut.id }, ctx.citizenId));
-    return { success: true, data: { site }, durationMs: 0 };
   }
 
-  const inv = bagFromItems(ctx.bot.inventory.items().map((i) => ({ name: i.name, count: i.count })));
+  const known = mergeKnown(settlement.knownStructures, scanRecognizedStructures(ctx, toKnown(settlement.knownStructures), 24));
+  let session =
+    project.session ??
+    createBuildSession({
+      blueprintId: project.blueprintId || BASIC_SHELTER_ID,
+      facing: project.facing ?? "south",
+      origin: project.site,
+    });
+  if (project.site && !session.origin) session.origin = project.site;
+
+  const inv = bagFromItems(ctx.bot.inventory.items().map((item) => ({ name: item.name, count: item.count })));
   const plankCount = PLANKS.reduce((sum, name) => sum + (inv[name] ?? 0), 0);
   const logCount = Object.entries(inv)
     .filter(([name]) => name.endsWith("_log"))
     .reduce((sum, [, count]) => sum + count, 0);
-  if (!materialsReady(project.requiredResources, { oak_planks: plankCount + logCount * 4, planks: plankCount })) {
-    const planks = await obtainItem(ctx, "oak_planks", 8);
+  if (
+    !materialsReady(project.requiredResources, {
+      oak_planks: plankCount + logCount * 4,
+      spruce_planks: inv.spruce_planks ?? 0,
+      birch_planks: inv.birch_planks ?? 0,
+      planks: plankCount,
+    })
+  ) {
+    const want = session.materials.WALL_MATERIAL ?? "oak_planks";
+    const planks = await obtainItem(ctx, want, 8);
     if (!planks.success) {
       runtime.project = transitionProject(project, { type: "materials_missing" });
+      runtime.project.session = session;
       persistProject(store, runtime);
       return planks;
     }
@@ -75,177 +83,168 @@ export async function buildShelter(
 
   if (project.status === "PROCURING" || project.status === "PLANNED") {
     runtime.project = transitionProject(project, { type: "materials_ready" });
+    runtime.project.session = session;
     persistProject(store, runtime);
   }
 
-  const origin = project.site;
-  const stage: BuildStage = project.stage === "site" ? "floor" : project.stage;
-  const stageBlocks = new Set(
-    blocksForStage(hut, stage).map((block) => `${block.dx},${block.dy},${block.dz}`),
-  );
-
-  const next = nextUnplaced(
-    hut,
-    origin,
-    (position, block) => {
-      const found = ctx.bot.blockAt(new Vec3Class(Math.floor(position.x), Math.floor(position.y), Math.floor(position.z)));
-      if (!found) return false;
-      if (block === "oak_door") return found.name.endsWith("_door");
-      return found.name === block;
-    },
-    (position) => {
-      const blocked = project.blocked.some((pos) => same(pos, position));
-      if (blocked) return true;
-      const rel = `${position.x - origin.x},${position.y - origin.y},${position.z - origin.z}`;
-      if (stage !== "verify" && stageBlocks.size > 0 && !stageBlocks.has(rel)) return true;
-      const owner = runtime.claims.ownerOf("block", cellClaimKey(position.x, position.y, position.z));
-      return Boolean(owner && owner !== ctx.citizenId);
-    },
-  );
-
-  if (!next) {
-    const advanced = nextStage(stage);
-    if (advanced && advanced !== "verify") {
-      runtime.project = { ...project, stage: advanced, status: "BUILDING" };
-      persistProject(store, runtime);
-      return { success: true, data: { stage: advanced }, durationMs: 0 };
-    }
-    return verifyProject(ctx, store, runtime, events);
-  }
-
-  const claimKey = cellClaimKey(next.position.x, next.position.y, next.position.z);
-  if (ctx.citizenId && !runtime.claims.tryClaim("block", claimKey, ctx.citizenId, 45_000)) {
-    return { success: false, code: "CONTAINER_BUSY", error: "Another citizen is placing this block", durationMs: 0, retryable: true };
-  }
-
-  const itemName = next.block === "oak_door" ? "oak_door" : next.block;
-  if (!ctx.bot.inventory.items().some((i) => i.name === itemName || (itemName === "oak_door" && i.name.endsWith("_door")))) {
-    const obtained = await obtainItem(ctx, itemName, 1);
-    if (!obtained.success) {
-      runtime.claims.release("block", claimKey, ctx.citizenId);
-      if (itemName === "torch") {
-        return placeOrSkip(ctx, "oak_planks", next.position, store, runtime, events);
-      }
-      return obtained;
-    }
-  }
-
-  const placed = await placeBlock(ctx, itemName, next.position, {
-    purpose: "shelter_blueprint",
-    projectId: project.id,
-    structureId: hut.id,
+  const liveValidate = session.stage === "FINAL_VALIDATION";
+  const result = await advanceBlueprintBuild(ctx, session, {
+    maxPlacements: 1,
+    known,
+    liveValidate,
+    forceNew: false,
   });
-  runtime.claims.release("block", claimKey, ctx.citizenId);
-  if (!placed.success) {
-    runtime.project = transitionProject(project, { type: "block_blocked", position: next.position });
+  session = result.success ? result.data.session : ((result.details?.session as BuildSession | undefined) ?? session);
+
+  const current = runtime.project ?? project;
+  current.session = session;
+  current.stage = session.stage;
+  current.site = session.origin ?? current.site;
+  current.placed = session.placed;
+  current.total = session.total;
+  current.facing = session.facing;
+  current.blueprintId = session.blueprintId;
+  current.blueprintVersion = session.blueprintVersion;
+  runtime.project = current;
+
+  if (result.success && result.data.reused) {
+    current.status = "COMPLETED";
+    current.stage = "FINAL_VALIDATION";
+    settlement.shelterComplete = true;
+    settlement.housingCapacity = Math.max(settlement.housingCapacity, 4);
+    rememberKnown(store, result.data.reused);
+    const persisted = persistProject(store, runtime);
+    if (persisted) {
+      events.emit(
+        createEvent("ConstructionCompleted", { blueprint: session.blueprintId, reused: true, persisted: true }, ctx.citizenId),
+      );
+    }
+    return {
+      success: true,
+      data: { reused: true, complete: true, structure: result.data.reused, persisted },
+      durationMs: result.durationMs,
+    };
+  }
+
+  if (session.origin && settlement.construction === undefined) {
+    events.emit(createEvent("ConstructionStarted", { origin: session.origin, blueprint: session.blueprintId }, ctx.citizenId));
+  }
+
+  if (!result.success) {
     persistProject(store, runtime);
+    if (result.code === "SITE_UNSUITABLE" || result.code === "INTERRUPTED") {
+      events.emit(createEvent("SettlementProjectBlocked", { reason: result.error, code: result.code }, ctx.citizenId));
+      return result;
+    }
     events.emit(
       createEvent(
         "ConstructionBlockFailed",
-        { block: itemName, position: next.position, error: placed.error, code: placed.code },
+        { block: result.details?.block, position: result.details?.position, error: result.error, code: result.code },
         ctx.citizenId,
       ),
     );
-    ctx.body.unreachable.mark(next.position, 25_000);
-    return placed;
+    return result;
   }
 
-  events.emit(
-    createEvent("ConstructionBlockPlaced", { block: placed.data.name, position: next.position }, ctx.citizenId),
-  );
-  if (itemName === "chest") rememberWorkstation(store, "chest", next.position);
-  if (itemName === "crafting_table") rememberWorkstation(store, "crafting_table", next.position);
-
-  const scan = scanBlueprint(hut, origin, (pos) => ctx.bot.blockAt(new Vec3Class(pos.x, pos.y, pos.z))?.name);
-  runtime.project = transitionProject(project, { type: "build_progress", placed: scan.correct, verified: scan.correct });
-  const settlement = store.getSettlement();
-  if (settlement.construction) {
-    settlement.construction.placedBlocks = scan.correct;
-    settlement.construction.totalBlocks = scan.expected;
+  if (session.status === "COMPLETE") {
+    return completeShelter(ctx, store, runtime, events, session, hut);
   }
-  store.saveSettlement(settlement);
+
   persistProject(store, runtime);
-  events.emit(createEvent("ConstructionProgress", { placed: scan.correct, total: scan.expected }, ctx.citizenId));
-  return placed;
+  events.emit(createEvent("ConstructionProgress", { placed: session.placed, total: session.total, stage: session.stage }, ctx.citizenId));
+  return result;
 }
 
-async function placeOrSkip(
-  ctx: SkillContext,
-  itemName: string,
-  position: Vec3,
-  store: CivilizationStore,
-  runtime: SettlementRuntime,
-  events: EventBus,
-): Promise<ActionResult> {
-  if (!ctx.bot.inventory.items().some((i) => i.name === itemName)) {
-    return { success: false, code: "ITEM_NOT_FOUND", error: `Need ${itemName}`, durationMs: 0, retryable: true };
-  }
-  const placed = await placeBlock(ctx, itemName, position, { purpose: "shelter_blueprint" });
-  if (!placed.success) {
-    events.emit(createEvent("ConstructionBlockFailed", { block: itemName, position, error: placed.error }, ctx.citizenId));
-  }
-  persistProject(store, runtime);
-  return placed;
-}
-
-function verifyProject(
+function completeShelter(
   ctx: SkillContext,
   store: CivilizationStore,
   runtime: SettlementRuntime,
   events: EventBus,
+  session: BuildSession,
+  hut: ReturnType<typeof starterHut>,
 ): ActionResult {
-  const project = runtime.project;
-  if (!project?.site) {
+  const settlement = store.getSettlement();
+  const origin = session.origin;
+  if (!origin) {
     return { success: false, code: "UNKNOWN", error: "No site to verify", durationMs: 0, retryable: true };
   }
-  const hut = starterHut();
-  const scan = scanBlueprint(hut, project.site, (pos) => ctx.bot.blockAt(new Vec3Class(pos.x, pos.y, pos.z))?.name);
-  runtime.project = transitionProject(project, { type: "verified", verified: scan.correct, total: scan.expected });
-  persistProject(store, runtime);
-  if (runtime.project.status === "COMPLETED") {
-    const settlement = store.getSettlement();
-    settlement.shelterComplete = true;
-    settlement.housingCapacity = 5;
-    if (settlement.construction) settlement.construction.complete = true;
-    store.saveSettlement(settlement);
-    runtime.reservations.releasePurpose("construction");
+  const scan = scanBlueprint(hut, origin, (pos) => ctx.bot.blockAt(new Vec3Class(pos.x, pos.y, pos.z))?.name);
+  runtime.project = transitionProject(runtime.project!, { type: "verified", verified: session.total, total: session.total });
+  runtime.project.session = session;
+  settlement.shelterComplete = true;
+  settlement.housingCapacity = Math.max(settlement.housingCapacity, 4);
+  rememberWorkstations(store, session);
+  const recorded = knownFromSession(session, "usable");
+  if (recorded) rememberKnown(store, recorded);
+  const persisted = persistProject(store, runtime);
+  runtime.reservations.releasePurpose("construction");
+  if (persisted) {
     events.emit(
       createEvent(
         "SettlementProjectCompleted",
-        { expected: scan.expected, correct: scan.correct, missing: scan.missing, incorrect: scan.incorrect },
+        { expected: scan.expected, correct: scan.correct, missing: scan.missing, incorrect: scan.incorrect, persisted: true },
         ctx.citizenId,
       ),
     );
-    events.emit(createEvent("ConstructionCompleted", { blueprint: hut.id }, ctx.citizenId));
-    return { success: true, data: scan, durationMs: 0 };
+    events.emit(createEvent("ConstructionCompleted", { blueprint: session.blueprintId, persisted: true }, ctx.citizenId));
   }
-  events.emit(createEvent("SettlementProjectBlocked", { ...scan }, ctx.citizenId));
-  return {
-    success: false,
-    code: "VERIFY_FAILED",
-    error: `Shelter incomplete: ${scan.correct}/${scan.expected} correct`,
-    durationMs: 0,
-    retryable: true,
-  };
+  return { success: true, data: { ...scan, complete: true, persisted }, durationMs: 0 };
 }
 
-function chooseSite(ctx: SkillContext): Vec3 | undefined {
-  const from = ctx.body.position();
-  if (!from) return undefined;
-  const getBlock = (pos: Vec3) => ctx.bot.blockAt(new Vec3Class(Math.floor(pos.x), Math.floor(pos.y), Math.floor(pos.z)))?.name;
-  const size = starterHutSize();
-  const best = pickBestSite(from, size.width, size.depth, getBlock, 40);
-  if (best && !isProtectedBlock(getBlock(best.origin))) return best.origin;
-  const scored = candidateOrigins(from, 40)
-    .map((origin) => ({ origin, evaluation: evaluateSite(origin, size.width, size.depth, getBlock) }))
-    .filter((entry) => entry.evaluation.ok)
-    .sort((a, b) => b.evaluation.score - a.evaluation.score);
-  for (const entry of scored) {
-    const standing = getBlock(entry.origin);
-    if (standing && isProtectedBlock(standing)) continue;
-    return entry.origin;
+function rememberWorkstations(store: CivilizationStore, session: BuildSession): void {
+  if (!session.origin) return;
+  const blueprint = getBlueprint(session.blueprintId);
+  if (!blueprint) return;
+  const expanded = expandBlueprint(blueprint, resolveMaterials(blueprint, {}, session.materials), session.facing, session.extras);
+  for (const work of expanded.workstationLocal) {
+    const pos = worldPosition(session.origin, work.dx, work.dy, work.dz, blueprint.footprint, session.facing);
+    if (work.role === "chest") rememberWorkstation(store, "chest", pos);
+    if (work.role === "crafting_table") rememberWorkstation(store, "crafting_table", pos);
+    if (work.role === "furnace") rememberWorkstation(store, "furnace", pos);
   }
-  return undefined;
+}
+
+function toKnown(
+  records: NonNullable<ReturnType<CivilizationStore["getSettlement"]>["knownStructures"]> | undefined,
+): KnownStructureRecord[] {
+  return (records ?? []).map((entry) => ({
+    id: entry.id,
+    blueprintId: entry.blueprintId,
+    blueprintVersion: entry.blueprintVersion,
+    structureType: entry.structureType as KnownStructureRecord["structureType"],
+    origin: entry.origin,
+    facing: (entry.facing as KnownStructureRecord["facing"]) ?? "south",
+    quality: entry.quality,
+  }));
+}
+
+function mergeKnown(
+  stored: ReturnType<CivilizationStore["getSettlement"]>["knownStructures"],
+  scanned: KnownStructureRecord[],
+): KnownStructureRecord[] {
+  const merged = [...toKnown(stored)];
+  for (const entry of scanned) {
+    if (!merged.some((existing) => existing.id === entry.id)) merged.push(entry);
+  }
+  return merged;
+}
+
+function rememberKnown(store: CivilizationStore, record: KnownStructureRecord): void {
+  const settlement = store.getSettlement();
+  const list = settlement.knownStructures ?? [];
+  if (!list.some((entry) => entry.id === record.id)) {
+    list.push({
+      id: record.id,
+      blueprintId: record.blueprintId,
+      blueprintVersion: record.blueprintVersion,
+      structureType: record.structureType,
+      origin: record.origin,
+      facing: record.facing,
+      quality: record.quality,
+    });
+  }
+  settlement.knownStructures = list;
+  store.saveSettlement(settlement);
 }
 
 function loadProject(store: CivilizationStore, runtime: SettlementRuntime): SettlementProject {
@@ -260,23 +259,35 @@ function loadProject(store: CivilizationStore, runtime: SettlementRuntime): Sett
     }
   }
   runtime.project = runtime.ensureShelterProject();
-  eventsCreated(store, runtime);
+  persistProject(store, runtime);
   return runtime.project;
 }
 
-function eventsCreated(store: CivilizationStore, runtime: SettlementRuntime): void {
-  persistProject(store, runtime);
-}
-
-function persistProject(store: CivilizationStore, runtime: SettlementRuntime): void {
-  const settlement = store.getSettlement();
-  settlement.projectJson = runtime.project ? JSON.stringify(runtime.project) : undefined;
-  if (runtime.project?.site) settlement.origin = runtime.project.site;
-  store.saveSettlement(settlement);
-}
-
-function same(a: Vec3, b: Vec3): boolean {
-  return Math.floor(a.x) === Math.floor(b.x) && Math.floor(a.y) === Math.floor(b.y) && Math.floor(a.z) === Math.floor(b.z);
+/** Returns true only when the settlement write succeeded while the store was open. */
+function persistProject(store: CivilizationStore, runtime: SettlementRuntime): boolean {
+  if (!store.isOpen()) return false;
+  const write = store.safeWrite("saveSettlement:project", () => {
+    const settlement = store.getSettlement();
+    settlement.projectJson = runtime.project ? JSON.stringify(runtime.project) : undefined;
+    if (runtime.project?.site) settlement.origin = runtime.project.site;
+    if (runtime.project?.session) {
+      settlement.construction = {
+        blueprintId: runtime.project.session.blueprintId,
+        blueprintVersion: runtime.project.session.blueprintVersion,
+        stage: runtime.project.session.stage,
+        facing: runtime.project.session.facing,
+        startedAt: runtime.project.startedAt,
+        totalBlocks: runtime.project.session.total,
+        placedBlocks: runtime.project.session.placed,
+        complete: runtime.project.session.status === "COMPLETE",
+      };
+    }
+    if (runtime.project?.status === "COMPLETED") {
+      settlement.shelterComplete = true;
+    }
+    store.saveSettlement(settlement);
+  });
+  return write.ok;
 }
 
 export function emitProjectCreated(events: EventBus, project: SettlementProject, citizenId?: string): void {

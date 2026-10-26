@@ -14,12 +14,18 @@ import {
   type PlayerInfo,
   type Vec3,
   HOSTILE_MOB_NAMES,
+  classifyEntityPresence,
+  entityGoneMessage,
+  isEntityPresent,
   resolveFromRoot,
+  type EntityPresence,
 } from "@civ/shared";
 import { BodyLock, DuplicateBodyError } from "./body-lock.js";
 import { patchMineflayerCrafting } from "./craft-patch.js";
 import { TargetBlacklist } from "./path-recovery.js";
-import { deriveConnectionHealth, emptyTelemetry, isKeepaliveTimeout, type ConnectionTelemetry } from "./connection-health.js";
+import { deriveConnectionHealth, emptyTelemetry, keepalivePolicy, armShutdownClient, type ConnectionTelemetry } from "./connection-health.js";
+import { installModernMovement } from "./movement-sync.js";
+import { loadPathfinder } from "./pathing.js";
 
 const activeBodies = new Map<string, MinecraftBody>();
 
@@ -70,6 +76,9 @@ export class MinecraftBody extends EventEmitter {
   private reconnecting = false;
   private telemetry: ConnectionTelemetry = emptyTelemetry();
   private readonly eventLoopLag?: () => number;
+  private activeTarget: { id: number; name?: string; username?: string; kind: string } | null = null;
+  perceptionEpoch = 0;
+  lastEntityResult?: { code: EntityPresence | string; id?: number; name?: string };
 
   constructor(options: MinecraftBodyOptions) {
     super();
@@ -203,6 +212,11 @@ export class MinecraftBody extends EventEmitter {
       };
 
       bot.once("spawn", () => {
+        if (this.shuttingDown || this.deceased) {
+          this.teardownBot("shutdown-during-connect");
+          finish(fail("CANCELLED", `Connect cancelled for ${this.username}`, Date.now() - started));
+          return;
+        }
         this.spawned = true;
         this.reconnectAttempt = 0;
         this.bindClientTelemetry(bot);
@@ -250,9 +264,21 @@ export class MinecraftBody extends EventEmitter {
     const client = asRecord((bot as unknown as { _client?: unknown })._client);
     if (!client) return;
     const onError = (error: unknown) => {
-      if (isKeepaliveTimeout(error)) {
+      const policy = keepalivePolicy({ shuttingDown: this.shuttingDown, error });
+      if (policy === "swallow_shutdown") {
         this.telemetry.keepaliveTimeouts += 1;
         this.telemetry.reconnectReason = error instanceof Error ? error.message : String(error);
+        return;
+      }
+      if (policy === "fail_active_task") {
+        this.telemetry.keepaliveTimeouts += 1;
+        this.telemetry.reconnectReason = error instanceof Error ? error.message : String(error);
+        this.spawned = false;
+        try {
+          bot.emit("end", "keepalive-timeout");
+        } catch {
+          // ignore
+        }
         return;
       }
     };
@@ -282,6 +308,18 @@ export class MinecraftBody extends EventEmitter {
     const setGoal = pathfinder?.["setGoal"];
     if (typeof setGoal === "function") {
       setGoal.call((bot as unknown as { pathfinder: unknown }).pathfinder, null);
+    }
+    try {
+      bot.clearControlStates();
+    } catch {
+      // ignore
+    }
+    for (const key of ["jump", "forward", "back", "left", "right", "sprint", "sneak"] as const) {
+      try {
+        bot.setControlState(key, false);
+      } catch {
+        // ignore
+      }
     }
   }
 
@@ -356,6 +394,7 @@ export class MinecraftBody extends EventEmitter {
     const result: NearbyEntity[] = [];
     for (const entity of Object.values(bot.entities)) {
       if (!entity?.position || entity === bot.entity) continue;
+      if (!isEntityPresent(bot.entities, entity)) continue;
       const pos = { x: entity.position.x, y: entity.position.y, z: entity.position.z };
       const dist = distance({ x: origin.x, y: origin.y, z: origin.z }, pos);
       if (dist > maxDistance) continue;
@@ -371,6 +410,39 @@ export class MinecraftBody extends EventEmitter {
       });
     }
     return result.sort((a, b) => a.distance - b.distance);
+  }
+
+  trackEntity(entity: { id: number; name?: string; username?: string }, kind = "entity"): void {
+    if (!entity) return;
+    this.activeTarget = { id: entity.id, name: entity.name, username: entity.username, kind };
+  }
+
+  trackedEntity(): { id: number; name?: string; username?: string; kind: string } | null {
+    return this.activeTarget;
+  }
+
+  clearTrackedEntity(code?: EntityPresence | string, extra: Record<string, unknown> = {}): void {
+    const prev = this.activeTarget;
+    this.activeTarget = null;
+    if (!prev) return;
+    this.perceptionEpoch += 1;
+    const resolved = code || "ENTITY_REMOVED";
+    this.lastEntityResult = { code: resolved, id: prev.id, name: prev.name };
+    this.stopPathfinding();
+    const name = prev.name || prev.username || String(prev.id);
+    const message =
+      resolved === "TARGET_DEAD" || resolved === "ENTITY_REMOVED"
+        ? entityGoneMessage(resolved, name)
+        : `${resolved}: ${name} is gone, not out of range.`;
+    if (resolved === "TARGET_DEAD") {
+      this.events?.emit(
+        createEvent("ActionCompleted", { code: resolved, entityId: prev.id, name, ...extra }, this.citizenId),
+      );
+    } else {
+      this.events?.emit(
+        createEvent("ActionFailed", { code: resolved, error: message, entityId: prev.id, name, ...extra }, this.citizenId),
+      );
+    }
   }
 
   async chat(message: string): Promise<ActionResult<{ message: string }>> {
@@ -430,9 +502,16 @@ export class MinecraftBody extends EventEmitter {
       }
     });
 
+    installModernMovement(bot);
+
     bot.on("spawn", () => {
       if (this.deceased) return;
       this.spawned = true;
+      try {
+        loadPathfinder(bot);
+      } catch {
+        // pathfinder plugin may already be loaded
+      }
       if (this.awaitingRespawn) {
         this.awaitingRespawn = false;
         this.events?.emit(
@@ -446,6 +525,13 @@ export class MinecraftBody extends EventEmitter {
       this.emit("chat", username, message);
     });
 
+    bot.on("entityGone", (entity) => {
+      const tracked = this.activeTarget;
+      if (!tracked || !entity || entity.id !== tracked.id) return;
+      const code = classifyEntityPresence(bot.entities, entity);
+      this.clearTrackedEntity(code === "PRESENT" ? "ENTITY_REMOVED" : code, { via: "entityGone" });
+    });
+
     bot.on("kicked", (reason) => {
       this.lastKick = stringifyKick(reason);
       this.emit("kicked", this.lastKick);
@@ -455,9 +541,21 @@ export class MinecraftBody extends EventEmitter {
     });
 
     bot.on("error", (error) => {
-      if (isKeepaliveTimeout(error)) {
+      const policy = keepalivePolicy({ shuttingDown: this.shuttingDown, error });
+      if (policy === "swallow_shutdown") {
         this.telemetry.keepaliveTimeouts += 1;
         this.telemetry.reconnectReason = error.message;
+        return;
+      }
+      if (policy === "fail_active_task") {
+        this.telemetry.keepaliveTimeouts += 1;
+        this.telemetry.reconnectReason = error.message;
+        this.spawned = false;
+        try {
+          bot.emit("end", "keepalive-timeout");
+        } catch {
+          // ignore
+        }
         return;
       }
       this.emit("error", error);
@@ -506,10 +604,10 @@ export class MinecraftBody extends EventEmitter {
     } catch {
       // plugin may already be gone
     }
-    bot.removeAllListeners();
     const client = (
-      bot as unknown as { _client?: { removeAllListeners?: () => void; end?: (r?: string) => void } }
+      bot as unknown as { _client?: { removeAllListeners?: () => void; on?: (event: string, listener: (error: unknown) => void) => void; end?: (r?: string) => void } }
     )._client;
+    armShutdownClient(client, reason);
     try {
       bot.quit(reason);
     } catch {
@@ -519,12 +617,7 @@ export class MinecraftBody extends EventEmitter {
         // already closed
       }
     }
-    try {
-      client?.removeAllListeners?.();
-      client?.end?.(reason);
-    } catch {
-      // ignore
-    }
+    bot.removeAllListeners();
   }
 }
 

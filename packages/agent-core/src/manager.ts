@@ -12,22 +12,43 @@ import {
   resolveFromRoot,
   yieldEventLoop,
   type AppConfig,
-  type ActionResult,
   type CitizenRecord,
   type PresentedEvent,
+  type SettlementNeed,
   type SettlementState,
   type SimEvent,
+  type Vec3,
 } from "@civ/shared";
 import { minecraftKnowledge } from "@civ/minecraft-knowledge";
-import { assignSettlementNeeds, assignWorkRoles, planCitizen, type LastOutcome, type PlannedTask } from "./planner.js";
-import { bodyContext, completeVerifiedTransfer, executePlan } from "./executor.js";
+import { Vec3 as Vec3Class } from "vec3";
+import { authorizedWorkStorage } from "./activity-choice.js";
+import { listAvailableHomes } from "./available-homes.js";
+import { experimentWorkAssignment, planCitizen, type LastOutcome, type PlannedTask, type WorkRole } from "./planner.js";
+import { shouldAbortActiveWorkForCurfew } from "./curfew-runtime.js";
+import {
+  cancelCitizenWork,
+  decisionKind,
+  lastOutcomeFrom,
+  loadCitizenLastOutcome,
+  physicalWorkComplete,
+  persistCitizenLastOutcome,
+  skillStatusOf,
+  taskEventType,
+} from "./task-recovery.js";
+import { listDiscoveredSites, visibleShoresFromWorld } from "./discovered-sites.js";
+import { bodyContext, completeVerifiedTransfer, completionMemoryForTask, executePlan } from "./executor.js";
 import { deriveSettlementInventory, type SettlementInventoryView } from "./inventory-view.js";
 import { SettlementRuntime } from "./settlement-runtime.js";
 import type { SettlementProject } from "./projects.js";
-import { CivilizationStore } from "./store.js";
+import { CivilizationStore, type StoreWriteResult } from "./store.js";
 import { DirectiveBoard } from "./directives.js";
 import { applyBodyRespawn, applyTemporaryBodyDeath, applyTerminalDeath } from "./lifecycle.js";
+import { OperationTracker, type DrainResult } from "./operation-tracker.js";
 import type { DirectiveMode, HumanDirective } from "./directive-parse.js";
+
+export type AgentManagerHooks = {
+  drainTimeoutMs?: number;
+};
 
 type RuntimeCitizen = {
   record: CitizenRecord;
@@ -70,6 +91,10 @@ export class AgentManager {
   private tickTimer?: ReturnType<typeof setInterval>;
   private perfTimer?: ReturnType<typeof setInterval>;
   private running = false;
+  private stopPromise?: Promise<void>;
+  private lastDrain?: DrainResult;
+  private readonly ops = new OperationTracker();
+  private readonly hooks: AgentManagerHooks;
   private snapshot: DashboardSnapshot;
   private lastTickMs = 0;
   private runId = "";
@@ -78,8 +103,9 @@ export class AgentManager {
   private readonly directives: DirectiveBoard;
   private readonly pendingDrops = new Map<string, { item: string; count: number; giverId: string; giverBefore: number }>();
 
-  constructor(config: AppConfig, store?: CivilizationStore) {
+  constructor(config: AppConfig, store?: CivilizationStore, hooks?: AgentManagerHooks) {
     this.config = config;
+    this.hooks = hooks ?? {};
     this.store = store ?? new CivilizationStore(resolveFromRoot(config.DATABASE_PATH));
     this.cognition = createCognition(config);
     this.snapshot = emptySnapshot();
@@ -91,12 +117,74 @@ export class AgentManager {
     );
     this.events.on((event) => {
       this.eventTimes.push(Date.now());
-      this.store.appendEvent(event);
+      if (!this.ops.canWrite() || !this.store.isOpen()) return;
+      const wrote = this.store.safeWrite("appendEvent", () => this.store.appendEvent(event));
+      if (!wrote.ok) return;
       if (event.type === "CitizenDied") this.handleDeathEvent(event);
       if (event.type === "CitizenBodyDied") this.handleBodyDied(event);
       if (event.type === "CitizenRespawned") this.handleRespawned(event);
       if (event.type === "ItemTransferred" || event.type === "ItemDropped") this.notePendingDrop(event);
     });
+  }
+
+  pendingOps(): number {
+    return this.ops.size;
+  }
+
+  /** Last shutdown drain outcome (undefined until stop() runs). */
+  lastShutdownDrain(): DrainResult | undefined {
+    return this.lastDrain;
+  }
+
+  private canRun(): boolean {
+    return this.running && this.ops.canAcceptWork() && this.store.isOpen();
+  }
+
+  private reportWrite(label: string, result: StoreWriteResult): boolean {
+    if (result.ok) return true;
+    if (result.reason === "closed") {
+      console.warn(`[shutdown] skipped durable write after close: ${label}`);
+      return false;
+    }
+    console.error(`[store] durable write failed (${label})`, result.error);
+    return false;
+  }
+
+  private writeCitizen(record: CitizenRecord): boolean {
+    if (!this.ops.canWrite() || !this.store.isOpen()) return false;
+    return this.reportWrite(
+      "upsertCitizen",
+      this.store.safeWrite("upsertCitizen", () => this.store.upsertCitizen(record)),
+    );
+  }
+
+  private writeMemory(...args: Parameters<CivilizationStore["addMemory"]>): boolean {
+    if (!this.ops.canWrite() || !this.store.isOpen()) return false;
+    return this.reportWrite(
+      "addMemory",
+      this.store.safeWrite("addMemory", () => this.store.addMemory(...args)),
+    );
+  }
+
+  private writeRelationship(...args: Parameters<CivilizationStore["saveRelationship"]>): boolean {
+    if (!this.ops.canWrite() || !this.store.isOpen()) return false;
+    return this.reportWrite(
+      "saveRelationship",
+      this.store.safeWrite("saveRelationship", () => this.store.saveRelationship(...args)),
+    );
+  }
+
+  private writeLlmCall(...args: Parameters<CivilizationStore["logLlmCall"]>): boolean {
+    if (!this.ops.canWrite() || !this.store.isOpen()) return false;
+    return this.reportWrite(
+      "logLlmCall",
+      this.store.safeWrite("logLlmCall", () => this.store.logLlmCall(...args)),
+    );
+  }
+
+  private emitIfLive(event: SimEvent): void {
+    if (!this.ops.canWrite() || !this.store.isOpen()) return;
+    this.events.emit(event);
   }
 
   getSnapshot(): DashboardSnapshot {
@@ -111,7 +199,15 @@ export class AgentManager {
     return [...this.citizens.values()].find((c) => c.record.name.toLowerCase() === name.toLowerCase());
   }
 
-  async start(count = this.config.SIM_CITIZEN_COUNT): Promise<void> {
+  /**
+   * Connect roster bodies. `deferTicks` skips the first planner tick so a
+   * WORLD-LAB launcher can inspect spawn (pond vs house) before Atlas acts.
+   * Default remains: connect then tick immediately.
+   */
+  async start(count = this.config.SIM_CITIZEN_COUNT, options?: { deferTicks?: boolean }): Promise<void> {
+    if (this.ops.isShuttingDown || this.ops.isClosed) {
+      throw new Error("Cannot start AgentManager while shutting down or after stop");
+    }
     if (this.running) return;
     this.running = true;
     this.loop.start();
@@ -120,7 +216,7 @@ export class AgentManager {
     this.store.setMeta("humanDirectives", String(this.config.HUMAN_DIRECTIVES_ENABLED));
     this.store.setMeta("permadeath", String(this.config.SIM_PERMADEATH_ENABLED));
     const wanted = DEFAULT_CITIZENS.slice(0, count).filter((identity) => !isMechanicsProbeUsername(identity.name));
-    this.events.emit(
+    this.emitIfLive(
       createEvent("SimulationStarted", {
         citizens: wanted.map((c) => c.name),
         runId: this.runId,
@@ -130,6 +226,7 @@ export class AgentManager {
     );
 
     for (const identity of wanted) {
+      if (!this.canRun()) break;
       if (isMechanicsProbeUsername(identity.name) || isMechanicsProbeUsername(identity.id)) continue;
       const record = this.store.getCitizen(identity.id) ?? {
         id: identity.id,
@@ -166,42 +263,86 @@ export class AgentManager {
         busy: false,
         lastLlmAt: Date.now(),
         lastChatAt: 0,
+        lastOutcome: loadCitizenLastOutcome(this.store, identity.id),
       });
       if (record.status === "dead") {
         continue;
       }
-      const result = await body.connect();
+      const connecting = body.connect();
+      void this.ops.track(connecting);
+      const result = await connecting;
+      if (!this.canRun() || !this.store.isOpen()) {
+        if (result.success || body.connected) await body.disconnect("startup-interrupted");
+        break;
+      }
       record.status = result.success ? "online" : "error";
       record.reason = result.success ? "connected" : result.error;
-      this.store.upsertCitizen(record);
+      this.writeCitizen(record);
       await delay(1500);
     }
 
+    this.perfTimer = setInterval(() => this.logPerformance(), 30_000);
+    if (options?.deferTicks) return;
+    if (!this.canRun()) return;
+    await this.resumeTicks();
+  }
+
+  /** Arm the planner loop after a `start(..., { deferTicks: true })` spawn check. */
+  async resumeTicks(): Promise<void> {
+    if (!this.canRun() || this.tickTimer) return;
     this.tickTimer = setInterval(() => {
       void this.tick();
     }, this.config.SIM_TICK_MS);
-    this.perfTimer = setInterval(() => this.logPerformance(), 30_000);
     await this.tick();
   }
 
-  async stop(): Promise<void> {
+  plannerTicksArmed(): boolean {
+    return Boolean(this.tickTimer);
+  }
+
+  /** Concurrent callers share one shutdown promise. */
+  stop(): Promise<void> {
+    if (this.stopPromise) return this.stopPromise;
+    this.stopPromise = this.performStop();
+    return this.stopPromise;
+  }
+
+  private async performStop(): Promise<void> {
     this.running = false;
     this.loop.stop();
     if (this.tickTimer) clearInterval(this.tickTimer);
+    this.tickTimer = undefined;
     if (this.perfTimer) clearInterval(this.perfTimer);
+    this.perfTimer = undefined;
     for (const citizen of this.citizens.values()) {
       citizen.abort?.abort();
+    }
+    this.lastDrain = await this.ops.drainAndClose(this.hooks.drainTimeoutMs ?? 8_000);
+    if (!this.lastDrain.fullyDrained) {
+      console.warn(
+        `[shutdown] drain incomplete: attempted=${this.lastDrain.attempted} remaining=${this.lastDrain.remaining} timedOut=${this.lastDrain.timedOut}`,
+      );
+    }
+    for (const citizen of this.citizens.values()) {
       if (!citizen.body.isDeceased()) {
         await citizen.body.disconnect("simulation-stop");
         if (citizen.record.status !== "dead") citizen.record.status = "offline";
-        this.store.upsertCitizen(citizen.record);
+        this.writeCitizen(citizen.record);
       }
     }
-    this.events.emit(createEvent("SimulationStopped", {}));
+    this.emitIfLive(createEvent("SimulationStopped", {}));
     this.store.close();
   }
 
   private async tick(): Promise<void> {
+    if (!this.canRun()) return;
+    const work = this.runTick();
+    void this.ops.track(work);
+    await work;
+  }
+
+  private async runTick(): Promise<void> {
+    if (!this.canRun()) return;
     const started = Date.now();
     const online = [...this.citizens.values()].filter((c) => c.body.connected && !c.body.isDeceased());
     const settlement = this.store.getSettlement();
@@ -212,18 +353,18 @@ export class AgentManager {
         this.runtime.project = undefined;
       }
     }
-    const assignments = assignSettlementNeeds(
+    const { roles, assignedNeeds: assignments } = experimentWorkAssignment(
       online.map((c) => c.record.id),
       settlement.needs,
+      this.config.SIM_ASSIGN_WORK_ROLES,
     );
-    const roles = assignWorkRoles(online.map((c) => c.record.id));
 
     for (const citizen of this.citizens.values()) {
       try {
         await this.tickCitizen(citizen, settlement, assignments.get(citizen.record.id) ?? [], roles.get(citizen.record.id));
         await yieldEventLoop();
       } catch (error) {
-        this.events.emit(
+        this.emitIfLive(
           createEvent(
             "ErrorOccurred",
             { error: error instanceof Error ? error.message : String(error) },
@@ -233,7 +374,7 @@ export class AgentManager {
         citizen.busy = false;
         if (citizen.record.status !== "dead") {
           citizen.record.status = citizen.body.connected ? "error" : "offline";
-          this.store.upsertCitizen(citizen.record);
+          this.writeCitizen(citizen.record);
         }
       }
     }
@@ -246,16 +387,17 @@ export class AgentManager {
   private async tickCitizen(
     citizen: RuntimeCitizen,
     settlement: SettlementState,
-    assignedNeeds: ReturnType<typeof assignSettlementNeeds> extends Map<string, infer V> ? V : never,
-    workRole?: ReturnType<typeof assignWorkRoles> extends Map<string, infer V> ? V : never,
+    assignedNeeds: SettlementNeed[],
+    workRole?: WorkRole,
   ): Promise<void> {
+    if (!this.ops.canAcceptWork()) return;
     if (citizen.body.isDeceased() || (this.config.SIM_PERMADEATH_ENABLED && citizen.record.status === "dead")) {
       citizen.record.status = "dead";
       return;
     }
     if (citizen.body.isAwaitingRespawn()) {
       citizen.record.status = "respawning";
-      this.store.upsertCitizen(citizen.record);
+      this.writeCitizen(citizen.record);
       return;
     }
 
@@ -266,7 +408,22 @@ export class AgentManager {
     citizen.record.status = observation.spawned ? "online" : citizen.body.connected ? "connecting" : "offline";
 
     if (citizen.busy || !observation.spawned) {
-      this.store.upsertCitizen(citizen.record);
+      if (
+        citizen.busy &&
+        observation.spawned &&
+        shouldAbortActiveWorkForCurfew({
+          busy: true,
+          lastAction: citizen.lastPlan?.action,
+          lastTask: citizen.lastPlan?.task,
+          home: this.store.getCitizenHome(citizen.record.id),
+          position: observation.position,
+          timeOfDay: observation.gameTime,
+          isNight: observation.isNight,
+        })
+      ) {
+        cancelCitizenWork(citizen);
+      }
+      this.writeCitizen(citizen.record);
       return;
     }
 
@@ -282,7 +439,7 @@ export class AgentManager {
       !(activeDirective && activeDirective.mode !== "SUGGESTION") &&
       (assignedNeeds.length > 1 || (observation.food ?? 20) < 12 || Boolean(observation.nearby.find((e) => e.hostile)));
 
-    if (llmDue) {
+    if (llmDue && this.ops.canAcceptWork()) {
       citizen.lastLlmAt = now;
       llmInFlight += 1;
       const started = Date.now();
@@ -295,7 +452,7 @@ export class AgentManager {
         hasPickaxe: observation.inventory.some((item) => item.name.includes("pickaxe")),
         hasCraftingTableNearby: Boolean(settlement.workstations?.craftingTables.length),
       }).facts;
-      void this.cognition
+      const decisionWork = this.cognition
         .decide({
           citizenName: citizen.record.name,
           health: observation.health,
@@ -312,15 +469,16 @@ export class AgentManager {
         })
         .then((decision) => {
           lastLlmMs = Date.now() - started;
+          if (!this.ops.canWrite()) return;
           citizen.pendingLlm = decision;
-          this.store.logLlmCall({
+          this.writeLlmCall({
             citizenId: citizen.record.id,
             latencyMs: lastLlmMs,
             ok: true,
             goal: decision.goal,
             reason: decision.reason,
           });
-          this.events.emit(
+          this.emitIfLive(
             createEvent(
               "LLMDecisionMade",
               { goal: decision.goal, reason: decision.reason, provider: this.cognition.name },
@@ -330,13 +488,14 @@ export class AgentManager {
         })
         .catch((error: unknown) => {
           lastLlmMs = Date.now() - started;
-          this.store.logLlmCall({
+          if (!this.ops.canWrite()) return;
+          this.writeLlmCall({
             citizenId: citizen.record.id,
             latencyMs: lastLlmMs,
             ok: false,
             error: error instanceof Error ? error.message : String(error),
           });
-          this.events.emit(
+          this.emitIfLive(
             createEvent(
               "LLMSkipped",
               { error: error instanceof Error ? error.message : String(error), provider: this.cognition.name },
@@ -347,8 +506,10 @@ export class AgentManager {
         .finally(() => {
           llmInFlight = Math.max(0, llmInFlight - 1);
         });
+      void this.ops.track(decisionWork);
     }
 
+    const claimedHome = this.store.getCitizenHome(citizen.record.id);
     const plan = planCitizen({
       citizenId: citizen.record.id,
       observation,
@@ -359,6 +520,20 @@ export class AgentManager {
       llmReason: llmDecision?.reason,
       projectStatus: this.runtime.project?.status,
       lastOutcome: citizen.lastOutcome,
+      home: claimedHome
+        ? {
+            homeId: claimedHome.homeId,
+            bed: claimedHome.bed,
+            status: claimedHome.status,
+            origin: claimedHome.origin,
+            entrance: claimedHome.entrance,
+            personalChest: claimedHome.personalChest,
+          }
+        : undefined,
+      knownSites: listDiscoveredSites(this.store),
+      visibleShores: visibleShoresFor(citizen.body, observation.position),
+      authorizedStorage: authorizedWorkStorage(this.store, citizen.record.id),
+      availableHomes: listAvailableHomes(this.store),
       humanDirective:
         activeDirective?.intent && activeDirective.mode !== "SUGGESTION"
           ? {
@@ -376,17 +551,30 @@ export class AgentManager {
     citizen.record.decisionSource = plan.source;
     citizen.record.reason = plan.reason;
     if (plan.occupation) citizen.record.occupation = plan.occupation;
-    this.store.upsertCitizen(citizen.record);
+    this.writeCitizen(citizen.record);
 
     if (plan.task !== "observe") {
-      this.events.emit(
+      this.emitIfLive(
         createEvent(
           "TaskStarted",
-          { task: plan.task, goal: plan.goal, source: plan.source, reason: plan.reason, item: plan.item },
+          {
+            task: plan.task,
+            goal: plan.goal,
+            source: plan.source,
+            reason: plan.reason,
+            item: plan.item,
+            target: plan.target,
+            blocked: plan.blocked,
+            options: plan.trace?.options.map((entry) => entry.action),
+            chosen: plan.trace?.chosen?.action,
+            decisionKind: decisionKind(citizen.record.id, "intent"),
+          },
           citizen.record.id,
         ),
       );
     }
+
+    if (!this.ops.canAcceptWork()) return;
 
     const ctx = bodyContext(citizen.body, undefined, this.events, citizen.record.id);
     if (!ctx) return;
@@ -396,36 +584,46 @@ export class AgentManager {
     ctx.signal = citizen.abort.signal;
 
     const taskStarted = Date.now();
-    void executePlan(ctx, plan, this.store, this.events, this.runtime)
+    const taskWork = executePlan(ctx, plan, this.store, this.events, this.runtime)
       .then((result) => {
         lastTaskMs = Date.now() - taskStarted;
+        if (!this.ops.canWrite()) return;
         citizen.lastOutcome = lastOutcomeFrom(plan, result, citizen.lastOutcome);
+        persistCitizenLastOutcome(this.store, citizen.record.id, citizen.lastOutcome);
         if (plan.task !== "observe") {
-          this.events.emit(
+          this.emitIfLive(
             createEvent(
-              result.success ? "TaskCompleted" : "TaskFailed",
+              taskEventType(result),
               {
                 task: plan.task,
                 success: result.success,
                 code: result.success ? undefined : result.code,
                 error: result.success ? undefined : result.error,
+                decisionKind: decisionKind(citizen.record.id, "result"),
+                skillStatus: skillStatusOf(result),
+                workComplete: citizen.lastOutcome.workComplete,
+                collected: citizen.lastOutcome.collected,
               },
               citizen.record.id,
             ),
           );
         }
         if (!result.success && shouldRememberFailure(result.code, plan.item)) {
-          this.store.addMemory(
+          this.writeMemory(
             createMemory(citizen.record.id, "episodic", `Task ${plan.task} failed: ${result.error}`, 0.45),
           );
-        } else if (result.success && (plan.task === "gather_wood" || plan.task === "gather_food" || plan.task === "build_shelter")) {
-          this.store.addMemory(createMemory(citizen.record.id, "episodic", `Completed ${plan.task}`, 0.4));
+        } else if (result.success) {
+          const memory = completionMemoryForTask(plan.task, result);
+          if (memory) {
+            this.writeMemory(createMemory(citizen.record.id, "episodic", memory, 0.4));
+          }
         }
         this.maybeCollectDropped(citizen);
-        this.maybeSocial(citizen, result.success);
+        this.maybeSocial(citizen, physicalWorkComplete(result));
       })
       .catch((error: unknown) => {
         lastTaskMs = Date.now() - taskStarted;
+        if (!this.ops.canWrite()) return;
         citizen.lastOutcome = {
           task: plan.task,
           action: plan.action,
@@ -433,15 +631,33 @@ export class AgentManager {
           error: String(error),
           item: plan.item,
           streak: citizen.lastOutcome?.task === plan.task ? (citizen.lastOutcome.streak ?? 0) + 1 : 1,
+          workComplete: false,
+          skillStatus: "FAILED",
+          unresolved: citizen.lastOutcome?.unresolved,
         };
-        this.events.emit(createEvent("TaskFailed", { task: plan.task, error: String(error) }, citizen.record.id));
+        persistCitizenLastOutcome(this.store, citizen.record.id, citizen.lastOutcome);
+        this.emitIfLive(
+          createEvent(
+            "TaskFailed",
+            {
+              task: plan.task,
+              error: String(error),
+              decisionKind: decisionKind(citizen.record.id, "result"),
+              workComplete: false,
+              skillStatus: "FAILED",
+            },
+            citizen.record.id,
+          ),
+        );
       })
       .finally(() => {
         citizen.busy = false;
       });
+    void this.ops.track(taskWork);
   }
 
   private maybeSocial(citizen: RuntimeCitizen, taskSucceeded: boolean): void {
+    if (!this.ops.canWrite() || !this.store.isOpen()) return;
     if (citizen.body.isDeceased() || citizen.record.status === "dead") return;
     const task = citizen.lastPlan?.task ?? "";
     if (task === "observe" || task === "eat" || task === "deposit") {
@@ -470,9 +686,9 @@ export class AgentManager {
     if (decision.applyRelationship && taskSucceeded) {
       let rel = this.store.getRelationship(citizen.record.id, other.record.id);
       rel = applySocialEvent(rel, trigger);
-      this.store.saveRelationship(rel);
+      if (!this.writeRelationship(rel)) return;
       this.social.noteRelationshipApplied(citizen.record.name, other.record.name, trigger, task);
-      this.events.emit(
+      this.emitIfLive(
         createEvent(
           "RelationshipChanged",
           {
@@ -493,10 +709,10 @@ export class AgentManager {
     if (!decision.shouldSpeak || !decision.message) return;
     citizen.lastChatAt = Date.now();
     void citizen.body.chat(decision.message);
-    this.events.emit(
+    this.emitIfLive(
       createEvent("ConversationOccurred", { message: decision.message, other: other.record.name, cause }, citizen.record.id),
     );
-    this.store.addMemory(createMemory(citizen.record.id, "social", decision.message, 0.5, other.record.id));
+    this.writeMemory(createMemory(citizen.record.id, "social", decision.message, 0.5, other.record.id));
   }
 
   private chooseJointWorker(citizen: RuntimeCitizen): RuntimeCitizen | undefined {
@@ -518,6 +734,7 @@ export class AgentManager {
   }
 
   private maybeProximity(citizen: RuntimeCitizen): void {
+    if (!this.ops.canWrite() || !this.store.isOpen()) return;
     const other = citizen.body
       .nearbyPlayers(6)
       .map((p) => this.get(p.username))
@@ -532,7 +749,7 @@ export class AgentManager {
     this.lastProximityAt.set(pair, now);
     let rel = this.store.getRelationship(citizen.record.id, other.record.id);
     rel = applySocialEvent(rel, "proximity");
-    this.store.saveRelationship(rel);
+    this.writeRelationship(rel);
   }
 
   private handleDeathEvent(event: SimEvent): void {
@@ -550,14 +767,14 @@ export class AgentManager {
     if (!citizen) return;
     applyTemporaryBodyDeath({ citizen, store: this.store, runtime: this.runtime });
     this.directives.cancelForCitizen(citizen.record.id, "body_died");
-    this.store.upsertCitizen(citizen.record);
+    this.writeCitizen(citizen.record);
   }
 
   private handleRespawned(event: SimEvent): void {
     const citizen = this.citizens.get(event.citizenId ?? "");
     if (!citizen) return;
     applyBodyRespawn(citizen);
-    this.store.upsertCitizen(citizen.record);
+    this.writeCitizen(citizen.record);
   }
 
   issueDirective(input: { target: string; mode: DirectiveMode; instruction: string; selectedIds?: string[] }) {
@@ -570,7 +787,7 @@ export class AgentManager {
         for (const id of directive.targetIds) {
           const citizen = this.citizens.get(id);
           if (!citizen) continue;
-          citizen.abort?.abort();
+          cancelCitizenWork(citizen);
           citizen.body.stopPathfinding();
           citizen.busy = false;
           this.runtime.releaseCitizen(id);
@@ -589,14 +806,14 @@ export class AgentManager {
       this.citizens.get(nameOrId) ??
       [...this.citizens.values()].find((c) => c.record.name.toLowerCase() === nameOrId.toLowerCase());
     if (!citizen) return { ok: false as const, reason: "Citizen not found", status: 404 };
-    citizen.abort?.abort();
+    cancelCitizenWork(citizen);
     citizen.body.stopPathfinding();
     citizen.busy = false;
     this.runtime.releaseCitizen(citizen.record.id);
     this.directives.cancelForCitizen(citizen.record.id, "stopped by human");
     citizen.record.currentTask = undefined;
     citizen.record.reason = "stopped by human; replanning";
-    this.store.upsertCitizen(citizen.record);
+    this.writeCitizen(citizen.record);
     return { ok: true as const, citizenId: citizen.record.id };
   }
 
@@ -802,23 +1019,18 @@ function emptySnapshot(): DashboardSnapshot {
   };
 }
 
-function lastOutcomeFrom(plan: PlannedTask, result: ActionResult, previous?: LastOutcome): LastOutcome {
-  const details = result.success ? undefined : result.details;
-  const item =
-    plan.item ??
-    (typeof details?.item === "string" ? details.item : undefined) ??
-    (typeof details?.next === "string" ? details.next : undefined);
-  return {
-    task: plan.task,
-    action: plan.action,
-    success: result.success,
-    code: result.success ? undefined : result.code,
-    error: result.success ? undefined : result.error,
-    item,
-    nextTask: typeof details?.nextTask === "string" ? details.nextTask : undefined,
-    nextAction: typeof details?.nextAction === "string" ? details.nextAction : undefined,
-    streak: result.success ? 0 : previous?.task === plan.task ? previous.streak + 1 : 1,
-  };
+function visibleShoresFor(body: MinecraftBody, position: Vec3 | undefined): Array<{ stand: Vec3; water: Vec3 }> {
+  const bot = body.getBot();
+  if (!bot || !position) return [];
+  try {
+    return visibleShoresFromWorld(position, (pos: Vec3) => {
+      const block = bot.blockAt(new Vec3Class(Math.floor(pos.x), Math.floor(pos.y), Math.floor(pos.z)));
+      if (!block) return undefined;
+      return { name: block.name, boundingBox: block.boundingBox };
+    });
+  } catch {
+    return [];
+  }
 }
 
 function delay(ms: number): Promise<void> {
@@ -831,8 +1043,12 @@ const INFRA_FAILURES = new Set([
   "KICKED",
   "CANCELLED",
   "INTERRUPTED",
+  "CURFEW_STOP",
+  "NOT_SLEEP_TIME",
   "PATH_FAILED",
   "PATH_BLOCKED",
+  "HAZARD_BLOCKED",
+  "INTERIOR_UNREACHABLE",
 ]);
 
 function shouldRememberFailure(code: string, item?: string): boolean {

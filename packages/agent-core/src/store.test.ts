@@ -89,4 +89,18 @@ describe("CivilizationStore", () => {
     expect(store.listDirectives()[0]?.parsedIntent).toBe("gather_wood");
     store.close();
   });
+
+  it("safeWrite and safeRead refuse work after close without throwing", () => {
+    const dir = mkdtempSync(join(tmpdir(), "civ-"));
+    const path = join(dir, "safe.sqlite");
+    const store = new CivilizationStore(path);
+    expect(store.isOpen()).toBe(true);
+    expect(store.safeWrite("meta", () => store.setMeta("k", "v"))).toEqual({ ok: true });
+    expect(store.safeRead("meta", () => store.getMeta("k"))).toEqual({ ok: true, value: "v" });
+    store.close();
+    expect(store.isOpen()).toBe(false);
+    expect(store.safeWrite("late", () => store.setMeta("k", "nope"))).toEqual({ ok: false, reason: "closed" });
+    expect(store.safeRead("late", () => store.getMeta("k"))).toEqual({ ok: false, reason: "closed" });
+    store.close();
+  });
 });

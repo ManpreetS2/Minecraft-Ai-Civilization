@@ -1,8 +1,9 @@
 import type { MinecraftBody } from "@civ/minecraft-adapter";
-import { navigationBackend, shouldBlacklistTarget, findReachableInteractionPosition } from "@civ/minecraft-adapter";
+import { executeReturnHome, navigationBackend, shouldBlacklistTarget, findReachableInteractionPosition } from "@civ/minecraft-adapter";
 import {
   confirmTransfer,
   createEvent,
+  fail,
   FOOD_ITEM_NAMES,
   LOG_BLOCK_NAMES,
   type ActionResult,
@@ -20,6 +21,8 @@ import {
   flee,
   harvestCrop,
   mineBlock,
+  mineKnownOre,
+  fishAtShore,
   observeNearby,
   obtainItem,
   placeBlock,
@@ -32,11 +35,104 @@ import {
 import { Vec3 as Vec3Class } from "vec3";
 import { cellClaimKey } from "./claims.js";
 import { buildShelter, emitProjectCreated } from "./construction.js";
+import { deferredCapabilityResult } from "./goal-dispatch.js";
 import type { PlannedTask } from "./planner.js";
 import { interiorStandingCells, isInsideShelter } from "./shelter.js";
 import { SettlementRuntime } from "./settlement-runtime.js";
 import type { CivilizationStore } from "./store.js";
 import { bestCraftTarget, equipBestTool, needsReplacement } from "./tools.js";
+import { executeHouseholdStorage, executePersonalStorage, executeSleepAtHome } from "./home-ops.js";
+import { resolveHomeSleepTarget } from "./homes.js";
+import { authorizedWorkStorage } from "./activity-choice.js";
+import { catalogHomeById, evaluateClaimHomeAction } from "./available-homes.js";
+import { travelTowardHousingResult } from "./home-discovery.js";
+import { rememberDiscoveredSite, visibleShoresFromWorld } from "./discovered-sites.js";
+import { skipProtectedPropertyCell, assertMayUseChest } from "./property-safety.js";
+import { decisionKind, physicalWorkComplete, skillStatusOf } from "./task-recovery.js";
+
+export type FoodGatherSuccess = {
+  acquired: true;
+  foodGained: number;
+  foodCount: number;
+  source: string;
+};
+
+/** True when a successful action also confirmed its durable write (or had none to confirm). */
+export function persistConfirmed(result: ActionResult): boolean {
+  if (!result.success) return false;
+  const data = result.data;
+  if (!data || typeof data !== "object") return true;
+  if (!("persisted" in data)) return true;
+  return (data as { persisted?: unknown }).persisted !== false;
+}
+
+/**
+ * Episodic completion text, or undefined when we must not claim the goal was saved.
+ * Intermediate shelter steps (complete !== true) never write "Completed build_shelter".
+ */
+export function completionMemoryForTask(task: string, result: ActionResult): string | undefined {
+  if (!result.success) {
+    return `Task ${task} failed: ${result.error}`;
+  }
+  if (task === "gather_food") {
+    const acquired =
+      result.data && typeof result.data === "object" && (result.data as { acquired?: unknown }).acquired === true;
+    if (!acquired) return undefined;
+    const gained = (result.data as { foodGained?: number }).foodGained;
+    return `Newly gathered food${typeof gained === "number" ? ` (+${gained})` : ""}`;
+  }
+  if (task === "build_shelter") {
+    const complete =
+      result.data && typeof result.data === "object" && (result.data as { complete?: unknown }).complete === true;
+    if (!complete) return undefined;
+    if (!persistConfirmed(result)) {
+      return `Task build_shelter succeeded physically but was not persisted`;
+    }
+    return "Completed build_shelter";
+  }
+  if (task === "gather_wood") {
+    return "Completed gather_wood";
+  }
+  return undefined;
+}
+
+/** Count edible items currently in inventory (evidence for gather_food success). */
+export function countInventoryFood(ctx: SkillContext): number {
+  return ctx.bot.inventory.items().filter((i) => FOOD_ITEM_NAMES.has(i.name)).reduce((s, i) => s + i.count, 0);
+}
+
+/**
+ * gather_food succeeds only when inventory food newly increases.
+ * Never treats log mining as food acquisition.
+ */
+export function finalizeFoodGather(
+  ctx: SkillContext,
+  foodBefore: number,
+  attempt: ActionResult,
+  source: string,
+): ActionResult {
+  const foodAfter = countInventoryFood(ctx);
+  const gained = foodAfter - foodBefore;
+  if (gained > 0) {
+    const data: FoodGatherSuccess = {
+      acquired: true,
+      foodGained: gained,
+      foodCount: foodAfter,
+      source,
+    };
+    return { success: true, data, durationMs: attempt.durationMs };
+  }
+  if (!attempt.success) {
+    return attempt;
+  }
+  return fail(
+    "FOOD_NOT_ACQUIRED",
+    `Action at '${source}' completed but inventory food did not increase`,
+    attempt.durationMs,
+    true,
+  );
+}
+
 import {
   forgetWorkstation,
   knownChest,
@@ -46,6 +142,11 @@ import {
 } from "./workstations.js";
 
 const FOOD_MOBS = new Set(["cow", "pig", "chicken", "sheep", "mooshroom"]);
+
+function claimedBed(store: CivilizationStore, citizenId: string | undefined): Vec3 | undefined {
+  const home = resolveHomeSleepTarget(store, citizenId);
+  return home.success ? home.data.bed : undefined;
+}
 
 export async function executePlan(
   ctx: SkillContext,
@@ -57,17 +158,23 @@ export async function executePlan(
   events.emit(
     createEvent(
       "ActionStarted",
-      { action: plan.action, task: plan.task, source: plan.source, reason: plan.reason },
+      {
+        action: plan.action,
+        task: plan.task,
+        source: plan.source,
+        reason: plan.reason,
+        decisionKind: decisionKind(ctx.citizenId, "intent"),
+      },
       ctx.citizenId,
     ),
   );
 
-  if (ctx.citizenId) {
-    ctx.skipBlock = (position) => {
-      const owner = runtime.claims.ownerOf("tree", cellClaimKey(position.x, position.y, position.z));
-      return Boolean(owner && owner !== ctx.citizenId);
-    };
-  }
+  ctx.skipBlock = (position) => {
+    if (skipProtectedPropertyCell(store, position)) return true;
+    if (!ctx.citizenId) return false;
+    const owner = runtime.claims.ownerOf("tree", cellClaimKey(position.x, position.y, position.z));
+    return Boolean(owner && owner !== ctx.citizenId);
+  };
 
   let result: ActionResult;
   switch (plan.action) {
@@ -84,14 +191,99 @@ export async function executePlan(
       result = await attack(ctx);
       break;
     case "depositItems":
-      result = await depositToSettlement(ctx, store, events, runtime);
+      if (plan.task === "deposit_personal") {
+        result = await executePersonalStorage(ctx, store, events, runtime, "deposit", plan.item);
+      } else if (plan.task === "deposit_household") {
+        result = await executeHouseholdStorage(ctx, store, events, runtime, "deposit", plan.item);
+      } else {
+        result = await depositToSettlement(ctx, store, events, runtime);
+      }
       break;
     case "withdrawItems":
-      result = await withdrawFood(ctx, store, events);
+      if (plan.task === "withdraw_personal") {
+        result = await executePersonalStorage(ctx, store, events, runtime, "withdraw", plan.item ?? "bread", plan.count ?? 1);
+      } else {
+        result = await withdrawFood(ctx, store, events);
+      }
       break;
-    case "observeNearby":
+    case "waitInsideHome":
+    case "sleep":
+      result = await executeSleepAtHome(ctx, store);
+      break;
+    case "returnHome": {
+      const home = ctx.citizenId ? store.getCitizenHome(ctx.citizenId) : undefined;
+      if (!home || home.status !== "active") {
+        result = fail("HOME_MISSING", "BLOCKED: no legitimate claimed home to return to", 0, false);
+        break;
+      }
+      result = await executeReturnHome(ctx.bot, {
+        home: plan.target ?? home.entrance ?? home.origin ?? home.bed,
+        bed: home.bed,
+        entrance: home.entrance,
+        signal: ctx.signal,
+      });
+      break;
+    }
+    case "claimHome": {
+      if (!ctx.citizenId) {
+        result = fail("HOME_MISSING", "BLOCKED: no citizen identity for claimHome", 0, false);
+        break;
+      }
+      if (!plan.item) {
+        result = fail("INVALID_ARGUMENT", "BLOCKED: claimHome requires a citizen-chosen catalog homeId", 0, false);
+        break;
+      }
+      result = evaluateClaimHomeAction({
+        store,
+        citizenId: ctx.citizenId,
+        homeId: plan.item,
+        position: ctx.body.position(),
+      });
+      break;
+    }
+    case "travelTowardHousing": {
+      const home = catalogHomeById(plan.item);
+      if (!plan.target || !home) {
+        result = fail(
+          "INVALID_ARGUMENT",
+          "BLOCKED: travelTowardHousing needs a catalog house destination; houses are not invented",
+          0,
+          false,
+        );
+        break;
+      }
+      const moved = await navigationBackend().navigateNear(ctx.bot, plan.target, 2, {
+        timeoutMs: ctx.timeoutMs ?? 20_000,
+        signal: ctx.signal,
+      });
+      result = travelTowardHousingResult({
+        home,
+        position: ctx.body.position(),
+        moved,
+      });
+      break;
+    }
+    case "observeNearby": {
       result = await observeNearby(ctx);
+      const here = ctx.body.position();
+      if (result.success && ctx.citizenId && here) {
+        const shores = visibleShoresFromWorld(here, (pos: Vec3) => {
+          const block = ctx.bot.blockAt(new Vec3Class(Math.floor(pos.x), Math.floor(pos.y), Math.floor(pos.z)));
+          if (!block) return undefined;
+          return { name: block.name, boundingBox: block.boundingBox };
+        });
+        for (const shore of shores.slice(0, 3)) {
+          rememberDiscoveredSite(store, {
+            kind: "shore",
+            origin: shore.stand,
+            stand: shore.stand,
+            citizenId: ctx.citizenId,
+            seenAt: new Date().toISOString(),
+          });
+        }
+      }
       break;
+    }
     case "gatherFood":
       result = await gatherFood(ctx, store, events);
       break;
@@ -130,15 +322,108 @@ export async function executePlan(
     case "obtainItem":
       result = await obtainItem(ctx, plan.item ?? plan.goal ?? "wooden_pickaxe");
       break;
+    case "mineOre": {
+      if (!plan.item || !plan.target) {
+        result = {
+          success: false,
+          code: "INVALID_ARGUMENT",
+          error:
+            "mineOre requires a citizen-chosen resource and search origin. Citizens are not assigned miner roles by roster.",
+          durationMs: 0,
+          retryable: false,
+        };
+        break;
+      }
+      const oreStorage = authorizedWorkStorage(store, ctx.citizenId);
+      if (!oreStorage) {
+        result = fail(
+          "ACCESS_DENIED",
+          "BLOCKED: no authorized chest; the mining-test chest is not settlement storage",
+          0,
+          false,
+        );
+        break;
+      }
+      result = await mineKnownOre(ctx, {
+        resource: plan.item,
+        searchOrigin: plan.target,
+        amount: plan.count ?? 1,
+        destinationStorage: oreStorage,
+        permittedStorage: oreStorage,
+        returnHome: claimedBed(store, ctx.citizenId),
+      });
+      break;
+    }
+    case "fishShore": {
+      if (!plan.target) {
+        result = {
+          success: false,
+          code: "INVALID_ARGUMENT",
+          error:
+            "fishShore requires a citizen-chosen shore origin. Citizens are not assigned fisher roles by roster.",
+          durationMs: 0,
+          retryable: false,
+        };
+        break;
+      }
+      const storage = authorizedWorkStorage(store, ctx.citizenId);
+      if (!storage) {
+        result = fail(
+          "ACCESS_DENIED",
+          "BLOCKED: no authorized chest; test-fixture and unclaimed house chests are not settlement storage",
+          0,
+          false,
+        );
+        break;
+      }
+      result = await fishAtShore(ctx, {
+        searchOrigin: plan.target,
+        casts: plan.count ?? 1,
+        destinationStorage: storage,
+        permittedStorage: storage,
+        returnHome: claimedBed(store, ctx.citizenId),
+      });
+      if (result.success && ctx.citizenId) {
+        rememberDiscoveredSite(store, {
+          kind: "shore",
+          origin: plan.target,
+          stand: plan.target,
+          citizenId: ctx.citizenId,
+          seenAt: new Date().toISOString(),
+        });
+      }
+      break;
+    }
+    case "blocked":
+      result = fail(
+        (plan.blocked?.code as "HOME_MISSING" | "ACCESS_DENIED" | "SEARCH_EXHAUSTED" | "MISSING_TOOL" | "CLAIM_CONFLICT") ??
+          "INVALID_ARGUMENT",
+        plan.reason,
+        0,
+        false,
+        plan.blocked,
+      );
+      break;
     case "returnToSettlement":
       result = await returnToSettlement(ctx, store.getSettlement().origin ?? store.getSettlement().storage);
       break;
     case "mineBlock":
-    default:
       result = await gatherByTask(ctx, plan.task, runtime);
+      break;
+    case "deferCapability":
+      result = deferredCapabilityResult(plan.task);
+      break;
+    default:
+      result = fail(
+        "UNSUPPORTED_ACTION",
+        `Unsupported action '${plan.action}' for task '${plan.task}' — refusing silent wood-mining fallback`,
+        0,
+        false,
+      );
       break;
   }
 
+  const foodMeta = foodResultMeta(result);
   events.emit(
     createEvent(
       result.success ? "ActionCompleted" : "ActionFailed",
@@ -146,17 +431,36 @@ export async function executePlan(
         action: plan.action,
         task: plan.task,
         success: result.success,
+        persisted: result.success ? persistConfirmed(result) : false,
         code: result.success ? undefined : result.code,
         error: result.success ? undefined : result.error,
+        decisionKind: decisionKind(ctx.citizenId, "result"),
+        skillStatus: skillStatusOf(result),
+        workComplete: physicalWorkComplete(result),
+        ...(foodMeta ? { food: foodMeta } : {}),
       },
       ctx.citizenId,
     ),
   );
 
-  if (result.success && ctx.citizenId) {
-    updateSettlementFromInventory(ctx, store);
+  // Only sync settlement resources when food was newly acquired or other actions succeeded.
+  if (result.success && ctx.citizenId && foodMeta?.acquired !== false) {
+    if (store.isOpen()) {
+      store.safeWrite("updateSettlementFromInventory", () => updateSettlementFromInventory(ctx, store));
+    }
   }
   return result;
+}
+
+function foodResultMeta(
+  result: ActionResult,
+): { acquired: boolean; foodGained?: number; alreadyHadFood?: boolean } | undefined {
+  if (!result.success || !result.data || typeof result.data !== "object") return undefined;
+  const data = result.data as Record<string, unknown>;
+  if (data.acquired === true && typeof data.foodGained === "number") {
+    return { acquired: true, foodGained: data.foodGained };
+  }
+  return undefined;
 }
 
 async function ensureAndBuild(
@@ -333,64 +637,84 @@ async function mineClaimedTarget(
   return mined;
 }
 
+/**
+ * gather_food succeeds only when inventory food newly increases.
+ * Eating already-held food is not credited as gathering (use eatFood via hunger reflex).
+ * Preserves Windows farming, chest withdraw, berry, leaf, animal, and bread paths.
+ */
 async function gatherFood(ctx: SkillContext, store: CivilizationStore, events: EventBus): Promise<ActionResult> {
+  const foodBefore = countInventoryFood(ctx);
   const heldFood = ctx.bot.inventory.items().find((i) => FOOD_ITEM_NAMES.has(i.name));
   if (heldFood && (ctx.bot.food ?? 20) <= 8) {
-    return eatFood(ctx);
+    // Hunger relief is a separate action; do not claim gather_food success from eating stock.
+    return fail(
+      "FOOD_NOT_ACQUIRED",
+      `Inventory already holds food; not credited as newly gathered (hunger ${ctx.bot.food ?? 20} — use eatFood)`,
+      0,
+      false,
+    );
+  }
+  if (foodBefore > 0) {
+    return fail(
+      "FOOD_NOT_ACQUIRED",
+      `Inventory already holds ${foodBefore} food; not credited as newly gathered`,
+      0,
+      false,
+    );
   }
 
   const chest = knownChest(ctx, store);
-  const storedFood = Object.entries(store.getSettlement().storageContents ?? {}).find(([name, count]) => FOOD_ITEM_NAMES.has(name) && count > 0);
+  const storedFood = Object.entries(store.getSettlement().storageContents ?? {}).find(
+    ([name, count]) => FOOD_ITEM_NAMES.has(name) && count > 0,
+  );
   if (!heldFood && chest && storedFood) {
     const withdrawn = await withdrawItemsNamed(ctx, store, events, storedFood[0], 1);
-    if (withdrawn.success) return withdrawn;
+    return finalizeFoodGather(ctx, foodBefore, withdrawn, `chest:${storedFood[0]}`);
   }
 
   for (const kind of ["wheat", "carrots", "potatoes", "beetroots"] as const) {
     const harvested = await harvestCrop(ctx, kind);
-    if (harvested.success) return harvested;
+    if (harvested.success || harvested.code !== "BLOCK_NOT_FOUND") {
+      const finalized = finalizeFoodGather(ctx, foodBefore, harvested, `farm:${kind}`);
+      if (finalized.success || harvested.success) return finalized;
+    }
   }
 
   const berries = await findBlock(ctx, ["sweet_berry_bush"], 20);
   if (berries.success) {
     const mined = await mineBlock(ctx, ["sweet_berry_bush"], 20);
     if (mined.success) await collectItem(ctx, undefined, 8);
-    return mined;
+    return finalizeFoodGather(ctx, foodBefore, mined, "sweet_berry_bush");
   }
 
   const apples = await findBlock(ctx, ["oak_leaves", "dark_oak_leaves"], 20);
   if (apples.success) {
     const mined = await mineBlock(ctx, ["oak_leaves", "dark_oak_leaves"], 20);
     if (mined.success) await collectItem(ctx, undefined, 8);
-    return mined;
+    return finalizeFoodGather(ctx, foodBefore, mined, "leaves");
   }
 
   const animal = ctx.body.nearbyEntities(20).find((e) => FOOD_MOBS.has(e.name.toLowerCase()));
   if (animal) {
     const attacked = await attack(ctx, animal.id);
     if (attacked.success) await collectItem(ctx, undefined, 10);
-    return attacked;
+    return finalizeFoodGather(ctx, foodBefore, attacked, animal.name);
   }
 
   const wheat = ctx.bot.inventory.items().filter((i) => i.name === "wheat").reduce((s, i) => s + i.count, 0);
   if (wheat >= 3) {
-    return obtainItem(ctx, "bread", 1);
+    const bread = await obtainItem(ctx, "bread", 1);
+    return finalizeFoodGather(ctx, foodBefore, bread, "craft:bread");
   }
 
   const farther = await findBlock(ctx, ["sweet_berry_bush"], 48);
   if (farther.success) {
     const mined = await mineBlock(ctx, ["sweet_berry_bush"], 48);
     if (mined.success) await collectItem(ctx, undefined, 8);
-    return mined;
+    return finalizeFoodGather(ctx, foodBefore, mined, "sweet_berry_bush:far");
   }
 
-  return {
-    success: false,
-    code: "NO_FOOD",
-    error: "No food sources in search range",
-    durationMs: 0,
-    retryable: true,
-  };
+  return fail("FOOD_NOT_FOUND", "No edible sources available — not mining wood as food", 0, true);
 }
 
 async function depositToSettlement(
@@ -416,6 +740,8 @@ async function depositToSettlement(
     }
     return { success: false, code: "CONTAINER_NOT_FOUND", error: "Settlement chest is gone", durationMs: 0, retryable: true };
   }
+  const access = assertMayUseChest(store, ctx.citizenId, chest, "communal");
+  if (!access.success) return access;
   if (ctx.citizenId && !runtime.claims.tryClaim("container", cellClaimKey(chest.x, chest.y, chest.z), ctx.citizenId, 30_000)) {
     return { success: false, code: "CONTAINER_BUSY", error: "Chest is in use", durationMs: 0, retryable: true };
   }
@@ -455,6 +781,8 @@ async function withdrawItemsNamed(
   if (!chest) {
     return { success: false, code: "CONTAINER_NOT_FOUND", error: "No settlement chest", durationMs: 0, retryable: true };
   }
+  const access = assertMayUseChest(store, ctx.citizenId, chest, "communal");
+  if (!access.success) return access;
   const result = await withdrawItems(ctx, itemName, count, chest);
   if (result.success) {
     const settlement = store.getSettlement();
@@ -466,6 +794,7 @@ async function withdrawItemsNamed(
 }
 
 async function seekSafety(ctx: SkillContext, store: CivilizationStore): Promise<ActionResult> {
+  // Temporary cover only. Never writes citizens.home_id or memberships.
   const settlement = store.getSettlement();
   const origin = settlement.origin;
   const pos = ctx.body.position();
