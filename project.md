@@ -1,0 +1,85 @@
+# Minecraft AI Civilization — Project Charter and Current Design
+
+> **Status:** Long-term design and active engineering plan. Features described below are goals unless explicitly labeled verified. Last design decision: October 26, 2026.
+
+**Core question:** What happens when independent persistent AI citizens, with different dispositions, survival needs and limited knowledge, must live together in a physically consequential Minecraft world long enough to create (or fail to create) a society?
+
+**Full design history:** [Master design migrated from Google Docs](docs/master-design-google-doc-mirror.md). The archive includes the full source plan, older proposals, implementation notes and references. **This shorter charter governs newer decisions where the historical plan disagrees.**
+
+## Locked decisions
+
+1. **Emergent leadership (Option B).** No citizen begins as mayor, leader, president, ruler or compulsory coordinator. Citizens may voluntarily organize, negotiate duties, appoint leaders, vote, form competing factions, reject leadership or remain leaderless. An apparent leader only has authority if other citizens recognize it through observable interaction. Losing or killing a fictional in-game leader never automatically creates a replacement or transfers political legitimacy.
+2. **Numerical, reproducible initial personalities.** Every newly introduced citizen gets independently generated trait values on bounded, interpretable scales, rather than three unrestricted adjective draws. Opposing concepts such as lazy versus hardworking sit on one dimension, not two contradictory random labels. Generation uses a recorded RNG seed and a declared, reviewable distribution. Initial values are tendencies, not fixed actions: traits may slowly evolve from experiences. No developer-assigned job, religion, friendship or ideological correctness.
+3. **Citizens retain individual agency.** A citizen can accept, question, bargain over, ignore or resist a request, including a leader's request, based on its own knowledge, goals, commitments, emotions and relationships. No global manager secretly scripts social outcomes.
+4. **Mayor access to stronger reasoning is conditional.** A citizen who *emerges* as a recognized leader may receive access to a more capable model or longer reasoning budget **for governance decisions**. Their persistent identity, memories and trait values do not switch or reset. Role-based compute access is revoked when the role ends. The chosen small/large models, compute budget and precise recognition mechanism are **open implementation decisions**, not evidence of a working model system. A privileged model cannot directly control other citizens or bypass their consent.
+5. **Private communication is a simulation rule.** Nearby speech, directed/private conversations and public announcements expose information only to their appropriate participants. A mayor does not automatically read other citizens' messages, thoughts, hidden plans or private memories. The human observer may retain complete logs for scientific audit; this observational access is not an in-world power.
+6. **AI chooses WHAT/WHY; scripts execute HOW.** High-level intentions feed an allowlisted action planner and deterministic Minecraft skills for movement, combat, inventory, gathering, fishing, crafting, trading and physical building. Actual Minecraft observations verify results. The model cannot execute arbitrary shell/network commands or manufacture success.
+7. **Real survival and consequences.** The primary goal is studying adaptation and cooperation under survival pressure, not decorating a beautiful world. Citizen-directed construction should eventually physically consume legitimate materials and produce verified Minecraft structures; blueprints may be simple and practical. Human-provided automation/commissioned infrastructure remains an allowed, measurable separate category.
+8. **Final experiment: frozen wilderness.** After baseline physical and social testing, move to a controlled frozen biome with genuinely tested cold/survival mechanics where required. Snow by itself is not a general temperature mechanic. Compare survival, scarcity management, communication, leadership and moral conflicts under logged starting conditions.
+9. **Fictional moral dilemmas may have harsh outcomes.** The engine does not pre-impose a morally “correct” solution to an in-world scarcity, theft, freeloading accusation or leadership dispute. Citizens can help, disagree, trade, punish, exile, fight or kill *fictional Minecraft citizens* using bounded game actions. The game can resist or fail an attempted action; the outcome is never scripted merely to look dramatic. No expanded host-level or real-world permissions follow from this.
+10. **Permanent death is final-product behavior.** On confirmed Minecraft death, the citizen becomes permanently deceased; the identity and history persist but its physical body cannot be respawned as the same citizen. Death does **not** spawn a free replacement. New distinct citizens require an explicit, recorded, authorized recruitment transaction. Whether that currency is entirely in-game or involves a human-approved real-world budget remains **undecided**. During debugging and body reliability tests, keep irreversible permadeath **disabled**, so accidental drowning/navigation bugs do not destroy research subjects.
+11. **Population cap:** up to 100 persistent living citizens in the long-term design, *not* 100 simultaneous full-GPU models or mandatory 100 bot clients. Share model inference infrastructure with isolated citizen memory/context and scale physical bodies selectively only after testing.
+12. **Reproducibility and honesty.** Distinguish an AI intention, script attempt, physical Minecraft outcome, externally supplied infrastructure and database event. Preserve seeds, model versions, game version, world snapshots, playerdata, SQLite events, known failures and experiment configurations. Never report an offline unit test as a full live Minecraft success.
+
+## Initial personality model (design, not implemented)
+
+| Axis (0–100) | Low end | High end | Notes |
+| --- | --- | --- | --- |
+| Work ethic | Avoids effort | Persistently diligent | Situational; not a compulsory job |
+| Aggression | Non-confrontational | Confrontational | Does not mandate violence |
+| Social trust | Suspicious | Trusting | Trust can differ by person |
+| Empathy | Low concern for others | High concern for others | May conflict with self-interest |
+| Curiosity | Prefers familiar things | Seeks novelty | May affect exploration |
+| Risk tolerance | Risk-averse | Risk-seeking | Modulated by actual danger |
+| Sociability | Solitary | Socially engaged | Not a friendship assignment |
+| Leadership drive | Avoids leadership | Seeks influence | **Does not** grant mayor status |
+
+**Generation contract:** sample one numeric value per independent dimension using a documented, weighted distribution (for example, middle values more common with occasional extremes); log the seed, version and generated values. Use contextual behavior and gradual learning, not hardcoded “aggression > 80 = murder” or “low work ethic = never gathers wood.” Check statistical diversity and avoid unintended duplicate/strongly correlated axes. Display adjectives only as descriptions of scores, not separate traits.
+
+**Example:** work ethic 18, aggression 86, social trust 32, curiosity 75. This citizen may be suspicious and conflict-prone, but still choose cooperation when hungry or outnumbered. No action is predetermined by a number.
+
+## Leadership and stronger-model access
+
+**Start:** five independent citizens, no mayor; each has its own beliefs, memories and ability to communicate. The settlement can publish objective shortages (e.g. food low) without commanding who must solve them.
+
+**Emergence:** citizens may propose organizations or leadership; election, acclamation, informal influence, coalition, coercion or refusal are all possible. A leadership claim should be grounded in witnessed speech/actions, commitments and actual recognition. Distinguish *claimant*, *recognized leader*, and *disputed office*.
+
+**Privilege:** if an agreed social role earns a stronger planning model, route eligible role-specific high-level questions to that model using the same citizen identity and strictly perspective-limited context. There is no omniscient “mayor brain.” Ordinary citizen decisions remain independent. Measure differences caused by model strength as an experimental confound rather than calling them purely social emergence.
+
+**Removal:** citizens may withdraw recognition, appoint another leader, split into factions or leave the office vacant. Physical death is separate from office succession. No implicit coronation, memory rewrite or transfer of a deceased citizen's personality.
+
+**Information boundaries:** private speech is not mirrored into an omniscient shared citizen prompt. Observer audit logs are not accessible to actors in the simulation.
+
+## Build strategy
+
+### Gate A — One reliable citizen
+Atlas must actually connect, obtain food, avoid drowning, navigate to a real bed, observe curfew, sleep, resume morning activity and shut down cleanly in isolated World-Lab. Preserve the existing Windows WIP and source/world/SQLite/WAL/SHM evidence. Offline tests alone do not close this gate.
+
+### Gate B — Five reliable independent citizens
+Atlas, Maya, Theo, Ava and Kai persist and survive at least three full Minecraft days in the initial usable starter settlement, communicating and pursuing individual goals without repeated human rescue. No initial mayor, assigned occupations or imposed government.
+
+### Gate C — Emergent society and physical construction
+Provide personality generation, per-citizen memory and private/public communication; let citizens choose collective rules and roles. Add real trade, resource/property accounting, script-driven physical construction, material acquisition, paid/human-provided infrastructure contracts and verified outcomes without scripted consensus.
+
+### Gate D — Controlled irreversible social mechanics
+In copied/test worlds, prove confirmed death remains permanent, no automatic replacement occurs, recruitment requires authorized payment, and attempted in-game conflict has verified Minecraft effects and meaningful observer/audience information limits. Test leadership formation, resignation, disputed succession and no-leader operation.
+
+### Gate E — Frozen-biome final experiment
+Run controlled, reproducible long-duration survival studies under measured cold/food/shelter scarcity. Report both successful cooperation and failed civilizations without forcing either result. Scale gradually toward the 100-citizen cap only when observability, server performance and model throughput support it.
+
+## Existing engineering guardrails and current status
+
+- Repository: `ManpreetS2/Minecraft-Ai-Civilization` (TypeScript, Mineflayer, Paper, SQLite, Vitest).
+- The richer real Windows working tree is **ahead of GitHub main** on local branch `integration/reliability-pr7-windows` (last reported local HEAD `019d26d` plus uncommitted WIP). Do **not** equate remote main with the authoritative local build.
+- World-Lab only: Minecraft `25567`, RCON `25577`, isolated `world-lab-civilization.sqlite`. Production `25565` / `25575` / `civilization.sqlite` must not be used for probes. Do not blindly run `pnpm sim:start` with production defaults.
+- The Day 2 controlled Atlas run confirmed real wood gathering/crafting but not successful sustained food acquisition or a completed sleep routine; it exposed drowning, navigation and backoff failures. A following Day 3 **offline** gate reported 76/76 targeted tests passing; that was **not** a verified Day 3 live completion.
+- Preserve previous experiments, worlds, databases and WIP. No unapproved teleports, time changes, free inventory, destructive branch resets, PR merges or Cloud Brain V2 activation.
+- The current task order is physical reliability first; architecture/model routing, randomized trait system, government, permanent-death final mode and frozen world are future phases.
+
+## Documentation and future LinkedIn showcase
+
+For every meaningful coding milestone, keep code changes separate from measured evidence. Document architecture decisions, verified tests, real Minecraft outcome clips/screenshots, failed attempts and their fixes, and honest portfolio/LinkedIn-ready summaries. Never post automatically; the project owner approves every public claim. Do not commit credentials, private keys or excessive raw player data.
+
+## Full project notes
+
+The [complete Google Docs master plan mirror](docs/master-design-google-doc-mirror.md) preserves prior discussion, reference repositories, economics ideas, architecture notes, build/world setup and milestones. It is an **archive**, not proof that described functionality exists. The root `project.md` records the latest decisions on **numerical personalities and naturally emergent leadership**, overriding any earlier sections that suggest fixed dispositions or an appointed mayor.
