@@ -2,6 +2,10 @@ import type { BodyObservation, DecisionSource, SettlementNeed, SettlementState }
 import { FOOD_ITEM_NAMES } from "@civ/shared";
 import { minecraftKnowledge } from "@civ/minecraft-knowledge";
 import { intentToPlan, type DirectiveIntent, type DirectiveMode } from "./directive-parse.js";
+import {
+  foodSearchBackoffReason,
+  shouldBackoffFoodSearch,
+} from "./failure-backoff.js";
 
 export type PlannedTask = {
   goal: string;
@@ -41,6 +45,7 @@ export type PlannerInput = {
   llmReason?: string;
   projectStatus?: string;
   lastOutcome?: LastOutcome;
+  visibleShores?: Array<{ stand: { x: number; y: number; z: number }; water: { x: number; y: number; z: number } }>;
   humanDirective?: {
     id: string;
     intent: DirectiveIntent;
@@ -115,6 +120,25 @@ export function planCitizen(input: PlannerInput): PlannedTask {
     );
     if (stored) {
       return task("survive", "withdraw_food", "withdrawItems", "reflex", "Hunger is low; food is in shared storage", 0.94);
+    }
+    // Day 2: hunger reflex re-issued gatherFood ~362× after FOOD_NOT_FOUND.
+    if (shouldBackoffFoodSearch(input.lastOutcome)) {
+      const hasRod = obs.inventory.some((item) => item.name === "fishing_rod");
+      const shore = input.visibleShores?.[0]?.stand;
+      if (hasRod && shore) {
+        const planned = task(
+          "survive",
+          "fish_shore",
+          "fishShore",
+          "reflex",
+          "Hunger low; land food search exhausted — try fishing at a visible shore",
+          0.92,
+          "gatherer",
+        );
+        planned.target = shore;
+        return planned;
+      }
+      return task("idle", "observe", "observeNearby", "reflex", foodSearchBackoffReason(input.lastOutcome!), 0.4);
     }
     return task("survive", "acquire_food", "gatherFood", "reflex", "Hunger is low and inventory has no food", 0.93);
   }
@@ -301,6 +325,9 @@ function correctiveFromFailure(input: PlannerInput): PlannedTask | undefined {
     if (!input.settlement.shelterComplete) {
       return task("settlement", "build_shelter", "buildShelter", "planner", "Failed shelter coordinate; resume building", 0.7, "builder");
     }
+  }
+  if (shouldBackoffFoodSearch(last)) {
+    return task("idle", "observe", "observeNearby", "planner", foodSearchBackoffReason(last), 0.35);
   }
   return undefined;
 }
