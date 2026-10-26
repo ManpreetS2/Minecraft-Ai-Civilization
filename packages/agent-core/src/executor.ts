@@ -714,7 +714,47 @@ async function gatherFood(ctx: SkillContext, store: CivilizationStore, events: E
     return finalizeFoodGather(ctx, foodBefore, mined, "sweet_berry_bush:far");
   }
 
-  return fail("FOOD_NOT_FOUND", "No edible sources available — not mining wood as food", 0, true);
+  // Day 2: Atlas held a fishing_rod at the pond but gatherFood never tried fishing before FOOD_NOT_FOUND.
+  const hasRod = ctx.bot.inventory.items().some((item) => item.name === "fishing_rod");
+  const pos = ctx.body.position() ?? ctx.bot.entity?.position;
+  if (hasRod && pos) {
+    const getBlock = (p: Vec3) => {
+      const block = ctx.bot.blockAt(new Vec3Class(Math.floor(p.x), Math.floor(p.y), Math.floor(p.z)));
+      if (!block) return undefined;
+      return { name: block.name, boundingBox: block.boundingBox };
+    };
+    const shores = visibleShoresFromWorld(pos, getBlock);
+    const storage = authorizedWorkStorage(store, ctx.citizenId);
+    if (shores.length > 0 && storage) {
+      const shore = shores[0]!;
+      const fished = await fishAtShore(ctx, {
+        searchOrigin: shore.stand,
+        casts: 1,
+        destinationStorage: storage,
+        permittedStorage: storage,
+        returnHome: claimedBed(store, ctx.citizenId),
+      });
+      return finalizeFoodGather(ctx, foodBefore, fished, "fish_shore");
+    }
+    if (shores.length > 0 && !storage) {
+      return fail(
+        "ACCESS_DENIED",
+        "Shore/water food is reachable with a rod, but no authorized chest exists to complete fishing — not inventing food",
+        0,
+        false,
+        { hasRod: true, shores: shores.length, workComplete: false },
+      );
+    }
+  }
+
+  // Exhausted local edible evidence. retryable=false so the planner must change strategy (Day 2 spin).
+  return fail(
+    "FOOD_NOT_FOUND",
+    "No edible sources available in reach (crops/berries/leaves/animals/fish) — not mining wood as food",
+    0,
+    false,
+    { workComplete: false, nextTask: "observe" },
+  );
 }
 
 async function depositToSettlement(
