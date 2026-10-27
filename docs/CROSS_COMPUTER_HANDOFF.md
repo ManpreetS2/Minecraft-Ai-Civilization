@@ -6,8 +6,8 @@
 | --- | --- |
 | **Private backup repository** | https://github.com/ManpreetS2/Minecraft-Ai-Civilization-windows-backup |
 | **Branch** | `backup/windows-wip-2026-10-26` |
-| **Commit SHA** | `449758cbbfbb7a0e0669cb34bff7424d8c2373a0` |
-| **Backup timestamp (UTC)** | 2026-10-27 (Mission 007 Windows snapshot) |
+| **Commit SHA** | `c6440f7aa6b2ac05222a4ffabe8150c014efb8a0` |
+| **Backup timestamp (UTC)** | 2026-10-27T~04:30Z (Mission 007 Windows snapshot; tip includes this handoff doc) |
 | **Prior working branch (preserved locally)** | `integration/reliability-pr7-windows` @ `019d26d4d414c2c962d9e58c4f2c0d84a7db569d` |
 | **Public repo (unchanged)** | https://github.com/ManpreetS2/Minecraft-Ai-Civilization — **do not push this WIP there** |
 
@@ -64,7 +64,7 @@ git clone https://github.com/ManpreetS2/Minecraft-Ai-Civilization-windows-backup
 cd Minecraft-Ai-Civilization-windows-backup
 git checkout backup/windows-wip-2026-10-26
 git rev-parse HEAD
-# Expect: 449758cbbfbb7a0e0669cb34bff7424d8c2373a0
+# Expect: c6440f7aa6b2ac05222a4ffabe8150c014efb8a0
 
 # 2) Dependencies
 copy .env.example .env
