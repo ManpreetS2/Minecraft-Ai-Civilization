@@ -1,24 +1,66 @@
 /**
  * Bounded shore fishing.
  *
- * Uses Mineflayer activateItem + existing BLUE SAFE navigation, equipItem,
- * pickupDroppedItem, and depositItems. Does not load a fishing plugin, does
- * not swim, and does not copy Mindcraft (upstream has no dedicated fish skill).
+ * Cast/bite/reel follows mineflayer@4.39.0 `lib/plugins/fishing.js` via the
+ * owner-aware `runMineflayerFishCycle` adapter. Shore search, inventory-delta
+ * verification, and authorized chest deposit stay in this module. Navigation
+ * remains BLUE SAFE. Stock `bot.fish()` is not used for concurrent two-bot
+ * fishing because it binds the first observed bobber on that client.
  */
 import { fail, ok, type ActionResult, type ErrorCode, type Vec3 } from "@civ/shared";
 import { evaluateReturnHome, navigationBackend, type ReturnHomePlan } from "@civ/minecraft-adapter";
-import type { Bot } from "mineflayer";
 import { Vec3 as Vec3Class } from "vec3";
 import type { SkillContext } from "./context.js";
 import { lookAtPosition } from "./look.js";
-import { canFitDrop, countItem, inventorySpace, pickupDroppedItem } from "./inventory-service.js";
-import { depositItems, equipItem } from "./inventory.js";
+import { canFitDrop, countItem, depositItem, inventorySpace, pickupDroppedItem, snapshotInventory } from "./inventory-service.js";
+import { equipItem } from "./inventory.js";
 import { assertPermittedStorage } from "./mine.js";
+import { runMineflayerFishCycle, type FishableBot } from "./mineflayer-fish-cycle.js";
+import { cancelledThisCitizen, optionalWorkInterrupted } from "./optional-work.js";
 
 export const FISHING_RADIUS_CAP = 16;
 export const FISHING_CAST_CAP = 4;
 export const FISHING_TIMEOUT_CAP_MS = 90_000;
 export const FISHING_CAST_TIMEOUT_MS = 45_000;
+/** Ignore bobber-landing velocity/sounds so two adjacent rods do not reel each other. */
+export const FISHING_BITE_GRACE_MS = 5_000;
+
+export type BobberLike = {
+  name?: string;
+  displayName?: string;
+  position?: { x: number; y: number; z: number };
+  velocity?: { y: number };
+};
+
+export function isFishingBobberName(name: string): boolean {
+  const text = name.toLowerCase();
+  return text.includes("fishing_bobber") || text.includes("fishing hook") || text.trim() === "bobber";
+}
+
+/** Generic water "splash" is not a bite. Two shoreline bodies hear each other constantly. */
+export function isFishingBiteSound(text: string): boolean {
+  const s = text.toLowerCase();
+  return s.includes("fishing_bobber.splash") || s.includes("entity.fishing_bobber.splash");
+}
+
+export function pickNearestBobber(
+  entities: BobberLike[],
+  from: { x: number; y: number; z: number },
+  maxDist = 16,
+): BobberLike | undefined {
+  let best: BobberLike | undefined;
+  let bestD = maxDist;
+  for (const entity of entities) {
+    const label = `${entity.name ?? ""} ${entity.displayName ?? ""}`;
+    if (!isFishingBobberName(label) || !entity.position) continue;
+    const dist = Math.hypot(entity.position.x - from.x, entity.position.y - from.y, entity.position.z - from.z);
+    if (dist <= bestD) {
+      best = entity;
+      bestD = dist;
+    }
+  }
+  return best;
+}
 
 const WATER = new Set(["water", "bubble_column"]);
 const AIRISH = new Set(["air", "cave_air", "void_air", "short_grass", "tall_grass", "grass", "fern", "snow"]);
@@ -72,6 +114,9 @@ export type FishingRequest = {
   destinationStorage?: Vec3;
   permittedStorage?: Vec3;
   returnHome?: Vec3;
+  /** Default true. Quota fishing sets false and deposits only the credited delta. */
+  depositCaught?: boolean;
+  pickupCatchNames?: readonly string[];
 };
 
 export type FishingDecision =
@@ -81,11 +126,6 @@ export type FishingDecision =
       rod: string;
     }
   | { ok: false; code: ErrorCode; error: string };
-
-type ActivatableBot = Bot & {
-  activateItem?: (offHand?: boolean) => void;
-  deactivateItem?: () => void;
-};
 
 function wait(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -181,6 +221,15 @@ export function fishingCatchCount(items: Array<{ name: string; count: number }>)
   return Object.values(snapshotCatchCounts(items)).reduce((sum, n) => sum + n, 0);
 }
 
+export function fishingCaughtDelta(ctx: SkillContext, before: Record<string, number>): Record<string, number> {
+  const caught: Record<string, number> = {};
+  for (const name of FISHING_CATCH_ITEMS) {
+    const delta = countItem(ctx, name) - (before[name] ?? 0);
+    if (delta > 0) caught[name] = delta;
+  }
+  return caught;
+}
+
 export function fishingHomeStop(input: {
   position: Vec3;
   home?: Vec3;
@@ -230,57 +279,6 @@ function worldGetterFromCtx(ctx: SkillContext): WorldGetter {
     if (!block) return undefined;
     return { name: block.name, boundingBox: block.boundingBox };
   };
-}
-
-function findBobber(bot: Bot): { position?: { x: number; y: number; z: number }; velocity?: { y: number } } | undefined {
-  return Object.values(bot.entities).find((entity) => {
-    const name = `${entity.name ?? ""} ${entity.displayName ?? ""}`.toLowerCase();
-    return name.includes("fishing_bobber") || name.includes("fishing hook") || name.trim() === "bobber";
-  });
-}
-
-async function waitForBite(
-  ctx: SkillContext,
-  timeoutMs: number,
-  home?: Vec3,
-): Promise<"bite" | "timeout" | "cancelled" | "return-home"> {
-  const started = Date.now();
-  let splash = false;
-  const onSound = (...args: unknown[]) => {
-    const text = args.map((value) => String(value)).join(" ").toLowerCase();
-    if (text.includes("fishing") || text.includes("bobber") || text.includes("splash")) splash = true;
-  };
-  ctx.bot.on("soundEffectHeard", onSound);
-  ctx.bot.on("hardcodedSoundEffectHeard", onSound);
-  try {
-    while (Date.now() - started < timeoutMs) {
-      if (ctx.signal?.aborted) return "cancelled";
-      const here = ctx.body.position() ?? ctx.bot.entity?.position;
-      if (here && home) {
-        const homePlan = fishingHomeStop({
-          position: { x: here.x, y: here.y, z: here.z },
-          home,
-          timeOfDay: ctx.bot.time?.timeOfDay ?? 0,
-        });
-        if (homePlan?.shouldStopOptionalWork) return "return-home";
-      }
-      if (splash) return "bite";
-      const bobber = findBobber(ctx.bot);
-      if (bobber?.velocity && bobber.velocity.y < -0.15) return "bite";
-      await wait(200);
-    }
-    return "timeout";
-  } finally {
-    ctx.bot.removeListener("soundEffectHeard", onSound);
-    ctx.bot.removeListener("hardcodedSoundEffectHeard", onSound);
-  }
-}
-
-function activateRod(bot: Bot): boolean {
-  const body = bot as ActivatableBot;
-  if (typeof body.activateItem !== "function") return false;
-  body.activateItem();
-  return true;
 }
 
 export async function fishAtShore(
@@ -339,13 +337,12 @@ export async function fishAtShore(
       timeOfDay: ctx.bot.time?.timeOfDay ?? 0,
     });
     if (homePlan.shouldStopOptionalWork) {
-      return fail(
-        "TIMEOUT",
-        `stopped optional fishing to return home; estimate ${homePlan.estimateMs}ms remaining ${homePlan.remainingMs}ms; ${homePlan.reason}`,
-        Date.now() - started,
-        true,
-        { estimateMs: homePlan.estimateMs, remainingMs: homePlan.remainingMs, delayMs: homePlan.delayMs },
-      );
+      return optionalWorkInterrupted({
+        plan: homePlan,
+        durationMs: Date.now() - started,
+        inventory: snapshotInventory(ctx).counts,
+        extra: { casts: 0, caught: {}, deposited: 0, quotaProgress: `0/${bounds.casts}` },
+      });
     }
   }
 
@@ -356,9 +353,16 @@ export async function fishAtShore(
   for (const name of FISHING_CATCH_ITEMS) before[name] = countItem(ctx, name);
 
   let casts = 0;
+  let curfewPlan: ReturnHomePlan | undefined;
   for (let i = 0; i < bounds.casts; i += 1) {
     if (ctx.signal?.aborted) {
-      return fail("CANCELLED", "Fishing task cancelled", Date.now() - started, false, { casts });
+      const caught = fishingCaughtDelta(ctx, before);
+      return cancelledThisCitizen({
+        durationMs: Date.now() - started,
+        inventory: snapshotInventory(ctx).counts,
+        extra: { casts, caught, quotaProgress: `${Object.values(caught).reduce((sum, n) => sum + n, 0)}/${bounds.casts}` },
+        error: "Fishing task cancelled for this citizen",
+      });
     }
     if (Date.now() - started > bounds.timeoutMs) break;
     if (ctx.body.nearbyEntities(8).some((entity) => entity.hostile)) {
@@ -373,69 +377,82 @@ export async function fishAtShore(
         timeOfDay: ctx.bot.time?.timeOfDay ?? 0,
       });
       if (homePlan.shouldStopOptionalWork) {
-        if (casts > 0) break;
-        return fail(
-          "TIMEOUT",
-          `stopped optional fishing to return home; estimate ${homePlan.estimateMs}ms remaining ${homePlan.remainingMs}ms`,
-          Date.now() - started,
-          true,
-        );
+        curfewPlan = homePlan;
+        break;
       }
     }
     await lookAtPosition(ctx, decision.shore.water);
-    if (!activateRod(ctx.bot)) {
-      return fail("INTERACTION_FAILED", "Mineflayer activateItem is unavailable", Date.now() - started, true);
-    }
-    casts += 1;
-    await wait(400);
-    if (!findBobber(ctx.bot)) {
-      return fail("INTERACTION_FAILED", "Fishing rod did not cast a bobber", Date.now() - started, true);
-    }
     const biteBudget = Math.min(FISHING_CAST_TIMEOUT_MS, bounds.timeoutMs - (Date.now() - started));
-    const bite = await waitForBite(ctx, Math.max(1_000, biteBudget), request.returnHome);
-    if (bite === "cancelled") {
-      activateRod(ctx.bot);
-      return fail("CANCELLED", "Fishing task cancelled", Date.now() - started, false, { casts });
-    }
-    if (bite === "return-home") {
-      activateRod(ctx.bot);
-      if (casts > 0) break;
-      const now = ctx.body.position() ?? ctx.bot.entity?.position ?? afterMove;
-      const homePlan = fishingHomeStop({
-        position: { x: now.x, y: now.y, z: now.z },
-        home: request.returnHome,
-        timeOfDay: ctx.bot.time?.timeOfDay ?? 0,
+    const cycle = await runMineflayerFishCycle(ctx.bot as FishableBot, {
+      timeoutMs: Math.max(1_000, biteBudget),
+      signal: ctx.signal,
+      ownerId: ctx.bot.username,
+      attemptId: `${ctx.bot.username}-${casts + 1}`,
+      onLog: (event) => {
+        console.log(
+          `FISH_ROD ${event.ownerId} ${event.attemptId} ${event.phase} ${event.action} ${event.detail}`,
+        );
+      },
+    });
+    casts += 1;
+    if (cycle.result === "cancelled") {
+      const caught = fishingCaughtDelta(ctx, before);
+      return cancelledThisCitizen({
+        durationMs: Date.now() - started,
+        inventory: snapshotInventory(ctx).counts,
+        extra: { casts, caught, cycle: cycle.result },
+        error: "Fishing task cancelled for this citizen",
       });
+    }
+    if (cycle.result === "already-fishing") {
       return fail(
-        "TIMEOUT",
-        `stopped optional fishing to return home during cast; estimate ${homePlan?.estimateMs ?? 0}ms remaining ${homePlan?.remainingMs ?? 0}ms`,
+        "INTERACTION_FAILED",
+        "This bot already has an active fishing cycle; refusing a second rod toggle",
         Date.now() - started,
         true,
-        { casts, estimateMs: homePlan?.estimateMs, remainingMs: homePlan?.remainingMs },
+        { casts },
       );
     }
-    activateRod(ctx.bot);
     await wait(500);
-    await pickupDroppedItem(ctx, undefined, 8);
+    const pickupNames = request.pickupCatchNames;
+    if (pickupNames && pickupNames.length > 0) {
+      for (const name of pickupNames) {
+        await pickupDroppedItem(ctx, name, 8);
+      }
+    } else {
+      await pickupDroppedItem(ctx, undefined, 8);
+    }
     const gainedNow = FISHING_CATCH_ITEMS.reduce((sum, name) => sum + Math.max(0, countItem(ctx, name) - (before[name] ?? 0)), 0);
     if (gainedNow > 0) break;
   }
 
-  const caught: Record<string, number> = {};
-  for (const name of FISHING_CATCH_ITEMS) {
-    const delta = countItem(ctx, name) - (before[name] ?? 0);
-    if (delta > 0) caught[name] = delta;
-  }
+  const caught = fishingCaughtDelta(ctx, before);
   const gained = Object.values(caught).reduce((sum, n) => sum + n, 0);
 
   let deposited = 0;
   const storage = assertPermittedStorage(request.destinationStorage, request.permittedStorage);
-  if (storage.ok && storage.position && gained > 0) {
-    for (const name of Object.keys(caught)) {
-      if (countItem(ctx, name) <= 0) continue;
-      const stored = await depositItems(ctx, name, storage.position);
+  if (request.depositCaught !== false && storage.ok && storage.position && gained > 0) {
+    for (const [name, count] of Object.entries(caught)) {
+      if (count <= 0 || countItem(ctx, name) <= 0) continue;
+      const stored = await depositItem(ctx, name, count, storage.position);
       if (stored.success) deposited += stored.data.deposited;
     }
+  }
+
+  if (curfewPlan) {
+    return optionalWorkInterrupted({
+      plan: curfewPlan,
+      durationMs: Date.now() - started,
+      inventory: snapshotInventory(ctx).counts,
+      extra: {
+        casts,
+        caught,
+        deposited,
+        quotaProgress: `${gained}/${bounds.casts}`,
+        shore: decision.shore.stand,
+        water: decision.shore.water,
+      },
+    });
   }
 
   if (gained <= 0) {

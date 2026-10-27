@@ -23,7 +23,8 @@ export const GOAL_ACTION_MAP: Record<Goal, Omit<GoalDispatch, "goal">> = {
   mine_stone: { task: "mine_stone", action: "mineBlock", occupation: "miner" },
   craft_tools: { task: "craft_tools", action: "craftItem", occupation: "crafter" },
   build_shelter: { task: "build_shelter", action: "buildShelter", occupation: "builder" },
-  contribute_to_project: { task: "contribute_to_project", action: "buildShelter", occupation: "builder" },
+  /** Settlement contribute uses structure intention path (workshop/cabin), not only starter hut. */
+  contribute_to_project: { task: "build_structure", action: "buildStructure", occupation: "builder" },
   help_citizen: { task: "help_citizen", action: "deferCapability", deferred: true },
   assist_citizen: { task: "assist_citizen", action: "deferCapability", deferred: true },
   deposit: { task: "deposit", action: "depositItems" },
@@ -51,6 +52,7 @@ export const EXECUTOR_ACTIONS = new Set([
   "gatherFood",
   "craftItem",
   "buildShelter",
+  "buildStructure",
   "mineBlock",
   "seekSafety",
   "deferCapability",

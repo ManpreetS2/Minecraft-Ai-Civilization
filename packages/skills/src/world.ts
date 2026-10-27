@@ -1,6 +1,6 @@
-import { fail, ok, createEvent, type ActionResult, type Vec3 } from "@civ/shared";
+import { fail, ok, createEvent, classifyEntityPresence, entityGoneMessage, type ActionResult, type Vec3 } from "@civ/shared";
 import { navigationBackend } from "@civ/minecraft-adapter";
-import { minecraftKnowledge } from "@civ/minecraft-knowledge";
+import { minecraftKnowledge, refuseAccidentalPropertyReplace } from "@civ/minecraft-knowledge";
 import { Vec3 as Vec3Class } from "vec3";
 import type { SkillContext } from "./context.js";
 import { findBlock } from "./observe.js";
@@ -31,62 +31,102 @@ const BED_NAMES = [
   "light_blue_bed",
 ];
 
-export async function sleep(ctx: SkillContext, preferred?: Vec3): Promise<ActionResult<{ rested: boolean }>> {
+function isBedBlock(block: { name: string } | null | undefined): boolean {
+  return Boolean(block?.name.endsWith("_bed"));
+}
+
+export async function sleep(ctx: SkillContext, preferred?: Vec3): Promise<ActionResult<{ rested: boolean; designated: boolean }>> {
   const started = Date.now();
   const bot = ctx.bot;
   const knowledge = minecraftKnowledge();
   const hostiles = ctx.body.nearbyEntities(8).some((entity) => entity.hostile);
-  const preferredBlock = preferred
-    ? bot.blockAt(new Vec3Class(Math.floor(preferred.x), Math.floor(preferred.y), Math.floor(preferred.z)))
-    : null;
-  const found =
-    preferred && preferredBlock && preferredBlock.name.endsWith("_bed")
-      ? { success: true as const, data: { name: preferredBlock.name, position: preferred } }
-      : await findBlock(ctx, BED_NAMES, 32);
+  const designated = Boolean(preferred);
+  let target: { name: string; position: Vec3 } | undefined;
+  if (preferred) {
+    const cell = { x: Math.floor(preferred.x), y: Math.floor(preferred.y), z: Math.floor(preferred.z) };
+    const preferredBlock = bot.blockAt(new Vec3Class(cell.x, cell.y, cell.z));
+    if (preferredBlock && !isBedBlock(preferredBlock)) {
+      return fail(
+        "BED_MISSING",
+        "Designated home bed is missing or is not a bed; ownership was not reassigned",
+        Date.now() - started,
+        true,
+        { designated: true, position: cell },
+      );
+    }
+    target = { name: isBedBlock(preferredBlock) ? preferredBlock!.name : "bed", position: cell };
+  } else {
+    const found = await findBlock(ctx, BED_NAMES, 32);
+    if (!found.success) {
+      return fail("BED_MISSING", "No bed nearby", Date.now() - started, true, { designated: false });
+    }
+    target = found.data;
+  }
   const facts = knowledge.sleepFacts({
     timeOfDay: bot.time.timeOfDay,
     thundering: Boolean((bot as { thunderState?: number }).thunderState),
     raining: Boolean(bot.isRaining),
-    bedPresent: found.success,
-    bedReachable: found.success,
+    bedPresent: true,
+    bedReachable: true,
     hostilesNearby: hostiles,
   });
   if (!facts.validSleepTime) {
-    return fail("NOT_SLEEP_TIME", facts.reasons.join(" ") || "It is not night enough to sleep", Date.now() - started, true);
+    return fail("NOT_SLEEP_TIME", facts.reasons.join(" ") || "It is not night enough to sleep", Date.now() - started, true, {
+      designated,
+      position: target.position,
+    });
   }
   if (hostiles) {
     return fail("HOSTILE_NEARBY", "Hostiles are too close to sleep", Date.now() - started, true);
   }
-  if (!found.success) {
-    return fail("BED_MISSING", "No bed nearby", Date.now() - started, true);
-  }
-  const move = await navigationBackend().navigateToInteractWithBlock(ctx.bot, found.data.position, {
+  const move = await navigationBackend().navigateToInteractWithBlock(ctx.bot, target.position, {
     timeoutMs: ctx.timeoutMs ?? 12_000,
     signal: ctx.signal,
   });
   if (!move.success) {
-    return fail("BED_UNREACHABLE", move.error, Date.now() - started, true);
+    return fail("BED_UNREACHABLE", move.error, Date.now() - started, true, { designated, position: target.position });
+  }
+  // Vanilla sleep is ~3 blocks. Eye-reach 4.5 can "arrive" on the stoop while bot.sleep still says too far.
+  const reach = bot.entity?.position;
+  const bedCenter = { x: target.position.x + 0.5, y: target.position.y, z: target.position.z + 0.5 };
+  if (reach && Math.hypot(reach.x - bedCenter.x, reach.z - bedCenter.z) > 2.6) {
+    const closer = await navigationBackend().navigateToPosition(ctx.bot, bedCenter, {
+      range: 1.2,
+      timeoutMs: Math.min(ctx.timeoutMs ?? 12_000, 10_000),
+      signal: ctx.signal,
+      recover: true,
+    });
+    if (!closer.success) {
+      const still = bot.entity?.position;
+      const xz = still ? Math.hypot(still.x - bedCenter.x, still.z - bedCenter.z) : 99;
+      if (xz > 2.9) {
+        return fail("BED_UNREACHABLE", closer.error, Date.now() - started, true, { designated, position: target.position });
+      }
+    }
   }
   const here = bot.entity?.position;
   if (here) {
-    const onBed = Math.floor(here.x) === Math.floor(found.data.position.x) && Math.floor(here.z) === Math.floor(found.data.position.z);
+    const onBed = Math.floor(here.x) === Math.floor(target.position.x) && Math.floor(here.z) === Math.floor(target.position.z);
     if (onBed) {
       const step = {
-        x: found.data.position.x + 1,
-        y: found.data.position.y,
-        z: found.data.position.z,
+        x: target.position.x + 1,
+        y: target.position.y,
+        z: target.position.z,
       };
       await navigationBackend().navigateToPosition(ctx.bot, step, { range: 1.2, timeoutMs: 4_000, signal: ctx.signal });
     }
   }
-  const bed = bot.findBlock({
-    matching: (b) => b.name.endsWith("_bed"),
-    maxDistance: 4,
-  });
-  if (!bed) {
-    return fail("BED_MISSING", "Bed vanished", Date.now() - started, true);
+  const bed = bot.blockAt(new Vec3Class(target.position.x, target.position.y, target.position.z));
+  if (!isBedBlock(bed)) {
+    return fail(
+      designated ? "BED_MISSING" : "BED_MISSING",
+      designated ? "Designated home bed vanished; ownership was not reassigned" : "Bed vanished",
+      Date.now() - started,
+      true,
+      { designated, position: target.position },
+    );
   }
-  await lookAtPosition(ctx, found.data.position);
+  await lookAtPosition(ctx, target.position);
   try {
     await bot.sleep(bed);
   } catch (error) {
@@ -114,7 +154,7 @@ export async function sleep(ctx: SkillContext, preferred?: Vec3): Promise<Action
   } catch {
     // already awake is fine
   }
-  return ok({ rested: true }, Date.now() - started);
+  return ok({ rested: true, designated, position: target.position, name: isBedBlock(bed) ? bed.name : target.name }, Date.now() - started);
 }
 
 export async function attack(
@@ -133,14 +173,29 @@ export async function attack(
       return hostile ? bot.entities[hostile.id] : undefined;
     })();
   if (!resolved) {
+    if (entityId !== undefined) {
+      return fail("ENTITY_REMOVED", entityGoneMessage("ENTITY_REMOVED", `id ${entityId}`), Date.now() - started, true);
+    }
     return fail("ENTITY_NOT_FOUND", "No hostile target nearby", Date.now() - started, true);
   }
+  const presence = classifyEntityPresence(bot.entities, resolved);
+  if (presence !== "PRESENT") {
+    return fail(presence, entityGoneMessage(presence, resolved.name), Date.now() - started, true);
+  }
+  ctx.body.trackEntity(resolved, "combat");
   try {
     await ctx.bot.lookAt(resolved.position);
     ctx.bot.attack(resolved);
   } catch (error) {
+    const gone = classifyEntityPresence(bot.entities, bot.entities[resolved.id] ?? resolved);
+    if (gone !== "PRESENT") {
+      ctx.body.clearTrackedEntity(gone);
+      return fail(gone, entityGoneMessage(gone, resolved.name), Date.now() - started, true);
+    }
+    ctx.body.clearTrackedEntity();
     return fail("ATTACK_FAILED", error instanceof Error ? error.message : String(error), Date.now() - started, true);
   }
+  ctx.body.clearTrackedEntity();
   return ok({ entityId: resolved.id }, Date.now() - started);
 }
 
@@ -200,14 +255,22 @@ export async function placeBlock(
     return fail("ITEM_NOT_FOUND", `Cannot place ${name}; none in inventory`, Date.now() - started, true);
   }
   const dest = new Vec3Class(Math.floor(position.x), Math.floor(position.y), Math.floor(position.z));
+  const occupant = bot.blockAt(dest);
+  const overwrite = refuseAccidentalPropertyReplace(occupant?.name);
+  if (!overwrite.ok) {
+    return fail(overwrite.code, overwrite.error, Date.now() - started, false, { item: name, position, existingName: occupant?.name });
+  }
   const move = await navigationBackend().navigateToPlaceBlock(ctx.bot, position, {
     timeoutMs: ctx.timeoutMs ?? 16_000,
     signal: ctx.signal,
   });
   if (!move.success) return move;
   const existing = bot.blockAt(dest);
+  const expectedName = name.replace(/^minecraft:/, "");
   if (existing && !knowledge.isReplaceable(existing.name) && existing.name !== "air") {
-    if (existing.name === name || (name.endsWith("_door") && existing.name.endsWith("_door"))) {
+    const existingName = existing.name.replace(/^minecraft:/, "");
+    // Idempotent only when the exact expected block is already present — no soft *_door wildcard.
+    if (existingName === expectedName) {
       return ok({ name: existing.name, position }, Date.now() - started);
     }
     return fail(
@@ -217,6 +280,7 @@ export async function placeBlock(
       true,
     );
   }
+  const beforeCount = bot.inventory.items().filter((i) => i.name === name).reduce((n, i) => n + i.count, 0);
   try {
     await bot.equip(item, "hand");
   } catch (error) {
@@ -251,8 +315,9 @@ export async function placeBlock(
       .join(" ");
     return fail("PLACE_FAILED", `Could not place ${name}: ${lastError} adj=${adj}`, Date.now() - started, true);
   }
+  // Promise resolve is insufficient — observe world for exact expected identity.
   const after = bot.blockAt(dest);
-  if (!after || after.name === "air") {
+  if (!after || after.name === "air" || after.name === "cave_air") {
     return fail(
       "VERIFY_FAILED",
       `Block not present after place at ${position.x},${position.y},${position.z}`,
@@ -260,5 +325,52 @@ export async function placeBlock(
       true,
     );
   }
+  const afterName = after.name.replace(/^minecraft:/, "");
+  if (afterName !== expectedName) {
+    return fail(
+      "VERIFY_FAILED",
+      `Expected ${expectedName} after place, observed ${afterName}`,
+      Date.now() - started,
+      true,
+      { item: name, position, observed: after.name },
+    );
+  }
+  // Doors: require upper half in world when Mineflayer reports properties (else leave unverified to caller).
+  if (expectedName.endsWith("_door")) {
+    const upper = bot.blockAt(dest.offset(0, 1, 0));
+    const upperName = upper?.name?.replace(/^minecraft:/, "");
+    if (!upper || upperName !== expectedName) {
+      return fail(
+        "VERIFY_FAILED",
+        `Door upper half missing or wrong after place (observed ${upper?.name ?? "null"})`,
+        Date.now() - started,
+        true,
+        { item: name, position, upper: upper?.name },
+      );
+    }
+  }
+  if (expectedName.endsWith("_bed")) {
+    // Head/foot twin must exist adjacent; without block properties we cannot assert facing — fail closed if no second bed cell nearby.
+    const offsets = [
+      dest.offset(1, 0, 0),
+      dest.offset(-1, 0, 0),
+      dest.offset(0, 0, 1),
+      dest.offset(0, 0, -1),
+    ];
+    const twin = offsets.some((p) => {
+      const b = bot.blockAt(p);
+      return b?.name?.replace(/^minecraft:/, "") === expectedName;
+    });
+    if (!twin) {
+      return fail(
+        "VERIFY_FAILED",
+        `Bed multiblock incomplete after place at ${position.x},${position.y},${position.z}`,
+        Date.now() - started,
+        true,
+        { item: name, position },
+      );
+    }
+  }
+  void beforeCount; // inventory decrement is Mineflayer-side; progress counting is session/reconcile responsibility
   return ok({ name: after.name, position }, Date.now() - started);
 }

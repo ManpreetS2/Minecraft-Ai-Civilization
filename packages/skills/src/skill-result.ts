@@ -48,7 +48,7 @@ const BLOCKED: ErrorCode[] = [
   "UNSAFE_EXCAVATION",
   "SEARCH_EXHAUSTED",
 ];
-const INTERRUPTED: ErrorCode[] = ["CANCELLED", "INTERRUPTED"];
+const INTERRUPTED: ErrorCode[] = ["CANCELLED", "INTERRUPTED", "CURFEW_STOP"];
 
 export function classifySkill(result: ActionResult): SkillStatus {
   if (result.success) return "SUCCESS";

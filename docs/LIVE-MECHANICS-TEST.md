@@ -133,3 +133,9 @@ Remaining live gaps:
 2. Water exit and ladder climb: Paper/Mineflayer 1.21.11 physics. Do not mark PASS from the skill existing.
 
 Do not mark LIVE PAPER VERIFIED from unit tests alone.
+
+## Colony vs test isolation
+
+MechProbe courses may temporarily set `gamerule doMobSpawning false` so random mobs do not wander onto the pad. That is **test isolation**, not colony policy, and must be restored to `true` afterward.
+
+Civilization / colony worlds use `spawn-monsters=false` plus monster spawn limits. They stay off Peaceful so hunger works. Animals, villagers, and day/night stay normal. Hostile combat code remains for summoned fights and future events.

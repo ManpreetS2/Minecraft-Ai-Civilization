@@ -1,11 +1,26 @@
-import type { BodyObservation, DecisionSource, SettlementNeed, SettlementState } from "@civ/shared";
+import type { BodyObservation, DecisionSource, SettlementNeed, SettlementState, Vec3 } from "@civ/shared";
 import { FOOD_ITEM_NAMES } from "@civ/shared";
 import { minecraftKnowledge } from "@civ/minecraft-knowledge";
 import { intentToPlan, type DirectiveIntent, type DirectiveMode } from "./directive-parse.js";
 import {
+  chooseActivity,
+  plannedTaskFromOption,
+  type ActivityChoiceInput,
+  type DecisionTrace,
+} from "./activity-choice.js";
+import type { CatalogHome } from "./available-homes.js";
+import { HOME_CLAIM_REACH_BLOCKS } from "./available-homes.js";
+import { housingOpportunity, housingTravelTarget } from "./home-discovery.js";
+import { nearestReachableSite, type DiscoveredSite } from "./discovered-sites.js";
+import { evaluateCitizenCurfew, planCurfewBedtimeAction, workHandoffToCurfew } from "./curfew-runtime.js";
+import { shouldBackoffToObserve, suppressedHomeIds, type UnresolvedBlock } from "./task-recovery.js";
+import {
   foodSearchBackoffReason,
+  homeSleepBackoffReason,
   shouldBackoffFoodSearch,
+  shouldBackoffHomeSleepRoute,
 } from "./failure-backoff.js";
+import { plannedTaskForConstructionProject, type BuildStructureProject } from "./build-structure.js";
 
 export type PlannedTask = {
   goal: string;
@@ -19,6 +34,8 @@ export type PlannedTask = {
   item?: string;
   target?: { x: number; y: number; z: number };
   count?: number;
+  blocked?: { code: string; missing: string };
+  trace?: DecisionTrace;
 };
 
 export type WorkRole = "wood" | "food" | "stone" | "tools" | "build";
@@ -33,6 +50,11 @@ export type LastOutcome = {
   nextTask?: string;
   nextAction?: string;
   streak: number;
+  retryable?: boolean;
+  workComplete?: boolean;
+  skillStatus?: string;
+  collected?: number;
+  unresolved?: UnresolvedBlock[];
 };
 
 export type PlannerInput = {
@@ -44,8 +66,23 @@ export type PlannerInput = {
   llmGoal?: string;
   llmReason?: string;
   projectStatus?: string;
+  /** Active structure project owned by this citizen — resumes without human injection. */
+  constructionProject?: BuildStructureProject;
   lastOutcome?: LastOutcome;
-  visibleShores?: Array<{ stand: { x: number; y: number; z: number }; water: { x: number; y: number; z: number } }>;
+  /** Already-claimed home. Planner never assigns houses by roster; selection stays UNVERIFIED. */
+  home?: {
+    homeId: string;
+    bed: { x: number; y: number; z: number };
+    status: "active" | "displaced" | "left";
+    entrance?: { x: number; y: number; z: number };
+    origin?: { x: number; y: number; z: number };
+    personalChest?: { x: number; y: number; z: number };
+  };
+  knownSites?: DiscoveredSite[];
+  visibleShores?: Array<{ stand: Vec3; water: Vec3 }>;
+  authorizedStorage?: Vec3;
+  /** Unclaimed catalog houses. Never a roster map and never hardcoded to H1. */
+  availableHomes?: CatalogHome[];
   humanDirective?: {
     id: string;
     intent: DirectiveIntent;
@@ -62,9 +99,14 @@ const LLM_MAP: Record<string, { task: string; action: string }> = {
   gather_wood: { task: "gather_wood", action: "mineBlock" },
   gather_food: { task: "gather_food", action: "gatherFood" },
   mine_stone: { task: "mine_stone", action: "mineBlock" },
+  mine_ore: { task: "mine_ore", action: "mineOre" },
+  fish_shore: { task: "fish_shore", action: "fishShore" },
+  work_farm: { task: "work_farm", action: "workFarmPlot" },
+  claim_home: { task: "claim_home", action: "claimHome" },
   craft_tools: { task: "craft_tools", action: "craftItem" },
   build_shelter: { task: "build_shelter", action: "buildShelter" },
-  contribute_to_project: { task: "build_shelter", action: "buildShelter" },
+  build_structure: { task: "build_structure", action: "buildStructure" },
+  contribute_to_project: { task: "build_structure", action: "buildStructure" },
   obtain_item: { task: "obtain_item", action: "obtainItem" },
   help_citizen: { task: "help_citizen", action: "shareItem" },
   assist_citizen: { task: "help_citizen", action: "shareItem" },
@@ -121,7 +163,7 @@ export function planCitizen(input: PlannerInput): PlannedTask {
     if (stored) {
       return task("survive", "withdraw_food", "withdrawItems", "reflex", "Hunger is low; food is in shared storage", 0.94);
     }
-    // Day 2: hunger reflex re-issued gatherFood ~362× after FOOD_NOT_FOUND.
+    // Day 2: hunger reflex re-issued gatherFood ~362× after FOOD_NOT_FOUND. Bound the loop.
     if (shouldBackoffFoodSearch(input.lastOutcome)) {
       const hasRod = obs.inventory.some((item) => item.name === "fishing_rod");
       const shore = input.visibleShores?.[0]?.stand;
@@ -131,7 +173,7 @@ export function planCitizen(input: PlannerInput): PlannedTask {
           "fish_shore",
           "fishShore",
           "reflex",
-          "Hunger low; land food search exhausted — try fishing at a visible shore",
+          `Hunger low; land food search exhausted — try fishing at a visible shore`,
           0.92,
           "gatherer",
         );
@@ -144,6 +186,44 @@ export function planCitizen(input: PlannerInput): PlannedTask {
   }
   if (hostile && hostile.distance < 8) {
     return task("survive", "flee_danger", "flee", "reflex", `Hostile ${hostile.name} is too close`, 0.92, "guard");
+  }
+
+  if (humanDirective && humanDirective.mode === "ADMIN_OVERRIDE" && !emergency) {
+    const mapped = intentToPlan(humanDirective.intent, humanDirective.args);
+    const planned = task(
+      mapped.goal,
+      mapped.task,
+      mapped.action,
+      "planner",
+      `Human admin override: ${humanDirective.intent}`,
+      0.97,
+    );
+    planned.directiveId = humanDirective.id;
+    planned.item = humanDirective.args?.item ?? (mapped.task === "obtain_item" ? mapped.goal : undefined);
+    return planned;
+  }
+
+  // Resume owned structure intention (procurement or build) before generic settlement work.
+  if (!emergency) {
+    const constructionPlan = plannedTaskForConstructionProject(input.constructionProject, input.citizenId);
+    if (constructionPlan) return constructionPlan;
+  }
+
+  const curfew = evaluateCitizenCurfew({
+    home: input.home,
+    position: obs.position,
+    timeOfDay: obs.gameTime,
+    isNight: obs.isNight,
+  });
+  const bedtime = planCurfewBedtimeAction({ curfew, timeOfDay: obs.gameTime });
+  if (bedtime) {
+    // Day 2: sleep_at_home retried 19× on the same blocked route (crafting_table). Bound it.
+    if (shouldBackoffHomeSleepRoute(input.lastOutcome)) {
+      return task("idle", "observe", "observeNearby", "planner", homeSleepBackoffReason(input.lastOutcome!), 0.42);
+    }
+    const planned = task("rest", bedtime.task, bedtime.action, "planner", bedtime.reason, 0.88);
+    planned.target = bedtime.target;
+    return planned;
   }
 
   if (humanDirective && humanDirective.mode !== "SUGGESTION" && !emergency) {
@@ -167,6 +247,19 @@ export function planCitizen(input: PlannerInput): PlannedTask {
   if (obs.isNight && hostile) {
     return task("survive", "seek_shelter", "seekSafety", "planner", "Night with nearby danger; use cover", 0.8);
   }
+  if (obs.isNight && (!input.home || input.home.status !== "active")) {
+    // Prefer catalog housing travel/claim over local seek_shelter. Day-1 evidence: seekSafety
+    // failed instantly (no nearby cover) then corrective forced buildShelter while exposed.
+    const nightHousing = planHomelessHousing(input);
+    if (nightHousing) return nightHousing;
+    if (shelterReady) {
+      return task("survive", "seek_shelter", "seekSafety", "planner", "Night with no claimed home; use nearby cover, do not invent H1", 0.78);
+    }
+    if (workRole === "build" || assignedNeeds.includes("NEED_HOUSING")) {
+      return task("survive", "build_shelter", "buildShelter", "planner", "Night; keep the starter shelter moving", 0.8, "builder");
+    }
+    return task("survive", "seek_shelter", "seekSafety", "planner", "Night without a claimed home or finished shelter; use nearby cover", 0.79);
+  }
   if (obs.isNight && shelterReady) {
     return task("survive", "seek_shelter", "seekSafety", "planner", "Night; a usable shelter exists", 0.78);
   }
@@ -177,13 +270,17 @@ export function planCitizen(input: PlannerInput): PlannedTask {
     return task("survive", "seek_shelter", "seekSafety", "planner", "Night without a finished shelter; use nearby cover", 0.79);
   }
 
+  const housing = planHomelessHousing(input);
+  if (housing && !emergency) return housing;
+
   if (inventorySlots(obs) >= 30) {
     return task("survive", "deposit", "depositItems", "reflex", "Inventory is nearly full", 0.86);
   }
 
   if (llmGoal && llmReason) {
     const mapped = LLM_MAP[llmGoal] ?? { task: llmGoal, action: llmGoal };
-    return task(llmGoal, mapped.task, mapped.action, "llm", llmReason, 0.8);
+    const planned = task(llmGoal, mapped.task, mapped.action, "llm", llmReason, 0.8);
+    return attachDiscoveredTarget(planned, input);
   }
 
   if (!hasAny(obs, TOOL_PICKAXES) && !hasAny(obs, LOG_ITEMS) && count(obs, ["oak_planks", "spruce_planks", "birch_planks"]) < 4) {
@@ -234,6 +331,10 @@ export function planCitizen(input: PlannerInput): PlannedTask {
     return task("settlement", "deposit", "depositItems", "planner", "Store surplus in the settlement chest", 0.45);
   }
 
+  if (!workRole) {
+    return autonomousWork(input);
+  }
+
   return task("idle", "observe", "observeNearby", "planner", "No urgent need; survey surroundings", 0.2);
 }
 
@@ -249,11 +350,226 @@ function task(
   return { goal, task: taskName, action, source, reason, priority, occupation };
 }
 
+function activityHome(home: PlannerInput["home"]): ActivityChoiceInput["home"] {
+  if (!home) return undefined;
+  return {
+    homeId: home.homeId,
+    bed: home.bed,
+    status: home.status,
+    origin: home.origin ?? home.bed,
+    entrance: home.entrance,
+    personalChest: home.personalChest,
+  };
+}
+
+function autonomousWork(input: PlannerInput): PlannedTask {
+  const { option, trace } = chooseActivity(activityInput(input));
+  if (option.id === "fish_shore" && !option.target) {
+    const blocked = task(
+      "blocked",
+      "blocked",
+      "blocked",
+      "planner",
+      "BLOCKED: fishing chosen without a discovered shore",
+      0.3,
+    );
+    blocked.blocked = { code: "SEARCH_EXHAUSTED", missing: "reachable_shore" };
+    blocked.trace = trace;
+    return blocked;
+  }
+  const planned = plannedTaskFromOption(option);
+  planned.trace = trace;
+  if (trace.blocked.length > 0 && option.id === "observe") {
+    planned.reason = `${trace.blocked.map((entry) => entry.reason).join("; ")}; surveying instead`;
+  }
+  return planned;
+}
+
+function attachDiscoveredTarget(planned: PlannedTask, input: PlannerInput): PlannedTask {
+  if (planned.action === "fishShore" && !planned.target) {
+    const { option, trace } = chooseActivity({ ...activityInput(input), settlementFoodNeed: true });
+    planned.trace = trace;
+    if (option.action === "fishShore" && option.target) {
+      planned.target = option.target;
+      return planned;
+    }
+    planned.action = "blocked";
+    planned.task = "blocked";
+    planned.goal = "blocked";
+    planned.reason = "BLOCKED: llm asked to fish but no discovered reachable shore";
+    planned.blocked = { code: "SEARCH_EXHAUSTED", missing: "reachable_shore" };
+    return planned;
+  }
+  if (planned.action === "mineOre") {
+    if (!hasAny(input.observation, TOOL_PICKAXES)) {
+      planned.action = "blocked";
+      planned.task = "blocked";
+      planned.goal = "blocked";
+      planned.reason = "BLOCKED: llm asked to mine ore but no pickaxe is held";
+      planned.blocked = { code: "MISSING_TOOL", missing: "pickaxe" };
+      return planned;
+    }
+    if (!input.authorizedStorage) {
+      planned.action = "blocked";
+      planned.task = "blocked";
+      planned.goal = "blocked";
+      planned.reason = "BLOCKED: llm asked to mine ore but no authorized chest; fixture chests are not storage";
+      planned.blocked = { code: "ACCESS_DENIED", missing: "authorized_storage" };
+      return planned;
+    }
+    const ore = nearestReachableSite(input.observation.position, input.knownSites ?? [], "ore");
+    if (ore) {
+      planned.target = ore.origin;
+      planned.item = planned.item ?? "coal_ore";
+      return planned;
+    }
+    planned.action = "blocked";
+    planned.task = "blocked";
+    planned.goal = "blocked";
+    planned.reason = "BLOCKED: llm asked to mine ore but no discovered reachable ore origin";
+    planned.blocked = { code: "SEARCH_EXHAUSTED", missing: "ore_site" };
+    return planned;
+  }
+  if (planned.action === "workFarmPlot" && !planned.target) {
+    const farm = (input.knownSites ?? []).find((site) => site.kind === "farm");
+    if (farm) {
+      planned.target = farm.origin;
+      return planned;
+    }
+    planned.action = "blocked";
+    planned.task = "blocked";
+    planned.goal = "blocked";
+    planned.reason = "BLOCKED: llm asked to farm but no discovered farm origin";
+    planned.blocked = { code: "SEARCH_EXHAUSTED", missing: "farm_site" };
+    return planned;
+  }
+  if (planned.action === "claimHome" || planned.action === "travelTowardHousing") {
+    const opportunity = housingOpportunity(input.observation.position, homesForClaim(input));
+    planned.trace = planned.trace;
+    if (opportunity.kind === "claim") {
+      planned.action = "claimHome";
+      planned.task = "claim_home";
+      planned.goal = "housing";
+      planned.item = opportunity.home.id;
+      planned.target = opportunity.home.bed;
+      return planned;
+    }
+    if (opportunity.kind === "travel") {
+      planned.action = "travelTowardHousing";
+      planned.task = "seek_housing";
+      planned.goal = "housing";
+      planned.item = opportunity.home.id;
+      planned.target = housingTravelTarget(opportunity.home);
+      planned.reason = `Unclaimed house ${opportunity.home.id} is ${opportunity.distance.toFixed(1)} blocks away; walk toward it (claim reach ${HOME_CLAIM_REACH_BLOCKS})`;
+      return planned;
+    }
+    planned.action = "blocked";
+    planned.task = "blocked";
+    planned.goal = "blocked";
+    planned.reason = "BLOCKED: no eligible unclaimed house to walk toward or claim";
+    planned.blocked = { code: "SEARCH_EXHAUSTED", missing: "eligible_house" };
+    return planned;
+  }
+  if (planned.action === "observeNearby" && (!input.home || input.home.status !== "active")) {
+    const opportunity = housingOpportunity(input.observation.position, homesForClaim(input));
+    if (opportunity.kind === "travel") {
+      planned.action = "travelTowardHousing";
+      planned.task = "seek_housing";
+      planned.goal = "housing";
+      planned.item = opportunity.home.id;
+      planned.target = housingTravelTarget(opportunity.home);
+      planned.reason = `Explore toward known unclaimed house ${opportunity.home.id} (${opportunity.distance.toFixed(1)} blocks); not a claim`;
+      return planned;
+    }
+  }
+  return planned;
+}
+
+function activityInput(input: PlannerInput): ActivityChoiceInput {
+  return {
+    citizenId: input.citizenId,
+    observation: input.observation,
+    home: activityHome(input.home),
+    knownSites: input.knownSites,
+    visibleShores: input.visibleShores,
+    authorizedStorage: input.authorizedStorage,
+    availableHomes: homesForClaim(input),
+    heldFood: personalFoodCount(input.observation),
+    settlementFoodNeed: input.settlement.needs.includes("NEED_FOOD") || input.settlement.food < 4,
+    lastOutcome: input.lastOutcome,
+  };
+}
+
+function homesForClaim(input: PlannerInput): CatalogHome[] | undefined {
+  const homes = input.availableHomes;
+  if (!homes) return homes;
+  const blocked = suppressedHomeIds(input.lastOutcome?.unresolved, {
+    hasStorage: Boolean(input.authorizedStorage),
+    hasRod: hasAny(input.observation, ["fishing_rod"]),
+    hasPickaxe: hasAny(input.observation, TOOL_PICKAXES),
+    hasShore: Boolean(input.visibleShores?.length),
+    hasOre: Boolean((input.knownSites ?? []).some((site) => site.kind === "ore")),
+    availableHomeIds: homes.map((home) => home.id),
+  });
+  const last = input.lastOutcome;
+  const skipLast =
+    last &&
+    !last.success &&
+    last.item &&
+    (last.action === "travelTowardHousing" || last.task === "seek_housing") &&
+    (last.code === "TARGET_UNREACHABLE" || last.code === "HAZARD_BLOCKED" || last.code === "PATH_BLOCKED")
+      ? last.item
+      : undefined;
+  return homes.filter((home) => !blocked.has(home.id) && home.id !== skipLast);
+}
+
+function planHomelessHousing(input: PlannerInput): PlannedTask | undefined {
+  if (input.home?.status === "active") return undefined;
+  if (input.availableHomes === undefined) return undefined;
+  const opportunity = housingOpportunity(input.observation.position, homesForClaim(input));
+  if (opportunity.kind === "claim") {
+    const planned = task(
+      "housing",
+      "claim_home",
+      "claimHome",
+      "planner",
+      `Unclaimed house ${opportunity.home.id} is in claim reach (${opportunity.distance.toFixed(1)} blocks); not assigned by roster`,
+      0.82,
+    );
+    planned.item = opportunity.home.id;
+    planned.target = opportunity.home.bed;
+    return planned;
+  }
+  if (opportunity.kind === "travel") {
+    const planned = task(
+      "housing",
+      "seek_housing",
+      "travelTowardHousing",
+      "planner",
+      `Unclaimed house ${opportunity.home.id} is a known catalog destination ${opportunity.distance.toFixed(1)} blocks away (outside claim reach ${HOME_CLAIM_REACH_BLOCKS}); walk toward it, do not claim yet`,
+      0.81,
+    );
+    planned.item = opportunity.home.id;
+    planned.target = housingTravelTarget(opportunity.home);
+    return planned;
+  }
+  return undefined;
+}
+
 function correctiveFromFailure(input: PlannerInput): PlannedTask | undefined {
   const last = input.lastOutcome;
   if (!last || last.success) return undefined;
-  if (last.streak > 8) {
-    return task("idle", "observe", "observeNearby", "planner", "Backing off after repeated failures", 0.35);
+  if (workHandoffToCurfew(last.code) || last.code === "NOT_SLEEP_TIME" || last.code === "PATH_BLOCKED" || last.code === "HAZARD_BLOCKED" || last.code === "BED_MISSING" || last.code === "INTERIOR_UNREACHABLE") {
+    return undefined;
+  }
+  if (last.workComplete === false && (last.code === "CURFEW_STOP" || last.code === "CANCELLED" || last.code === "INTERRUPTED")) {
+    return undefined;
+  }
+  if (
+    codeIsBlockedWork(last.code) ||
+    (last.code === "MISSING_TOOL" && (last.action === "fishShore" || last.task === "fish_shore"))
+  ) {
+    return undefined;
   }
   const knowledge = minecraftKnowledge();
   const bag = Object.fromEntries(input.observation.inventory.map((item) => [item.name, item.count]));
@@ -322,14 +638,36 @@ function correctiveFromFailure(input: PlannerInput): PlannedTask | undefined {
   }
 
   if (last.task === "seek_shelter" && (code === "TARGET_UNREACHABLE" || code === "TIMEOUT" || code === "PATH_BLOCKED") && last.streak >= 3) {
+    // Do not keep retrying an impossible local cover goal — change strategy.
+    const housingFallback = planHomelessHousing(input);
+    if (housingFallback) {
+      housingFallback.reason = `Seek shelter failed ${last.streak}x; ${housingFallback.reason}`;
+      return housingFallback;
+    }
     if (!input.settlement.shelterComplete) {
       return task("settlement", "build_shelter", "buildShelter", "planner", "Failed shelter coordinate; resume building", 0.7, "builder");
     }
+    return task("idle", "observe", "observeNearby", "planner", "Seek shelter unreachable and no housing fallback; back off", 0.4);
   }
   if (shouldBackoffFoodSearch(last)) {
     return task("idle", "observe", "observeNearby", "planner", foodSearchBackoffReason(last), 0.35);
   }
+  if (shouldBackoffHomeSleepRoute(last)) {
+    return task("idle", "observe", "observeNearby", "planner", homeSleepBackoffReason(last), 0.35);
+  }
+  if (shouldBackoffToObserve(last)) {
+    return task("idle", "observe", "observeNearby", "planner", "Backing off after repeated failures", 0.35);
+  }
   return undefined;
+}
+
+function codeIsBlockedWork(code: string | undefined): boolean {
+  return (
+    code === "ACCESS_DENIED" ||
+    code === "SEARCH_EXHAUSTED" ||
+    code === "CLAIM_CONFLICT" ||
+    code === "HOME_MISSING"
+  );
 }
 
 export function assignSettlementNeeds(

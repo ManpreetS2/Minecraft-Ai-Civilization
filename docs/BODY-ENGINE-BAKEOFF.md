@@ -8,8 +8,8 @@ Known-good branch at start: `integration/first-settlement-v2` @ `1a5bc0ea82f6df5
 
 | Project | Clone | Commit | License | Connects to Paper 1.21.11? |
 | --- | --- | --- | --- | --- |
-| Mindcraft | `C:\Users\sh1ft\OneDrive\Desktop\mindcraft_upstream_test` | `5f3acc87b479864124173de444f31fa5538f94a6` | MIT | Yes. Username `MindcraftProbe`. `allow_insecure_coding` was not enabled. Body skills were called directly (no purchased API, no generated-code execution). npm resolved mineflayer 4.39.0; their mineflayer 4.33.0 patch did **not** apply. Pathfinder 2.4.5 patch **did** apply. |
-| Phoenix | `C:\Users\sh1ft\OneDrive\Desktop\phoenix_upstream_test` | `91618523f3eb7ea76ae1aedd659ad6e74a1ce38f` | MIT | Yes, it logs in. Username `PhoenixProbe`. Framework is not a competent 1.21.11 body. |
+| Mindcraft | `<LOCAL_MINDCRAFT_UPSTREAM>` | `5f3acc87b479864124173de444f31fa5538f94a6` | MIT | Yes. Username `MindcraftProbe`. `allow_insecure_coding` was not enabled. Body skills were called directly (no purchased API, no generated-code execution). npm resolved mineflayer 4.39.0; their mineflayer 4.33.0 patch did **not** apply. Pathfinder 2.4.5 patch **did** apply. |
+| Phoenix | `<LOCAL_PHOENIX>` | `91618523f3eb7ea76ae1aedd659ad6e74a1ce38f` | MIT | Yes, it logs in. Username `PhoenixProbe`. Framework is not a competent 1.21.11 body. |
 | MechProbe (ours) | this repo | live `pnpm --filter @civ/orchestrator mechanics` | — | Yes. Username `MechProbe`. |
 
 Neither upstream tree was copied into the production repo.

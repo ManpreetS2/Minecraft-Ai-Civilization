@@ -27,7 +27,7 @@ export function intentToPlan(
     case "transfer_item":
       return { goal: "help_citizen", task: "help_citizen", action: "shareItem" };
     case "contribute_to_project":
-      return { goal: "build_shelter", task: "build_shelter", action: "buildShelter" };
+      return { goal: "build_structure", task: "build_structure", action: "buildStructure" };
     case "return_to_settlement":
       return { goal: "return_home", task: "return_to_settlement", action: "returnToSettlement" };
     case "seek_safety":

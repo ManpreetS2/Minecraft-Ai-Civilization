@@ -3,6 +3,8 @@ import { AgentManager } from "@civ/agent-core";
 import { loadConfig } from "@civ/shared";
 import { startDashboardServer } from "./http-server.js";
 import { ensurePaper } from "./paper.js";
+import { tryRcon } from "./rcon.js";
+import { enableColonyMode } from "./colony-world.js";
 
 async function main(): Promise<void> {
   loadEnv();
@@ -13,6 +15,20 @@ async function main(): Promise<void> {
     console.error("Start it with server\\start.bat, then re-run pnpm sim:start.");
     process.exitCode = 1;
     return;
+  }
+
+  const rcon = await tryRcon(config.MINECRAFT_HOST, Number(process.env.RCON_PORT ?? 25575), process.env.RCON_PASSWORD ?? "civ-mechanics-rcon");
+  if (rcon) {
+    try {
+      const colony = await enableColonyMode(rcon);
+      console.log(`Colony mode: difficulty kept non-peaceful, animals/hunger/day-night on, hostiles purged=${colony.purged}`);
+    } catch (error) {
+      console.warn("Colony mode RCON apply failed:", error);
+    } finally {
+      rcon.close();
+    }
+  } else {
+    console.warn("Colony mode: RCON unavailable. Set spawn-monsters=false in server.properties (not Peaceful) and restart Paper.");
   }
 
   const manager = new AgentManager(config);

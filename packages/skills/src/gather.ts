@@ -1,10 +1,20 @@
 import { fail, ok, retry, type ActionResult, type ErrorCode, type Vec3 } from "@civ/shared";
-import { navigationBackend, shouldBlacklistTarget } from "@civ/minecraft-adapter";
+import { navigationBackend, retreatFromHazard, shouldBlacklistTarget } from "@civ/minecraft-adapter";
+import { refuseAccidentalPropertyBreak } from "@civ/minecraft-knowledge";
 import { Vec3 as Vec3Class } from "vec3";
 import type { SkillContext } from "./context.js";
 import { findBlock } from "./observe.js";
 import { lookAtPosition } from "./look.js";
 import { moveTo } from "./movement.js";
+import { isStandingInLiquid } from "./fish.js";
+
+function botWorldGetter(bot: SkillContext["bot"]) {
+  return (pos: Vec3) => {
+    const block = bot.blockAt(new Vec3Class(Math.floor(pos.x), Math.floor(pos.y), Math.floor(pos.z)));
+    if (!block) return undefined;
+    return { name: block.name, boundingBox: block.boundingBox };
+  };
+}
 
 export function classifyStaleTarget(expected?: string, actual?: string): ErrorCode | undefined {
   if (!actual || actual === "air" || actual === "cave_air" || actual === "void_air") return "TARGET_GONE";
@@ -35,6 +45,26 @@ export async function mineBlock(
       }
 
       const bot = ctx.bot;
+      // Day 2: Atlas drowned while gathering. Refuse dig while feet/head are in liquid.
+      const stand = bot.entity?.position;
+      if (stand && isStandingInLiquid({ x: stand.x, y: stand.y, z: stand.z }, botWorldGetter(bot))) {
+        const away = {
+          dx: Math.sign(stand.x - target.x) || 1,
+          dz: Math.sign(stand.z - target.z) || 0,
+        };
+        await retreatFromHazard(bot, away, ctx.signal);
+        const after = bot.entity?.position;
+        if (after && isStandingInLiquid({ x: after.x, y: after.y, z: after.z }, botWorldGetter(bot))) {
+          ctx.body.unreachable.mark(target, 20_000);
+          return fail(
+            "HAZARD_BLOCKED",
+            "Standing in water after approach; refusing dig to avoid drowning",
+            Date.now() - started,
+            true,
+            { position: { x: after.x, y: after.y, z: after.z }, workComplete: false },
+          );
+        }
+      }
       const block = bot.blockAt(new Vec3Class(target.x, target.y, target.z));
       const stale = classifyStaleTarget(found.data.name, block?.name);
       if (stale) {
@@ -44,10 +74,14 @@ export async function mineBlock(
       if (!block || block.name === "air") {
         return fail("TARGET_GONE", "Target block disappeared before mining", Date.now() - started, true);
       }
+      const protectedBlock = refuseAccidentalPropertyBreak(block.name);
+      if (!protectedBlock.ok) {
+        return fail(protectedBlock.code, protectedBlock.error, Date.now() - started, false);
+      }
       await lookAtPosition(ctx, target);
       try {
         if (ctx.signal?.aborted) {
-          return fail("CANCELLED", "Cancelled before dig", Date.now() - started);
+          return fail("CANCELLED", "Cancelled before dig", Date.now() - started, false, { workComplete: false });
         }
         await bot.dig(block, true);
       } catch (error) {
@@ -94,7 +128,10 @@ export async function collectItem(
     return origin.distanceTo(entity.position) <= maxDistance;
   });
   if (nearby.length === 0) {
-    return fail("ITEM_NOT_FOUND", `No dropped items nearby${itemName ? ` matching ${itemName}` : ""}`, Date.now() - started, true);
+    return fail("ITEM_NOT_FOUND", `No dropped items nearby${itemName ? ` matching ${itemName}` : ""}`, Date.now() - started, true, {
+      collected: 0,
+      workComplete: false,
+    });
   }
 
   let reached = 0;
@@ -108,8 +145,32 @@ export async function collectItem(
   await new Promise((resolve) => setTimeout(resolve, 250));
   const after = bot.inventory.items().reduce((sum, item) => sum + item.count, 0);
   const collected = Math.max(0, after - before);
-  if (collected === 0 && reached === 0) {
-    return fail("ITEM_NOT_FOUND", "Could not reach dropped items", Date.now() - started, true);
+  if (ctx.signal?.aborted && collected === 0) {
+    return fail("CANCELLED", "Pickup cancelled for this citizen", Date.now() - started, false, {
+      collected: 0,
+      reached,
+      workComplete: false,
+    });
   }
-  return ok({ collected: Math.max(collected, reached) }, Date.now() - started);
+  if (ctx.signal?.aborted) {
+    return fail("INTERRUPTED", "Pickup interrupted after partial inventory gain", Date.now() - started, true, {
+      collected,
+      reached,
+      workComplete: false,
+    });
+  }
+  if (collected === 0) {
+    return fail(
+      "ITEM_NOT_FOUND",
+      reached === 0 ? "Could not reach dropped items" : "Reached drops but inventory did not increase",
+      Date.now() - started,
+      true,
+      {
+        collected: 0,
+        reached,
+        workComplete: false,
+      },
+    );
+  }
+  return ok({ collected }, Date.now() - started);
 }

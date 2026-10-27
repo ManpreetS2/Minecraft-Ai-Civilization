@@ -72,6 +72,20 @@ describe("local terrain classification", () => {
     expect(inspectLocalTerrain(bot)?.kind).toBe("open");
   });
 
+  it("does not treat standing on dirt_path as clipped", () => {
+    const cells: Record<string, { name: string; boundingBox: string }> = {};
+    for (let x = 0; x <= 10; x += 1) {
+      for (let z = 0; z <= 10; z += 1) {
+        cells[`${x},63,${z}`] = { name: "dirt", boundingBox: "block" };
+        cells[`${x},64,${z}`] = { name: "dirt_path", boundingBox: "block" };
+        cells[`${x},65,${z}`] = { name: "air", boundingBox: "empty" };
+        cells[`${x},66,${z}`] = { name: "air", boundingBox: "empty" };
+      }
+    }
+    const bot = fakeBot(cells, { x: 5.5, y: 64.94, z: 5.5 });
+    expect(inspectLocalTerrain(bot)?.kind).toBe("open");
+  });
+
   it("classifies feet inside a solid as clipped", () => {
     const cells = pitWithRim();
     cells["5,64,5"] = { name: "dirt", boundingBox: "block" };

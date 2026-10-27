@@ -514,16 +514,21 @@ async function resolveContainer(
 ): Promise<ActionResult<{ position: Vec3 }>> {
   const started = Date.now();
   if (preferred) {
-    const block = ctx.bot.blockAt(new Vec3Class(Math.floor(preferred.x), Math.floor(preferred.y), Math.floor(preferred.z)));
-    if (!block || !names.includes(block.name)) {
+    const cell = { x: Math.floor(preferred.x), y: Math.floor(preferred.y), z: Math.floor(preferred.z) };
+    const existing = ctx.bot.blockAt(new Vec3Class(cell.x, cell.y, cell.z));
+    if (existing && !names.includes(existing.name)) {
       return fail("CONTAINER_NOT_FOUND", "Preferred container is missing", Date.now() - started, true);
     }
-    const move = await navigationBackend().navigateToInteractWithBlock(ctx.bot, preferred, {
+    const move = await navigationBackend().navigateToInteractWithBlock(ctx.bot, cell, {
       timeoutMs: ctx.timeoutMs ?? 12_000,
       signal: ctx.signal,
     });
     if (!move.success) return move;
-    return ok({ position: preferred }, Date.now() - started);
+    const after = ctx.bot.blockAt(new Vec3Class(cell.x, cell.y, cell.z));
+    if (!after || !names.includes(after.name)) {
+      return fail("CONTAINER_NOT_FOUND", "Preferred container is missing after navigation", Date.now() - started, true);
+    }
+    return ok({ position: cell }, Date.now() - started);
   }
   const found = await findBlock(ctx, names, 16);
   if (!found.success) return found;

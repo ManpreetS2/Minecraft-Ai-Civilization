@@ -1,8 +1,8 @@
 # GREEN fishing live-test plan (FishProbe)
 
-Date: 2026-09-19  
+Date: 2026-09-20  
 Owner: Agent GREEN  
-Status: **Harness prepared. FishProbe not launched.** Physical fishing live = **UNVERIFIED**. Return-home live = **UNVERIFIED**.
+Status: **Live FishProbe complete.** Physical fishing live = **PASS**. Return-home live = **SKIP** (no claimed home; `FISH_TEST_RETURN_HOME` unset). Evidence: [GREEN_FISHING_LIVE_RUN.md](./GREEN_FISHING_LIVE_RUN.md).
 
 Mining live PASS is preserved in `docs/GREEN_MINING_LIVE_RUN.md`. Do **not** re-mine **-953,58,946**. Do **not** reset WORLD-LAB. Do **not** reuse chest **-954,58,944**.
 
@@ -11,12 +11,12 @@ Mining live PASS is preserved in `docs/GREEN_MINING_LIVE_RUN.md`. Do **not** re-
 | Item | Status |
 | --- | --- |
 | Skill `fishAtShore` + 10 unit tests (rod, shore, cancel, chest, curfew stop) | Ready |
-| Guarded harness `pnpm mechanics:fish` | Ready, **blocked by flags** |
-| RED shore + chest | **Blocker** — not supplied |
-| BLUE exclusive WORLD-LAB release | **Blocker** — confirm idle before launch |
-| User `FISH_TEST_USER_APPROVED` | **Blocker** |
-| `FISH_TEST_ORIGIN` / `FISH_TEST_CHEST` | **Blocker** — do not invent |
-| Return-home `FISH_TEST_HOME` | Optional; SKIP return-home if omitted |
+| Guarded harness `pnpm mechanics:fish` | **Ran live 2026-09-20** |
+| RED shore + chest | Origin **-1043,63,980**; chest **-1042,63,980** (RED placed; GREEN did not `PLACE_CHEST`) |
+| BLUE exclusive WORLD-LAB release | Idle; FishProbe window used |
+| User `FISH_TEST_USER_APPROVED` | Given |
+| `FISH_TEST_ORIGIN` / `FISH_TEST_CHEST` | Used as above |
+| Return-home `FISH_TEST_HOME` | **SKIP** — FishProbe has no claimed home |
 | Two-bot / five citizens | **Not this test** |
 
 Default `pnpm mechanics:fish` without flags exits **2** and prints the needs list. That is not a live FAIL.
@@ -76,13 +76,13 @@ Curfew stop during a cast (`TIMEOUT` / return-home request before a catch) → f
 
 | Requirement | Where | Live |
 | --- | --- | --- |
-| Real rod | `evaluateFishingRequest` `MISSING_TOOL`; harness give + count | UNVERIFIED |
-| Safe shore, no swim | dry stand + adjacent water; `HAZARD_BLOCKED` in liquid | UNVERIFIED |
-| Catch / inventory delta | `snapshotCatchCounts` + chest NBT before/after | UNVERIFIED |
-| Authorized container | `assertPermittedStorage` | UNVERIFIED |
-| Cancel | `ctx.signal` + harness abort stage | unit PASS, live UNVERIFIED |
-| Early return-home request | `fishingHomeStop` / `evaluateReturnHome` during casts and bite wait | unit PASS, live UNVERIFIED |
-| Physical walk home | harness stage only, BLUE navigator | UNVERIFIED |
+| Real rod | `evaluateFishingRequest` `MISSING_TOOL`; harness give + count | **PASS** (`fishing_rod=1`) |
+| Safe shore, no swim | dry stand + adjacent water; `HAZARD_BLOCKED` in liquid | **PASS** stand `-1043,63,980`, water `-1044,62,980` |
+| Catch / inventory delta | `snapshotCatchCounts` + chest NBT before/after | **PASS** salmon ×1 in `-1042,63,980`; inv rod-only |
+| Authorized container | `assertPermittedStorage` | **PASS** designated chest only |
+| Cancel | `ctx.signal` + harness abort stage | unit PASS; live abort stage **PASS** |
+| Early return-home request | `fishingHomeStop` / `evaluateReturnHome` during casts and bite wait | unit PASS; live **SKIP** (no claimed home) |
+| Physical walk home | harness stage only, BLUE navigator | **SKIP** |
 
 `packages/agent-core/src/executor.ts`: GREEN previously wired `fishShore` + `claimedBed` → `returnHome`. **No further executor edits this pass.** BLUE owns homes schema / bed logic; GREEN will not touch those. Coordinate before mixing more executor changes.
 
@@ -110,15 +110,13 @@ set FISH_TEST_HOME=x,y,z
 pnpm mechanics:fish
 ```
 
-Do not fill origin/chest until RED publishes them.
+Live values used: `FISH_TEST_ORIGIN=-1043,63,980` `FISH_TEST_CHEST=-1042,63,980` `FISH_TEST_TIMEOUT_MS=90000`. Do **not** set `FISH_TEST_PLACE_CHEST` (chest exists). Do **not** set `FISH_TEST_RETURN_HOME` unless a claimed home is wired for FishProbe.
 
-## Blockers
+## Remaining
 
-1. RED has not approved a shore (water + dry stand + empty test chest, away from preserves and the coal pocket).
-2. BLUE has not confirmed WORLD-LAB is idle for FishProbe (movement/home work may still need the lab).
-3. User has not set `FISH_TEST_USER_APPROVED` or approved a chest cell.
-4. Return-home live needs BLUE-stable navigator plus an approved `FISH_TEST_HOME` (H1 bed is BLUE’s fixture; do not invent it as a fishing shore).
-5. Two-bot and five-citizen runs stay blocked; this harness is FishProbe only.
+1. **RETURN_HOME_LIVE=SKIP** until FishProbe has a real claimed, accessible home. Do not pretend it owns H1.
+2. Two-bot and five-citizen runs stay blocked; this harness is FishProbe only.
+3. BLUE’s separate two-block log-detour TIMEOUT is still unverified; this run TPed to the dry origin and did not use that route.
 
 ## Files
 
@@ -126,3 +124,4 @@ Do not fill origin/chest until RED publishes them.
 - `apps/orchestrator/src/live-fish-test.ts`
 - `packages/skills/src/fish.ts` + `fish.test.ts`
 - Script: `pnpm mechanics:fish`
+- Evidence: `docs/GREEN_FISHING_LIVE_RUN.md`

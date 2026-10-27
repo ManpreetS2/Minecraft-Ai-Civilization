@@ -10,7 +10,7 @@ import {
   pickBestResourceTarget,
   shouldBlacklistTarget,
 } from "@civ/minecraft-adapter";
-import { minecraftKnowledge } from "@civ/minecraft-knowledge";
+import { minecraftKnowledge, refuseAccidentalPropertyBreak } from "@civ/minecraft-knowledge";
 import { Vec3 as Vec3Class } from "vec3";
 import type { SkillContext } from "./context.js";
 import { findBlockCandidates } from "./observe.js";
@@ -36,7 +36,11 @@ export async function collectResource(
 
   while (countMatching(ctx, names) - before < amount) {
     if (ctx.signal?.aborted) {
-      return fail("INTERRUPTED", "collectResource interrupted", Date.now() - started, true);
+      return fail("INTERRUPTED", "collectResource interrupted for this citizen", Date.now() - started, true, {
+        collected: countMatching(ctx, names) - before,
+        inventoryPreserved: true,
+        workComplete: false,
+      });
     }
     if (!canFitDrop(ctx, names) && inventorySpace(ctx) <= 0) {
       return fail("INVENTORY_FULL", "Inventory is full; store items before mining more", Date.now() - started, true);
@@ -104,6 +108,11 @@ export async function collectResource(
       if (!current || current.name === "air") {
         gone = true;
       } else {
+        const protectedBlock = refuseAccidentalPropertyBreak(current.name);
+        if (!protectedBlock.ok) {
+          skipped.add(key);
+          return fail(protectedBlock.code, protectedBlock.error, Date.now() - started, false);
+        }
         await lookAtPosition(ctx, best.position);
         try {
           await ctx.bot.dig(current, true);
@@ -126,10 +135,18 @@ export async function collectResource(
   }
 
   const gained = countMatching(ctx, names) - before;
-  if (gained <= 0 && mined === 0) {
-    return fail("BLOCK_NOT_FOUND", `Could not collect ${names.join("/")}`, Date.now() - started, true);
+  if (gained <= 0) {
+    return fail(
+      mined > 0 ? "ITEM_NOT_FOUND" : "BLOCK_NOT_FOUND",
+      mined > 0
+        ? `Broke ${lastName} but did not collect a drop into inventory`
+        : `Could not collect ${names.join("/")}`,
+      Date.now() - started,
+      true,
+      { mined, collected: 0, workComplete: false, position: lastPos },
+    );
   }
-  return ok({ name: lastName, collected: Math.max(gained, mined), position: lastPos ?? { x: 0, y: 0, z: 0 } }, Date.now() - started);
+  return ok({ name: lastName, collected: gained, position: lastPos ?? { x: 0, y: 0, z: 0 } }, Date.now() - started);
 }
 
 function blockMissing(ctx: SkillContext, position: Vec3, expected: string): boolean {

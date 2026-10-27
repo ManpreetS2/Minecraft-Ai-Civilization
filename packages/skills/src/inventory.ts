@@ -250,6 +250,13 @@ export async function craftItem(
 ): Promise<ActionResult<{ item: string; count: number }>> {
   const started = Date.now();
   const bot = ctx.bot;
+  if (ctx.signal?.aborted) {
+    return fail("CANCELLED", "Crafting cancelled for this citizen", 0, false, {
+      item: itemName,
+      inventoryPreserved: true,
+      workComplete: false,
+    });
+  }
   const api = recipeApi(bot);
   const knowledge = minecraftKnowledge();
   const name = knowledge.normalizeItemName(itemName) || itemName;

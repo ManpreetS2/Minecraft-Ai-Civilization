@@ -22,10 +22,24 @@ function isAirLike(name: string | undefined, boundingBox?: string): boolean {
   );
 }
 
+export function isWalkSurface(name: string | undefined): boolean {
+  if (!name) return false;
+  return (
+    name === "dirt_path" ||
+    name === "grass_path" ||
+    name === "farmland" ||
+    name === "soul_sand" ||
+    name === "soul_soil" ||
+    name === "mud" ||
+    name === "muddy_mangrove_roots"
+  );
+}
+
 function isHazardName(name: string | undefined): boolean {
   return Boolean(
     name &&
       (name === "lava" ||
+        name === "flowing_lava" ||
         name === "fire" ||
         name === "soul_fire" ||
         name === "magma_block" ||
@@ -40,6 +54,7 @@ export function canOccupyFeet(bot: Bot, pos: Vec3): boolean {
   if (!feet) return true;
   if (isHazardName(feet.name)) return false;
   if (isAirLike(feet.name, feet.boundingBox)) return true;
+  if (isWalkSurface(feet.name)) return true;
   if (feet.name === "water" || feet.name.endsWith("_slab") || feet.name.includes("stairs")) return true;
   if (feet.name.endsWith("_door") || feet.name.endsWith("_gate") || feet.name.endsWith("_carpet")) return true;
   return feet.boundingBox !== "block";
@@ -50,6 +65,11 @@ export function hasHeadroom(bot: Bot, pos: Vec3): boolean {
   if (!head) return true;
   if (isHazardName(head.name)) return false;
   return isAirLike(head.name, head.boundingBox) || head.boundingBox !== "block";
+}
+
+/** Jumping needs the head cell and the cell above it clear (player 1.8 tall, jump ~1.25). */
+export function hasJumpHeadroom(bot: Bot, pos: Vec3): boolean {
+  return hasHeadroom(bot, pos) && hasHeadroom(bot, { x: pos.x, y: pos.y + 1, z: pos.z });
 }
 
 export const BLOCK_INTERACT_REACH = 4.5;
@@ -88,6 +108,29 @@ export function canStandOn(bot: Bot, pos: Vec3): boolean {
 
 export function isWalkableStanding(bot: Bot, pos: Vec3): boolean {
   return canOccupyFeet(bot, pos) && hasHeadroom(bot, pos) && canStandOn(bot, pos);
+}
+
+/** Loaded solid standing cell. Rejects unloaded, lava/magma, water, and unverified drops. */
+export function isVerifiedStanding(
+  bot: Bot,
+  pos: Vec3,
+  options: { fromY?: number; maxDrop?: number } = {},
+): boolean {
+  const x = Math.floor(pos.x);
+  const y = Math.floor(pos.y);
+  const z = Math.floor(pos.z);
+  const feet = botBlock(bot, x, y, z);
+  const below = botBlock(bot, x, y - 1, z);
+  const head = botBlock(bot, x, y + 1, z);
+  if (!feet || !below || !head) return false;
+  if (isHazardName(feet.name) || isHazardName(below.name) || isHazardName(head.name)) return false;
+  if (below.name === "water" || feet.name === "water") return false;
+  if (!isWalkableStanding(bot, { x, y, z })) return false;
+  if (options.fromY !== undefined) {
+    const maxDrop = options.maxDrop ?? 1;
+    if (y < Math.floor(options.fromY) - maxDrop) return false;
+  }
+  return true;
 }
 
 export function interactionCandidates(bot: Bot, block: Vec3, radius = 2): Vec3[] {

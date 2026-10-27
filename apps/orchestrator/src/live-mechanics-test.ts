@@ -139,6 +139,11 @@ async function runCommand(
 
 async function main(): Promise<void> {
   loadEnv();
+  if (process.env.MECHANICS_DEMO === "true") {
+    const { runMechanicsDemo } = await import("./live-mechanics-demo.js");
+    await runMechanicsDemo();
+    return;
+  }
   const config = loadConfig();
   const launchedByMechanicsScript = process.env.npm_lifecycle_event === "mechanics";
   if (!config.MECHANICS_PROBE_ENABLED && !launchedByMechanicsScript) {
@@ -674,7 +679,7 @@ async function main(): Promise<void> {
   results.push(
     await runCase("sleep if valid time", async () => {
       if (!rcon) throw new Error("SKIP RCON required for bed fixture");
-      await rcon.command("gamerule doMobSpawning false");
+      await rcon.command("gamerule doMobSpawning false"); // TEST-ONLY sleep fixture; colony worlds use spawn-monsters=false instead of Peaceful
       await rcon.command("gamerule doDaylightCycle false");
       const stand = body.position();
       if (!stand) throw new Error("no position for bed");

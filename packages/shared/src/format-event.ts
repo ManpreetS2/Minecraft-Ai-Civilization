@@ -40,6 +40,21 @@ export type PresentedEvent = {
   };
 };
 
+function decisionKindLabel(payload: Record<string, unknown>): string | undefined {
+  const kind = payload.decisionKind;
+  if (kind === "test_control") return "TEST_CONTROL (not a citizen decision)";
+  if (kind === "physical_result") return "Physical action result";
+  if (kind === "planner_intent") return "Planner intent";
+  return undefined;
+}
+
+function withDecisionKind(extra: string | undefined, payload: Record<string, unknown>): string | undefined {
+  const label = decisionKindLabel(payload);
+  const skill = typeof payload.skillStatus === "string" ? `Skill ${payload.skillStatus}` : undefined;
+  const parts = [label, extra, skill].filter(Boolean);
+  return parts.length ? parts.join(". ") : undefined;
+}
+
 export function presentEvent(event: PresentableEvent, names: Record<string, string> = {}): PresentedEvent {
   const name = citizenDisplayName(event.citizenId, names);
   const payload = event.payload ?? {};
@@ -90,17 +105,30 @@ export function presentEvent(event: PresentableEvent, names: Record<string, stri
       return {
         ...base,
         headline: `${name} started ${task}.`,
-        subtext: reason ? `Reason: ${humanReason(reason)}` : undefined,
+        subtext: withDecisionKind(reason ? `Reason: ${humanReason(reason)}` : undefined, payload),
         kind: "info",
       };
     }
     case "TaskCompleted":
-      return { ...base, headline: `${name} finished ${task}.`, kind: "success" };
+      return {
+        ...base,
+        headline: `${name} finished ${task}.`,
+        subtext: withDecisionKind(undefined, payload),
+        kind: "success",
+      };
     case "TaskFailed":
+      if (payload.skillStatus === "INTERRUPTED") {
+        return {
+          ...base,
+          headline: `${name} stopped ${task} without finishing.`,
+          subtext: withDecisionKind(translated?.subtext ?? reason, payload),
+          kind: "warning",
+        };
+      }
       return {
         ...base,
         headline: translated?.headline ? `${name} ${translated.headline}.` : `${name} couldn't ${failedTask(payload.task)}.`,
-        subtext: translated?.subtext,
+        subtext: withDecisionKind(translated?.subtext, payload) ?? translated?.subtext,
         kind: "failure",
       };
     case "CitizenConnected":
@@ -350,15 +378,19 @@ export function presentEvent(event: PresentableEvent, names: Record<string, stri
     case "ActionFailed":
       return {
         ...base,
-        headline: `${name} failed while ${friendlyTask(payload.action ?? payload.task)}.`,
-        subtext: translated?.subtext,
-        kind: "failure",
+        headline:
+          payload.skillStatus === "INTERRUPTED"
+            ? `${name} stopped ${friendlyTask(payload.action ?? payload.task)} without finishing.`
+            : `${name} failed while ${friendlyTask(payload.action ?? payload.task)}.`,
+        subtext: withDecisionKind(translated?.subtext, payload) ?? translated?.subtext,
+        kind: payload.skillStatus === "INTERRUPTED" ? "warning" : "failure",
       };
     case "ActionStarted":
     case "ActionCompleted":
       return {
         ...base,
         headline: `${name} ${type === "ActionStarted" ? "began" : "finished"} ${friendlyTask(payload.action ?? payload.task)}.`,
+        subtext: withDecisionKind(undefined, payload),
         kind: type === "ActionCompleted" ? "success" : "info",
       };
     case "ConstructionBlockPlaced":

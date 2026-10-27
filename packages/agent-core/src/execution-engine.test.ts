@@ -13,11 +13,12 @@ describe("compact starter hut", () => {
   it("stays smaller than the original 101-block 5x5x3 hut", () => {
     const hut = starterHut();
     const size = starterHutSize();
-    expect(size.width).toBe(5);
-    expect(size.depth).toBe(4);
+    // basic_shelter_v1 footprint (starterHut), not small_house_v1
+    expect(size.width).toBe(4);
+    expect(size.depth).toBe(3);
     expect(size.wallHeight).toBe(2);
     expect(hut.blocks.length).toBeLessThan(85);
-    expect(hut.blocks.length).toBeGreaterThan(40);
+    expect(hut.blocks.length).toBeGreaterThan(20);
   });
 });
 
@@ -50,7 +51,7 @@ describe("intent mapping", () => {
       task: "obtain_item",
       action: "obtainItem",
     });
-    expect(intentToPlan("contribute_to_project").action).toBe("buildShelter");
+    expect(intentToPlan("contribute_to_project").action).toBe("buildStructure");
   });
 });
 

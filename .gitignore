@@ -86,3 +86,28 @@ models/
 
 # Generated cognition benchmark output
 artifacts/
+
+# Local Paper / World-Lab runtimes (never commit worlds, jars, libraries)
+world-lab/
+experiments/**/world-lab-isolated/
+experiments/**/*.sqlite
+experiments/**/*.sqlite-journal
+experiments/**/*.sqlite-wal
+experiments/**/*.sqlite-shm
+experiments/**/paper.jar
+experiments/**/*.jar
+experiments/**/libraries/
+experiments/**/versions/
+experiments/**/plugins/
+experiments/**/cache/
+experiments/**/logs/
+experiments/**/world/
+experiments/**/world_nether/
+experiments/**/world_the_end/
+
+# Keep experiment operator docs / evidence JSONL / manifests trackable
+!experiments/**/*.md
+!experiments/**/*.json
+!experiments/**/*.jsonl
+!experiments/**/.env.example
+!experiments/**/*.example

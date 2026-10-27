@@ -1,5 +1,11 @@
 import type { Vec3 } from "@civ/shared";
+import {
+  BUILD_STAGES,
+  migrateLegacyStage,
+  type BuildStage,
+} from "@civ/minecraft-knowledge";
 import { materialList, starterHut, type Blueprint, type BlueprintBlock } from "./blueprint.js";
+import type { BuildSession } from "@civ/skills";
 
 export type ProjectStatus =
   | "PLANNED"
@@ -10,14 +16,16 @@ export type ProjectStatus =
   | "COMPLETED"
   | "FAILED";
 
-export type BuildStage = "site" | "floor" | "walls" | "door" | "roof" | "interior" | "verify";
+export type { BuildStage };
 
 export type SettlementProject = {
   id: string;
-  type: "STARTER_SHELTER";
+  type: "STARTER_SHELTER" | "STRUCTURE_BUILD";
   status: ProjectStatus;
   stage: BuildStage;
   blueprintId: string;
+  blueprintVersion?: number;
+  facing?: "south" | "north" | "east" | "west";
   site?: Vec3;
   requiredResources: Record<string, number>;
   reservedResources: Record<string, number>;
@@ -27,9 +35,10 @@ export type SettlementProject = {
   verified: number;
   startedAt: string;
   completedAt?: string;
+  session?: BuildSession;
 };
 
-export const STAGE_ORDER: BuildStage[] = ["site", "floor", "walls", "door", "roof", "interior", "verify"];
+export const STAGE_ORDER: BuildStage[] = [...BUILD_STAGES];
 
 export function createShelterProject(now = new Date().toISOString()): SettlementProject {
   const hut = starterHut();
@@ -37,8 +46,10 @@ export function createShelterProject(now = new Date().toISOString()): Settlement
     id: "project_starter_shelter",
     type: "STARTER_SHELTER",
     status: "PLANNED",
-    stage: "site",
+    stage: "SITE_SELECTION",
     blueprintId: hut.id,
+    blueprintVersion: 1,
+    facing: "south",
     requiredResources: materialList(hut),
     reservedResources: {},
     blocked: [],
@@ -49,23 +60,27 @@ export function createShelterProject(now = new Date().toISOString()): Settlement
   };
 }
 
-export function stageForBlock(block: BlueprintBlock): Exclude<BuildStage, "site" | "verify"> {
-  if (block.dy === 0) return "floor";
-  if (block.block === "oak_door") return "door";
-  if (block.block === "chest" || block.block === "crafting_table" || block.block === "torch") return "interior";
+export function stageForBlock(block: BlueprintBlock): Exclude<BuildStage, "SITE_SELECTION" | "SITE_CLEARING" | "FINAL_VALIDATION"> {
+  if (block.stage === "floor" || block.dy === 0) return "FLOOR";
+  if (block.block.endsWith("_door") || block.stage === "door") return "DOOR_ACCESS";
+  if (block.block === "chest" || block.block === "crafting_table" || block.block === "furnace") return "WORKSTATIONS";
+  if (block.block === "torch" || block.block.endsWith("_bed") || block.stage === "interior") return "INTERIOR";
+  if (block.stage === "roof") return "ROOF";
   const hut = starterHut();
-  const maxY = Math.max(...hut.blocks.map((b) => b.dy));
-  if (block.dy === maxY) return "roof";
-  return "walls";
+  const maxY = Math.max(...hut.blocks.map((entry) => entry.dy));
+  if (block.dy === maxY) return "ROOF";
+  return "WALLS";
 }
 
 export function blocksForStage(blueprint: Blueprint, stage: BuildStage): BlueprintBlock[] {
-  if (stage === "site" || stage === "verify") return [];
-  return blueprint.blocks.filter((block) => stageForBlock(block) === stage);
+  const canonical = migrateLegacyStage(stage);
+  if (canonical === "SITE_SELECTION" || canonical === "SITE_CLEARING" || canonical === "FINAL_VALIDATION") return [];
+  return blueprint.blocks.filter((block) => stageForBlock(block) === canonical);
 }
 
 export function nextStage(stage: BuildStage): BuildStage | undefined {
-  const index = STAGE_ORDER.indexOf(stage);
+  const canonical = migrateLegacyStage(stage);
+  const index = STAGE_ORDER.indexOf(canonical);
   return STAGE_ORDER[index + 1];
 }
 
@@ -80,19 +95,30 @@ export function transitionProject(
     | { type: "verified"; verified: number; total: number }
     | { type: "failed"; reason?: string },
 ): SettlementProject {
-  const next = { ...project, blocked: [...project.blocked], reservedResources: { ...project.reservedResources } };
+  const next: SettlementProject = {
+    ...project,
+    stage: migrateLegacyStage(project.stage),
+    blocked: [...project.blocked],
+    reservedResources: { ...project.reservedResources },
+  };
   switch (event.type) {
     case "site_chosen":
       next.site = event.site;
       next.status = "PROCURING";
-      next.stage = "floor";
+      next.stage = "SITE_CLEARING";
       break;
     case "materials_missing":
       next.status = "PROCURING";
       break;
     case "materials_ready":
-      next.status = next.stage === "floor" || next.stage === "site" ? "READY_TO_BUILD" : "BUILDING";
-      if (next.stage === "site") next.stage = "floor";
+      next.status =
+        next.stage === "FLOOR" ||
+        next.stage === "SITE_SELECTION" ||
+        next.stage === "SITE_CLEARING" ||
+        next.stage === "FOUNDATION"
+          ? "READY_TO_BUILD"
+          : "BUILDING";
+      if (next.stage === "SITE_SELECTION") next.stage = "SITE_CLEARING";
       break;
     case "build_progress":
       next.status = "BUILDING";
@@ -110,7 +136,7 @@ export function transitionProject(
       next.total = event.total;
       if (event.verified >= event.total && event.total > 0) {
         next.status = "COMPLETED";
-        next.stage = "verify";
+        next.stage = "FINAL_VALIDATION";
         next.completedAt = new Date().toISOString();
       }
       break;
@@ -140,8 +166,13 @@ export function scanBlueprint(
     const pos = { x: origin.x + block.dx, y: origin.y + block.dy, z: origin.z + block.dz };
     const actual = getBlock(pos);
     if (!actual || actual === "air" || actual === "cave_air") missing += 1;
-    else if (actual === block.block || (block.block === "oak_door" && actual.endsWith("_door"))) correct += 1;
-    else incorrect += 1;
+    else if (
+      actual === block.block ||
+      (block.block.endsWith("_door") && actual.endsWith("_door")) ||
+      (block.block.endsWith("_planks") && actual.endsWith("_planks"))
+    ) {
+      correct += 1;
+    } else incorrect += 1;
   }
   return { expected: blueprint.blocks.length, correct, missing, incorrect };
 }
@@ -150,8 +181,13 @@ export function materialsReady(
   required: Record<string, number>,
   available: Record<string, number>,
 ): boolean {
-  const planksNeeded = required.oak_planks ?? 0;
-  const planksHave = (available.oak_planks ?? 0) + (available.planks ?? 0);
-  if (planksHave < Math.min(12, planksNeeded)) return false;
+  const plankNeed =
+    (required.oak_planks ?? 0) + (required.spruce_planks ?? 0) + (required.birch_planks ?? 0);
+  const planksHave =
+    (available.oak_planks ?? 0) +
+    (available.spruce_planks ?? 0) +
+    (available.birch_planks ?? 0) +
+    (available.planks ?? 0);
+  if (planksHave < Math.min(12, plankNeed || 12)) return false;
   return true;
 }

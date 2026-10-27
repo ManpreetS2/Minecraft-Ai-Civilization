@@ -30,6 +30,7 @@ describe("config", () => {
     expect(cfg.MINECRAFT_VERSION).toBe("1.21.11");
     expect(cfg.MINECRAFT_AUTH_MODE).toBe("offline");
     expect(cfg.LLM_ENABLED).toBe(false);
+    expect(cfg.SIM_ASSIGN_WORK_ROLES).toBe(false);
     expect(cfg.OLLAMA_ROUTINE_MODEL).toBe("qwen3.5:9b");
     expect(cfg.OLLAMA_MAX_CONCURRENCY).toBe(1);
   });
@@ -65,6 +66,27 @@ describe("event presentation", () => {
     expect(failed.headline).toBe("Ava couldn't gather wood.");
     expect(failed.subtext).toMatch(/Movement stopped after no progress was made/);
     expect(failed.kind).toBe("failure");
+
+    const interrupted = formatSimEvent(
+      createEvent(
+        "TaskFailed",
+        { task: "fish_shore", skillStatus: "INTERRUPTED", workComplete: false, decisionKind: "physical_result" },
+        "citizen_atlas",
+      ),
+    );
+    expect(interrupted.headline).toMatch(/stopped/i);
+    expect(interrupted.kind).toBe("warning");
+    expect(interrupted.subtext).toMatch(/Physical action result/i);
+
+    const intent = formatSimEvent(
+      createEvent("TaskStarted", { task: "claim_home", reason: "nearest house", decisionKind: "planner_intent" }, "citizen_kai"),
+    );
+    expect(intent.subtext).toMatch(/Planner intent/i);
+
+    const probe = formatSimEvent(
+      createEvent("ActionStarted", { action: "fishShore", decisionKind: "test_control" }, "HomeProbe"),
+    );
+    expect(probe.subtext).toMatch(/TEST_CONTROL/i);
 
     const connected = formatSimEvent(createEvent("CitizenConnected", {}, "citizen_theo"));
     expect(connected.headline).toBe("Theo entered the world.");

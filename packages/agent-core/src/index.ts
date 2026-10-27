@@ -84,3 +84,52 @@ export {
   classifyChestKnowledge,
   skipProtectedPropertyCell,
 } from "./property-safety.js";
+export {
+  planBuildStructure,
+  createStructureProjectFromPreflight,
+  applyWorldReconcileToSession,
+  dispatchCitizenBuildIntention,
+  executeBuildStructurePlan,
+  plannedTaskForConstructionProject,
+  cancelConstructionProject,
+  authorizedInventoryForCitizen,
+  projectsMatchIntention,
+  constructionProjectId,
+  type BuildStructureProject,
+  type BuildStructureIntention,
+  type BuildStructurePreflight,
+  type ConstructionDispatchResult,
+  type ConstructionDispatchPhase,
+} from "./build-structure.js";
+export { buildShelter, standingInWater, emitProjectCreated } from "./construction.js";
+export { selectConstructionSite, type SiteSelectResult, type SiteCandidate } from "./construction-site-select.js";
+export {
+  planConstructionProcurement,
+  releaseConstructionReservations,
+  reserveProcurementBite,
+  type ProcurementPlan,
+} from "./construction-procurement.js";
+export {
+  runWorkshopCabinOfflineAcceptance,
+  simulatePlaceNext,
+  seedFlatPad,
+  cancelAndCleanup,
+  type EndToEndOfflineResult,
+} from "./construction-offline-engine.js";
+export {
+  createConstructionEvidenceLog,
+  inventoryDelta,
+  evidenceHeaderMarkdown,
+  ensureEvidenceDir,
+  type ConstructionEvidenceEvent,
+  type ConstructionEvidenceLog,
+  type EvidencePhase,
+} from "./construction-evidence.js";
+export {
+  createShelterProject,
+  transitionProject,
+  scanBlueprint,
+  materialsReady,
+  type SettlementProject,
+  type ProjectStatus,
+} from "./projects.js";

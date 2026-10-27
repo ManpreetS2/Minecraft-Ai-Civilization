@@ -162,6 +162,18 @@ describe("unsafe excavation refusal", () => {
     });
     expect(result.ok).toBe(false);
   });
+
+  it("refuses breaking a chest to reach ore", () => {
+    const result = evaluateExcavation({
+      target: { x: 4, y: 64, z: 4 },
+      feet: { x: 2, y: 64, z: 4 },
+      targetName: "chest",
+      neighborNames: ["coal_ore", "air", "air", "air", "air", "air"],
+      inBounds: true,
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.code).toBe("ACCESS_DENIED");
+  });
 });
 
 describe("evaluateMiningRequest", () => {

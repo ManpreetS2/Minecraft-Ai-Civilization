@@ -68,6 +68,10 @@ Human observer commands (in Minecraft):
 
 See [docs/DEVELOPER.md](docs/DEVELOPER.md).
 
+## Third-Party Credits
+
+Runtime and adapted libraries are listed with license text in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). Minecraft bodies use PrismarineJS **mineflayer** and **mineflayer-pathfinder** (MIT). Movement skill patterns and a pathfinder settings review also inspected [mindcraft-bots/mindcraft](https://github.com/mindcraft-bots/mindcraft) (MIT, Copyright 2024 Kolby Nottingham, develop `5f3acc87`). This repository is **not** a Mindcraft product; we did not vendor Mindcraft's agent, LLM code execution, or lava-as-walkable pathfinder patch. See `docs/BLUE_MINDCRAFT_MOVEMENT_REUSE.md`.
+
 ## Workspace commands
 
 | Command | Purpose |

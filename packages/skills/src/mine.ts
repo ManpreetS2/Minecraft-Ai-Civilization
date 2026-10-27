@@ -15,6 +15,7 @@ import {
   isWithinBlockReach,
   navigationBackend,
   shouldBlacklistTarget,
+  type ReturnHomePlan,
 } from "@civ/minecraft-adapter";
 import {
   getOreProfile,
@@ -23,6 +24,7 @@ import {
   pickaxeMeetsTier,
   pickaxeTierRank,
   recommendedPickaxeItem,
+  refuseAccidentalPropertyBreak,
   resolveOreResource,
   type OreProfile,
 } from "@civ/minecraft-knowledge";
@@ -34,6 +36,7 @@ import { depositItems } from "./inventory.js";
 import { pickupDroppedItem, countItem } from "./inventory-service.js";
 import { lookAtPosition } from "./look.js";
 import { obtainItem } from "./obtain.js";
+import { cancelledThisCitizen, optionalWorkInterrupted } from "./optional-work.js";
 import { equipForBlock } from "./tools.js";
 
 export const MINING_RADIUS_CAP = 32;
@@ -111,6 +114,7 @@ export type MiningDecision =
 export type ExcavationIntent = {
   target: Vec3;
   feet: Vec3;
+  targetName?: string;
   aboveName?: string;
   neighborNames: string[];
   inBounds: boolean;
@@ -236,6 +240,10 @@ export function classifyOreTarget(
 }
 
 export function evaluateExcavation(intent: ExcavationIntent): { ok: true } | { ok: false; code: ErrorCode; error: string } {
+  const property = refuseAccidentalPropertyBreak(intent.targetName);
+  if (!property.ok) {
+    return { ok: false, code: property.code, error: property.error };
+  }
   if (!intent.inBounds) {
     return { ok: false, code: "UNSAFE_EXCAVATION", error: "Target is outside the permitted excavation boundary" };
   }
@@ -444,7 +452,14 @@ export async function mineKnownOre(
     const retryable = prereq.code !== "INVALID_ARGUMENT" && prereq.code !== "ACCESS_DENIED";
     return fail(prereq.code, prereq.error, Date.now() - started, retryable, { notFound: false });
   }
-  if (ctx.signal?.aborted) return fail("CANCELLED", "Mining task cancelled", Date.now() - started);
+  if (ctx.signal?.aborted) {
+    return cancelledThisCitizen({
+      durationMs: Date.now() - started,
+      inventory: snapshotInventory(ctx).counts,
+      extra: { mined: [], collected: {} },
+      error: "Mining task cancelled for this citizen",
+    });
+  }
 
   if (prereq.obtainTool) {
     const made = await obtainItem(ctx, prereq.obtainTool, 1);
@@ -467,11 +482,17 @@ export async function mineKnownOre(
   const mined: Array<{ name: string; position: Vec3 }> = [];
   let actions = 0;
   let hiddenIgnored = 0;
+  let curfewPlan: ReturnHomePlan | undefined;
   const profile = prereq.profile;
 
   while (mined.length < bounds.amount && actions < bounds.maxActions) {
     if (ctx.signal?.aborted) {
-      return fail("CANCELLED", "Mining task cancelled", Date.now() - started, false, { mined, hiddenIgnored });
+      return cancelledThisCitizen({
+        durationMs: Date.now() - started,
+        inventory: snapshotInventory(ctx).counts,
+        extra: { mined, hiddenIgnored, quotaProgress: `${mined.length}/${bounds.amount}` },
+        error: "Mining task cancelled for this citizen",
+      });
     }
     if (Date.now() - started > bounds.timeoutMs) {
       return fail("TIMEOUT", "Mining search budget timed out", Date.now() - started, true, { mined, hiddenIgnored });
@@ -485,15 +506,8 @@ export async function mineKnownOre(
         timeOfDay: ctx.bot.time?.timeOfDay ?? 0,
       });
       if (homePlan.shouldStopOptionalWork) {
-        const detail = `at ${freshPos.x.toFixed(1)},${freshPos.y.toFixed(1)},${freshPos.z.toFixed(1)}; estimate ${homePlan.estimateMs}ms remaining ${homePlan.remainingMs}ms delay ${homePlan.delayMs}ms; ${homePlan.reason}`;
-        if (mined.length > 0) break;
-        return fail("TIMEOUT", `stopped optional mining to return home; ${detail}`, Date.now() - started, true, {
-          mined,
-          hiddenIgnored,
-          estimateMs: homePlan.estimateMs,
-          delayMs: homePlan.delayMs,
-          remainingMs: homePlan.remainingMs,
-        });
+        curfewPlan = homePlan;
+        break;
       }
     }
     if (ctx.body.nearbyEntities(8).some((entity) => entity.hostile)) {
@@ -526,6 +540,7 @@ export async function mineKnownOre(
     const safety = evaluateExcavation({
       target: target.position,
       feet: freshPos,
+      targetName: target.name,
       aboveName: above,
       neighborNames: neighbors,
       inBounds: isWithinMiningBounds(target.position, request.searchOrigin, bounds.radius, request.minY, request.maxY),
@@ -572,13 +587,8 @@ export async function mineKnownOre(
             routeImpassable: approach.code === "HAZARD_BLOCKED" || approach.code === "STUCK" || approach.code === "PATH_BLOCKED",
           });
           if (homePlan.shouldStopOptionalWork) {
-            return fail(
-              approach.code === "HAZARD_BLOCKED" ? "HAZARD_BLOCKED" : "HOME_INACCESSIBLE",
-              `mining travel failed (${approach.code}); at ${hereNow.x.toFixed(1)},${hereNow.y.toFixed(1)},${hereNow.z.toFixed(1)}; estimate ${homePlan.estimateMs}ms delay ${homePlan.delayMs}ms; did not teleport`,
-              Date.now() - started,
-              true,
-              { mined, estimateMs: homePlan.estimateMs, delayMs: homePlan.delayMs },
-            );
+            curfewPlan = homePlan;
+            break;
           }
         }
         continue;
@@ -617,6 +627,22 @@ export async function mineKnownOre(
       if (stored.success) deposited += stored.data.deposited;
       else if (deposited === 0 && mined.length === 0) return stored;
     }
+  }
+
+  if (curfewPlan) {
+    return optionalWorkInterrupted({
+      plan: curfewPlan,
+      durationMs: Date.now() - started,
+      inventory: snapshotInventory(ctx).counts,
+      extra: {
+        resource: prereq.resource,
+        mined,
+        collected,
+        deposited,
+        hiddenIgnored,
+        quotaProgress: `${mined.length}/${bounds.amount}`,
+      },
+    });
   }
 
   if (mined.length === 0 && gained <= 0) {

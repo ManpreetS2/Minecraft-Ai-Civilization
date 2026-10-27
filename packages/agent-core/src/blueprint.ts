@@ -1,4 +1,11 @@
 import type { Vec3 } from "@civ/shared";
+import {
+  BASIC_SHELTER_ID,
+  expandBlueprint,
+  getBlueprint,
+  resolveMaterials,
+  type PlannedBlock,
+} from "@civ/minecraft-knowledge";
 
 export type BlueprintBlock = {
   dx: number;
@@ -14,52 +21,53 @@ export type Blueprint = {
   blocks: BlueprintBlock[];
 };
 
+const LEGACY_STAGE: Record<string, BlueprintBlock["stage"]> = {
+  FLOOR: "floor",
+  WALLS: "walls",
+  DOOR_ACCESS: "door",
+  ROOF: "roof",
+  INTERIOR: "interior",
+  WORKSTATIONS: "interior",
+};
+
+function toLegacy(block: PlannedBlock, item: string): BlueprintBlock | undefined {
+  if (block.stage === "FOUNDATION") return undefined;
+  return {
+    dx: block.dx,
+    dy: block.dy,
+    dz: block.dz,
+    block: item,
+    stage: LEGACY_STAGE[block.stage] ?? "walls",
+  };
+}
+
 export function starterHutSize(): { width: number; depth: number; wallHeight: number } {
-  return { width: 5, depth: 4, wallHeight: 2 };
+  const hut = getBlueprint(BASIC_SHELTER_ID)!;
+  return { width: hut.footprint.width, depth: hut.footprint.depth, wallHeight: hut.footprint.wallHeight };
 }
 
 export function starterHut(): Blueprint {
+  const spec = getBlueprint(BASIC_SHELTER_ID)!;
+  const materials = resolveMaterials(spec, {
+    oak_planks: 64,
+    oak_door: 1,
+    chest: 1,
+    torch: 1,
+    crafting_table: 1,
+  });
+  const expanded = expandBlueprint(spec, materials, "south", ["chest", "lighting"]);
   const blocks: BlueprintBlock[] = [];
-  const { width, depth, wallHeight } = starterHutSize();
-
-  for (let x = 0; x < width; x += 1) {
-    for (let z = 0; z < depth; z += 1) {
-      blocks.push({ dx: x, dy: 0, dz: z, block: "oak_planks", stage: "floor" });
-    }
+  for (const block of expanded.blocks) {
+    const mapped = toLegacy(block, block.role === "door" ? "oak_door" : block.role === "chest" ? "chest" : block.role === "lighting" ? "torch" : "oak_planks");
+    if (mapped) blocks.push(mapped);
   }
-
-  for (let y = 1; y <= wallHeight; y += 1) {
-    for (let x = 0; x < width; x += 1) {
-      for (let z = 0; z < depth; z += 1) {
-        const wall = x === 0 || z === 0 || x === width - 1 || z === depth - 1;
-        const door = y <= 2 && x === 2 && z === 0;
-        if (wall && !door) {
-          blocks.push({ dx: x, dy: y, dz: z, block: "oak_planks", stage: "walls" });
-        }
-      }
-    }
-  }
-
-  const roofY = wallHeight + 1;
-  for (let x = 0; x < width; x += 1) {
-    for (let z = 0; z < depth; z += 1) {
-      blocks.push({ dx: x, dy: roofY, dz: z, block: "oak_planks", stage: "roof" });
-    }
-  }
-
-  blocks.push({ dx: 2, dy: 1, dz: 0, block: "oak_door", stage: "door" });
-  blocks.push({ dx: 1, dy: 1, dz: 2, block: "chest", stage: "interior" });
-  blocks.push({ dx: 3, dy: 1, dz: 2, block: "crafting_table", stage: "interior" });
-  blocks.push({ dx: 1, dy: 2, dz: 1, block: "torch", stage: "interior" });
-
-  return { id: "starter_hut", name: "Starter Hut", blocks };
+  return { id: spec.id, name: spec.name, blocks };
 }
 
 export function materialList(blueprint: Blueprint): Record<string, number> {
   const counts: Record<string, number> = {};
   for (const block of blueprint.blocks) {
-    const item = block.block === "oak_door" ? "oak_door" : block.block;
-    counts[item] = (counts[item] ?? 0) + 1;
+    counts[block.block] = (counts[block.block] ?? 0) + 1;
   }
   return counts;
 }

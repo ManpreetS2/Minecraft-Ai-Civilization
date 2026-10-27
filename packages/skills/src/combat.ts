@@ -1,4 +1,4 @@
-import { fail, ok, HOSTILE_MOB_NAMES, type ActionResult } from "@civ/shared";
+import { fail, ok, HOSTILE_MOB_NAMES, classifyEntityPresence, entityGoneMessage, type ActionResult } from "@civ/shared";
 import type { SkillContext } from "./context.js";
 import { flee, moveTo } from "./movement.js";
 import { pickupDroppedItem } from "./inventory-service.js";
@@ -61,6 +61,7 @@ function findTarget(ctx: SkillContext, names: string[], maxDistance: number) {
   const wanted = new Set(names.map(entityKey));
   const matches = Object.values(ctx.bot.entities).filter((entity) => {
     if (!entity.position || entity === ctx.bot.entity) return false;
+    if (classifyEntityPresence(ctx.bot.entities, entity) !== "PRESENT") return false;
     const key = entityKey(entity.name);
     if (wanted.size > 0 && !wanted.has(key)) return false;
     return origin.distanceTo(entity.position) <= maxDistance;
@@ -99,20 +100,37 @@ export async function attackHostile(
   const weapon = await equipWeapon(ctx);
   const meleeRange = entityKey(target.name) === "skeleton" ? 2.6 : 3.2;
   let hits = 0;
+  ctx.body.trackEntity(target, "combat");
   const deadline = Date.now() + (options.timeoutMs ?? ctx.timeoutMs ?? 20_000);
   while (Date.now() < deadline) {
     if (ctx.signal?.aborted) {
+      ctx.body.clearTrackedEntity("CANCELLED");
       return fail("CANCELLED", "attackHostile interrupted", Date.now() - started, true);
     }
     const live = ctx.bot.entities[target.id];
-    if (!live || (typeof live.health === "number" && live.health <= 0)) break;
+    const presence = classifyEntityPresence(ctx.bot.entities, live ?? target);
+    if (presence !== "PRESENT") {
+      if (presence === "TARGET_DEAD") break;
+      ctx.body.clearTrackedEntity(presence);
+      return fail(presence, entityGoneMessage(presence, target.name), Date.now() - started, true, { hits, weapon });
+    }
     const pos = live.position;
-    if (!pos) break;
+    if (!pos) {
+      ctx.body.clearTrackedEntity("ENTITY_REMOVED");
+      return fail("ENTITY_REMOVED", entityGoneMessage("ENTITY_REMOVED", target.name), Date.now() - started, true);
+    }
     const here = ctx.bot.entity?.position;
     const dist = here ? here.distanceTo(pos) : 99;
     if (dist > meleeRange) {
       const moved = await moveTo(ctx, { x: pos.x, y: pos.y, z: pos.z }, meleeRange);
+      const afterMove = classifyEntityPresence(ctx.bot.entities, ctx.bot.entities[target.id] ?? target);
+      if (afterMove !== "PRESENT") {
+        if (afterMove === "TARGET_DEAD") break;
+        ctx.body.clearTrackedEntity(afterMove);
+        return fail(afterMove, entityGoneMessage(afterMove, target.name), Date.now() - started, true);
+      }
       if (!moved.success && dist > 6) {
+        ctx.body.clearTrackedEntity();
         return fail("TARGET_UNREACHABLE", moved.error, Date.now() - started, true);
       }
     }
@@ -121,23 +139,29 @@ export async function attackHostile(
       ctx.bot.attack(live);
       hits += 1;
     } catch (error) {
+      const gone = classifyEntityPresence(ctx.bot.entities, ctx.bot.entities[target.id] ?? target);
+      if (gone !== "PRESENT") {
+        if (gone === "TARGET_DEAD") break;
+        ctx.body.clearTrackedEntity(gone);
+        return fail(gone, entityGoneMessage(gone, target.name), Date.now() - started, true);
+      }
+      ctx.body.clearTrackedEntity();
       return fail("ATTACK_FAILED", error instanceof Error ? error.message : String(error), Date.now() - started, true);
     }
     await new Promise((resolve) => setTimeout(resolve, 450));
   }
   await new Promise((resolve) => setTimeout(resolve, 500));
   const still = ctx.bot.entities[target.id];
-  const killed =
-    !still ||
-    (still as { isValid?: boolean }).isValid === false ||
-    (typeof still.health === "number" && still.health <= 0) ||
-    !still.position;
+  const endPresence = classifyEntityPresence(ctx.bot.entities, still ?? target);
+  const killed = endPresence !== "PRESENT";
   if (!killed) {
+    ctx.body.clearTrackedEntity("ENTITY_ESCAPED");
     return fail("ENTITY_ESCAPED", `${target.name ?? "hostile"} still present after combat`, Date.now() - started, true, {
       hits,
       weapon,
     });
   }
+  ctx.body.clearTrackedEntity(endPresence === "TARGET_DEAD" ? "TARGET_DEAD" : "ENTITY_REMOVED");
   if (options.collect !== false) {
     await pickupDroppedItem(ctx, undefined, 8);
   }
@@ -206,28 +230,37 @@ export async function huntAnimal(
   }
   const beforeFood = ctx.bot.inventory.items().reduce((sum, item) => sum + item.count, 0);
   await equipWeapon(ctx);
+  ctx.body.trackEntity(target, "hunt");
   const deadline = Date.now() + (ctx.timeoutMs ?? 16_000);
   while (Date.now() < deadline) {
     const live = ctx.bot.entities[target.id];
-    if (!live) break;
+    const presence = classifyEntityPresence(ctx.bot.entities, live ?? target);
+    if (presence !== "PRESENT") break;
     const pos = live.position;
     if (!pos) break;
     const here = ctx.bot.entity?.position;
     if (here && here.distanceTo(pos) > 3) {
       await moveTo(ctx, { x: pos.x, y: pos.y, z: pos.z }, 2.4);
+      if (classifyEntityPresence(ctx.bot.entities, ctx.bot.entities[target.id] ?? target) !== "PRESENT") break;
     }
     try {
       await ctx.bot.lookAt(pos.offset(0, 0.6, 0), true);
       ctx.bot.attack(live);
     } catch (error) {
+      const gone = classifyEntityPresence(ctx.bot.entities, ctx.bot.entities[target.id] ?? target);
+      if (gone !== "PRESENT") break;
+      ctx.body.clearTrackedEntity();
       return fail("ATTACK_FAILED", error instanceof Error ? error.message : String(error), Date.now() - started, true);
     }
     await new Promise((resolve) => setTimeout(resolve, 400));
   }
-  const killed = !ctx.bot.entities[target.id];
+  const endPresence = classifyEntityPresence(ctx.bot.entities, ctx.bot.entities[target.id] ?? target);
+  const killed = endPresence !== "PRESENT";
   if (!killed) {
+    ctx.body.clearTrackedEntity("ENTITY_ESCAPED");
     return fail("ENTITY_ESCAPED", `${type} still present`, Date.now() - started, true);
   }
+  ctx.body.clearTrackedEntity(endPresence === "TARGET_DEAD" ? "TARGET_DEAD" : "ENTITY_REMOVED");
   await new Promise((resolve) => setTimeout(resolve, 1_200));
   let picked = await pickupDroppedItem(ctx, undefined, 10);
   if (!picked.success) {

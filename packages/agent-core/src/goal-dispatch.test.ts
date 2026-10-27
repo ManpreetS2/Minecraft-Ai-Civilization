@@ -25,6 +25,11 @@ describe("goal-dispatch", () => {
       goal: "build_shelter",
       action: "buildShelter",
     });
+    expect(dispatchCognitionGoal("contribute_to_project")).toMatchObject({
+      goal: "contribute_to_project",
+      task: "build_structure",
+      action: "buildStructure",
+    });
   });
 
   it("defers help/rest/socialize without fabricating success", () => {

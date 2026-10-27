@@ -2,7 +2,7 @@
 
 Date: 2026-09-19  
 Auditor: Agent BLUE  
-Repo: `C:\Users\sh1ft\OneDrive\Desktop\minecraft_ai_sim`  
+Repo: `<WORKSPACE>`  
 Production body: MechProbe / `@civ/minecraft-adapter` + `@civ/skills` on Paper **1.21.11**. Mindcraft/Astra were not restarted.
 
 This is **not** a live farming PASS. A historical gauntlet “farm creation PASS” is **not** evidence that every agricultural operation works.

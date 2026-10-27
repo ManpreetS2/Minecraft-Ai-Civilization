@@ -5,7 +5,9 @@ import {
   canOccupyFeet,
   canStandOn,
   hasHeadroom,
+  isVerifiedStanding,
   isWalkableStanding,
+  isWalkSurface,
 } from "./interaction.js";
 import { nearbyOffsets } from "./path-recovery.js";
 
@@ -67,21 +69,26 @@ export function inspectLocalTerrain(bot: Bot): LocalTerrainReport | undefined {
   for (const offset of nearbyOffsets(1)) {
     adjacent.push(sample(bot, x + offset.x, y, z + offset.z));
     const same = { x: x + offset.x, y, z: z + offset.z };
-    if (isWalkableStanding(bot, same) && !isHazardLanding(bot, same)) walkableSameY.push(same);
+    if (isWalkableStanding(bot, same) && isVerifiedStanding(bot, same, { fromY: y, maxDrop: 0 }) && !isHazardLanding(bot, same)) walkableSameY.push(same);
   }
   for (const offset of nearbyOffsets(2).slice(0, 12)) {
     const up = { x: x + offset.x, y: y + 1, z: z + offset.z };
-    if (isWalkableStanding(bot, up) && !isHazardLanding(bot, up)) walkableUp.push(up);
+    if (isWalkableStanding(bot, up) && isVerifiedStanding(bot, up, { fromY: y, maxDrop: 0 }) && !isHazardLanding(bot, up)) walkableUp.push(up);
     const down = { x: x + offset.x, y: y - 1, z: z + offset.z };
-    if (isWalkableStanding(bot, down) && canStandOn(bot, down) && !isHazardLanding(bot, down)) walkableDown.push(down);
+    if (isWalkableStanding(bot, down) && isVerifiedStanding(bot, down, { fromY: y, maxDrop: 1 }) && !isHazardLanding(bot, down)) walkableDown.push(down);
   }
   const cardinalBlocked = [
     sample(bot, x + 1, y, z),
     sample(bot, x - 1, y, z),
     sample(bot, x, y, z + 1),
     sample(bot, x, y, z - 1),
-  ].filter((cell) => !canOccupyFeet(bot, cell) || cell.boundingBox === "block").length;
-  const feetSolid = feet.boundingBox === "block" && !feet.name.endsWith("_slab") && !feet.name.includes("stairs") && !feet.name.endsWith("_door");
+  ].filter((cell) => !canOccupyFeet(bot, cell)).length;
+  const feetSolid =
+    feet.boundingBox === "block" &&
+    !isWalkSurface(feet.name) &&
+    !feet.name.endsWith("_slab") &&
+    !feet.name.includes("stairs") &&
+    !feet.name.endsWith("_door");
   let kind: TerrainKind = "open";
   let reason = "open standing cell with walkable neighbors";
   if (feetSolid) {
@@ -125,11 +132,25 @@ export function formatTerrainReport(report: LocalTerrainReport): string {
   ].join(" | ");
 }
 
-export function chooseStandingDestination(bot: Bot, target: Vec3, radius = 3): Vec3 | undefined {
+export function chooseStandingDestination(
+  bot: Bot,
+  target: Vec3,
+  radius = 3,
+  options: { minY?: number; avoid?: Set<string> } = {},
+): Vec3 | undefined {
   const tx = Math.floor(target.x);
   const ty = Math.floor(target.y);
   const tz = Math.floor(target.z);
   const origin = bot.entity?.position;
+  const exact = { x: tx, y: ty, z: tz };
+  if (
+    isVerifiedStanding(bot, exact, origin ? { fromY: origin.y, maxDrop: 1 } : undefined) &&
+    !isHazardLanding(bot, exact) &&
+    (options.minY === undefined || exact.y >= options.minY) &&
+    !options.avoid?.has(`${exact.x},${exact.y},${exact.z}`)
+  ) {
+    return exact;
+  }
   const candidates: Vec3[] = [];
   for (const dy of [0, 1, -1]) {
     if (dy === -1) {
@@ -139,7 +160,9 @@ export function chooseStandingDestination(bot: Bot, target: Vec3, radius = 3): V
     for (let dx = -radius; dx <= radius; dx += 1) {
       for (let dz = -radius; dz <= radius; dz += 1) {
         const pos = { x: tx + dx, y: ty + dy, z: tz + dz };
-        if (!isWalkableStanding(bot, pos) || isHazardLanding(bot, pos)) continue;
+        if (options.minY !== undefined && pos.y < options.minY) continue;
+        if (options.avoid?.has(`${pos.x},${pos.y},${pos.z}`)) continue;
+        if (!isVerifiedStanding(bot, pos, origin ? { fromY: origin.y, maxDrop: 1 } : undefined) || isHazardLanding(bot, pos)) continue;
         candidates.push(pos);
       }
     }

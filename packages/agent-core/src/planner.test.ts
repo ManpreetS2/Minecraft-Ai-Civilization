@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { BodyObservation, SettlementState } from "@civ/shared";
+import { WORLD_LAB_CLAIMABLE_HOMES } from "./available-homes.js";
 import { assignSettlementNeeds, experimentWorkAssignment, planCitizen } from "./planner.js";
 
 const emptySettlement = (): SettlementState => ({
@@ -221,5 +222,685 @@ describe("planCitizen without assigned jobs", () => {
     expect(planned.action).not.toBe("gatherFood");
     expect(planned.action).not.toBe("workFarmPlot");
     expect(planned.reason).not.toMatch(/Assigned to obtain food/);
+  });
+
+  it("sleeps in a claimed home bed at night instead of the nearest unused bed", () => {
+    const planned = planCitizen({
+      citizenId: "citizen_atlas",
+      observation: obs({ isNight: true }),
+      settlement: { ...emptySettlement(), shelterComplete: true },
+      assignedNeeds: [],
+      home: { homeId: "home_h7", bed: { x: -1089, y: 68, z: 817 }, status: "active" },
+    });
+    expect(planned.action).toBe("sleep");
+    expect(planned.task).toBe("sleep_at_home");
+    expect(planned.target).toEqual({ x: -1089, y: 68, z: 817 });
+  });
+
+  it("does not invent a house when no home has been claimed", () => {
+    const planned = planCitizen({
+      citizenId: "citizen_atlas",
+      observation: obs({ isNight: true }),
+      settlement: { ...emptySettlement(), shelterComplete: true },
+      assignedNeeds: [],
+    });
+    expect(planned.action).toBe("seekSafety");
+    expect(planned.action).not.toBe("sleep");
+  });
+
+  it("does not assign ore mining by roster when work roles are off", () => {
+    const planned = planCitizen({
+      citizenId: "citizen_kai",
+      observation: obs({ food: 20, inventory: [{ name: "stone_pickaxe", count: 1 }] }),
+      settlement: { ...emptySettlement(), shelterComplete: true, wood: 8, needs: [] },
+      assignedNeeds: [],
+    });
+    expect(planned.action).not.toBe("mineOre");
+    expect(planned.occupation).not.toBe("miner");
+  });
+
+  it("routes an explicit mind mine_ore goal without creating a permanent miner", () => {
+    const planned = planCitizen({
+      citizenId: "citizen_maya",
+      observation: obs({
+        position: { x: -953, y: 58, z: 945 },
+        inventory: [{ name: "stone_pickaxe", count: 1 }],
+      }),
+      settlement: { ...emptySettlement(), shelterComplete: true },
+      assignedNeeds: [],
+      llmGoal: "mine_ore",
+      llmReason: "Need iron for better tools",
+      authorizedStorage: { x: -1038, y: 65, z: 839 },
+      knownSites: [{ kind: "ore", origin: { x: -953, y: 58, z: 945 }, citizenId: "citizen_maya", seenAt: "2026-09-20T00:00:00.000Z" }],
+    });
+    expect(planned.action).toBe("mineOre");
+    expect(planned.task).toBe("mine_ore");
+    expect(planned.occupation).toBeUndefined();
+    expect(planned.target).toEqual({ x: -953, y: 58, z: 945 });
+  });
+
+  it("stops claimed-home work before night using travel ETA, not a go-home command", () => {
+    const planned = planCitizen({
+      citizenId: "citizen_atlas",
+      observation: obs({
+        isNight: false,
+        gameTime: 11_990,
+        position: { x: -1043, y: 63, z: 980 },
+        inventory: [{ name: "stone_pickaxe", count: 1 }],
+      }),
+      settlement: { ...emptySettlement(), shelterComplete: true },
+      assignedNeeds: [],
+      llmGoal: "mine_ore",
+      llmReason: "Keep mining iron",
+      home: {
+        homeId: "home_h7",
+        bed: { x: -1089, y: 68, z: 817 },
+        origin: { x: -1089, y: 68, z: 817 },
+        status: "active",
+      },
+    });
+    expect(planned.action).toBe("sleep");
+    expect(planned.action).not.toBe("returnHome");
+    expect(planned.task).toBe("sleep_at_home");
+    expect(planned.target).toEqual({ x: -1089, y: 68, z: 817 });
+    expect(planned.reason).toMatch(/stop work|night/i);
+  });
+
+  it("waits inside a claimed house arrived at before vanilla sleep", () => {
+    const planned = planCitizen({
+      citizenId: "citizen_atlas",
+      observation: obs({
+        isNight: false,
+        gameTime: 12_766,
+        position: { x: -1088.5, y: 68, z: 817.5 },
+        inventory: [{ name: "stone_pickaxe", count: 1 }],
+      }),
+      settlement: { ...emptySettlement(), shelterComplete: true },
+      assignedNeeds: [],
+      llmGoal: "mine_ore",
+      llmReason: "Keep mining iron",
+      home: {
+        homeId: "home_h7",
+        bed: { x: -1089, y: 68, z: 817 },
+        origin: { x: -1089, y: 68, z: 817 },
+        status: "active",
+      },
+    });
+    expect(planned.action).toBe("waitInsideHome");
+    expect(planned.task).toBe("WAIT_INSIDE_HOME");
+    expect(planned.target).toEqual({ x: -1089, y: 68, z: 817 });
+    expect(planned.reason).toMatch(/wait inside/i);
+  });
+
+  it("sleeps the claimed bed once vanilla night has started inside", () => {
+    const planned = planCitizen({
+      citizenId: "citizen_atlas",
+      observation: obs({
+        isNight: true,
+        gameTime: 14_000,
+        position: { x: -1088.5, y: 68, z: 817.5 },
+      }),
+      settlement: { ...emptySettlement(), shelterComplete: true },
+      assignedNeeds: [],
+      home: {
+        homeId: "home_h7",
+        bed: { x: -1089, y: 68, z: 817 },
+        origin: { x: -1089, y: 68, z: 817 },
+        status: "active",
+      },
+    });
+    expect(planned.action).toBe("sleep");
+    expect(planned.task).toBe("sleep_at_home");
+    expect(planned.target).toEqual({ x: -1089, y: 68, z: 817 });
+  });
+
+  it("hands interrupted work to curfew instead of resuming the quota", () => {
+    const planned = planCitizen({
+      citizenId: "citizen_atlas",
+      observation: obs({
+        isNight: false,
+        gameTime: 11_990,
+        position: { x: -1043, y: 63, z: 980 },
+        inventory: [{ name: "stone_pickaxe", count: 1 }],
+      }),
+      settlement: { ...emptySettlement(), shelterComplete: true },
+      assignedNeeds: [],
+      llmGoal: "mine_ore",
+      llmReason: "Keep mining iron",
+      lastOutcome: {
+        task: "mine_ore",
+        action: "mineOre",
+        success: false,
+        code: "CURFEW_STOP",
+        streak: 1,
+      },
+      home: {
+        homeId: "home_h7",
+        bed: { x: -1089, y: 68, z: 817 },
+        origin: { x: -1089, y: 68, z: 817 },
+        status: "active",
+      },
+      knownSites: [{ kind: "ore", origin: { x: -953, y: 58, z: 945 }, citizenId: "citizen_atlas", seenAt: "2026-09-20T00:00:00.000Z" }],
+    });
+    expect(planned.action).toBe("sleep");
+    expect(planned.action).not.toBe("mineOre");
+  });
+
+  it("keeps Maya waiting in H4, not Atlas H1, before vanilla sleep", () => {
+    const planned = planCitizen({
+      citizenId: "citizen_maya",
+      observation: obs({
+        isNight: false,
+        gameTime: 12_766,
+        position: { x: -1054.5, y: 65, z: 779.5 },
+      }),
+      settlement: { ...emptySettlement(), shelterComplete: true },
+      assignedNeeds: [],
+      home: {
+        homeId: "home_h4",
+        bed: { x: -1055, y: 65, z: 779 },
+        origin: { x: -1055, y: 65, z: 779 },
+        status: "active",
+      },
+    });
+    expect(planned.action).toBe("waitInsideHome");
+    expect(planned.target).toEqual({ x: -1055, y: 65, z: 779 });
+    expect(planned.target).not.toEqual({ x: -1097, y: 69, z: 728 });
+  });
+
+  it("does not keep WAIT_INSIDE_HOME running after sunrise", () => {
+    const planned = planCitizen({
+      citizenId: "citizen_atlas",
+      observation: obs({
+        isNight: false,
+        gameTime: 23_100,
+        position: { x: -1088.5, y: 68, z: 817.5 },
+        inventory: [{ name: "stone_pickaxe", count: 1 }],
+      }),
+      settlement: { ...emptySettlement(), shelterComplete: true },
+      assignedNeeds: [],
+      llmGoal: "mine_ore",
+      llmReason: "Need iron for better tools",
+      home: {
+        homeId: "home_h7",
+        bed: { x: -1089, y: 68, z: 817 },
+        origin: { x: -1089, y: 68, z: 817 },
+        status: "active",
+      },
+      knownSites: [{ kind: "ore", origin: { x: -953, y: 58, z: 945 }, citizenId: "citizen_atlas", seenAt: "2026-09-20T00:00:00.000Z" }],
+    });
+    expect(planned.action).not.toBe("waitInsideHome");
+    expect(planned.action).not.toBe("sleep");
+    expect(planned.action).not.toBe("returnHome");
+  });
+
+  it("sends Maya to her own bed, not Atlas H1", () => {
+    const planned = planCitizen({
+      citizenId: "citizen_maya",
+      observation: obs({
+        isNight: true,
+        gameTime: 14_000,
+        position: { x: -1043, y: 63, z: 980 },
+      }),
+      settlement: { ...emptySettlement(), shelterComplete: true },
+      assignedNeeds: [],
+      home: {
+        homeId: "home_h4",
+        bed: { x: -1055, y: 65, z: 779 },
+        origin: { x: -1055, y: 65, z: 779 },
+        status: "active",
+      },
+    });
+    expect(planned.target).toEqual({ x: -1055, y: 65, z: 779 });
+    expect(planned.target).not.toEqual({ x: -1097, y: 69, z: 728 });
+  });
+
+  it("blocks llm mine_ore when no ore site is known", () => {
+    const planned = planCitizen({
+      citizenId: "citizen_maya",
+      observation: obs({ inventory: [{ name: "stone_pickaxe", count: 1 }] }),
+      settlement: { ...emptySettlement(), shelterComplete: true },
+      assignedNeeds: [],
+      llmGoal: "mine_ore",
+      llmReason: "Need iron for better tools",
+      authorizedStorage: { x: -1096, y: 69, z: 729 },
+    });
+    expect(planned.action).toBe("blocked");
+    expect(planned.blocked?.code).toBe("SEARCH_EXHAUSTED");
+    expect(planned.blocked?.missing).toBe("ore_site");
+  });
+
+  it("claims the nearest reachable house, not H1, when the citizen has no home", () => {
+    const planned = planCitizen({
+      citizenId: "citizen_kai",
+      observation: obs({
+        food: 20,
+        isNight: false,
+        gameTime: 1_000,
+        position: { x: -1065, y: 68, z: 847 },
+        inventory: [{ name: "stone_pickaxe", count: 1 }],
+      }),
+      settlement: { ...emptySettlement(), shelterComplete: true, wood: 8, needs: [] },
+      assignedNeeds: [],
+      availableHomes: [...WORLD_LAB_CLAIMABLE_HOMES],
+    });
+    expect(planned.action).toBe("claimHome");
+    expect(planned.item).toBe("home_h9");
+    expect(planned.item).not.toBe("home_h1");
+    expect(planned.occupation).toBeUndefined();
+  });
+
+  it("walks toward catalog housing at night from the pond instead of claiming distant H1 or looping seekSafety", () => {
+    const planned = planCitizen({
+      citizenId: "citizen_kai",
+      observation: obs({
+        isNight: true,
+        gameTime: 14_000,
+        position: { x: -1043, y: 63, z: 980 },
+        inventory: [{ name: "fishing_rod", count: 1 }],
+      }),
+      settlement: { ...emptySettlement(), shelterComplete: true },
+      assignedNeeds: [],
+      availableHomes: [...WORLD_LAB_CLAIMABLE_HOMES],
+    });
+    expect(planned.action).toBe("travelTowardHousing");
+    expect(planned.item).toBe("home_h9");
+    expect(planned.action).not.toBe("claimHome");
+    expect(planned.item).not.toBe("home_h1");
+    expect(planned.action).not.toBe("seekSafety");
+    expect(planned.action).not.toBe("sleep");
+  });
+
+  it("after repeated seek_shelter failures switches to housing travel, not build_shelter", () => {
+    const planned = planCitizen({
+      citizenId: "citizen_atlas",
+      observation: obs({
+        isNight: true,
+        gameTime: 14_000,
+        position: { x: -1043.5, y: 63, z: 981.5 },
+        inventory: [],
+      }),
+      settlement: { ...emptySettlement(), shelterComplete: false },
+      assignedNeeds: [],
+      availableHomes: [...WORLD_LAB_CLAIMABLE_HOMES],
+      lastOutcome: {
+        task: "seek_shelter",
+        action: "seekSafety",
+        success: false,
+        code: "TARGET_UNREACHABLE",
+        streak: 3,
+        retryable: true,
+      },
+    });
+    expect(planned.action).toBe("travelTowardHousing");
+    expect(planned.item).toBe("home_h9");
+    expect(planned.action).not.toBe("buildShelter");
+    expect(planned.reason).toMatch(/Seek shelter failed/i);
+  });
+
+  it("walks toward the nearest eligible house from the pond by day without claiming it", () => {
+    const planned = planCitizen({
+      citizenId: "citizen_atlas",
+      observation: obs({
+        food: 20,
+        isNight: false,
+        gameTime: 1_000,
+        position: { x: -1043.5, y: 63, z: 981.5 },
+        inventory: [],
+      }),
+      settlement: { ...emptySettlement(), shelterComplete: true, wood: 8, needs: [] },
+      assignedNeeds: [],
+      availableHomes: [...WORLD_LAB_CLAIMABLE_HOMES],
+    });
+    expect(planned.action).toBe("travelTowardHousing");
+    expect(planned.task).toBe("seek_housing");
+    expect(planned.action).not.toBe("claimHome");
+    expect(planned.item).not.toBe("home_h1");
+    expect(planned.item).toBe("home_h9");
+    expect(planned.target).toEqual({ x: -1063, y: 68, z: 847 });
+    expect(planned.reason).toMatch(/outside claim reach|walk toward/i);
+  });
+
+  it("does not hardcode H9 when a different catalog house is nearer", () => {
+    const planned = planCitizen({
+      citizenId: "citizen_atlas",
+      observation: obs({
+        food: 20,
+        isNight: false,
+        gameTime: 1_000,
+        position: { x: -1043.5, y: 63, z: 981.5 },
+      }),
+      settlement: { ...emptySettlement(), shelterComplete: true, needs: [] },
+      assignedNeeds: [],
+      availableHomes: [
+        {
+          id: "home_west",
+          origin: { x: -1200, y: 68, z: 700 },
+          entrance: { x: -1198, y: 68, z: 700 },
+          bed: { x: -1201, y: 68, z: 699 },
+          personalChest: { x: -1200, y: 68, z: 701 },
+        },
+        {
+          id: "home_south",
+          origin: { x: -1043, y: 63, z: 900 },
+          entrance: { x: -1041, y: 63, z: 900 },
+          bed: { x: -1044, y: 63, z: 899 },
+          personalChest: { x: -1043, y: 63, z: 901 },
+        },
+      ],
+    });
+    expect(planned.action).toBe("travelTowardHousing");
+    expect(planned.item).toBe("home_south");
+    expect(planned.item).not.toBe("home_h9");
+    expect(planned.target).toEqual({ x: -1041, y: 63, z: 900 });
+  });
+
+  it("claims once the body is in range after travel, still not assigning H1", () => {
+    const planned = planCitizen({
+      citizenId: "citizen_atlas",
+      observation: obs({
+        food: 20,
+        isNight: false,
+        gameTime: 1_000,
+        position: { x: -1061, y: 68, z: 847 },
+        inventory: [{ name: "stone_pickaxe", count: 1 }],
+      }),
+      settlement: { ...emptySettlement(), shelterComplete: true, wood: 8, needs: [] },
+      assignedNeeds: [],
+      availableHomes: [...WORLD_LAB_CLAIMABLE_HOMES],
+    });
+    expect(planned.action).toBe("claimHome");
+    expect(planned.item).toBe("home_h9");
+    expect(planned.item).not.toBe("home_h1");
+  });
+
+  it("does not invent a house when none are eligible", () => {
+    const planned = planCitizen({
+      citizenId: "citizen_atlas",
+      observation: obs({
+        food: 20,
+        isNight: false,
+        gameTime: 1_000,
+        position: { x: -1043.5, y: 63, z: 981.5 },
+        inventory: [{ name: "stone_pickaxe", count: 1 }],
+      }),
+      settlement: { ...emptySettlement(), shelterComplete: true, wood: 8, needs: [] },
+      assignedNeeds: [],
+      availableHomes: [],
+    });
+    expect(planned.action).not.toBe("travelTowardHousing");
+    expect(planned.action).not.toBe("claimHome");
+  });
+
+  it("skips a blocked house and walks toward the next eligible one", () => {
+    const planned = planCitizen({
+      citizenId: "citizen_atlas",
+      observation: obs({
+        food: 20,
+        isNight: false,
+        gameTime: 1_000,
+        position: { x: -1043.5, y: 63, z: 981.5 },
+      }),
+      settlement: { ...emptySettlement(), shelterComplete: true, needs: [] },
+      assignedNeeds: [],
+      availableHomes: [...WORLD_LAB_CLAIMABLE_HOMES],
+      lastOutcome: {
+        task: "seek_housing",
+        action: "travelTowardHousing",
+        success: false,
+        code: "HAZARD_BLOCKED",
+        item: "home_h9",
+        streak: 1,
+        retryable: true,
+      },
+    });
+    expect(planned.action).toBe("travelTowardHousing");
+    expect(planned.item).not.toBe("home_h9");
+    expect(planned.item).toBeTruthy();
+  });
+
+  it("reports no-house-found after every eligible house is unreachable", () => {
+    const planned = planCitizen({
+      citizenId: "citizen_atlas",
+      observation: obs({
+        food: 20,
+        isNight: false,
+        gameTime: 1_000,
+        position: { x: -1043.5, y: 63, z: 981.5 },
+        inventory: [{ name: "stone_pickaxe", count: 1 }],
+      }),
+      settlement: { ...emptySettlement(), shelterComplete: true, wood: 8, needs: [] },
+      assignedNeeds: [],
+      availableHomes: [WORLD_LAB_CLAIMABLE_HOMES.find((home) => home.id === "home_h9")!],
+      lastOutcome: {
+        task: "seek_housing",
+        action: "travelTowardHousing",
+        success: false,
+        code: "TARGET_UNREACHABLE",
+        item: "home_h9",
+        streak: 1,
+        retryable: true,
+      },
+    });
+    expect(planned.action).not.toBe("travelTowardHousing");
+    expect(planned.action).not.toBe("claimHome");
+  });
+
+  it("turns llm claim_home from the pond into travel, not a forced claim", () => {
+    const planned = planCitizen({
+      citizenId: "citizen_atlas",
+      observation: obs({
+        food: 20,
+        isNight: false,
+        gameTime: 1_000,
+        position: { x: -1043.5, y: 63, z: 981.5 },
+      }),
+      settlement: { ...emptySettlement(), shelterComplete: true, needs: [] },
+      assignedNeeds: [],
+      availableHomes: [...WORLD_LAB_CLAIMABLE_HOMES],
+      llmGoal: "claim_home",
+      llmReason: "I should find a house",
+    });
+    expect(planned.action).toBe("travelTowardHousing");
+    expect(planned.action).not.toBe("claimHome");
+    expect(planned.blocked).toBeUndefined();
+  });
+
+  it("does not force fishing when hungry at a claimed home far from any shore", () => {
+    const planned = planCitizen({
+      citizenId: "citizen_kai",
+      observation: obs({
+        food: 12,
+        gameTime: 1_000,
+        position: { x: -1096, y: 69, z: 730 },
+        inventory: [{ name: "fishing_rod", count: 1 }, { name: "stone_pickaxe", count: 1 }],
+      }),
+      settlement: { ...emptySettlement(), shelterComplete: true, needs: ["NEED_FOOD"] },
+      assignedNeeds: [],
+      home: {
+        homeId: "home_h1",
+        bed: { x: -1097, y: 69, z: 728 },
+        status: "active",
+        origin: { x: -1096, y: 69, z: 730 },
+        personalChest: { x: -1096, y: 69, z: 729 },
+      },
+      authorizedStorage: { x: -1096, y: 69, z: 729 },
+      visibleShores: [],
+      knownSites: [],
+    });
+    expect(planned.action).not.toBe("fishShore");
+    expect(planned.occupation).not.toBe("fisher");
+  });
+
+  it("reports BLOCKED instead of fishing when the only known chest is unauthorized", () => {
+    const planned = planCitizen({
+      citizenId: "citizen_kai",
+      observation: obs({
+        food: 12,
+        gameTime: 1_000,
+        position: { x: -1043, y: 63, z: 980 },
+        inventory: [{ name: "fishing_rod", count: 1 }, { name: "stone_pickaxe", count: 1 }],
+      }),
+      settlement: { ...emptySettlement(), shelterComplete: true, needs: ["NEED_FOOD"] },
+      assignedNeeds: [],
+      visibleShores: [{ stand: { x: -1043, y: 63, z: 980 }, water: { x: -1044, y: 62, z: 980 } }],
+    });
+    expect(planned.action).not.toBe("fishShore");
+    expect(planned.trace?.blocked.some((entry) => entry.code === "ACCESS_DENIED")).toBe(true);
+  });
+
+  it("does not retry fishing after ACCESS_DENIED when storage is still missing", () => {
+    const planned = planCitizen({
+      citizenId: "citizen_kai",
+      observation: obs({
+        food: 12,
+        gameTime: 1_000,
+        position: { x: -1043, y: 63, z: 980 },
+        inventory: [{ name: "fishing_rod", count: 1 }, { name: "stone_pickaxe", count: 1 }],
+      }),
+      settlement: { ...emptySettlement(), shelterComplete: true, needs: ["NEED_FOOD"] },
+      assignedNeeds: [],
+      visibleShores: [{ stand: { x: -1043, y: 63, z: 980 }, water: { x: -1044, y: 62, z: 980 } }],
+      lastOutcome: {
+        task: "fish_shore",
+        action: "fishShore",
+        success: false,
+        code: "ACCESS_DENIED",
+        streak: 1,
+        workComplete: false,
+        unresolved: [{ action: "fishShore", task: "fish_shore", code: "ACCESS_DENIED" }],
+      },
+    });
+    expect(planned.action).not.toBe("fishShore");
+  });
+
+  it("blocks llm mine_ore without authorized storage even when a site is known", () => {
+    const planned = planCitizen({
+      citizenId: "citizen_maya",
+      observation: obs({
+        position: { x: -953, y: 58, z: 945 },
+        inventory: [{ name: "stone_pickaxe", count: 1 }],
+      }),
+      settlement: { ...emptySettlement(), shelterComplete: true },
+      assignedNeeds: [],
+      llmGoal: "mine_ore",
+      llmReason: "Need iron for better tools",
+      knownSites: [{ kind: "ore", origin: { x: -953, y: 58, z: 945 }, citizenId: "citizen_maya", seenAt: "2026-09-20T00:00:00.000Z" }],
+    });
+    expect(planned.action).toBe("blocked");
+    expect(planned.blocked?.code).toBe("ACCESS_DENIED");
+  });
+
+  it("backs off gather_wood after repeated timeouts instead of looping", () => {
+    const planned = planCitizen({
+      citizenId: "citizen_atlas",
+      observation: obs({ food: 20 }),
+      settlement: { ...emptySettlement(), shelterComplete: true, wood: 8, needs: [] },
+      assignedNeeds: [],
+      lastOutcome: {
+        task: "gather_wood",
+        action: "mineBlock",
+        success: false,
+        code: "TIMEOUT",
+        streak: 3,
+        retryable: true,
+      },
+    });
+    expect(planned.action).toBe("observeNearby");
+    expect(planned.reason).toMatch(/repeated failures/i);
+  });
+
+  it("lets Atlas and Maya plan from independent last outcomes", () => {
+    const atlas = planCitizen({
+      citizenId: "citizen_atlas",
+      observation: obs({
+        food: 12,
+        gameTime: 1_000,
+        position: { x: -1043, y: 63, z: 980 },
+        inventory: [{ name: "fishing_rod", count: 1 }],
+      }),
+      settlement: { ...emptySettlement(), shelterComplete: true, needs: ["NEED_FOOD"] },
+      assignedNeeds: [],
+      visibleShores: [{ stand: { x: -1043, y: 63, z: 980 }, water: { x: -1044, y: 62, z: 980 } }],
+      lastOutcome: {
+        task: "fish_shore",
+        action: "fishShore",
+        success: false,
+        code: "ACCESS_DENIED",
+        streak: 1,
+        unresolved: [{ action: "fishShore", code: "ACCESS_DENIED" }],
+      },
+    });
+    const maya = planCitizen({
+      citizenId: "citizen_maya",
+      observation: obs({
+        food: 20,
+        gameTime: 1_000,
+        position: { x: -1065, y: 68, z: 847 },
+        inventory: [{ name: "stone_pickaxe", count: 1 }],
+      }),
+      settlement: { ...emptySettlement(), shelterComplete: true, wood: 8, needs: [] },
+      assignedNeeds: [],
+      availableHomes: [...WORLD_LAB_CLAIMABLE_HOMES],
+    });
+    expect(atlas.action).not.toBe("fishShore");
+    expect(maya.action).toBe("claimHome");
+    expect(maya.item).toBe("home_h9");
+  });
+
+  it("does not spin acquire_food forever after FOOD_NOT_FOUND; prefers fishing when a rod and shore exist", () => {
+    const planned = planCitizen({
+      citizenId: "citizen_atlas",
+      observation: obs({
+        food: 6,
+        inventory: [{ name: "fishing_rod", count: 1 }],
+        position: { x: -1043.5, y: 63, z: 981.5 },
+      }),
+      settlement: emptySettlement(),
+      assignedNeeds: [],
+      visibleShores: [{ stand: { x: -1043, y: 63, z: 980 }, water: { x: -1044, y: 62, z: 980 } }],
+      lastOutcome: {
+        task: "acquire_food",
+        action: "gatherFood",
+        success: false,
+        code: "FOOD_NOT_FOUND",
+        streak: 3,
+        retryable: false,
+      },
+    });
+    expect(planned.action).toBe("fishShore");
+    expect(planned.target).toEqual({ x: -1043, y: 63, z: 980 });
+  });
+
+  it("backs off sleep_at_home after repeated STUCK on the same home route", () => {
+    const planned = planCitizen({
+      citizenId: "citizen_atlas",
+      observation: obs({
+        isNight: true,
+        gameTime: 14_000,
+        position: { x: -1036, y: 64, z: 836 },
+        inventory: [{ name: "wooden_pickaxe", count: 1 }],
+      }),
+      settlement: { ...emptySettlement(), shelterComplete: true },
+      assignedNeeds: [],
+      home: {
+        homeId: "home_h9",
+        status: "active",
+        bed: { x: -1067, y: 68, z: 848 },
+        origin: { x: -1065, y: 68, z: 847 },
+        entrance: { x: -1063, y: 68, z: 847 },
+      },
+      lastOutcome: {
+        task: "sleep_at_home",
+        action: "sleep",
+        success: false,
+        code: "STUCK",
+        streak: 3,
+        retryable: true,
+        error: "no initial progress; obstacle=crafting_table",
+      },
+    });
+    expect(planned.action).toBe("observeNearby");
+    expect(planned.reason).toMatch(/crafting_table|blocked/i);
   });
 });

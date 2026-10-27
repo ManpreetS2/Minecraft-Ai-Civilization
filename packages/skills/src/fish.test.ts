@@ -6,8 +6,10 @@ import {
   findShoreCasts,
   fishingCatchCount,
   fishingHomeStop,
+  isFishingBiteSound,
   isStandingInLiquid,
   isWalkableShoreCell,
+  pickNearestBobber,
   type WorldGetter,
 } from "./fish.js";
 
@@ -179,5 +181,23 @@ describe("early return-home request", () => {
     });
     expect(noon?.shouldStopOptionalWork).toBe(false);
     expect(fishingHomeStop({ position: { x: 0, y: 64, z: 0 }, timeOfDay: 12_542 })).toBeUndefined();
+  });
+});
+
+describe("two-bot bobber isolation", () => {
+  it("picks the nearest bobber and ignores generic splash sounds", () => {
+    expect(isFishingBiteSound("entity.generic.splash")).toBe(false);
+    expect(isFishingBiteSound("splash")).toBe(false);
+    expect(isFishingBiteSound("entity.fishing_bobber.throw")).toBe(false);
+    expect(isFishingBiteSound("entity.fishing_bobber.retrieve")).toBe(false);
+    expect(isFishingBiteSound("entity.fishing_bobber.splash")).toBe(true);
+    const mine = pickNearestBobber(
+      [
+        { name: "fishing_bobber", position: { x: -1044, y: 62, z: 981 } },
+        { name: "fishing_bobber", position: { x: -1048, y: 62, z: 980 } },
+      ],
+      { x: -1042.5, y: 63, z: 980.5 },
+    );
+    expect(mine?.position).toEqual({ x: -1044, y: 62, z: 981 });
   });
 });

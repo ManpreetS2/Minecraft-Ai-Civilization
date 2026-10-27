@@ -27,5 +27,7 @@ simulation-distance=10
 # Non-ops cannot place/break within this radius of world spawn.
 # If citizens cannot mine near spawn, op them from the Paper console or set this to 0 and restart.
 spawn-protection=16
+# Colony worlds: suppress natural MONSTER spawning only. Do NOT use Peaceful (hunger must stay on).
+spawn-monsters=false
 view-distance=10
 white-list=false

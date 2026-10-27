@@ -1,4 +1,4 @@
-import { fail, ok, type ActionResult } from "@civ/shared";
+import { fail, ok, classifyEntityPresence, entityGoneMessage, type ActionResult } from "@civ/shared";
 import type { SkillContext } from "./context.js";
 import { moveTo } from "./movement.js";
 import { countItem } from "./inventory-service.js";
@@ -31,8 +31,17 @@ export async function tradeWithVillager(
   if (!villager?.position) {
     return fail("ENTITY_NOT_FOUND", "No villager nearby", Date.now() - started, true);
   }
+  ctx.body.trackEntity(villager, "trade");
   const moved = await moveTo(ctx, { x: villager.position.x, y: villager.position.y, z: villager.position.z }, 2.5);
-  if (!moved.success) return moved;
+  const presence = classifyEntityPresence(ctx.bot.entities, ctx.bot.entities[villager.id] ?? villager);
+  if (presence !== "PRESENT") {
+    ctx.body.clearTrackedEntity(presence);
+    return fail(presence, entityGoneMessage(presence, "villager"), Date.now() - started, true);
+  }
+  if (!moved.success) {
+    ctx.body.clearTrackedEntity();
+    return moved;
+  }
   let window: VillagerWindow | undefined;
   try {
     window = (await ctx.bot.openVillager(villager)) as unknown as VillagerWindow;
@@ -43,6 +52,7 @@ export async function tradeWithVillager(
     });
     if (!trade || !trade.inputItem1?.name || !trade.outputItem?.name) {
       window.close();
+      ctx.body.clearTrackedEntity();
       return fail("TRADE_UNAVAILABLE", "Villager has no currently affordable trade", Date.now() - started, true);
     }
     const input = trade.inputItem1.name;
@@ -54,8 +64,10 @@ export async function tradeWithVillager(
     window.close();
     await new Promise((resolve) => setTimeout(resolve, 400));
     if (countItem(ctx, input) >= beforeIn || countItem(ctx, output) <= beforeOut) {
+      ctx.body.clearTrackedEntity();
       return fail("VERIFY_FAILED", "Trade did not change inventories", Date.now() - started, true);
     }
+    ctx.body.clearTrackedEntity();
     return ok(
       {
         profession: (villager as { profession?: string }).profession,
@@ -72,6 +84,12 @@ export async function tradeWithVillager(
       // ignore
     }
     const message = error instanceof Error ? error.message : String(error);
+    const gone = classifyEntityPresence(ctx.bot.entities, ctx.bot.entities[villager.id] ?? villager);
+    if (gone !== "PRESENT") {
+      ctx.body.clearTrackedEntity(gone);
+      return fail(gone, entityGoneMessage(gone, "villager"), Date.now() - started, true);
+    }
+    ctx.body.clearTrackedEntity();
     if (/trade|villager|window/i.test(message)) {
       return fail("TRADE_UNAVAILABLE", message, Date.now() - started, true);
     }

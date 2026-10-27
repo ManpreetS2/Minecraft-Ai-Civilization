@@ -107,8 +107,24 @@ export async function obtainItem(
   if (inventoryCount(ctx, name) >= amount) {
     return ok({ item: name, count: inventoryCount(ctx, name) }, Date.now() - started);
   }
+  if (ctx.signal?.aborted) {
+    return fail("CANCELLED", "obtainItem cancelled for this citizen", Date.now() - started, false, {
+      item: name,
+      count: inventoryCount(ctx, name),
+      inventoryPreserved: true,
+      workComplete: false,
+    });
+  }
 
   for (let guard = 0; guard < 20; guard += 1) {
+    if (ctx.signal?.aborted) {
+      return fail("CANCELLED", "obtainItem cancelled for this citizen", Date.now() - started, false, {
+        item: name,
+        count: inventoryCount(ctx, name),
+        inventoryPreserved: true,
+        workComplete: false,
+      });
+    }
     if (inventoryCount(ctx, name) >= amount) {
       return ok({ item: name, count: inventoryCount(ctx, name) }, Date.now() - started);
     }
@@ -123,7 +139,17 @@ export async function obtainItem(
     if (!analysis.known && analysis.recipes.length === 0 && !knowledge.recipeExists(name)) {
       if (isGatherable(name)) {
         const collected = await collectResource(ctx, collectBlocks(name), Math.max(1, amount - inventoryCount(ctx, name)), 48);
-        if (!collected.success) return collected;
+        if (!collected.success) {
+          if (ctx.signal?.aborted || collected.code === "INTERRUPTED" || collected.code === "CANCELLED") {
+            return fail("CANCELLED", "obtainItem cancelled for this citizen", Date.now() - started, false, {
+              item: name,
+              count: inventoryCount(ctx, name),
+              inventoryPreserved: true,
+              workComplete: false,
+            });
+          }
+          return collected;
+        }
         continue;
       }
       if (!knowledge.getItem(name)) {
@@ -147,7 +173,17 @@ export async function obtainItem(
     }
     if (step.kind === "gather") {
       const collected = await collectResource(ctx, collectBlocks(step.item), Math.max(1, step.count), 64);
-      if (!collected.success) return collected;
+      if (!collected.success) {
+        if (ctx.signal?.aborted || collected.code === "INTERRUPTED" || collected.code === "CANCELLED") {
+          return fail("CANCELLED", "obtainItem cancelled for this citizen", Date.now() - started, false, {
+            item: name,
+            count: inventoryCount(ctx, name),
+            inventoryPreserved: true,
+            workComplete: false,
+          });
+        }
+        return collected;
+      }
       continue;
     }
     if (step.kind === "ensure_table") {

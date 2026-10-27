@@ -58,6 +58,7 @@ export async function runBodyGauntlet(h: Helpers): Promise<GauntletCase[]> {
   await cmd(`fill ${COURSE.x0} ${COURSE.y} ${COURSE.z0} ${COURSE.x1} ${COURSE.y} ${COURSE.z1} grass_block`);
   await cmd(`fill ${COURSE.x0} ${COURSE.y + 1} ${COURSE.z0} ${COURSE.x1} ${COURSE.y + 4} ${COURSE.z1} air`);
   await cmd("gamerule mobGriefing false");
+  // TEST-ONLY course isolation. Colony worlds use spawn-monsters=false, not Peaceful and not this gamerule.
   await cmd("gamerule doMobSpawning false");
   await cmd("difficulty easy");
 
@@ -445,6 +446,7 @@ export async function runBodyGauntlet(h: Helpers): Promise<GauntletCase[]> {
     await cmd(`fill ${COURSE.x0} ${COURSE.y + 1} ${COURSE.z0} ${COURSE.x1} ${COURSE.y + 8} ${COURSE.z1} air`);
     await cmd("time set day");
     await cmd("gamerule doDaylightCycle true");
+    await cmd("gamerule doMobSpawning true");
   }
 
   return results;

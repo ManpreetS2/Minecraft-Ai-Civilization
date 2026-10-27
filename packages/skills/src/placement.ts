@@ -1,4 +1,5 @@
 import type { Vec3 } from "@civ/shared";
+import { refuseAccidentalPropertyReplace } from "@civ/minecraft-knowledge";
 import { Vec3 as Vec3Class } from "vec3";
 
 export type PlacementPurpose =
@@ -26,7 +27,7 @@ export type WorldCell = {
 
 export type PlacementDecision = {
   ok: boolean;
-  code?: "PURPOSELESS_PLACEMENT" | "PLACE_FAILED";
+  code?: "PURPOSELESS_PLACEMENT" | "PLACE_FAILED" | "ACCESS_DENIED";
   reason?: string;
 };
 
@@ -148,10 +149,15 @@ export function evaluateFunctionalPlacement(args: {
   getBlock: (x: number, y: number, z: number) => WorldCell | undefined;
 }): PlacementDecision {
   const item = args.item.replace(/^minecraft:/, "");
-  if (!isFunctionalItem(item)) return { ok: true };
   const x = Math.floor(args.position.x);
   const y = Math.floor(args.position.y);
   const z = Math.floor(args.position.z);
+  const occupant = args.getBlock(x, y, z);
+  const overwrite = refuseAccidentalPropertyReplace(occupant?.name);
+  if (!overwrite.ok) {
+    return { ok: false, code: overwrite.code, reason: overwrite.error };
+  }
+  if (!isFunctionalItem(item)) return { ok: true };
   const purpose = args.purpose;
 
   if (!purpose) {

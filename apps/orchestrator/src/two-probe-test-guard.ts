@@ -32,7 +32,7 @@ export function evaluateTwoProbeTestLaunch(env: NodeJS.ProcessEnv = process.env)
   if (env.TWO_PROBE_USER_APPROVED !== "true") {
     return { allowed: false, error: "TWO_PROBE_USER_APPROVED is not true." };
   }
-  if (env.MECHANICS_HOME_TEST_ENABLED === "true" || env.MECHANICS_MINE_TEST_ENABLED === "true" || env.MECHANICS_FARM_TEST_ENABLED === "true" || env.MECHANICS_FISH_TEST_ENABLED === "true") {
+  if (env.MECHANICS_HOME_TEST_ENABLED === "true" || env.MECHANICS_MINE_TEST_ENABLED === "true" || env.MECHANICS_FARM_TEST_ENABLED === "true" || env.MECHANICS_FISH_TEST_ENABLED === "true" || env.MECHANICS_TWO_FISH_TEST_ENABLED === "true") {
     return { allowed: false, error: "Refusing concurrent two-probe run while a single-probe harness is enabled." };
   }
 

@@ -34,6 +34,7 @@ import {
 } from "@civ/skills";
 import { Vec3 as Vec3Class } from "vec3";
 import { cellClaimKey } from "./claims.js";
+import { executeBuildStructurePlan } from "./build-structure.js";
 import { buildShelter, emitProjectCreated } from "./construction.js";
 import { deferredCapabilityResult } from "./goal-dispatch.js";
 import type { PlannedTask } from "./planner.js";
@@ -81,14 +82,14 @@ export function completionMemoryForTask(task: string, result: ActionResult): str
     const gained = (result.data as { foodGained?: number }).foodGained;
     return `Newly gathered food${typeof gained === "number" ? ` (+${gained})` : ""}`;
   }
-  if (task === "build_shelter") {
+  if (task === "build_shelter" || task === "build_structure") {
     const complete =
       result.data && typeof result.data === "object" && (result.data as { complete?: unknown }).complete === true;
     if (!complete) return undefined;
     if (!persistConfirmed(result)) {
-      return `Task build_shelter succeeded physically but was not persisted`;
+      return `Task ${task} succeeded physically but was not persisted`;
     }
-    return "Completed build_shelter";
+    return task === "build_structure" ? "Completed build_structure" : "Completed build_shelter";
   }
   if (task === "gather_wood") {
     return "Completed gather_wood";
@@ -312,6 +313,23 @@ export async function executePlan(
       break;
     case "buildShelter":
       result = await ensureAndBuild(ctx, store, events, runtime);
+      break;
+    case "buildStructure":
+      result = await executeBuildStructurePlan({
+        ctx,
+        plan,
+        runtime,
+        persist: (project) => {
+          if (!store.isOpen()) return { ok: false, reason: "store_closed" };
+          const write = store.safeWrite("saveSettlement:structureProject", () => {
+            const settlement = store.getSettlement();
+            settlement.projectJson = JSON.stringify(project);
+            if (project.site) settlement.origin = project.site;
+            store.saveSettlement(settlement);
+          });
+          return write.ok ? { ok: true } : { ok: false, reason: write.reason };
+        },
+      });
       break;
     case "seekSafety":
       result = await seekSafety(ctx, store);

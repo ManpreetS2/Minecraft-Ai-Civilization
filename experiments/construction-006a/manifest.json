@@ -1,0 +1,50 @@
+{
+  "mission": "006A",
+  "preparedAt": "2026-10-27T02:57:53.079Z",
+  "executeCopy": true,
+  "liveMinecraftAuthorized": false,
+  "autoStartPaper": false,
+  "originalWorldLab": "world-lab",
+  "originalSqlite": "data/world-lab-civilization.sqlite",
+  "originalServerPropertiesSha256": "7168f3f95f2a6c47f87cb64df1fc0f67d6f22f768a1c6db3a284e7d5e111b021",
+  "originalSqliteSha256": "037a0f751fec685d411664be2815657b7b49ac7fffdb92e4443104bae51e57e4",
+  "originalFingerprint": {
+    "workspace": ".",
+    "worldLab": "world-lab",
+    "sqlite": "data/world-lab-civilization.sqlite",
+    "serverPropertiesBytes": 1820,
+    "sqliteBytes": 884736
+  },
+  "isolatedRoot": "experiments/construction-006a",
+  "isolatedWorldLab": "experiments/construction-006a/world-lab-isolated",
+  "isolatedSqlite": "experiments/construction-006a/world-lab-civilization.sqlite",
+  "isolatedPaperPort": 25568,
+  "isolatedRconPort": 25578,
+  "proposedPad": {
+    "x": -900,
+    "y": 70,
+    "z": 700
+  },
+  "padSafety": {
+    "ok": true,
+    "nearestHomeId": "home_h2",
+    "distance": 167.96725871431016
+  },
+  "envPins": {
+    "MINECRAFT_HOST": "127.0.0.1",
+    "MINECRAFT_PORT": "25568",
+    "DATABASE_PATH": "experiments/construction-006a/world-lab-civilization.sqlite",
+    "AUTO_START_PAPER": "false",
+    "SIM_CITIZEN_COUNT": "1",
+    "SIM_ASSIGN_WORK_ROLES": "false",
+    "MECHANICS_PROBE_ENABLED": "false",
+    "CONSTRUCTION_EXPERIMENT_ENABLED": "false",
+    "CONSTRUCTION_EXPERIMENT_ALLOW_LIVE": "false",
+    "CONSTRUCTION_EXPERIMENT_ALLOW_WORLD_MUTATION": "false"
+  },
+  "note": "Offline preparation only. Physical stages require separate operator authorization. Absolute local paths sanitized for backup.",
+  "copied": true,
+  "isolatedServerPropertiesSha256": "70c67697ce428a52752ad65d1b87387fc5e25e316ed4cab28f5434deccafd214",
+  "isolatedSqliteSha256": "037a0f751fec685d411664be2815657b7b49ac7fffdb92e4443104bae51e57e4",
+  "originalUnchangedAfterCopy": true
+}

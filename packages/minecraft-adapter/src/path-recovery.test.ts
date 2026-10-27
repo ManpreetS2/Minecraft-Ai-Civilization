@@ -24,9 +24,15 @@ describe("path recovery helpers", () => {
   it("builds a short recovery sequence and blacklists failed movement codes", () => {
     const attempts = recoveryAttempts({ x: 10, y: 70, z: 4 }, 2, 3);
     expect(attempts[0]).toEqual({ x: 10, y: 70, z: 4, range: 2 });
-    expect(attempts[1]?.range).toBeGreaterThan(2);
+    expect(attempts[1]?.range).not.toBeGreaterThan(4);
     expect(attempts.some((attempt) => attempt.y === 71)).toBe(true);
     expect(attempts.some((attempt) => attempt.y === 69)).toBe(true);
+    const climb = recoveryAttempts({ x: 10, y: 70, z: 4 }, 2, 3, { climb: true });
+    expect(climb.some((attempt) => attempt.y === 69)).toBe(false);
+    expect(climb.some((attempt) => attempt.y === 70)).toBe(true);
+    expect(climb[0]?.range).toBe(2);
+    const noDrop = recoveryAttempts({ x: 10, y: 70, z: 4 }, 2, 3, { noDrop: true });
+    expect(noDrop.some((attempt) => attempt.y === 69)).toBe(false);
     expect(attempts.length).toBeGreaterThan(5);
     expect(shouldBlacklistTarget("TIMEOUT")).toBe(true);
     expect(shouldBlacklistTarget("NAV_NO_INITIAL_PROGRESS")).toBe(true);

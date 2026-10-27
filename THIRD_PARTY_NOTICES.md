@@ -6,8 +6,10 @@ This project reuses and adapts open-source Minecraft bot libraries. Copied or wr
 
 - Repository: https://github.com/PrismarineJS/mineflayer
 - License: MIT
-- What we use: Minecraft Java client runtime for citizen bodies (connect, inventory, dig, place, craft, containers).
-- Copyright: PrismarineJS contributors
+- What we use: Minecraft Java client runtime for citizen bodies (connect, inventory, dig, place, craft, containers). `bot.fish()` / `lib/plugins/fishing.js` particle reel is the reference for one cast→bite→reel cycle. Concurrent two-bot fishing uses an owner-aware adapter in `packages/skills/src/mineflayer-fish-cycle.ts` instead of stock first-bobber `lastBobber` binding.
+- Installed package: npm `mineflayer@4.39.0` (dependency range `^4.37.1`).
+- Adapted files: `packages/skills/src/mineflayer-fish-cycle.ts` (particle distance 1.23, amount 6, `world_particles` fishing/bubble; owner-aware bind via spawn `objectData` instead of first `lastBobber`). Not a copy of `examples/fisherman.js` auto-recast loop.
+- Copyright: PrismarineJS contributors / Andrew Kelley (MIT). License text retained in `node_modules` and this notice.
 
 ## PrismarineJS / mineflayer-pathfinder
 
@@ -34,9 +36,12 @@ This project reuses and adapts open-source Minecraft bot libraries. Copied or wr
 ## mindcraft-bots / mindcraft
 
 - Repository: https://github.com/mindcraft-bots/mindcraft
-- License: MIT
-- What we adapt: Bounded skill patterns from `src/agent/library/skills.js` (commit `5f3acc87b479864124173de444f31fa5538f94a6`) — go-to-position, nearest-block selection, collect-block, place-block, and craft-recipe flows. Pathfinder patch `patches/mineflayer-pathfinder+2.4.5.patch` was inspected live; we adopted `canOpenDoors=true` in `configureMovements` only. We do **not** vendor the rest of that node_modules patch (lava-as-walkable, vine climbing, 0.175 arrival, trapdoor climbers) and do **not** import Mindcraft's arbitrary code-generation. Citizens may only run approved verified skills.
-- Copyright: mindcraft-bots contributors
+- License: MIT (Copyright (c) 2024 Kolby Nottingham). Full license text retained below.
+- Source commit inspected: `5f3acc87b479864124173de444f31fa5538f94a6` (`develop`, 2026-06-09).
+- What we adapt: Bounded skill *patterns* from `src/agent/library/skills.js` — go-to-position, nearest-block selection, collect-block, place-block, and craft-recipe flows. Pathfinder patch `patches/mineflayer-pathfinder+2.4.5.patch` was inspected; we adopted `canOpenDoors=true` in `configureMovements` only. We do **not** vendor the rest of that node_modules patch (lava-as-walkable, vine climbing, 0.175 arrival, trapdoor climbers, jump-in-lava) and do **not** import Mindcraft's agent, cheat `/tp`, or `allow_insecure_coding`. Citizens may only run approved verified skills.
+- Adapted files in this repo: none copied verbatim from Mindcraft. Independent movement lives in `packages/minecraft-adapter/src/{pathing,step-jump,hazard-nav,terrain-memory,movement-sync,travel-home}.ts`.
+- Copyright: Kolby Nottingham and mindcraft-bots contributors
+- This civilization is not authored by Mindcraft.
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
 
@@ -116,5 +121,6 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 ## Not used / do not copy
 
 - `nuxdie/baritone-ts` (AGPL-3.0) is **not** copied or vendored. No AGPL navigation code is included in this repository.
+- [cabaletta/baritone](https://github.com/cabaletta/baritone) (LGPL-3.0) is **reference only** for bounded mining-goal ideas (search radius, stop conditions). It is not a Mineflayer, Paper, or production dependency. GREEN does not vendor Baritone or enable pathfinder `canDig`.
 - MineColonies and similar colony mods are **not** the civilization engine.
 - Mindcraft unconstrained LLM code execution is **not** imported (MIT skill *patterns* only, with notice above).

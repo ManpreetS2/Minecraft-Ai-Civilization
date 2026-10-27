@@ -57,6 +57,19 @@ Example later: 100 identities, 30 active bodies. Distant people can run at lower
 
 One Paper server. Human + AI join the same world. Mineflayer bots are protocol clients, not graphical game instances.
 
+### Colony spawn rules (not Peaceful)
+
+Natural **MONSTER** spawning is disabled. Keep survival hunger, passive animals, villagers, and normal day/night.
+
+- `spawn-monsters=false` in `server.properties` (requires Paper restart)
+- Bukkit/Paper monster spawn limits and ticks = 0
+- Difficulty stays **easy** (or at least not Peaceful)
+- Do **not** use `gamerule doMobSpawning false` as the colony lever — that also stops animals
+- Existing hostiles may be purged **once** when enabling colony mode (`enableColonyMode`)
+- Hostile-mob **body** support stays: controlled combat tests, optional expeditions, scripted/emergent events via `/summon`
+
+Stale entity targeting is generic: if a tracked entity dies, despawns, or is removed, the body records `TARGET_DEAD` or `ENTITY_REMOVED`, clears the target, cancels actions that need that entity, refreshes perception, and does **not** describe it as merely "out of range".
+
 ## Action verification
 
 Never trust a claimed success.

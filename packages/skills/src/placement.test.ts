@@ -144,4 +144,19 @@ describe("semantic functional placement", () => {
     expect(decision.ok).toBe(false);
     expect(decision.reason).toMatch(/path/i);
   });
+
+  it("refuses placing over an existing chest, bed, or door", () => {
+    const getBlock = grid({
+      "3,63,3": "oak_planks",
+      "3,64,3": "chest",
+    });
+    const decision = evaluateFunctionalPlacement({
+      item: "oak_planks",
+      purpose: "shelter_blueprint",
+      position: { x: 3, y: 64, z: 3 },
+      getBlock,
+    });
+    expect(decision.ok).toBe(false);
+    expect(decision.code).toBe("ACCESS_DENIED");
+  });
 });

@@ -76,6 +76,12 @@ op Kai
 
 or set `spawn-protection=0` in `server/server.properties` and restart Paper.
 
+## Colony world (hostile spawn off, not Peaceful)
+
+Civilization worlds suppress **natural monster spawning only**. Do not switch difficulty to Peaceful — hunger must remain.
+
+In `server.properties`: `spawn-monsters=false` (restart Paper). Bukkit monster spawn-limits/ticks are 0. `pnpm sim:start` applies colony mode over RCON: keeps difficulty non-peaceful, restores `doMobSpawning true` so animals/villagers can spawn, and purges existing hostiles once. Combat skills still work for summoned/scripted hostiles.
+
 ## Paper RCON (one-shot)
 
 ```

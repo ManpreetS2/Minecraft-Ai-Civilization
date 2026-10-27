@@ -1,7 +1,9 @@
 import type { Vec3 } from "@civ/shared";
 import { Vec3 as Vec3Class } from "vec3";
 import type { SkillContext } from "@civ/skills";
+import { isCatalogPersonalChest } from "./available-homes.js";
 import type { CivilizationStore } from "./store.js";
+import { isTestFixtureChest } from "./test-fixtures.js";
 
 export type WorkstationKind = "crafting_table" | "chest" | "furnace";
 
@@ -39,7 +41,7 @@ export function rememberWorkstation(
     list.push({ x: Math.floor(pos.x), y: Math.floor(pos.y), z: Math.floor(pos.z) });
   }
   settlement.workstations = current;
-  if (kind === "chest" && !settlement.storage) {
+  if (kind === "chest" && !settlement.storage && mayBecomeSettlementStorage(store, pos)) {
     settlement.storage = { x: Math.floor(pos.x), y: Math.floor(pos.y), z: Math.floor(pos.z) };
   }
   store.saveSettlement(settlement);
@@ -77,17 +79,30 @@ export function knownCraftingTable(ctx: SkillContext, store: CivilizationStore):
 
 export function knownChest(ctx: SkillContext, store: CivilizationStore): Vec3 | undefined {
   const settlement = store.getSettlement();
-  if (settlement.storage && verifyWorkstation(ctx, settlement.storage, "chest")) {
+  if (settlement.storage && usableSettlementChest(store, settlement.storage) && verifyWorkstation(ctx, settlement.storage, "chest")) {
     return settlement.storage;
   }
-  if (settlement.storage) {
+  if (settlement.storage && !verifyWorkstation(ctx, settlement.storage, "chest") && !isTestFixtureChest(settlement.storage)) {
     forgetWorkstation(store, "chest", settlement.storage);
   }
   for (const pos of settlement.workstations?.chests ?? []) {
+    if (!usableSettlementChest(store, pos)) continue;
     if (verifyWorkstation(ctx, pos, "chest")) return pos;
     forgetWorkstation(store, "chest", pos);
   }
   return undefined;
+}
+
+/** Pond/mine fixtures and unclaimed house chests are not communal settlement storage. */
+export function usableSettlementChest(store: CivilizationStore, pos: Vec3): boolean {
+  if (isTestFixtureChest(pos)) return false;
+  if (store.isClaimedPersonalChest(pos)) return false;
+  if (isCatalogPersonalChest(pos)) return false;
+  return true;
+}
+
+function mayBecomeSettlementStorage(store: CivilizationStore, pos: Vec3): boolean {
+  return usableSettlementChest(store, pos);
 }
 
 export function sameBlock(a: Vec3, b: Vec3): boolean {

@@ -523,6 +523,13 @@ export class AgentManager {
       llmGoal: llmDecision?.goal,
       llmReason: llmDecision?.reason,
       projectStatus: this.runtime.project?.status,
+      constructionProject: (() => {
+        const project = this.runtime.project;
+        if (!project || project.type !== "STRUCTURE_BUILD") return undefined;
+        const owner = (project as { ownerCitizenId?: string }).ownerCitizenId;
+        if (owner && owner !== citizen.record.id) return undefined;
+        return project;
+      })(),
       lastOutcome: citizen.lastOutcome,
       home: claimedHome
         ? {

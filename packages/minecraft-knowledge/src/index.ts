@@ -434,6 +434,12 @@ export {
   cellIngredientName,
 } from "./crafting.js";
 export { interpretVillageFeature, villageChestImpliesOwnership } from "./village.js";
+export {
+  isProtectedFurnitureName,
+  refuseAccidentalPropertyBreak,
+  refuseAccidentalPropertyReplace,
+} from "./property.js";
+export type { PropertyBreakDecision } from "./property.js";
 export { normalizeItemName, normalizeBlockName, friendlyName } from "./names.js";
 export { sleepFacts } from "./sleep.js";
 export type { SleepFacts, SleepQuery } from "./sleep.js";
@@ -472,8 +478,19 @@ export {
   MATERIAL_CATEGORIES,
   BASIC_SHELTER_ID,
   SMALL_HOUSE_ID,
+  STARTER_HOUSE_ID,
+  WORKSHOP_CABIN_ID,
+  STORAGE_SHED_ID,
+  SIMPLE_FARM_ID,
+  SMALL_WAREHOUSE_ID,
+  PATH_SEGMENT_ID,
+  BLUEPRINT_MAX_WIDTH,
+  BLUEPRINT_MAX_DEPTH,
+  BLUEPRINT_MAX_WALL_HEIGHT,
+  BLUEPRINT_MAX_CELLS,
   listBlueprints,
   getBlueprint,
+  registerBlueprint,
   defaultBlueprintFor,
   starterBlueprints,
   createLearnedBlueprint,
@@ -492,10 +509,25 @@ export {
   nextBuildStage,
   migrateLegacyStage,
   countMaterials,
+  authoritativeBomFromExpanded,
+  materialRequirementsMatchExpanded,
+  sanitizeBlueprintExtras,
+  oppositeCardinal,
+  bedHeadOffset,
+  recipeAwareMaterialNeeds,
   blocksForStage,
   isShelterType,
   isReplaceableName,
 } from "./structures.js";
+export {
+  SUPPORTED_CONSTRUCTION_ITEMS,
+  validateBlueprintFootprint,
+  validateSupportedItems,
+  validateBlueprintPipeline,
+  nextBuildableBlocks,
+  PLACEMENT_STAGE_ORDER,
+} from "./construction-blueprint-rules.js";
+export type { BlueprintSchemaIssue } from "./construction-blueprint-rules.js";
 export type {
   StructureType,
   BuildStage,
@@ -511,3 +543,34 @@ export type {
   StructureValidationCode,
   StructureFeature,
 } from "./structures.js";
+export {
+  preflightBuildStructure,
+  validateExpandedCells,
+  expandPlannedWorldCells,
+  comparePlanToWorld,
+  inventoryShortfall,
+  remainingAfterPartialBuild,
+  facingFromRotation,
+  rotateCardinal,
+  rotateFacingProperty,
+  transformBlockProperties,
+  doorPropertiesForEntrance,
+  bedProperties,
+  stairProperties,
+  slabProperties,
+  propertiesForPlannedBlock,
+  matchBlockProperties,
+  resolveBlueprintForIntention,
+  rotateLocalOffset,
+} from "./build-preflight.js";
+export type {
+  RotationDegrees,
+  BlockProperties,
+  PlannedWorldCell,
+  BlueprintCellIssue,
+  WorldCellCompare,
+  RemainingMaterials,
+  BuildPreflightStatus,
+  BuildStructureIntention,
+  BuildStructurePreflight,
+} from "./build-preflight.js";

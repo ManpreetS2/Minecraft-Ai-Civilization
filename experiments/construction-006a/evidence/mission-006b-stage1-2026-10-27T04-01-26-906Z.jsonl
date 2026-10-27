@@ -1,0 +1,2 @@
+{"ts":"2026-10-27T04:01:26.907Z","experimentId":"mission-006b-stage1-2026-10-27T04-01-26-906Z","liveSession":false,"stage":"stage1_one_block","phase":"intended","note":"006B entry — readiness or gated live","citizenId":"citizen_atlas","site":{"x":-900,"y":70,"z":700},"constructionStatus":"AUTH_GATE"}
+{"ts":"2026-10-27T04:01:26.930Z","experimentId":"mission-006b-stage1-2026-10-27T04-01-26-906Z","liveSession":false,"stage":"stage1_one_block","phase":"aborted","failureReason":"no_live_flag_or_readiness_only","constructionStatus":"STOPPED_AT_AUTH_BOUNDARY"}

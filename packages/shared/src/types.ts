@@ -62,6 +62,13 @@ export type BodyObservation = {
   players: PlayerInfo[];
   nearby: NearbyEntity[];
   heldItem?: string;
+  nearbyStructures?: Array<{
+    id: string;
+    structureType: string;
+    origin: { x: number; y: number; z: number };
+    distance: number;
+    quality: "known" | "incomplete" | "usable" | "safe";
+  }>;
 };
 
 export type CitizenRecord = {
@@ -126,11 +133,23 @@ export type SettlementState = {
   };
   storageContents?: Record<string, number>;
   projectJson?: string;
+  knownStructures?: Array<{
+    id: string;
+    blueprintId: string;
+    blueprintVersion: number;
+    structureType: string;
+    origin: { x: number; y: number; z: number };
+    facing: string;
+    quality: "known" | "incomplete" | "usable" | "safe";
+  }>;
   needs: SettlementNeed[];
 };
 
 export type ConstructionState = {
   blueprintId: string;
+  blueprintVersion?: number;
+  stage?: string;
+  facing?: string;
   startedAt: string;
   totalBlocks: number;
   placedBlocks: number;
@@ -156,6 +175,8 @@ export const HOSTILE_MOB_NAMES = new Set([
   "warden",
   "bogged",
 ]);
+
+/** Combat, expeditions, and scripted events still use these. Colony worlds only suppress *natural* monster spawning. */
 
 export const FOOD_ITEM_NAMES = new Set([
   "bread",

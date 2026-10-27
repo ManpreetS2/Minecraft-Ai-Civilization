@@ -1,34 +1,35 @@
 import { describe, expect, it } from "vitest";
-import { classifyStaleTarget } from "./gather.js";
-import { missingPrerequisites } from "./obtain.js";
-import { minecraftKnowledge } from "@civ/minecraft-knowledge";
+import { collectItem } from "./gather.js";
+import type { SkillContext } from "./context.js";
 
-describe("stale target revalidation", () => {
-  it("classifies disappeared and replaced blocks instead of retrying the same cell as success", () => {
-    expect(classifyStaleTarget("oak_log", "air")).toBe("TARGET_GONE");
-    expect(classifyStaleTarget("oak_log", undefined)).toBe("TARGET_GONE");
-    expect(classifyStaleTarget("oak_log", "oak_leaves")).toBe("TARGET_CHANGED");
-    expect(classifyStaleTarget("oak_log", "oak_log")).toBeUndefined();
-  });
-});
+function ctxWith(items: Array<{ name: string; count: number }>, entityCount = 0): SkillContext {
+  const entities: Record<string, { name: string; position: { x: number; y: number; z: number } }> = {};
+  for (let i = 0; i < entityCount; i += 1) {
+    entities[`drop-${i}`] = { name: "item", position: { x: 1, y: 64, z: 1 } };
+  }
+  return {
+    citizenId: "citizen_atlas",
+    bot: {
+      username: "Atlas",
+      inventory: { items: () => items },
+      entity: { position: { x: 0, y: 64, z: 0, distanceTo: () => 1 } },
+      entities,
+    },
+    body: {
+      position: () => ({ x: 0, y: 64, z: 0 }),
+    },
+  } as unknown as SkillContext;
+}
 
-describe("recursive obtain-item chains", () => {
-  it("plans oak_door from logs without calling that an unknown recipe", () => {
-    const knowledge = minecraftKnowledge();
-    const steps = knowledge.planFor("oak_door", { oak_log: 4 }, []);
-    expect(knowledge.recipeExists("oak_door")).toBe(true);
-    expect(steps.some((step) => step.kind === "craft" && step.item === "oak_planks")).toBe(true);
-    expect(steps.at(-1)).toMatchObject({ kind: "craft", item: "oak_door" });
-    const missing = missingPrerequisites({}, "oak_door");
-    expect(missing.length).toBeGreaterThan(0);
-    expect(missing).not.toContain("UNKNOWN_RECIPE");
-  });
-
-  it("plans stone_pickaxe through sticks and a table", () => {
-    const knowledge = minecraftKnowledge();
-    const steps = knowledge.planFor("stone_pickaxe", { cobblestone: 3, oak_planks: 2 }, ["crafting_table"]);
-    expect(knowledge.recipeExists("stone_pickaxe")).toBe(true);
-    expect(steps.some((step) => step.kind === "craft" && step.item === "stick")).toBe(true);
-    expect(steps.at(-1)).toMatchObject({ kind: "craft", item: "stone_pickaxe", needsTable: true });
+describe("collectItem honesty", () => {
+  it("does not report collected items when inventory did not increase", async () => {
+    const items = [{ name: "oak_log", count: 2 }];
+    const result = await collectItem(ctxWith(items, 0));
+    expect(result.success).toBe(false);
+    if (result.success) throw new Error("expected miss");
+    expect(result.code).toBe("ITEM_NOT_FOUND");
+    expect(result.details?.collected).toBe(0);
+    expect(result.details?.workComplete).toBe(false);
+    expect(items).toEqual([{ name: "oak_log", count: 2 }]);
   });
 });

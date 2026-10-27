@@ -6,13 +6,22 @@ export function cellKey(pos: Vec3, precision = 1): string {
 
 export type RecoveryAttempt = { x: number; y: number; z: number; range: number };
 
-export function recoveryAttempts(target: Vec3, range = 2, adjacent = 4): RecoveryAttempt[] {
+export function recoveryAttempts(
+  target: Vec3,
+  range = 2,
+  adjacent = 4,
+  options: { climb?: boolean; noDrop?: boolean } = {},
+): RecoveryAttempt[] {
   const attempts: RecoveryAttempt[] = [
     { x: target.x, y: target.y, z: target.z, range },
-    { x: target.x, y: target.y, z: target.z, range: Math.max(range + 1, 4) },
-    { x: target.x, y: target.y + 1, z: target.z, range: Math.max(range, 2) },
-    { x: target.x, y: target.y - 1, z: target.z, range: Math.max(range, 2) },
   ];
+  const allowDrop = !options.climb && !options.noDrop;
+  if (!options.climb) {
+    attempts.push({ x: target.x, y: target.y + 1, z: target.z, range: Math.max(range, 2) });
+    if (allowDrop) {
+      attempts.push({ x: target.x, y: target.y - 1, z: target.z, range: Math.max(range, 2) });
+    }
+  }
   for (const offset of nearbyOffsets(2).slice(0, adjacent)) {
     attempts.push({
       x: target.x + offset.x,
@@ -20,18 +29,22 @@ export function recoveryAttempts(target: Vec3, range = 2, adjacent = 4): Recover
       z: target.z + offset.z,
       range: 1.5,
     });
-    attempts.push({
-      x: target.x + offset.x,
-      y: target.y + 1,
-      z: target.z + offset.z,
-      range: 1.5,
-    });
-    attempts.push({
-      x: target.x + offset.x,
-      y: target.y - 1,
-      z: target.z + offset.z,
-      range: 1.5,
-    });
+    if (!options.climb) {
+      attempts.push({
+        x: target.x + offset.x,
+        y: target.y + 1,
+        z: target.z + offset.z,
+        range: 1.5,
+      });
+      if (allowDrop) {
+        attempts.push({
+          x: target.x + offset.x,
+          y: target.y - 1,
+          z: target.z + offset.z,
+          range: 1.5,
+        });
+      }
+    }
   }
   return attempts;
 }
@@ -48,7 +61,8 @@ export function shouldBlacklistTarget(code: string): boolean {
     code === "TARGET_GONE" ||
     code === "TARGET_CHANGED" ||
     code === "STUCK" ||
-    code === "NAV_NO_INITIAL_PROGRESS"
+    code === "NAV_NO_INITIAL_PROGRESS" ||
+    code === "HAZARD_BLOCKED"
   );
 }
 

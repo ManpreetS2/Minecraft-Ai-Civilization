@@ -81,7 +81,8 @@ export function evaluateFishTestLaunch(env: NodeJS.ProcessEnv = process.env): Fi
     env.MECHANICS_HOME_TEST_ENABLED === "true" ||
     env.MECHANICS_FARM_TEST_ENABLED === "true" ||
     env.MECHANICS_MINE_TEST_ENABLED === "true" ||
-    env.MECHANICS_TWO_PROBE_TEST_ENABLED === "true"
+    env.MECHANICS_TWO_PROBE_TEST_ENABLED === "true" ||
+    env.MECHANICS_TWO_FISH_TEST_ENABLED === "true"
   ) {
     return { allowed: false, error: "Refusing fish test while another live harness is enabled." };
   }
