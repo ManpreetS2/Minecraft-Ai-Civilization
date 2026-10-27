@@ -89,6 +89,8 @@ export type CitizenRecord = {
   reason?: string;
   diedAt?: string;
   deathPosition?: { x: number; y: number; z: number };
+  /** Seeded personality JSON; once set, must not be silently rerolled. */
+  personalityJson?: string;
 };
 
 export type Relationship = {

@@ -63,6 +63,14 @@ const envSchema = z.object({
   CLOUD_MAX_REQUESTS_PER_RUN: z.coerce.number().int().min(0).default(60),
   CLOUD_SPEND_ALLOWANCE_USD: z.coerce.number().nonnegative().default(1.0),
   CLOUD_MAX_RETRIES: z.coerce.number().int().min(0).max(2).default(1),
+  /**
+   * Opt-in demonstration profile. `none` preserves historical five-citizen defaults.
+   * `three_citizen` selects Atlas/Maya/Theo with charter demo constraints (validated separately).
+   */
+  DEMO_PROFILE: z.enum(["none", "three_citizen"]).default("none"),
+  DEMO_PERSONALITY_SEED: z.string().default("civ-demo-2026"),
+  DEMO_RUN_MINUTES: z.coerce.number().int().positive().default(60),
+  DEMO_BULLETIN_TARGET_TOKENS: z.coerce.number().int().positive().max(400).default(200),
   MECHANICS_PROBE_ENABLED: z
     .enum(["true", "false"])
     .default("false")

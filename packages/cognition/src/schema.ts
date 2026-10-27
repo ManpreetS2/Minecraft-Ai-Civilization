@@ -35,6 +35,12 @@ export type CognitionPrompt = {
   memories: string[];
   nearbyCitizens: string[];
   gameFacts?: string[];
+  /** Neutral personality tendency text (optional; never imperative commands). */
+  personalityContext?: string;
+  /** Perspective-authorized public bulletin text (optional). */
+  bulletin?: string;
+  /** Shared demo survival objective when three-citizen profile is active. */
+  sharedObjective?: string;
 };
 
 export type CognitionProvider = {

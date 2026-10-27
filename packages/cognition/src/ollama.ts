@@ -51,11 +51,14 @@ export class OllamaProvider implements CognitionProvider {
 export function formatPrompt(prompt: CognitionPrompt): string {
   return [
     `Citizen: ${prompt.citizenName}`,
+    prompt.sharedObjective ? `Shared objective: ${prompt.sharedObjective}` : "",
+    prompt.personalityContext ?? "",
     `Health: ${prompt.health ?? "unknown"} Hunger: ${prompt.hunger ?? "unknown"}`,
     `Occupation: ${prompt.occupation ?? "unassigned"}`,
     `Inventory: ${prompt.inventory.slice(0, 12).join(", ") || "empty"}`,
     `Settlement needs: ${prompt.settlementNeeds.join(", ") || "none"}`,
     `Nearby citizens: ${prompt.nearbyCitizens.join(", ") || "none"}`,
+    prompt.bulletin ?? "",
     `Relevant memories: ${prompt.memories.slice(0, 5).join(" | ") || "none"}`,
     prompt.gameFacts?.length ? `Relevant Minecraft facts:\n- ${prompt.gameFacts.slice(0, 8).join("\n- ")}` : "",
     "Choose the single most useful high-level goal.",

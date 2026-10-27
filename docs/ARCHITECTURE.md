@@ -29,7 +29,9 @@ Persistent simulation entity stored in SQLite:
 - id, name, minecraft username
 - status, last known position, health, hunger
 - occupation, home, current goal
+- seeded personality traits (optional JSON; restart/respawn safe)
 - memories, relationships, history
+- per-citizen authorized event delivery checkpoints
 
 Identity survives orchestrator restart.
 
@@ -50,6 +52,8 @@ The LLM must never steer movement every tick.
 **Autonomy precedence (Mission 010B):** Allowlisted model proposals are accepted before routine daytime housing and before night-default shelter when no immediate hostile threat exists. Safety reflexes, construction resume, and curfew still win when applicable. `modelProvenance` records accept / safety-override / reject / backoff / absent. See [MISSION010B_AUTONOMY_PRECEDENCE.md](./MISSION010B_AUTONOMY_PRECEDENCE.md).
 
 **Cloud cognition (Mission 011):** Optional OpenAI Responses API adapter implements the same `CognitionProvider` interface. Enabled only when `LLM_PROVIDER=openai` **and** `LLM_ENABLED=true` **and** `CLOUD_LLM_ENABLED=true` with a non-empty `OPENAI_API_KEY`. `OLLAMA_ENABLED` never enables cloud billing. See [MISSION011_CLOUD_PROVIDER.md](./MISSION011_CLOUD_PROVIDER.md).
+
+**Demo identity & perspective bulletin (Mission 012):** Opt-in `DEMO_PROFILE=three_citizen` selects Atlas/Maya/Theo with shared survival objective, seeded eight-axis personalities (persistent, never silently rerolled), and a deterministic visibility-gated public bulletin (~150–250 tokens). Unknown event visibility fails closed. Delivery checkpoints are per-citizen event IDs. Traits influence cognition context as tendencies only — they never force planner actions. See [MISSION012_DEMO_IDENTITY_AND_BULLETIN.md](./MISSION012_DEMO_IDENTITY_AND_BULLETIN.md).
 
 ## Scaling (architected, not implemented at population scale)
 
@@ -110,6 +114,8 @@ SQLite (`data/civilization.sqlite`) for the MVP. Citizen identity migrations liv
 ## Events
 
 Structured events (`CitizenConnected`, `TaskFailed`, `LLMDecisionMade`, …) are stored and streamed to the dashboard. This is the debugging spine of the project.
+
+Event payloads may include `visibility` metadata. The observer receives the full audit log; citizens receive only authorized bulletin lines. Missing/unknown visibility is never treated as world-public for citizens.
 
 ## Security
 

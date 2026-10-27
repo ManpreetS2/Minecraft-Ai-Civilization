@@ -1,5 +1,11 @@
 export { AgentManager, type AgentManagerHooks, type DashboardSnapshot } from "./manager.js";
 export { CivilizationStore, computeNeeds, type StoreReadResult, type StoreWriteResult } from "./store.js";
+export {
+  buildCitizenContextPack,
+  ensureCitizenPersonality,
+  filterMemoriesForCitizen,
+  type CitizenContextPack,
+} from "./citizen-context.js";
 export { OperationTracker, type DrainResult } from "./operation-tracker.js";
 export {
   GOAL_ACTION_MAP,

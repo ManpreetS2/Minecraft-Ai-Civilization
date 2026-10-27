@@ -33,6 +33,8 @@ describe("config", () => {
     expect(cfg.SIM_ASSIGN_WORK_ROLES).toBe(false);
     expect(cfg.OLLAMA_ROUTINE_MODEL).toBe("qwen3.5:9b");
     expect(cfg.OLLAMA_MAX_CONCURRENCY).toBe(1);
+    expect(cfg.DEMO_PROFILE).toBe("none");
+    expect(cfg.DEMO_PERSONALITY_SEED).toBe("civ-demo-2026");
   });
 });
 

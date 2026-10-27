@@ -1,0 +1,207 @@
+import type { SimEvent } from "./events.js";
+import {
+  authorizeEventForCitizen,
+  readEventVisibility,
+  type EventVisibility,
+  type VisibilityDecision,
+} from "./event-visibility.js";
+
+export type BulletinLine = {
+  eventId: string;
+  type: string;
+  summary: string;
+  urgency: number;
+  visibilityClass: EventVisibility["class"];
+  reasonVisible: string;
+  kind: "observed_fact";
+};
+
+export type BulletinExclude = {
+  eventId: string;
+  reason: string;
+};
+
+export type BulletinBuildResult = {
+  lines: BulletinLine[];
+  excluded: BulletinExclude[];
+  text: string;
+  estimatedTokens: number;
+  urgentOverflow: boolean;
+  overflowNote?: string;
+  deliveredEventIds: string[];
+};
+
+export type BulletinBuildOptions = {
+  readerCitizenId: string;
+  events: SimEvent[];
+  /** Event IDs already delivered to this citizen (durable checkpoint). */
+  alreadyDeliveredIds: ReadonlySet<string>;
+  targetTokens?: number;
+  maxLines?: number;
+};
+
+const DEFAULT_TARGET_TOKENS = 200;
+const DEFAULT_MAX_LINES = 12;
+
+/** Rough token estimate: ~4 chars per token. */
+export function estimateTokens(text: string): number {
+  if (!text) return 0;
+  return Math.max(1, Math.ceil(text.length / 4));
+}
+
+function urgencyFor(event: SimEvent): number {
+  switch (event.type) {
+    case "CitizenDied":
+    case "CitizenBodyDied":
+    case "CitizenInjured":
+      return 100;
+    case "HumanDirectiveIssued":
+    case "ErrorOccurred":
+    case "SystemIncident":
+      return 90;
+    case "ConversationOccurred":
+    case "SettlementNeedDetected":
+      return 70;
+    case "ResourceCollected":
+    case "ItemTransferred":
+    case "ConstructionCompleted":
+    case "CitizenRespawned":
+      return 55;
+    case "SimulationStarted":
+    case "TaskCompleted":
+    case "LLMDecisionMade":
+      return 40;
+    default:
+      return 30;
+  }
+}
+
+function summarizeEvent(event: SimEvent): string {
+  const actor = event.citizenId ? ` by ${event.citizenId}` : "";
+  const note =
+    typeof event.payload.message === "string"
+      ? event.payload.message
+      : typeof event.payload.summary === "string"
+        ? event.payload.summary
+        : typeof event.payload.announcement === "string"
+          ? event.payload.announcement
+          : typeof event.payload.goal === "string"
+            ? String(event.payload.goal)
+            : "";
+  const clip = note ? `: ${note.slice(0, 80)}` : "";
+  return `${event.type}${actor}${clip}`;
+}
+
+function dedupeKey(event: SimEvent, summary: string): string {
+  const scope = typeof event.payload.dedupeKey === "string" ? event.payload.dedupeKey : "";
+  return scope || `${event.type}|${event.citizenId ?? ""}|${summary}`;
+}
+
+/**
+ * Deterministic citizen bulletin:
+ * observe → authorize → filter already-delivered → urgency rank → dedupe → aggregate → compact text.
+ * Unknown visibility fails closed. Does not invent proximity or LoS.
+ */
+export function buildCitizenBulletin(options: BulletinBuildOptions): BulletinBuildResult {
+  const targetTokens = options.targetTokens ?? DEFAULT_TARGET_TOKENS;
+  const maxLines = options.maxLines ?? DEFAULT_MAX_LINES;
+  const excluded: BulletinExclude[] = [];
+  const candidates: BulletinLine[] = [];
+
+  // Oldest-first so late-visible events remain eligible regardless of prior cursor scans.
+  const ordered = [...options.events].sort((a, b) => {
+    if (a.timestamp !== b.timestamp) return a.timestamp.localeCompare(b.timestamp);
+    return a.id.localeCompare(b.id);
+  });
+
+  for (const event of ordered) {
+    if (options.alreadyDeliveredIds.has(event.id)) {
+      excluded.push({ eventId: event.id, reason: "already_delivered" });
+      continue;
+    }
+    const visibility = readEventVisibility(event.payload);
+    const auth: VisibilityDecision = authorizeEventForCitizen(
+      options.readerCitizenId,
+      visibility,
+      event.citizenId,
+    );
+    if (!auth.visible) {
+      excluded.push({ eventId: event.id, reason: auth.reason });
+      continue;
+    }
+    candidates.push({
+      eventId: event.id,
+      type: event.type,
+      summary: summarizeEvent(event),
+      urgency: urgencyFor(event),
+      visibilityClass: visibility.class,
+      reasonVisible: auth.reason,
+      kind: "observed_fact",
+    });
+  }
+
+  candidates.sort((a, b) => {
+    if (b.urgency !== a.urgency) return b.urgency - a.urgency;
+    return a.eventId.localeCompare(b.eventId);
+  });
+
+  const seen = new Set<string>();
+  const deduped: BulletinLine[] = [];
+  for (const line of candidates) {
+    const key = dedupeKey(
+      ordered.find((e) => e.id === line.eventId)!,
+      line.summary,
+    );
+    if (seen.has(key)) {
+      excluded.push({ eventId: line.eventId, reason: "deduplicated" });
+      continue;
+    }
+    seen.add(key);
+    deduped.push(line);
+  }
+
+  const selected: BulletinLine[] = [];
+  let urgentOverflow = false;
+  let text = "";
+  const header = "Public bulletin (authorized observed facts only):";
+
+  for (const line of deduped) {
+    if (selected.length >= maxLines) {
+      if (line.urgency >= 90) urgentOverflow = true;
+      excluded.push({ eventId: line.eventId, reason: "max_lines" });
+      continue;
+    }
+    const nextLine = `- [${line.urgency}] ${line.summary}`;
+    const trial = selected.length === 0 ? `${header}\n${nextLine}` : `${text}\n${nextLine}`;
+    const tokens = estimateTokens(trial);
+    if (tokens > targetTokens && selected.length > 0) {
+      if (line.urgency >= 90) {
+        // Measured over-budget exception for urgent items.
+        selected.push(line);
+        text = trial;
+        urgentOverflow = true;
+      } else {
+        excluded.push({ eventId: line.eventId, reason: "token_budget" });
+      }
+      continue;
+    }
+    selected.push(line);
+    text = trial;
+  }
+
+  if (!text) text = `${header}\n- (none)`;
+
+  const overflowNote = urgentOverflow
+    ? `urgent_overflow: bulletin exceeded targetTokens=${targetTokens} to include high-urgency items`
+    : undefined;
+
+  return {
+    lines: selected,
+    excluded,
+    text,
+    estimatedTokens: estimateTokens(text),
+    urgentOverflow,
+    overflowNote,
+    deliveredEventIds: selected.map((l) => l.eventId),
+  };
+}

@@ -230,10 +230,32 @@ export class CivilizationStore {
     if (!settlementNames.has("project_json")) this.db.exec(`ALTER TABLE settlement ADD COLUMN project_json TEXT`);
     if (!settlementNames.has("workstations_json")) this.db.exec(`ALTER TABLE settlement ADD COLUMN workstations_json TEXT`);
     if (!settlementNames.has("storage_contents_json")) this.db.exec(`ALTER TABLE settlement ADD COLUMN storage_contents_json TEXT`);
+    if (!names.has("personality_json")) this.db.exec(`ALTER TABLE citizens ADD COLUMN personality_json TEXT`);
     this.db.exec(`CREATE TABLE IF NOT EXISTS sim_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)`);
     this.db.exec(
       `CREATE TABLE IF NOT EXISTS human_directives (id TEXT PRIMARY KEY, json TEXT NOT NULL, created_at TEXT NOT NULL)`,
     );
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS citizen_event_delivery (
+        citizen_id TEXT NOT NULL,
+        event_id TEXT NOT NULL,
+        delivered_at TEXT NOT NULL,
+        PRIMARY KEY (citizen_id, event_id)
+      );
+      CREATE INDEX IF NOT EXISTS idx_citizen_event_delivery_citizen
+        ON citizen_event_delivery(citizen_id, delivered_at);
+    `);
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS citizen_persistent_facts (
+        id TEXT PRIMARY KEY,
+        citizen_id TEXT NOT NULL,
+        fact_key TEXT NOT NULL,
+        content TEXT NOT NULL,
+        kind TEXT NOT NULL DEFAULT 'observed_fact',
+        created_at TEXT NOT NULL,
+        UNIQUE(citizen_id, fact_key)
+      );
+    `);
     this.migrateHomes();
   }
 
@@ -373,11 +395,11 @@ export class CivilizationStore {
       INSERT INTO citizens (
         id, name, minecraft_username, created_at, status, last_x, last_y, last_z,
         health, hunger, occupation, home_id, current_goal, current_task, current_action,
-        decision_source, reason, died_at, death_x, death_y, death_z
+        decision_source, reason, died_at, death_x, death_y, death_z, personality_json
       ) VALUES (
         @id, @name, @minecraftUsername, @createdAt, @status, @lastX, @lastY, @lastZ,
         @health, @hunger, @occupation, @homeId, @currentGoal, @currentTask, @currentAction,
-        @decisionSource, @reason, @diedAt, @deathX, @deathY, @deathZ
+        @decisionSource, @reason, @diedAt, @deathX, @deathY, @deathZ, @personalityJson
       )
       ON CONFLICT(id) DO UPDATE SET
         status = CASE WHEN citizens.status = 'dead' THEN 'dead' ELSE excluded.status END,
@@ -396,7 +418,8 @@ export class CivilizationStore {
         died_at = COALESCE(citizens.died_at, excluded.died_at),
         death_x = COALESCE(citizens.death_x, excluded.death_x),
         death_y = COALESCE(citizens.death_y, excluded.death_y),
-        death_z = COALESCE(citizens.death_z, excluded.death_z)
+        death_z = COALESCE(citizens.death_z, excluded.death_z),
+        personality_json = COALESCE(citizens.personality_json, excluded.personality_json)
     `,
       )
       .run({
@@ -421,7 +444,118 @@ export class CivilizationStore {
         deathX: record.deathPosition?.x ?? null,
         deathY: record.deathPosition?.y ?? null,
         deathZ: record.deathPosition?.z ?? null,
+        personalityJson: record.personalityJson ?? null,
       });
+  }
+
+  /**
+   * Persist personality only when none exists yet. Never silently overwrites.
+   * Returns true when a new record was written.
+   */
+  ensurePersonality(citizenId: string, personalityJson: string): boolean {
+    const row = this.db.prepare(`SELECT personality_json FROM citizens WHERE id = ?`).get(citizenId) as
+      | { personality_json: string | null }
+      | undefined;
+    if (!row) return false;
+    if (row.personality_json) return false;
+    this.db.prepare(`UPDATE citizens SET personality_json = ? WHERE id = ? AND personality_json IS NULL`).run(personalityJson, citizenId);
+    return true;
+  }
+
+  getDeliveredEventIds(citizenId: string): Set<string> {
+    const rows = this.db
+      .prepare(`SELECT event_id FROM citizen_event_delivery WHERE citizen_id = ?`)
+      .all(citizenId) as Array<{ event_id: string }>;
+    return new Set(rows.map((r) => r.event_id));
+  }
+
+  /**
+   * Record delivered event IDs after bulletin state is ready. Idempotent.
+   * Call only after associated decision context was safely built.
+   */
+  markEventsDelivered(citizenId: string, eventIds: string[], at = new Date().toISOString()): void {
+    if (eventIds.length === 0) return;
+    const insert = this.db.prepare(
+      `INSERT OR IGNORE INTO citizen_event_delivery (citizen_id, event_id, delivered_at) VALUES (?, ?, ?)`,
+    );
+    const run = this.db.transaction(() => {
+      for (const eventId of eventIds) {
+        insert.run(citizenId, eventId, at);
+      }
+    });
+    run();
+  }
+
+  upsertPersistentFact(fact: {
+    id: string;
+    citizenId: string;
+    factKey: string;
+    content: string;
+    kind?: "observed_fact" | "suspicion";
+    createdAt?: string;
+  }): void {
+    this.db
+      .prepare(
+        `INSERT INTO citizen_persistent_facts (id, citizen_id, fact_key, content, kind, created_at)
+         VALUES (@id, @citizenId, @factKey, @content, @kind, @createdAt)
+         ON CONFLICT(citizen_id, fact_key) DO UPDATE SET content = excluded.content`,
+      )
+      .run({
+        id: fact.id,
+        citizenId: fact.citizenId,
+        factKey: fact.factKey,
+        content: fact.content,
+        kind: fact.kind ?? "observed_fact",
+        createdAt: fact.createdAt ?? new Date().toISOString(),
+      });
+  }
+
+  listPersistentFacts(citizenId: string, limit = 20): Array<{
+    id: string;
+    citizenId: string;
+    factKey: string;
+    content: string;
+    kind: string;
+    createdAt: string;
+  }> {
+    const rows = this.db
+      .prepare(
+        `SELECT * FROM citizen_persistent_facts WHERE citizen_id = ? ORDER BY created_at DESC LIMIT ?`,
+      )
+      .all(citizenId, limit) as Array<{
+      id: string;
+      citizen_id: string;
+      fact_key: string;
+      content: string;
+      kind: string;
+      created_at: string;
+    }>;
+    return rows.map((row) => ({
+      id: row.id,
+      citizenId: row.citizen_id,
+      factKey: row.fact_key,
+      content: row.content,
+      kind: row.kind,
+      createdAt: row.created_at,
+    }));
+  }
+
+  /** Observer audit: all events newest-first (no citizen visibility filter). */
+  listAllEventsForObserver(limit = 500): SimEvent[] {
+    return this.recentEvents(limit);
+  }
+
+  listEventsAscending(limit = 500): SimEvent[] {
+    const rows = this.db
+      .prepare(`SELECT * FROM events ORDER BY timestamp ASC, id ASC LIMIT ?`)
+      .all(limit) as EventRow[];
+    return rows.map((row) => ({
+      id: row.id,
+      type: row.type as SimEvent["type"],
+      timestamp: row.timestamp,
+      citizenId: row.citizen_id ?? undefined,
+      payload: JSON.parse(row.payload) as Record<string, unknown>,
+    }));
   }
 
   appendEvent(event: SimEvent): void {
@@ -864,6 +998,7 @@ type CitizenRow = {
   death_x: number | null;
   death_y: number | null;
   death_z: number | null;
+  personality_json?: string | null;
 };
 
 type EventRow = {
@@ -942,6 +1077,7 @@ function mapCitizen(row: CitizenRow): CitizenRecord {
       row.death_x != null && row.death_y != null && row.death_z != null
         ? { x: row.death_x, y: row.death_y, z: row.death_z }
         : undefined,
+    personalityJson: row.personality_json ?? undefined,
   };
 }
 

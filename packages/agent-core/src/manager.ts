@@ -6,6 +6,8 @@ import {
   createEvent,
   DEFAULT_CITIZENS,
   isMechanicsProbeUsername,
+  isThreeCitizenDemo,
+  validateThreeCitizenDemo,
   EventBus,
   EventLoopMonitor,
   formatSimEvent,
@@ -19,6 +21,7 @@ import {
   type SimEvent,
   type Vec3,
 } from "@civ/shared";
+import { buildCitizenContextPack, ensureCitizenPersonality } from "./citizen-context.js";
 import { minecraftKnowledge } from "@civ/minecraft-knowledge";
 import { Vec3 as Vec3Class } from "vec3";
 import { authorizedWorkStorage } from "./activity-choice.js";
@@ -209,6 +212,19 @@ export class AgentManager {
       throw new Error("Cannot start AgentManager while shutting down or after stop");
     }
     if (this.running) return;
+    if (isThreeCitizenDemo(this.config)) {
+      const demo = validateThreeCitizenDemo(this.config);
+      if (!demo.ok) {
+        throw new Error(`Invalid three_citizen demo configuration:\n- ${demo.errors.join("\n- ")}`);
+      }
+      count = 3;
+      this.store.setMeta("demoProfile", "three_citizen");
+      this.store.setMeta("demoPersonalitySeed", demo.profile.personalitySeed);
+      this.store.setMeta("demoSharedObjective", demo.profile.sharedObjective);
+      this.store.setMeta("demoKeepInventory", "false");
+      this.store.setMeta("demoGovernance", "false");
+      this.store.setMeta("demoEconomy", "false");
+    }
     this.running = true;
     this.loop.start();
     this.runId = crypto.randomUUID();
@@ -222,6 +238,8 @@ export class AgentManager {
         runId: this.runId,
         permadeath: this.config.SIM_PERMADEATH_ENABLED,
         humanDirectives: this.config.HUMAN_DIRECTIVES_ENABLED,
+        demoProfile: this.config.DEMO_PROFILE,
+        visibility: { class: "world_public" },
       }),
     );
 
@@ -245,12 +263,14 @@ export class AgentManager {
           record.reason = restored.reason;
         }
       }
+      ensureCitizenPersonality(this.store, identity.id, this.config.DEMO_PERSONALITY_SEED);
+      const withPersonality = this.store.getCitizen(identity.id) ?? record;
       const body = new MinecraftBody({
         username: identity.name,
         config: this.config,
         events: this.events,
         citizenId: identity.id,
-        reconnect: record.status !== "dead",
+        reconnect: withPersonality.status !== "dead",
         allowRespawn: !this.config.SIM_PERMADEATH_ENABLED,
         eventLoopLag: () => this.loop.lagMs,
       });
@@ -258,11 +278,11 @@ export class AgentManager {
       body.on("error", (error) => {
         console.warn(`[body] ${identity.name} error: ${error.message}`);
       });
-      if (record.status === "dead") {
+      if (withPersonality.status === "dead") {
         body.markDeceased();
       }
       this.citizens.set(identity.id, {
-        record,
+        record: withPersonality,
         body,
         busy: false,
         lastLlmAt: Date.now(),
@@ -456,6 +476,15 @@ export class AgentManager {
         hasPickaxe: observation.inventory.some((item) => item.name.includes("pickaxe")),
         hasCraftingTableNearby: Boolean(settlement.workstations?.craftingTables.length),
       }).facts;
+      const contextPack = buildCitizenContextPack({
+        store: this.store,
+        config: this.config,
+        citizenId: citizen.record.id,
+      });
+      const persistentFacts = this.store
+        .listPersistentFacts(citizen.record.id, 5)
+        .filter((f) => f.kind === "observed_fact")
+        .map((f) => f.content);
       const decisionWork = this.cognition
         .decide({
           citizenName: citizen.record.name,
@@ -467,9 +496,11 @@ export class AgentManager {
           memories: [
             ...suggestions.map((item) => `Human suggestion: ${item.rawText}`),
             ...memories.map((m) => m.content),
+            ...persistentFacts,
           ],
           nearbyCitizens: observation.players.map((p) => p.username),
           gameFacts,
+          ...contextPack.promptExtras,
         })
         .then((decision) => {
           lastLlmMs = Date.now() - started;
