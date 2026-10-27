@@ -30,7 +30,7 @@ export {
   type CognitionProvider,
   type HighLevelDecision,
 } from "./schema.js";
-export { GOALS, type Goal } from "./goals.js";
+export { GOALS, GOAL_ALIASES, GOAL_SET, type Goal } from "./goals.js";
 export { resolveCognitionConfig, type CognitionConfig } from "./config.js";
 export { ModelRouter, isRareReflection, type CognitionMode, type DeliberationTrigger } from "./router.js";
 export { detectEmergencyReflex, type ReflexDecision, type WorldView } from "./reflex.js";

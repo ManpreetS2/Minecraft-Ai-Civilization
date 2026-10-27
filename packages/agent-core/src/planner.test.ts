@@ -259,7 +259,7 @@ describe("planCitizen without assigned jobs", () => {
     expect(planned.occupation).not.toBe("miner");
   });
 
-  it("routes an explicit mind mine_ore goal without creating a permanent miner", () => {
+  it("fail-closes model mine_ore (internal planner action, not a cognition goal)", () => {
     const planned = planCitizen({
       citizenId: "citizen_maya",
       observation: obs({
@@ -273,10 +273,11 @@ describe("planCitizen without assigned jobs", () => {
       authorizedStorage: { x: -1038, y: 65, z: 839 },
       knownSites: [{ kind: "ore", origin: { x: -953, y: 58, z: 945 }, citizenId: "citizen_maya", seenAt: "2026-09-20T00:00:00.000Z" }],
     });
-    expect(planned.action).toBe("mineOre");
-    expect(planned.task).toBe("mine_ore");
+    expect(planned.source).toBe("llm");
+    expect(planned.action).toBe("deferCapability");
+    expect(planned.task).toBe("unsupported_goal");
+    expect(planned.action).not.toBe("mineOre");
     expect(planned.occupation).toBeUndefined();
-    expect(planned.target).toEqual({ x: -953, y: 58, z: 945 });
   });
 
   it("stops claimed-home work before night using travel ETA, not a go-home command", () => {
@@ -455,7 +456,7 @@ describe("planCitizen without assigned jobs", () => {
     expect(planned.target).not.toEqual({ x: -1097, y: 69, z: 728 });
   });
 
-  it("blocks llm mine_ore when no ore site is known", () => {
+  it("fail-closes llm mine_ore even when storage exists but ore is unknown (not a cognition goal)", () => {
     const planned = planCitizen({
       citizenId: "citizen_maya",
       observation: obs({ inventory: [{ name: "stone_pickaxe", count: 1 }] }),
@@ -465,9 +466,8 @@ describe("planCitizen without assigned jobs", () => {
       llmReason: "Need iron for better tools",
       authorizedStorage: { x: -1096, y: 69, z: 729 },
     });
-    expect(planned.action).toBe("blocked");
-    expect(planned.blocked?.code).toBe("SEARCH_EXHAUSTED");
-    expect(planned.blocked?.missing).toBe("ore_site");
+    expect(planned.action).toBe("deferCapability");
+    expect(planned.task).toBe("unsupported_goal");
   });
 
   it("claims the nearest reachable house, not H1, when the citizen has no home", () => {
@@ -686,8 +686,8 @@ describe("planCitizen without assigned jobs", () => {
     expect(planned.action).not.toBe("claimHome");
   });
 
-  it("turns llm claim_home from the pond into travel, not a forced claim", () => {
-    const planned = planCitizen({
+  it("fail-closes unsupported claim_home while homeless (housing remains deterministic without LLM)", () => {
+    const withBadGoal = planCitizen({
       citizenId: "citizen_atlas",
       observation: obs({
         food: 20,
@@ -701,9 +701,50 @@ describe("planCitizen without assigned jobs", () => {
       llmGoal: "claim_home",
       llmReason: "I should find a house",
     });
-    expect(planned.action).toBe("travelTowardHousing");
-    expect(planned.action).not.toBe("claimHome");
-    expect(planned.blocked).toBeUndefined();
+    expect(withBadGoal.source).toBe("llm");
+    expect(withBadGoal.action).toBe("deferCapability");
+    expect(withBadGoal.modelProvenance?.kind).toBe("rejected_unsupported");
+
+    const fallback = planCitizen({
+      citizenId: "citizen_atlas",
+      observation: obs({
+        food: 20,
+        isNight: false,
+        gameTime: 1_000,
+        position: { x: -1043.5, y: 63, z: 981.5 },
+      }),
+      settlement: { ...emptySettlement(), shelterComplete: true, needs: [] },
+      assignedNeeds: [],
+      availableHomes: [...WORLD_LAB_CLAIMABLE_HOMES],
+    });
+    expect(fallback.source).toBe("planner");
+    expect(fallback.action).toBe("travelTowardHousing");
+  });
+
+  it("fail-closes model claim_home when housing is already claimed (not a cognition goal)", () => {
+    const planned = planCitizen({
+      citizenId: "citizen_atlas",
+      observation: obs({
+        food: 20,
+        isNight: false,
+        gameTime: 1_000,
+        position: { x: -1088.5, y: 68, z: 817.5 },
+        inventory: [{ name: "stone_pickaxe", count: 1 }, { name: "oak_log", count: 8 }],
+      }),
+      settlement: { ...emptySettlement(), shelterComplete: true, needs: [] },
+      assignedNeeds: [],
+      home: {
+        homeId: "home_h7",
+        bed: { x: -1089, y: 68, z: 817 },
+        origin: { x: -1089, y: 68, z: 817 },
+        status: "active",
+      },
+      llmGoal: "claim_home",
+      llmReason: "I should find a house",
+    });
+    expect(planned.source).toBe("llm");
+    expect(planned.action).toBe("deferCapability");
+    expect(planned.task).toBe("unsupported_goal");
   });
 
   it("does not force fishing when hungry at a claimed home far from any shore", () => {
@@ -774,7 +815,7 @@ describe("planCitizen without assigned jobs", () => {
     expect(planned.action).not.toBe("fishShore");
   });
 
-  it("blocks llm mine_ore without authorized storage even when a site is known", () => {
+  it("fail-closes llm mine_ore without treating it as an executor action name", () => {
     const planned = planCitizen({
       citizenId: "citizen_maya",
       observation: obs({
@@ -787,8 +828,9 @@ describe("planCitizen without assigned jobs", () => {
       llmReason: "Need iron for better tools",
       knownSites: [{ kind: "ore", origin: { x: -953, y: 58, z: 945 }, citizenId: "citizen_maya", seenAt: "2026-09-20T00:00:00.000Z" }],
     });
-    expect(planned.action).toBe("blocked");
-    expect(planned.blocked?.code).toBe("ACCESS_DENIED");
+    expect(planned.action).toBe("deferCapability");
+    expect(planned.action).not.toBe("mine_ore");
+    expect(planned.action).not.toBe("mineOre");
   });
 
   it("backs off gather_wood after repeated timeouts instead of looping", () => {
@@ -902,5 +944,143 @@ describe("planCitizen without assigned jobs", () => {
     });
     expect(planned.action).toBe("observeNearby");
     expect(planned.reason).toMatch(/crafting_table|blocked/i);
+  });
+
+  it("routes LLM proposals through the unified cognition map (gather_food / build_shelter)", () => {
+    const food = planCitizen({
+      citizenId: "citizen_atlas",
+      observation: obs({
+        food: 20,
+        inventory: [{ name: "wooden_pickaxe", count: 1 }, { name: "oak_log", count: 8 }],
+      }),
+      settlement: { ...emptySettlement(), shelterComplete: true, needs: [] },
+      assignedNeeds: [],
+      home: {
+        homeId: "home_h7",
+        bed: { x: -1089, y: 68, z: 817 },
+        origin: { x: -1089, y: 68, z: 817 },
+        status: "active",
+      },
+      llmGoal: "gather_food",
+      llmReason: "Need more food for the settlement",
+    });
+    expect(food.source).toBe("llm");
+    expect(food.action).toBe("gatherFood");
+    expect(food.task).toBe("gather_food");
+    expect(food.occupation).toBe("gatherer");
+
+    const shelter = planCitizen({
+      citizenId: "citizen_atlas",
+      observation: obs({
+        food: 20,
+        inventory: [{ name: "wooden_pickaxe", count: 1 }, { name: "oak_log", count: 16 }],
+      }),
+      settlement: { ...emptySettlement(), shelterComplete: false, wood: 20, needs: [] },
+      assignedNeeds: [],
+      home: {
+        homeId: "home_h7",
+        bed: { x: -1089, y: 68, z: 817 },
+        origin: { x: -1089, y: 68, z: 817 },
+        status: "active",
+      },
+      llmGoal: "build_shelter",
+      llmReason: "Finish the hut",
+    });
+    expect(shelter.source).toBe("llm");
+    expect(shelter.action).toBe("buildShelter");
+  });
+
+  it("defers help_citizen from the planner LLM path (never shareItem)", () => {
+    const planned = planCitizen({
+      citizenId: "citizen_atlas",
+      observation: obs({
+        food: 20,
+        inventory: [{ name: "wooden_pickaxe", count: 1 }, { name: "bread", count: 4 }],
+      }),
+      settlement: { ...emptySettlement(), shelterComplete: true, needs: [] },
+      assignedNeeds: [],
+      home: {
+        homeId: "home_h7",
+        bed: { x: -1089, y: 68, z: 817 },
+        origin: { x: -1089, y: 68, z: 817 },
+        status: "active",
+      },
+      llmGoal: "help_citizen",
+      llmReason: "Share food with a neighbor",
+    });
+    expect(planned.source).toBe("llm");
+    expect(planned.action).toBe("deferCapability");
+    expect(planned.task).toBe("help_citizen");
+    expect(planned.action).not.toBe("shareItem");
+  });
+
+  it("routes contribute_to_project to buildStructure without inventing success", () => {
+    const planned = planCitizen({
+      citizenId: "citizen_atlas",
+      observation: obs({
+        food: 20,
+        inventory: [{ name: "wooden_pickaxe", count: 1 }, { name: "oak_log", count: 32 }],
+      }),
+      settlement: { ...emptySettlement(), shelterComplete: true, needs: [] },
+      assignedNeeds: [],
+      home: {
+        homeId: "home_h7",
+        bed: { x: -1089, y: 68, z: 817 },
+        origin: { x: -1089, y: 68, z: 817 },
+        status: "active",
+      },
+      llmGoal: "contribute_to_project",
+      llmReason: "Help with the workshop",
+    });
+    expect(planned.source).toBe("llm");
+    expect(planned.action).toBe("buildStructure");
+    expect(planned.task).toBe("build_structure");
+  });
+
+  it("does not execute unrecognized model goals as arbitrary executor actions", () => {
+    const planned = planCitizen({
+      citizenId: "citizen_atlas",
+      observation: obs({
+        food: 20,
+        inventory: [{ name: "wooden_pickaxe", count: 1 }, { name: "oak_log", count: 8 }],
+      }),
+      settlement: { ...emptySettlement(), shelterComplete: true, needs: [] },
+      assignedNeeds: [],
+      home: {
+        homeId: "home_h7",
+        bed: { x: -1089, y: 68, z: 817 },
+        origin: { x: -1089, y: 68, z: 817 },
+        status: "active",
+      },
+      llmGoal: "teleport_home",
+      llmReason: "Warp to bed",
+    });
+    expect(planned.action).toBe("deferCapability");
+    expect(planned.action).not.toBe("teleport_home");
+    expect(planned.task).toBe("unsupported_goal");
+  });
+
+  it("preserves LLM-disabled deterministic planner behavior (no llmGoal)", () => {
+    const planned = planCitizen({
+      citizenId: "citizen_atlas",
+      observation: obs({
+        food: 20,
+        inventory: [{ name: "wooden_pickaxe", count: 1 }],
+      }),
+      settlement: {
+        ...emptySettlement(),
+        food: 20,
+        wood: 40,
+        stone: 40,
+        tools: 4,
+        needs: ["NEED_HOUSING"],
+        shelterComplete: false,
+      },
+      assignedNeeds: ["NEED_HOUSING"],
+      workRole: "build",
+    });
+    expect(planned.source).toBe("planner");
+    expect(planned.action).toBe("buildShelter");
+    expect(planned.task).toBe("build_shelter");
   });
 });

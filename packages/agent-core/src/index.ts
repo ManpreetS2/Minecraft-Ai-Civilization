@@ -3,10 +3,19 @@ export { CivilizationStore, computeNeeds, type StoreReadResult, type StoreWriteR
 export { OperationTracker, type DrainResult } from "./operation-tracker.js";
 export {
   GOAL_ACTION_MAP,
+  INTERNAL_PLANNER_ACTIONS,
+  MODEL_PLAN_ENRICHMENT_ACTIONS,
   assertGoalMapComplete,
+  cognitionReachableActions,
   deferredCapabilityResult,
   dispatchCognitionGoal,
+  enforceModelOriginatedPlan,
+  isAllowlistedExecutorAction,
+  isCognitionReachableAction,
   isDeferredGoal,
+  isInternalPlannerActionName,
+  resolveModelGoalForPlanner,
+  validateModelOriginatedPlan,
 } from "./goal-dispatch.js";
 export {
   completionMemoryForTask,
@@ -19,6 +28,9 @@ export {
   assignWorkRoles,
   experimentWorkAssignment,
   planCitizen,
+  shouldBackoffModelProposal,
+  shouldOverrideModelForSafety,
+  type ModelDecisionProvenance,
   type PlannedTask,
 } from "./planner.js";
 export { starterHut, materialList } from "./blueprint.js";

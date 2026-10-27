@@ -43,6 +43,12 @@ Decision-making in three layers:
 
 The LLM must never steer movement every tick.
 
+**Single model-goal dispatch contract:** validated cognition goals (`@civ/cognition` `GOALS`) are mapped to executor actions only through `dispatchCognitionGoal` / `GOAL_ACTION_MAP` in `@civ/agent-core` (`goal-dispatch.ts`). The planner must not keep a second `LLM_MAP` or treat raw goal strings as action names. Deferred goals (`help_citizen`, `rest`, `socialize`, …) execute `deferCapability` and cannot report success. Internal planner actions (`fishShore`, `mineOre`, `claimHome`, …) remain deterministic and are outside the LLM goal contract. See [MISSION009_GOAL_DISPATCH.md](./MISSION009_GOAL_DISPATCH.md).
+
+**Runtime integrity (Mission 010):** `source === "llm"` plans are enforced at planner exit and again at `executePlan` via `enforceModelOriginatedPlan`. Action events record `dispatchIntegrity` (`allowlisted` | `rewritten_fail_closed`). Reflex, human-directive and construction-resume plans are not rewritten. See [MISSION010_DISPATCH_INTEGRITY.md](./MISSION010_DISPATCH_INTEGRITY.md).
+
+**Autonomy precedence (Mission 010B):** Allowlisted model proposals are accepted before routine daytime housing and before night-default shelter when no immediate hostile threat exists. Safety reflexes, construction resume, and curfew still win when applicable. `modelProvenance` records accept / safety-override / reject / backoff / absent. See [MISSION010B_AUTONOMY_PRECEDENCE.md](./MISSION010B_AUTONOMY_PRECEDENCE.md).
+
 ## Scaling (architected, not implemented at population scale)
 
 Persistent citizen count is independent of:

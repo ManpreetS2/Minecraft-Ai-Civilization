@@ -21,6 +21,19 @@ import {
   shouldBackoffHomeSleepRoute,
 } from "./failure-backoff.js";
 import { plannedTaskForConstructionProject, type BuildStructureProject } from "./build-structure.js";
+import { enforceModelOriginatedPlan, resolveModelGoalForPlanner } from "./goal-dispatch.js";
+
+/**
+ * Why a model proposal did or did not become the selected action.
+ * Never claim a planner-only choice was an independent LLM strategy.
+ */
+export type ModelDecisionProvenance =
+  | { kind: "accepted"; goal: string }
+  | { kind: "overridden_safety"; goal: string; reason: string }
+  | { kind: "deferred_mechanical"; goal: string; reason: string }
+  | { kind: "rejected_unsupported"; goal: string }
+  | { kind: "backoff_fallback"; goal: string; reason: string }
+  | { kind: "absent_fallback" };
 
 export type PlannedTask = {
   goal: string;
@@ -36,6 +49,8 @@ export type PlannedTask = {
   count?: number;
   blocked?: { code: string; missing: string };
   trace?: DecisionTrace;
+  /** Present when an LLM proposal influenced this tick (accepted, overridden, or rejected). */
+  modelProvenance?: ModelDecisionProvenance;
 };
 
 export type WorkRole = "wood" | "food" | "stone" | "tools" | "build";
@@ -94,30 +109,6 @@ export type PlannerInput = {
 const TOOL_PICKAXES = ["wooden_pickaxe", "stone_pickaxe", "iron_pickaxe", "diamond_pickaxe", "netherite_pickaxe"];
 const TOOL_AXES = ["wooden_axe", "stone_axe", "iron_axe"];
 const LOG_ITEMS = ["oak_log", "birch_log", "spruce_log", "jungle_log", "acacia_log", "dark_oak_log", "cherry_log"];
-
-const LLM_MAP: Record<string, { task: string; action: string }> = {
-  gather_wood: { task: "gather_wood", action: "mineBlock" },
-  gather_food: { task: "gather_food", action: "gatherFood" },
-  mine_stone: { task: "mine_stone", action: "mineBlock" },
-  mine_ore: { task: "mine_ore", action: "mineOre" },
-  fish_shore: { task: "fish_shore", action: "fishShore" },
-  work_farm: { task: "work_farm", action: "workFarmPlot" },
-  claim_home: { task: "claim_home", action: "claimHome" },
-  craft_tools: { task: "craft_tools", action: "craftItem" },
-  build_shelter: { task: "build_shelter", action: "buildShelter" },
-  build_structure: { task: "build_structure", action: "buildStructure" },
-  contribute_to_project: { task: "build_structure", action: "buildStructure" },
-  obtain_item: { task: "obtain_item", action: "obtainItem" },
-  help_citizen: { task: "help_citizen", action: "shareItem" },
-  assist_citizen: { task: "help_citizen", action: "shareItem" },
-  deposit: { task: "deposit", action: "depositItems" },
-  use_storage: { task: "deposit", action: "depositItems" },
-  rest: { task: "seek_shelter", action: "seekSafety" },
-  seek_safety: { task: "seek_shelter", action: "seekSafety" },
-  explore: { task: "observe", action: "observeNearby" },
-  defend: { task: "defend", action: "attack" },
-  survive: { task: "acquire_food", action: "gatherFood" },
-};
 
 function count(obs: BodyObservation, names: string[]): number {
   const set = new Set(names);
@@ -241,46 +232,109 @@ export function planCitizen(input: PlannerInput): PlannedTask {
     return planned;
   }
 
+  // Bound spinning model proposals before corrective steals the tick without provenance.
+  if (shouldBackoffModelProposal(input)) {
+    const backedOff = resolveModelProposal(input).candidate;
+    if (backedOff) return backedOff;
+  }
+
   const corrective = correctiveFromFailure(input);
   if (corrective && !emergency) return corrective;
 
+  // --- Model proposal (async pendingLlm consumed by manager as llmGoal/llmReason) ---
+  // Accept allowlisted proposals before routine housing / night-default shelter so citizens
+  // can pursue food vs shelter independently. Safety threats still override below.
+  const modelResolution = resolveModelProposal(input);
+  const nearbyHostile = Boolean(hostile);
+  const safetyOverride = Boolean(modelResolution.candidate) && shouldOverrideModelForSafety(obs, nearbyHostile);
+
+  if (modelResolution.candidate && !safetyOverride) {
+    return modelResolution.candidate;
+  }
+
+  // Displaced model proposal due to immediate threat (reflex flee already handled closer hostiles).
+  if (safetyOverride && nearbyHostile && !obs.isNight) {
+    return annotateModelOverride(
+      task(
+        "survive",
+        "flee_danger",
+        "flee",
+        "reflex",
+        `Hostile ${hostile?.name ?? "mob"} nearby; model proposal overridden for safety`,
+        0.91,
+        "guard",
+      ),
+      modelResolution,
+      "immediate hostile threat",
+    );
+  }
+
   if (obs.isNight && hostile) {
-    return task("survive", "seek_shelter", "seekSafety", "planner", "Night with nearby danger; use cover", 0.8);
+    return annotateModelOverride(
+      task("survive", "seek_shelter", "seekSafety", "planner", "Night with nearby danger; use cover", 0.8),
+      modelResolution,
+      "immediate hostile threat at night",
+    );
   }
   if (obs.isNight && (!input.home || input.home.status !== "active")) {
     // Prefer catalog housing travel/claim over local seek_shelter. Day-1 evidence: seekSafety
     // failed instantly (no nearby cover) then corrective forced buildShelter while exposed.
     const nightHousing = planHomelessHousing(input);
-    if (nightHousing) return nightHousing;
+    if (nightHousing) {
+      return annotateModelOverride(nightHousing, modelResolution, "nighttime exposure without a claimed home");
+    }
     if (shelterReady) {
-      return task("survive", "seek_shelter", "seekSafety", "planner", "Night with no claimed home; use nearby cover, do not invent H1", 0.78);
+      return annotateModelOverride(
+        task("survive", "seek_shelter", "seekSafety", "planner", "Night with no claimed home; use nearby cover, do not invent H1", 0.78),
+        modelResolution,
+        "nighttime exposure; settlement shelter available",
+      );
     }
     if (workRole === "build" || assignedNeeds.includes("NEED_HOUSING")) {
-      return task("survive", "build_shelter", "buildShelter", "planner", "Night; keep the starter shelter moving", 0.8, "builder");
+      return annotateModelOverride(
+        task("survive", "build_shelter", "buildShelter", "planner", "Night; keep the starter shelter moving", 0.8, "builder"),
+        modelResolution,
+        "nighttime exposure; builder role continuing shelter",
+      );
     }
-    return task("survive", "seek_shelter", "seekSafety", "planner", "Night without a claimed home or finished shelter; use nearby cover", 0.79);
+    return annotateModelOverride(
+      task("survive", "seek_shelter", "seekSafety", "planner", "Night without a claimed home or finished shelter; use nearby cover", 0.79),
+      modelResolution,
+      "nighttime exposure without shelter",
+    );
   }
   if (obs.isNight && shelterReady) {
-    return task("survive", "seek_shelter", "seekSafety", "planner", "Night; a usable shelter exists", 0.78);
+    return annotateModelOverride(
+      task("survive", "seek_shelter", "seekSafety", "planner", "Night; a usable shelter exists", 0.78),
+      modelResolution,
+      "nighttime; seek available shelter",
+    );
   }
   if (obs.isNight && !shelterReady) {
     if (workRole === "build" || assignedNeeds.includes("NEED_HOUSING")) {
-      return task("survive", "build_shelter", "buildShelter", "planner", "Night; keep the starter shelter moving", 0.8, "builder");
+      return annotateModelOverride(
+        task("survive", "build_shelter", "buildShelter", "planner", "Night; keep the starter shelter moving", 0.8, "builder"),
+        modelResolution,
+        "nighttime without shelter; builder continuing",
+      );
     }
-    return task("survive", "seek_shelter", "seekSafety", "planner", "Night without a finished shelter; use nearby cover", 0.79);
+    return annotateModelOverride(
+      task("survive", "seek_shelter", "seekSafety", "planner", "Night without a finished shelter; use nearby cover", 0.79),
+      modelResolution,
+      "nighttime without finished shelter",
+    );
   }
 
-  const housing = planHomelessHousing(input);
-  if (housing && !emergency) return housing;
+  // Daytime: routine homeless housing is a fallback, not an automatic override of valid model plans.
+  if (!modelResolution.candidate) {
+    const housing = planHomelessHousing(input);
+    if (housing && !emergency) {
+      return withModelProvenance(housing, modelResolution.absentProvenance);
+    }
+  }
 
   if (inventorySlots(obs) >= 30) {
     return task("survive", "deposit", "depositItems", "reflex", "Inventory is nearly full", 0.86);
-  }
-
-  if (llmGoal && llmReason) {
-    const mapped = LLM_MAP[llmGoal] ?? { task: llmGoal, action: llmGoal };
-    const planned = task(llmGoal, mapped.task, mapped.action, "llm", llmReason, 0.8);
-    return attachDiscoveredTarget(planned, input);
   }
 
   if (!hasAny(obs, TOOL_PICKAXES) && !hasAny(obs, LOG_ITEMS) && count(obs, ["oak_planks", "spruce_planks", "birch_planks"]) < 4) {
@@ -385,6 +439,107 @@ function autonomousWork(input: PlannerInput): PlannedTask {
   return planned;
 }
 
+type ModelProposalResolution = {
+  candidate?: PlannedTask;
+  absentProvenance: ModelDecisionProvenance;
+};
+
+/**
+ * Immediate threats that may displace an otherwise valid model proposal.
+ * Critical hunger/health reflexes already returned earlier in planCitizen.
+ * Routine homelessness and night-without-hostile are NOT automatic overrides.
+ */
+export function shouldOverrideModelForSafety(_obs: BodyObservation, nearbyHostile: boolean): boolean {
+  return nearbyHostile;
+}
+
+/**
+ * Bound repeated identical model-driven failures so pendingLlm cannot spin forever.
+ * After streak>=3 failures on the same mapped task/action, fall through to deterministic paths.
+ */
+export function shouldBackoffModelProposal(input: PlannerInput): boolean {
+  if (!input.llmGoal || !input.lastOutcome || input.lastOutcome.success) return false;
+  if (input.lastOutcome.streak < 3) return false;
+  const mapped = resolveModelGoalForPlanner(input.llmGoal);
+  if (mapped.unsupported) return false;
+  return (
+    input.lastOutcome.task === mapped.task ||
+    input.lastOutcome.action === mapped.action ||
+    input.lastOutcome.task === "unsupported_goal"
+  );
+}
+
+function resolveModelProposal(input: PlannerInput): ModelProposalResolution {
+  const { llmGoal, llmReason } = input;
+  if (!llmGoal || !llmReason) {
+    return { absentProvenance: { kind: "absent_fallback" } };
+  }
+  if (shouldBackoffModelProposal(input)) {
+    const reason = `model proposal '${llmGoal}' failed ${input.lastOutcome?.streak ?? 0}x; using deterministic fallback`;
+    const fallback = task("idle", "observe", "observeNearby", "planner", reason, 0.35);
+    fallback.modelProvenance = { kind: "backoff_fallback", goal: llmGoal, reason };
+    return {
+      candidate: fallback,
+      absentProvenance: { kind: "backoff_fallback", goal: llmGoal, reason },
+    };
+  }
+  const mapped = resolveModelGoalForPlanner(llmGoal);
+  if (mapped.unsupported) {
+    const planned = enforceModelOriginatedPlan(
+      task(
+        mapped.goal,
+        mapped.task,
+        mapped.action,
+        "llm",
+        `Unsupported model goal '${mapped.goal}' (fail closed). ${llmReason}`,
+        0.8,
+      ),
+    );
+    planned.modelProvenance = { kind: "rejected_unsupported", goal: mapped.goal };
+    return { candidate: planned, absentProvenance: { kind: "absent_fallback" } };
+  }
+  const planned = task(
+    mapped.goal,
+    mapped.task,
+    mapped.action,
+    "llm",
+    llmReason,
+    0.8,
+    mapped.occupation,
+  );
+  const enforced = enforceModelOriginatedPlan(attachDiscoveredTarget(planned, input));
+  if (enforced.action === "deferCapability" && mapped.deferred) {
+    enforced.modelProvenance = { kind: "accepted", goal: mapped.goal };
+  } else if (enforced.action === "deferCapability") {
+    enforced.modelProvenance = { kind: "rejected_unsupported", goal: mapped.goal };
+  } else {
+    enforced.modelProvenance = { kind: "accepted", goal: mapped.goal };
+  }
+  return { candidate: enforced, absentProvenance: { kind: "absent_fallback" } };
+}
+
+function withModelProvenance(planned: PlannedTask, provenance: ModelDecisionProvenance): PlannedTask {
+  planned.modelProvenance = provenance;
+  return planned;
+}
+
+function annotateModelOverride(
+  planned: PlannedTask,
+  resolution: ModelProposalResolution,
+  reason: string,
+): PlannedTask {
+  if (resolution.candidate?.modelProvenance?.kind === "accepted" || resolution.candidate?.source === "llm") {
+    const goal = resolution.candidate.goal;
+    planned.modelProvenance = { kind: "overridden_safety", goal, reason };
+    planned.reason = `${planned.reason} | model '${goal}' overridden: ${reason}`;
+    return planned;
+  }
+  if (resolution.absentProvenance.kind === "backoff_fallback") {
+    return withModelProvenance(planned, resolution.absentProvenance);
+  }
+  return planned;
+}
+
 function attachDiscoveredTarget(planned: PlannedTask, input: PlannerInput): PlannedTask {
   if (planned.action === "fishShore" && !planned.target) {
     const { option, trace } = chooseActivity({ ...activityInput(input), settlementFoodNeed: true });
@@ -470,7 +625,12 @@ function attachDiscoveredTarget(planned: PlannedTask, input: PlannerInput): Plan
     planned.blocked = { code: "SEARCH_EXHAUSTED", missing: "eligible_house" };
     return planned;
   }
-  if (planned.action === "observeNearby" && (!input.home || input.home.status !== "active")) {
+  // Model explore must not be silently rewritten into housing travel (Mission 010B autonomy).
+  if (
+    planned.source !== "llm" &&
+    planned.action === "observeNearby" &&
+    (!input.home || input.home.status !== "active")
+  ) {
     const opportunity = housingOpportunity(input.observation.position, homesForClaim(input));
     if (opportunity.kind === "travel") {
       planned.action = "travelTowardHousing";

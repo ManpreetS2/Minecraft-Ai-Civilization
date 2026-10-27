@@ -36,7 +36,7 @@ import { Vec3 as Vec3Class } from "vec3";
 import { cellClaimKey } from "./claims.js";
 import { executeBuildStructurePlan } from "./build-structure.js";
 import { buildShelter, emitProjectCreated } from "./construction.js";
-import { deferredCapabilityResult } from "./goal-dispatch.js";
+import { deferredCapabilityResult, enforceModelOriginatedPlan, validateModelOriginatedPlan } from "./goal-dispatch.js";
 import type { PlannedTask } from "./planner.js";
 import { interiorStandingCells, isInsideShelter } from "./shelter.js";
 import { SettlementRuntime } from "./settlement-runtime.js";
@@ -156,15 +156,24 @@ export async function executePlan(
   events: EventBus,
   runtime = new SettlementRuntime(),
 ): Promise<ActionResult> {
+  // Shared boundary: model-originated plans must stay on the cognition allowlist.
+  // Reflex / planner / human-directive plans are not rewritten here.
+  const gated = plan.source === "llm" ? enforceModelOriginatedPlan(plan) : plan;
+  const integrity = plan.source === "llm" ? validateModelOriginatedPlan(plan) : { ok: true as const };
+
   events.emit(
     createEvent(
       "ActionStarted",
       {
-        action: plan.action,
-        task: plan.task,
-        source: plan.source,
-        reason: plan.reason,
+        action: gated.action,
+        task: gated.task,
+        source: gated.source,
+        reason: gated.reason,
         decisionKind: decisionKind(ctx.citizenId, "intent"),
+        goal: gated.goal,
+        dispatchIntegrity: integrity.ok ? "allowlisted" : "rewritten_fail_closed",
+        ...(integrity.ok ? {} : { integrityReason: integrity.reason }),
+        ...(gated.modelProvenance ? { modelProvenance: gated.modelProvenance } : {}),
       },
       ctx.citizenId,
     ),
@@ -178,7 +187,7 @@ export async function executePlan(
   };
 
   let result: ActionResult;
-  switch (plan.action) {
+  switch (gated.action) {
     case "eatFood":
       result = await eatFood(ctx);
       break;
@@ -429,12 +438,12 @@ export async function executePlan(
       result = await gatherByTask(ctx, plan.task, runtime);
       break;
     case "deferCapability":
-      result = deferredCapabilityResult(plan.task);
+      result = deferredCapabilityResult(gated.task);
       break;
     default:
       result = fail(
         "UNSUPPORTED_ACTION",
-        `Unsupported action '${plan.action}' for task '${plan.task}' — refusing silent wood-mining fallback`,
+        `Unsupported action '${gated.action}' for task '${gated.task}' — refusing silent wood-mining fallback`,
         0,
         false,
       );
@@ -446,8 +455,10 @@ export async function executePlan(
     createEvent(
       result.success ? "ActionCompleted" : "ActionFailed",
       {
-        action: plan.action,
-        task: plan.task,
+        action: gated.action,
+        task: gated.task,
+        goal: gated.goal,
+        source: gated.source,
         success: result.success,
         persisted: result.success ? persistConfirmed(result) : false,
         code: result.success ? undefined : result.code,
@@ -455,6 +466,7 @@ export async function executePlan(
         decisionKind: decisionKind(ctx.citizenId, "result"),
         skillStatus: skillStatusOf(result),
         workComplete: physicalWorkComplete(result),
+        dispatchIntegrity: integrity.ok ? "allowlisted" : "rewritten_fail_closed",
         ...(foodMeta ? { food: foodMeta } : {}),
       },
       ctx.citizenId,
