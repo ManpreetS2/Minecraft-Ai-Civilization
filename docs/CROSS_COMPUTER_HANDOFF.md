@@ -6,12 +6,13 @@
 | --- | --- |
 | **Private backup repository** | https://github.com/ManpreetS2/Minecraft-Ai-Civilization-windows-backup |
 | **Branch** | `backup/windows-wip-2026-10-26` |
-| **Commit SHA** | `c6440f7aa6b2ac05222a4ffabe8150c014efb8a0` |
-| **Backup timestamp (UTC)** | 2026-10-27T~04:30Z (Mission 007 Windows snapshot; tip includes this handoff doc) |
+| **WIP snapshot commit** | `449758cbbfbb7a0e0669cb34bff7424d8c2373a0` (205 source/docs files) |
+| **Branch tip** | After clone, run `git rev-parse HEAD` and confirm it matches `git ls-remote` for this branch (tip includes this handoff doc on top of the WIP snapshot). |
+| **Backup timestamp (UTC)** | 2026-10-27 (Mission 007 Windows snapshot) |
 | **Prior working branch (preserved locally)** | `integration/reliability-pr7-windows` @ `019d26d4d414c2c962d9e58c4f2c0d84a7db569d` |
 | **Public repo (unchanged)** | https://github.com/ManpreetS2/Minecraft-Ai-Civilization — **do not push this WIP there** |
 
-This backup is a **private** GitHub repository. The public `Minecraft-Ai-Civilization` remote/`main` were not updated by this handoff.
+This backup is a **private** GitHub repository. The public `Minecraft-Ai-Civilization` remote/`main` were not updated by this handoff. The backup branch was **not** pushed to `origin`.
 
 ## Project status
 
@@ -63,8 +64,12 @@ This backup is a **private** GitHub repository. The public `Minecraft-Ai-Civiliz
 git clone https://github.com/ManpreetS2/Minecraft-Ai-Civilization-windows-backup.git
 cd Minecraft-Ai-Civilization-windows-backup
 git checkout backup/windows-wip-2026-10-26
+
+# Confirm tip matches GitHub
+git fetch origin
 git rev-parse HEAD
-# Expect: c6440f7aa6b2ac05222a4ffabe8150c014efb8a0
+git rev-parse origin/backup/windows-wip-2026-10-26
+# WIP engineering content starts at: 449758cbbfbb7a0e0669cb34bff7424d8c2373a0
 
 # 2) Dependencies
 copy .env.example .env
@@ -92,5 +97,5 @@ git fetch public
 
 ## Remotes reference (original machine)
 
-- `origin` → public `ManpreetS2/Minecraft-Ai-Civilization` (visibility unchanged)
+- `origin` → public `ManpreetS2/Minecraft-Ai-Civilization` (visibility unchanged; backup branch **not** present)
 - `backup` → private `ManpreetS2/Minecraft-Ai-Civilization-windows-backup`
