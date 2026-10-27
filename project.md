@@ -58,21 +58,24 @@
 
 ## Current delivery priority — public demo, then iterative research
 
-**Ship an honest, external demonstration soon rather than waiting for every envisioned civilization feature.** The owner is building the project largely independently with coding assistants; keep the first showcase narrowly scoped to capabilities that can be proven live in Minecraft, supported by actual observations, logs and a short reproducible capture. Do not pass off an offline simulator, a guided scripted sequence or a hand-provided world resource as fully autonomous Minecraft AI. The exact first-demo acceptance criteria are being simplified in discussion and are **not yet locked**.
+**Ship an honest, external demonstration soon rather than waiting for every envisioned civilization feature.** The owner is building the project largely independently with coding assistants; keep the first showcase narrowly scoped to capabilities that can be proven live in Minecraft, supported by actual observations, logs and a short reproducible capture. Do not pass off an offline simulator, a guided scripted sequence or a hand-provided world resource as fully autonomous Minecraft AI. **First public demo target (Option B, LOCKED): a small AI society of 2–3 independently acting citizens, not all five.** Demonstrate them physically connected to Minecraft, independently making decisions, communicating, and either cooperating or disagreeing over a **real shared survival problem** (e.g. food or shelter). Show actual Minecraft outcomes and logs rather than a scripted conversation or unverified agent claims. This demo needs no mayor, adviser council, surveillance, colonies, elaborate economy, or 100-citizen scaling. The precise run duration, success metrics and presentation format remain to be determined through live reliability tests.
 
 After the first public demo, continue improving reliability and adding genuinely tested capabilities through repeatable simulation rounds. Record what citizens actually did, failures, new mechanisms, model/tool changes and limitations; share follow-up GitHub/LinkedIn progress only with the owner's approval. Keep optional features (government, virtual advisers, surveillance, colonies at scale, extended economy) out of the initial critical path unless they are necessary to demonstrate independent survival and interaction.
 
 **Public-record intelligence only for the initial adviser/surveillance concept (future, not implemented):** if an advisory institution eventually emerges, a settlement intelligence function may summarize legitimately observable **public** activity—communal storage changes, resource contributions, publicly witnessed disputes, voluntarily shared reports and abandoned commitments. It must cite the underlying event records, distinguish facts from inferences and avoid reading private conversations, secret thoughts or observer-only audit logs. No physical spy bots or omniscient digital interception in this approved first scope; any wider surveillance system remains an unresolved later discussion, not a coding requirement.
 
-**Research direction:** five citizens initially, then 10, 20 and beyond subject to successful live scaling. Colonies, trade and governance are interesting **potential emergent outcomes**, not objectives the prompt forces into existence.
+**Research direction after the first demo:** advance from **2–3 demo citizens** to the original **five-citizen civilization**, then 10, 20 and beyond only after successful live scaling. Colonies, trade and governance are interesting **potential emergent outcomes**, not objectives the prompt forces into existence.
 
 ## Build strategy
 
 ### Gate A — One reliable citizen
 Atlas must actually connect, obtain food, avoid drowning, navigate to a real bed, observe curfew, sleep, resume morning activity and shut down cleanly in isolated World-Lab. Preserve the existing Windows WIP and source/world/SQLite/WAL/SHM evidence. Offline tests alone do not close this gate.
 
-### Gate B — Five reliable independent citizens
-Atlas, Maya, Theo, Ava and Kai persist and survive at least three full Minecraft days in the initial usable starter settlement, communicating and pursuing individual goals without repeated human rescue. No initial mayor, assigned occupations or imposed government.
+### Gate B — First public demo: 2–3 citizen survival society
+After Atlas passes the solo reliability gate, connect **two or three distinct persistent AI citizens** in the same Minecraft world. They must make their own decisions, communicate with one another, and cooperate or disagree over a genuine survival need while executing physically verified actions. Capture a short, truthful and reproducible public demonstration with event logs showing intent versus results; no prewritten dialogue, fixed social outcome, guaranteed success, initial mayor or advisory council. This is the **first showcase milestone**, not a claim that the complete civilization already works.
+
+### Gate B+ — Original five-citizen follow-up
+Expand the verified demo to **Atlas, Maya, Theo, Ava and Kai** and seek sustained multi-day survival and interaction without repeated human rescue. Document the run duration and actual successes/failures. No assigned occupations or imposed government. Scale toward 10, 20 and larger groups only when live evidence and performance permit.
 
 ### Gate C — Emergent society and physical construction
 Provide personality generation, per-citizen memory and private/public communication; let citizens choose collective rules and roles. Add real trade, resource/property accounting, script-driven physical construction, material acquisition, paid/human-provided infrastructure contracts and verified outcomes without scripted consensus.
