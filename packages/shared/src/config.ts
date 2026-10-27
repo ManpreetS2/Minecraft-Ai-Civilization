@@ -28,7 +28,7 @@ const envSchema = z.object({
     .enum(["true", "false"])
     .default("true")
     .transform((v) => v === "true"),
-  LLM_PROVIDER: z.enum(["ollama", "llamacpp", "none"]).default("ollama"),
+  LLM_PROVIDER: z.enum(["ollama", "llamacpp", "openai", "none"]).default("ollama"),
   LLM_ENABLED: z
     .enum(["true", "false"])
     .default("false")
@@ -49,6 +49,20 @@ const envSchema = z.object({
     .default("false")
     .transform((v) => v === "true"),
   LLM_COOLDOWN_MS: z.coerce.number().int().default(60_000),
+  /** Explicit cloud enable. OLLAMA_ENABLED must never turn this on. Default false. */
+  CLOUD_LLM_ENABLED: z
+    .enum(["true", "false"])
+    .default("false")
+    .transform((v) => v === "true"),
+  OPENAI_API_KEY: z.string().optional().default(""),
+  OPENAI_MODEL: z.string().default("gpt-4o-mini"),
+  OPENAI_BASE_URL: z.string().default("https://api.openai.com/v1"),
+  CLOUD_TIMEOUT_MS: z.coerce.number().int().positive().default(30_000),
+  CLOUD_MAX_OUTPUT_TOKENS: z.coerce.number().int().positive().max(512).default(128),
+  CLOUD_MAX_CONCURRENCY: z.coerce.number().int().min(1).max(8).default(1),
+  CLOUD_MAX_REQUESTS_PER_RUN: z.coerce.number().int().min(0).default(60),
+  CLOUD_SPEND_ALLOWANCE_USD: z.coerce.number().nonnegative().default(1.0),
+  CLOUD_MAX_RETRIES: z.coerce.number().int().min(0).max(2).default(1),
   MECHANICS_PROBE_ENABLED: z
     .enum(["true", "false"])
     .default("false")

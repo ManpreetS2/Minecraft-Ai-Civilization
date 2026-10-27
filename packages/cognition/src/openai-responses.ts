@@ -1,0 +1,282 @@
+import { GOALS } from "./goals.js";
+import { CloudBudgetGate } from "./cloud-budget.js";
+import { CloudDecisionLedger, type CloudDecisionRecord } from "./decision-record.js";
+import { isAllowedOpenAiModel } from "./cloud-prices.js";
+import { formatPrompt } from "./ollama.js";
+import type { CognitionPrompt, CognitionProvider, HighLevelDecision } from "./schema.js";
+import { extractJson, validateDecision } from "./schema.js";
+
+export type FetchLike = typeof fetch;
+
+export type OpenAiResponsesConfig = {
+  apiKey: string;
+  model: string;
+  baseUrl: string;
+  timeoutMs: number;
+  maxOutputTokens: number;
+  maxRetries: number;
+  budget: CloudBudgetGate;
+  ledger?: CloudDecisionLedger;
+  fetchImpl?: FetchLike;
+  /** Optional run/trigger label for records. */
+  defaultTrigger?: string;
+};
+
+const DECISION_JSON_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: ["goal", "priority", "reason"],
+  properties: {
+    goal: { type: "string", enum: [...GOALS] },
+    priority: { type: "number", minimum: 0, maximum: 1 },
+    reason: { type: "string", minLength: 1, maxLength: 280 },
+    targetCitizenId: { type: "string" },
+  },
+} as const;
+
+export class OpenAiResponsesProvider implements CognitionProvider {
+  readonly name = "openai-responses";
+  private readonly fetchImpl: FetchLike;
+  private readonly ledger: CloudDecisionLedger;
+  private readonly inflight = new Set<AbortController>();
+  private closed = false;
+
+  constructor(private readonly config: OpenAiResponsesConfig) {
+    this.fetchImpl = config.fetchImpl ?? fetch;
+    this.ledger = config.ledger ?? new CloudDecisionLedger();
+    assertOpenAiConfig(config);
+  }
+
+  get recentDecisions(): CloudDecisionRecord[] {
+    return this.ledger.recent();
+  }
+
+  get budgetSnapshot() {
+    return this.config.budget.snapshot;
+  }
+
+  close(): void {
+    this.closed = true;
+    this.config.budget.close();
+    for (const controller of this.inflight) {
+      controller.abort();
+    }
+    this.inflight.clear();
+  }
+
+  async decide(prompt: CognitionPrompt, timeoutMs = this.config.timeoutMs): Promise<HighLevelDecision> {
+    if (this.closed) {
+      throw new Error("OpenAI cognition provider is shut down");
+    }
+    assertOpenAiConfig(this.config);
+
+    const admission = this.config.budget.tryAdmit();
+    if (!admission.ok) {
+      this.recordFailure(prompt, {
+        failureReason: admission.reason,
+        startedAt: new Date().toISOString(),
+      });
+      throw new Error(admission.reason);
+    }
+
+    const startedAt = new Date().toISOString();
+    const startedMs = Date.now();
+    const controller = new AbortController();
+    this.inflight.add(controller);
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+    let lastStatus: number | undefined;
+    let attempt = 0;
+    const maxAttempts = 1 + Math.max(0, this.config.maxRetries);
+
+    try {
+      while (attempt < maxAttempts) {
+        attempt += 1;
+        if (controller.signal.aborted || this.closed) {
+          throw new Error("OpenAI request cancelled");
+        }
+        try {
+          const { decision, usage, requestId, httpStatus } = await this.invokeOnce(prompt, controller.signal);
+          const latencyMs = Date.now() - startedMs;
+          const estimatedCostUsd = this.config.budget.reconcile(admission.reservationId, usage, false);
+          this.ledger.push({
+            id: crypto.randomUUID(),
+            citizenName: prompt.citizenName,
+            provider: this.name,
+            model: this.config.model,
+            requestId,
+            trigger: this.config.defaultTrigger ?? "routine_deliberation",
+            startedAt,
+            completedAt: new Date().toISOString(),
+            latencyMs,
+            inputTokens: usage.inputTokens,
+            outputTokens: usage.outputTokens,
+            estimatedCostUsd,
+            ok: true,
+            acceptedGoal: decision.goal,
+            httpStatus,
+          });
+          return decision;
+        } catch (error) {
+          lastStatus = (error as { httpStatus?: number }).httpStatus;
+          const message = error instanceof Error ? error.message : String(error);
+          const retryable = lastStatus === 429 || lastStatus === 500 || lastStatus === 503;
+          if (!retryable || attempt >= maxAttempts || lastStatus === 401) {
+            this.config.budget.reconcile(admission.reservationId, undefined, true);
+            this.ledger.push({
+              id: crypto.randomUUID(),
+              citizenName: prompt.citizenName,
+              provider: this.name,
+              model: this.config.model,
+              trigger: this.config.defaultTrigger ?? "routine_deliberation",
+              startedAt,
+              completedAt: new Date().toISOString(),
+              latencyMs: Date.now() - startedMs,
+              ok: false,
+              failureReason: message,
+              rejectedGoal: undefined,
+              httpStatus: lastStatus,
+            });
+            throw error instanceof Error ? error : new Error(message);
+          }
+        }
+      }
+      throw new Error("OpenAI retry exhaustion");
+    } finally {
+      clearTimeout(timer);
+      this.inflight.delete(controller);
+    }
+  }
+
+  private async invokeOnce(
+    prompt: CognitionPrompt,
+    signal: AbortSignal,
+  ): Promise<{
+    decision: HighLevelDecision;
+    usage: { inputTokens: number; outputTokens: number; model: string };
+    requestId?: string;
+    httpStatus: number;
+  }> {
+    const url = `${this.config.baseUrl.replace(/\/$/, "")}/responses`;
+    const body = {
+      model: this.config.model,
+      store: false,
+      max_output_tokens: this.config.maxOutputTokens,
+      input: [
+        {
+          role: "system",
+          content:
+            "You are a high-level advisor for one Minecraft citizen. Choose exactly one allowlisted survival goal. Reply with structured JSON only. Do not include chain-of-thought, tools, code, shell commands, or Minecraft slash commands.",
+        },
+        {
+          role: "user",
+          content: formatPrompt(prompt),
+        },
+      ],
+      text: {
+        format: {
+          type: "json_schema",
+          name: "high_level_decision",
+          strict: true,
+          schema: DECISION_JSON_SCHEMA,
+        },
+      },
+    };
+
+    const response = await this.fetchImpl(url, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${this.config.apiKey}`,
+      },
+      signal,
+      body: JSON.stringify(body),
+    });
+
+    if (!response.ok) {
+      const err = new Error(`OpenAI HTTP ${response.status}`) as Error & { httpStatus?: number };
+      err.httpStatus = response.status;
+      throw err;
+    }
+
+    const payload = (await response.json()) as Record<string, unknown>;
+    assertNoSecretLeak(payload, this.config.apiKey);
+    const text = extractResponsesOutputText(payload);
+    const decision = validateDecision(extractJson(text));
+    const usageRaw = (payload.usage ?? {}) as {
+      input_tokens?: number;
+      output_tokens?: number;
+      prompt_tokens?: number;
+      completion_tokens?: number;
+    };
+    const usage = {
+      model: this.config.model,
+      inputTokens: Number(usageRaw.input_tokens ?? usageRaw.prompt_tokens ?? 0),
+      outputTokens: Number(usageRaw.output_tokens ?? usageRaw.completion_tokens ?? 0),
+    };
+    return {
+      decision,
+      usage,
+      requestId: typeof payload.id === "string" ? payload.id : undefined,
+      httpStatus: response.status,
+    };
+  }
+
+  private recordFailure(
+    prompt: CognitionPrompt,
+    partial: Pick<CloudDecisionRecord, "failureReason" | "startedAt" | "httpStatus">,
+  ): void {
+    this.ledger.push({
+      id: crypto.randomUUID(),
+      citizenName: prompt.citizenName,
+      provider: this.name,
+      model: this.config.model,
+      trigger: this.config.defaultTrigger ?? "routine_deliberation",
+      startedAt: partial.startedAt,
+      completedAt: new Date().toISOString(),
+      ok: false,
+      failureReason: partial.failureReason,
+      httpStatus: partial.httpStatus,
+    });
+  }
+}
+
+export function assertOpenAiConfig(config: Pick<OpenAiResponsesConfig, "apiKey" | "model" | "baseUrl">): void {
+  if (!config.apiKey || !config.apiKey.trim()) {
+    throw new Error("OPENAI_API_KEY is required when cloud OpenAI cognition is enabled");
+  }
+  if (!isAllowedOpenAiModel(config.model)) {
+    throw new Error(`Unsupported OpenAI model '${config.model}' — update allowlist intentionally`);
+  }
+  if (!config.baseUrl.startsWith("https://") && !config.baseUrl.includes("127.0.0.1") && !config.baseUrl.includes("localhost")) {
+    throw new Error("OPENAI_BASE_URL must be https (or localhost for offline mocks)");
+  }
+}
+
+export function extractResponsesOutputText(payload: Record<string, unknown>): string {
+  if (typeof payload.output_text === "string" && payload.output_text.trim()) {
+    return payload.output_text;
+  }
+  const output = payload.output;
+  if (!Array.isArray(output)) {
+    throw new Error("OpenAI response missing output");
+  }
+  for (const item of output) {
+    if (!item || typeof item !== "object") continue;
+    const row = item as { type?: string; content?: Array<{ type?: string; text?: string }> };
+    if (row.type !== "message" || !Array.isArray(row.content)) continue;
+    for (const part of row.content) {
+      if (part && (part.type === "output_text" || part.type === "text") && typeof part.text === "string" && part.text.trim()) {
+        return part.text;
+      }
+    }
+  }
+  throw new Error("OpenAI response contained no decision text");
+}
+
+function assertNoSecretLeak(payload: unknown, apiKey: string): void {
+  const blob = JSON.stringify(payload);
+  if (apiKey && blob.includes(apiKey)) {
+    throw new Error("Refusing to process OpenAI payload that echoes the API key");
+  }
+}

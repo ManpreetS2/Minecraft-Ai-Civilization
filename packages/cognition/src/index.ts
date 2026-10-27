@@ -1,13 +1,46 @@
 import type { AppConfig } from "@civ/shared";
 import { resolveCognitionConfig } from "./config.js";
+import { CloudBudgetGate } from "./cloud-budget.js";
+import { CloudDecisionLedger } from "./decision-record.js";
 import { HeuristicProvider } from "./heuristic.js";
 import { OllamaProvider } from "./ollama.js";
+import { OpenAiResponsesProvider } from "./openai-responses.js";
 import type { CognitionProvider } from "./schema.js";
 
-export function createCognition(config: AppConfig): CognitionProvider {
+export type CreateCognitionOptions = {
+  /** Injected fetch for offline tests — never hits a paid network when provided as a mock. */
+  fetchImpl?: typeof fetch;
+  ledger?: CloudDecisionLedger;
+  budget?: CloudBudgetGate;
+};
+
+export function createCognition(config: AppConfig, options: CreateCognitionOptions = {}): CognitionProvider {
   const cog = resolveCognitionConfig(config);
   if (!cog.enabled) {
     return new HeuristicProvider();
+  }
+  if (cog.provider === "openai") {
+    if (!cog.cloud.enabled) {
+      return new HeuristicProvider();
+    }
+    const budget =
+      options.budget ??
+      new CloudBudgetGate({
+        maxConcurrency: cog.cloud.maxConcurrency,
+        maxRequestsPerRun: cog.cloud.maxRequestsPerRun,
+        spendAllowanceUsd: cog.cloud.spendAllowanceUsd,
+      });
+    return new OpenAiResponsesProvider({
+      apiKey: cog.cloud.apiKey,
+      model: cog.cloud.model,
+      baseUrl: cog.cloud.baseUrl,
+      timeoutMs: cog.cloud.timeoutMs,
+      maxOutputTokens: cog.cloud.maxOutputTokens,
+      maxRetries: cog.cloud.maxRetries,
+      budget,
+      ledger: options.ledger,
+      fetchImpl: options.fetchImpl,
+    });
   }
   if (cog.provider === "ollama") {
     return new OllamaProvider(cog.host, cog.routineModel);
@@ -16,7 +49,20 @@ export function createCognition(config: AppConfig): CognitionProvider {
 }
 
 export { HeuristicProvider } from "./heuristic.js";
-export { OllamaProvider } from "./ollama.js";
+export { OllamaProvider, formatPrompt } from "./ollama.js";
+export {
+  OpenAiResponsesProvider,
+  assertOpenAiConfig,
+  extractResponsesOutputText,
+} from "./openai-responses.js";
+export { CloudBudgetGate } from "./cloud-budget.js";
+export { CloudDecisionLedger, type CloudDecisionRecord } from "./decision-record.js";
+export {
+  OPENAI_ALLOWED_MODELS,
+  OPENAI_MODEL_PRICES,
+  estimateCloudCostUsd,
+  isAllowedOpenAiModel,
+} from "./cloud-prices.js";
 export {
   CognitionDecisionSchema,
   DecisionSchema,
@@ -31,7 +77,7 @@ export {
   type HighLevelDecision,
 } from "./schema.js";
 export { GOALS, GOAL_ALIASES, GOAL_SET, type Goal } from "./goals.js";
-export { resolveCognitionConfig, type CognitionConfig } from "./config.js";
+export { resolveCognitionConfig, type CognitionConfig, type CloudCognitionConfig } from "./config.js";
 export { ModelRouter, isRareReflection, type CognitionMode, type DeliberationTrigger } from "./router.js";
 export { detectEmergencyReflex, type ReflexDecision, type WorldView } from "./reflex.js";
 export {

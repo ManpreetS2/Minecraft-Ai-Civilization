@@ -49,6 +49,8 @@ The LLM must never steer movement every tick.
 
 **Autonomy precedence (Mission 010B):** Allowlisted model proposals are accepted before routine daytime housing and before night-default shelter when no immediate hostile threat exists. Safety reflexes, construction resume, and curfew still win when applicable. `modelProvenance` records accept / safety-override / reject / backoff / absent. See [MISSION010B_AUTONOMY_PRECEDENCE.md](./MISSION010B_AUTONOMY_PRECEDENCE.md).
 
+**Cloud cognition (Mission 011):** Optional OpenAI Responses API adapter implements the same `CognitionProvider` interface. Enabled only when `LLM_PROVIDER=openai` **and** `LLM_ENABLED=true` **and** `CLOUD_LLM_ENABLED=true` with a non-empty `OPENAI_API_KEY`. `OLLAMA_ENABLED` never enables cloud billing. See [MISSION011_CLOUD_PROVIDER.md](./MISSION011_CLOUD_PROVIDER.md).
+
 ## Scaling (architected, not implemented at population scale)
 
 Persistent citizen count is independent of:
