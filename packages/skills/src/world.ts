@@ -48,7 +48,7 @@ export async function sleep(
   if (preferred) {
     const cell = { x: Math.floor(preferred.x), y: Math.floor(preferred.y), z: Math.floor(preferred.z) };
     const preferredBlock = bot.blockAt(new Vec3Class(cell.x, cell.y, cell.z));
-    if (preferredBlock && !isBedBlock(preferredBlock)) {
+    if (!preferredBlock || !isBedBlock(preferredBlock)) {
       return fail(
         "BED_MISSING",
         "Designated home bed is missing or is not a bed; ownership was not reassigned",
@@ -57,7 +57,7 @@ export async function sleep(
         { designated: true, position: cell },
       );
     }
-    target = { name: isBedBlock(preferredBlock) ? preferredBlock!.name : "bed", position: cell };
+    target = { name: preferredBlock.name, position: cell };
   } else {
     const found = await findBlock(ctx, BED_NAMES, 32);
     if (!found.success) {

@@ -118,7 +118,8 @@ describe("sleep uses a designated home bed", () => {
   });
 
   it("fails when the designated bed block is unloaded", async () => {
-    setNavigationBackend(stubNav([]));
+    const navigated: Vec3[] = [];
+    setNavigationBackend(stubNav(navigated));
     const { ctx, slept } = fakeSleepCtx();
     ctx.bot.blockAt = () => null;
     const result = await sleep(ctx, designated);
@@ -126,5 +127,6 @@ describe("sleep uses a designated home bed", () => {
     if (result.success) throw new Error("unloaded bed should fail");
     expect(result.code).toBe("BED_MISSING");
     expect(slept).toHaveLength(0);
+    expect(navigated).toHaveLength(0);
   });
 });

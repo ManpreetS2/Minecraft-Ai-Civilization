@@ -355,7 +355,10 @@ export async function workFarmPlot(
     }
     if (cell.crop.farmland && cell.crop.cropName === spec.crop) continue;
     const made = await tillAndPlant(ctx, cell.soil, kind);
-    if (!made.success) continue;
+    if (!made.success) {
+      failed.push({ position: cell.soil, code: made.code, error: made.error });
+      continue;
+    }
     tilled.push(cell.soil);
     planted.push({ x: cell.soil.x, y: cell.soil.y + 1, z: cell.soil.z });
   }
@@ -381,6 +384,21 @@ export async function workFarmPlot(
     harvested.push(cropPos);
     remaining -= 1;
     if (result.data.replanted) replanted.push(cropPos);
+  }
+  if (tilled.length === 0 && planted.length === 0 && harvested.length === 0) {
+    const idle = inspection.cells.every(
+      (cell) => cell.crop.farmland && cell.crop.cropName === spec.crop && !cell.crop.mature,
+    );
+    if (!idle) {
+      const first = failed[0];
+      return fail(
+        first?.code ?? "VERIFY_FAILED",
+        first?.error ?? "Farm work made no verified till, plant, or harvest progress",
+        Date.now() - started,
+        true,
+        { inspected: inspection, failed, workComplete: false },
+      );
+    }
   }
   await collectFarmDrops(ctx, kind);
 

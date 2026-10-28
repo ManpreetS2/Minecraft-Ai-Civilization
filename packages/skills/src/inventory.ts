@@ -78,7 +78,9 @@ export async function eatFood(ctx: SkillContext): Promise<ActionResult<{ item: s
   }
   const afterHunger = ctx.bot.food ?? 0;
   const afterCount = countItem(ctx, food.name);
-  if (afterCount >= beforeCount && afterHunger <= beforeHunger && beforeHunger < 20) {
+  const consumed = afterCount < beforeCount;
+  const recovered = afterHunger > beforeHunger;
+  if (!consumed && !recovered) {
     return fail("VERIFY_FAILED", "Eating did not consume food or raise hunger", Date.now() - started, true);
   }
   return ok({ item: food.name, food: afterHunger }, Date.now() - started);

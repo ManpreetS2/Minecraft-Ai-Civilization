@@ -1,4 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
+import type { Bot } from "mineflayer";
+import { fail } from "@civ/shared";
+import { createNavigationBackend, setNavigationBackend, type NavigationBackend } from "@civ/minecraft-adapter";
 import {
   CROP_BLOCKS,
   cropKindFromBlock,
@@ -10,7 +13,9 @@ import {
   selectHydratedPlot,
   soilHydratedByWater,
   TILLABLE_SOIL,
+  workFarmPlot,
 } from "./farm.js";
+import type { SkillContext } from "./context.js";
 
 describe("farm geometry and crop maturity", () => {
   it("treats wheat age 7 as mature and age 3 as immature", () => {
@@ -114,5 +119,97 @@ describe("farm geometry and crop maturity", () => {
     );
     expect(gate.ok).toBe(false);
     if (!gate.ok) expect(gate.code).toBe("ITEM_NOT_FOUND");
+  });
+});
+
+function failingNav(): NavigationBackend {
+  const blocked = () => Promise.resolve(fail("PATH_BLOCKED", "blocked", 1, true));
+  return {
+    name: "test-nav-blocked",
+    navigateToPosition: blocked,
+    navigateNear: blocked,
+    navigateToInteractWithBlock: blocked,
+    navigateToPlaceBlock: blocked,
+    followEntity: async () => fail("PATH_BLOCKED", "blocked", 1, true),
+    escapeFrom: blocked,
+    probeReachability: () => ({ reachable: false, cost: 99 }),
+    stop: () => undefined,
+  };
+}
+
+function farmWorld(kind: "untilled" | "immature"): {
+  ctx: SkillContext;
+  cells: Record<string, { name: string; getProperties?: () => { age?: number } }>;
+} {
+  const origin = { x: 20, y: 68, z: 240 };
+  const cells: Record<string, { name: string; getProperties?: () => { age?: number } }> = {};
+  for (const soil of plotCells(origin, 3)) {
+    cells[`${soil.x},${soil.y},${soil.z}`] = { name: kind === "untilled" ? "dirt" : "farmland" };
+    cells[`${soil.x},${soil.y + 1},${soil.z}`] =
+      kind === "untilled"
+        ? { name: "air" }
+        : { name: "wheat", getProperties: () => ({ age: 3 }) };
+  }
+  cells["23,68,241"] = { name: "water" };
+  const hoe = { name: "wooden_hoe", count: 1 };
+  const seeds = { name: "wheat_seeds", count: 9 };
+  const items = [hoe, seeds];
+  const slots: Array<{ name: string; count: number; slot: number } | null> = Array.from({ length: 46 }, () => null);
+  slots[9] = { ...hoe, slot: 9 };
+  slots[10] = { ...seeds, slot: 10 };
+  const bot = {
+    food: 18,
+    heldItem: hoe,
+    entities: {},
+    entity: { position: { x: 0.5, y: 64, z: 0.5 }, eyeHeight: 1.62 },
+    inventory: { items: () => items, slots, inventoryStart: 9, inventoryEnd: 44 },
+    async equip(item: { name: string; count?: number }) {
+      bot.heldItem = { name: item.name, count: item.count ?? 1 };
+    },
+    blockAt(pos: { x: number; y: number; z: number }) {
+      return cells[`${Math.floor(pos.x)},${Math.floor(pos.y)},${Math.floor(pos.z)}`] ?? { name: "air" };
+    },
+    async activateBlock() {
+      return undefined;
+    },
+  };
+  const ctx = {
+    bot: bot as unknown as Bot,
+    timeoutMs: 1_000,
+    body: { nearbyEntities: () => [] },
+  } as unknown as SkillContext;
+  return { ctx, cells };
+}
+
+describe("workFarmPlot verified progress", () => {
+  afterEach(() => {
+    setNavigationBackend(createNavigationBackend("pathfinder"));
+  });
+
+  it("does not report success when tilling cannot reach the plot", async () => {
+    setNavigationBackend(failingNav());
+    const { ctx } = farmWorld("untilled");
+    const result = await workFarmPlot(ctx, {
+      origin: { x: 20, y: 68, z: 240 },
+      water: { x: 23, y: 68, z: 241 },
+    });
+    expect(result.success).toBe(false);
+    if (result.success) throw new Error("unreachable farm work should fail");
+    expect(result.code).toBe("PATH_BLOCKED");
+    expect(result.details?.workComplete).toBe(false);
+  });
+
+  it("treats an already-planted immature plot as idle success", async () => {
+    setNavigationBackend(failingNav());
+    const { ctx } = farmWorld("immature");
+    const result = await workFarmPlot(ctx, {
+      origin: { x: 20, y: 68, z: 240 },
+      water: { x: 23, y: 68, z: 241 },
+    });
+    expect(result.success).toBe(true);
+    if (!result.success) throw new Error(result.error);
+    expect(result.data.tilled).toHaveLength(0);
+    expect(result.data.harvested).toHaveLength(0);
+    expect(result.data.inspected.immature).toBe(9);
   });
 });

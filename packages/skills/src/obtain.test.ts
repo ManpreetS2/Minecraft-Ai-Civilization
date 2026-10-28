@@ -26,6 +26,9 @@ function ctxWith(items: Array<{ name: string; count: number }>, signal?: AbortSi
       },
       findBlock: () => null,
       currentWindow: null,
+      recipesAll: () => [],
+      recipesFor: () => [],
+      craft: async () => undefined,
       entity: { position: { x: 0, y: 64, z: 0 } },
     },
     body: {
@@ -81,5 +84,14 @@ describe("craftItem abort", () => {
     if (result.success) throw new Error("expected cancel");
     expect(result.code).toBe("CANCELLED");
     expect(items).toEqual([{ name: "oak_planks", count: 8 }]);
+  });
+
+  it("fails without consuming logs when planks are missing", async () => {
+    const items = [{ name: "oak_log", count: 4 }];
+    const result = await craftItem(ctxWith(items), "stick");
+    expect(result.success).toBe(false);
+    if (result.success) throw new Error("stick without planks should fail");
+    expect(result.code === "MISSING_INGREDIENT" || result.code === "PREREQUISITE_MISSING").toBe(true);
+    expect(items).toEqual([{ name: "oak_log", count: 4 }]);
   });
 });
