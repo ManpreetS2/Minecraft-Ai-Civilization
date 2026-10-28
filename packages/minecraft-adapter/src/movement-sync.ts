@@ -1,4 +1,4 @@
-import type { Bot } from "mineflayer";
+import type { Bot, ControlState } from "mineflayer";
 
 type FeatureBot = Bot & {
   supportFeature?: (name: string) => boolean;
@@ -81,7 +81,7 @@ export function installModernMovement(bot: Bot): void {
 
   const originalSet = bot.setControlState?.bind(bot);
   if (originalSet) {
-    bot.setControlState = ((name: string, value: boolean) => {
+    bot.setControlState = ((name: ControlState, value: boolean) => {
       originalSet(name, value);
       writePlayerInput(bot);
     }) as Bot["setControlState"];

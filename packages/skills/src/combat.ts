@@ -114,6 +114,10 @@ export async function attackHostile(
       ctx.body.clearTrackedEntity(presence);
       return fail(presence, entityGoneMessage(presence, target.name), Date.now() - started, true, { hits, weapon });
     }
+    if (!live) {
+      ctx.body.clearTrackedEntity("ENTITY_REMOVED");
+      return fail("ENTITY_REMOVED", entityGoneMessage("ENTITY_REMOVED", target.name), Date.now() - started, true, { hits, weapon });
+    }
     const pos = live.position;
     if (!pos) {
       ctx.body.clearTrackedEntity("ENTITY_REMOVED");
@@ -236,6 +240,7 @@ export async function huntAnimal(
     const live = ctx.bot.entities[target.id];
     const presence = classifyEntityPresence(ctx.bot.entities, live ?? target);
     if (presence !== "PRESENT") break;
+    if (!live) break;
     const pos = live.position;
     if (!pos) break;
     const here = ctx.bot.entity?.position;

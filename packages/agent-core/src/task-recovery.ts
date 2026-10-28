@@ -80,8 +80,9 @@ export function mergeUnresolved(
   const code = result.success ? "INTERRUPTED" : result.code;
   if (!code || !NON_RETRYABLE_CODES.has(code)) return next;
   next = next.filter((entry) => entry.action !== plan.action);
+  const failureDetails = result.success ? undefined : result.details;
   const missing =
-    (typeof result.details?.missing === "string" ? result.details.missing : undefined) ?? plan.blocked?.missing;
+    (typeof failureDetails?.missing === "string" ? failureDetails.missing : undefined) ?? plan.blocked?.missing;
   next.push({
     action: plan.action,
     task: plan.task,

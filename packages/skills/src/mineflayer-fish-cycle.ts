@@ -308,7 +308,6 @@ export async function runMineflayerFishCycle(
     return { result: "already-fishing", logs, activations: 0 };
   }
 
-  let phase: FishCyclePhase = "IDLE";
   let bound: BobberEntity | undefined;
   let reeled = false;
   let activations = 0;
@@ -320,8 +319,8 @@ export async function runMineflayerFishCycle(
   const spawnInfo = new Map<number, BobberEntity>();
   const castAt = now();
 
-  const handle = {
-    phase,
+  const handle: { phase: FishCyclePhase; cancel: (reason: string) => void } = {
+    phase: "IDLE",
     cancel: (reason: string) => {
       cancelReason = reason;
     },
@@ -331,7 +330,6 @@ export async function runMineflayerFishCycle(
   const activate = (why: string, next: FishCyclePhase) => {
     bot.activateItem();
     activations += 1;
-    phase = next;
     handle.phase = next;
     log(next, next === "CAST" ? "cast" : "reel", why);
   };
@@ -362,14 +360,13 @@ export async function runMineflayerFishCycle(
     if (!chosen) return;
     bound = chosen;
     const cmd = rodCommandForEvent({
-      phase,
+      phase: handle.phase,
       event: "bound",
       hasOwnBobber: true,
       alreadyReeled: reeled,
     });
-    phase = cmd.phase;
-    handle.phase = phase;
-    log(phase, via, `bobberId=${bound.id}`);
+    handle.phase = cmd.phase;
+    log(handle.phase, via, `bobberId=${bound.id}`);
   };
 
   const reelOwnBite = (why: string) => {
@@ -400,7 +397,7 @@ export async function runMineflayerFishCycle(
     if (!packet || packet.entityId == null) return;
     if (
       !shouldBindSpawnedBobber({
-        taskActive: phase === "CAST" || phase === "WAIT_FOR_OWN_BITE",
+        taskActive: handle.phase === "CAST" || handle.phase === "WAIT_FOR_OWN_BITE",
         alreadyBound: Boolean(bound),
         packetType: packet.type ?? -1,
         bobberTypeId: typeId,
@@ -427,7 +424,7 @@ export async function runMineflayerFishCycle(
   };
 
   const onParticles = (...args: unknown[]) => {
-    if (!bound || reeled || (phase !== "WAIT_FOR_OWN_BITE" && phase !== "CAST")) return;
+    if (!bound || reeled || (handle.phase !== "WAIT_FOR_OWN_BITE" && handle.phase !== "CAST")) return;
     const packet = args[0] as ParticlePacket | undefined;
     const pos = bot.entities[bound.id]?.position ?? bound.position;
     if (!packet || pos == null) return;
@@ -446,7 +443,7 @@ export async function runMineflayerFishCycle(
   };
 
   const onMetadata = (...args: unknown[]) => {
-    if (!bound || reeled || (phase !== "WAIT_FOR_OWN_BITE" && phase !== "CAST")) return;
+    if (!bound || reeled || (handle.phase !== "WAIT_FOR_OWN_BITE" && handle.phase !== "CAST")) return;
     const packet = args[0] as { entityId?: number; metadata?: Array<{ key?: number; value?: unknown }> } | undefined;
     if (!packet) return;
     if (!isOwnBobberBiting({ boundId: bound.id, packet, metadataKeys })) return;
@@ -458,15 +455,14 @@ export async function runMineflayerFishCycle(
     const packet = args[0] as { entityIds?: number[] } | undefined;
     if (!packet?.entityIds?.includes(bound.id)) return;
     const cmd = rodCommandForEvent({
-      phase,
+      phase: handle.phase,
       event: "bobber-lost",
       hasOwnBobber: false,
       alreadyReeled: reeled,
     });
-    phase = cmd.phase;
-    handle.phase = phase;
+    handle.phase = cmd.phase;
     bound = undefined;
-    log(phase, "bobber-lost", "entity_destroy of bound bobber");
+    log(handle.phase, "bobber-lost", "entity_destroy of bound bobber");
   };
 
   bot._client.on("spawn_entity", onSpawn);
@@ -485,7 +481,7 @@ export async function runMineflayerFishCycle(
     const bindDeadline = now() + MF_FISH_BOBBER_BIND_MS;
     while (!bound && now() < bindDeadline) {
       if (opts.signal?.aborted || cancelReason) {
-        return { result: "cancelled", logs, activations, bobberId: bound?.id };
+        return { result: "cancelled", logs, activations, bobberId: undefined };
       }
       const elapsed = now() - castAt;
       tryBind(elapsed >= MF_FISH_COLLECT_MS || now() >= bindDeadline - 50, "bind-scan");
@@ -498,10 +494,12 @@ export async function runMineflayerFishCycle(
     }
 
     const waitDeadline = now() + Math.max(1_000, opts.timeoutMs);
-    while (phase === "WAIT_FOR_OWN_BITE" && !reeled && now() < waitDeadline) {
+    while (handle.phase === "WAIT_FOR_OWN_BITE" && !reeled && now() < waitDeadline) {
       if (opts.signal?.aborted || cancelReason) break;
-      const live = bot.entities[bound.id];
-      if (live?.position) bound = { ...bound, ...live };
+      const hook: BobberEntity | undefined = bound;
+      if (!hook) break;
+      const live: BobberEntity | undefined = bot.entities[hook.id];
+      if (live?.position) bound = { ...hook, ...live };
       await wait(50);
     }
 
@@ -510,13 +508,13 @@ export async function runMineflayerFishCycle(
       return { result: "cancelled", logs, activations, bobberId: bound?.id };
     }
     if (reeled) {
-      phase = "VERIFY_OWN_CATCH";
-      log(phase, "verify", "reeled-on-own-bite");
+      handle.phase = "VERIFY_OWN_CATCH";
+      log(handle.phase, "verify", "reeled-on-own-bite");
       return { result: "reeled", logs, activations, bobberId: bound?.id };
     }
     if (!reeled && bound && bot.entities[bound.id]) activate("timeout-retrieve", "REEL");
-    phase = "VERIFY_OWN_CATCH";
-    log(phase, "timeout", "no own bite particle or biting metadata within budget");
+    handle.phase = "VERIFY_OWN_CATCH";
+    log(handle.phase, "timeout", "no own bite particle or biting metadata within budget");
     return { result: "timeout", logs, activations, bobberId: bound?.id };
   } finally {
     detach(bot._client, "spawn_entity", onSpawn);

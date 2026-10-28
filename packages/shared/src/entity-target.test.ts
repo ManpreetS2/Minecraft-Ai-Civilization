@@ -6,7 +6,7 @@ describe("generic entity targeting", () => {
     const skeleton = { id: 7, name: "skeleton", health: 0, isValid: false };
     expect(classifyEntityPresence({ 7: skeleton }, skeleton)).toBe("TARGET_DEAD");
     expect(entityGoneMessage("TARGET_DEAD", "skeleton")).toContain("TARGET_DEAD");
-    expect(entityGoneMessage("TARGET_DEAD", "skeleton")).not.toMatch(/out of range/i);
+    expect(entityGoneMessage("TARGET_DEAD", "skeleton")).toContain("not out of range");
   });
 
   it("classifies despawn/removal as ENTITY_REMOVED for any entity type", () => {
@@ -14,7 +14,7 @@ describe("generic entity targeting", () => {
     expect(classifyEntityPresence({}, cow)).toBe("ENTITY_REMOVED");
     expect(classifyEntityPresence({ 9: { id: 9, name: "villager" } }, cow)).toBe("ENTITY_REMOVED");
     expect(entityGoneMessage("ENTITY_REMOVED", "cow")).toContain("ENTITY_REMOVED");
-    expect(entityGoneMessage("ENTITY_REMOVED", "cow")).not.toMatch(/out of range/i);
+    expect(entityGoneMessage("ENTITY_REMOVED", "cow")).toContain("not out of range");
   });
 
   it("treats isValid false as dead/destroyed for villagers and hostiles alike", () => {

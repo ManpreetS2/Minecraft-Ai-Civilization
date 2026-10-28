@@ -85,6 +85,9 @@ describe("sleep uses a designated home bed", () => {
     const { ctx, slept } = fakeSleepCtx();
     const result = await sleep(ctx, designated);
     expect(result.success).toBe(true);
+    if (!result.success) throw new Error("designated sleep should succeed");
+    expect(result.data.position).toEqual(designated);
+    expect(result.data.name).toBe("red_bed");
     expect(navigated.some((pos) => Math.floor(pos.x) === designated.x && Math.floor(pos.z) === designated.z)).toBe(true);
     expect(navigated.some((pos) => Math.floor(pos.x) === closer.x && Math.floor(pos.z) === closer.z)).toBe(false);
     expect(slept).toHaveLength(1);
@@ -111,6 +114,17 @@ describe("sleep uses a designated home bed", () => {
     expect(result.success).toBe(false);
     if (result.success) throw new Error("daytime should fail");
     expect(result.code).toBe("NOT_SLEEP_TIME");
+    expect(slept).toHaveLength(0);
+  });
+
+  it("fails when the designated bed block is unloaded", async () => {
+    setNavigationBackend(stubNav([]));
+    const { ctx, slept } = fakeSleepCtx();
+    ctx.bot.blockAt = () => null;
+    const result = await sleep(ctx, designated);
+    expect(result.success).toBe(false);
+    if (result.success) throw new Error("unloaded bed should fail");
+    expect(result.code).toBe("BED_MISSING");
     expect(slept).toHaveLength(0);
   });
 });

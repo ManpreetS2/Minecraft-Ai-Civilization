@@ -86,9 +86,15 @@ describe("farm geometry and crop maturity", () => {
     expect(wet.hydrated).toBe(true);
     expect(wet.water).toEqual({ x: 23, y: 68, z: 241 });
     expect(evaluateFarmPreconditions(wet, { hoe: true, seeds: 9 }).ok).toBe(true);
-    expect(evaluateFarmPreconditions(wet, { hoe: false, seeds: 0, seedStorage: { x: 23, y: 69, z: 238 }, storagePresent: false }).code).toBe(
-      "CONTAINER_NOT_FOUND",
-    );
+    const missingStore = evaluateFarmPreconditions(wet, {
+      hoe: false,
+      seeds: 0,
+      seedStorage: { x: 23, y: 69, z: 238 },
+      storagePresent: false,
+    });
+    expect(missingStore.ok).toBe(false);
+    if (missingStore.ok) throw new Error("missing seed storage should fail");
+    expect(missingStore.code).toBe("CONTAINER_NOT_FOUND");
   });
 
   it("does not treat an arbitrary nearby chest as the farm store", () => {

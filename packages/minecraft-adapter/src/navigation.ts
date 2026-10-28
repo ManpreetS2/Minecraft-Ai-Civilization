@@ -18,8 +18,13 @@ export type NavigationBackend = {
 
 function currentReachResult(bot: Bot, block: Vec3) {
   if (!isWithinBlockReach(bot, block)) return undefined;
-  const pos = bot.entity!.position;
-  return ok({ position: { x: pos.x, y: pos.y, z: pos.z }, distance: blockInteractDistance(bot, block) ?? 0 });
+  const pos = bot.entity?.position;
+  if (!pos) return undefined;
+  return ok({ position: { x: pos.x, y: pos.y, z: pos.z }, distance: blockInteractDistance(bot, block) ?? 0 }, 0);
+}
+
+function isAbortNavResult<T>(result: ActionResult<T>): result is Extract<ActionResult<T>, { success: false }> {
+  return !result.success && (result.code === "CANCELLED" || result.code === "NOT_CONNECTED");
 }
 
 function closeInteractResult(bot: Bot, block: Vec3) {
@@ -56,7 +61,7 @@ export class MineflayerPathfinderBackend implements NavigationBackend {
         });
         const reached = closeInteractResult(bot, block);
         if (reached) return reached;
-        if (approach.code === "CANCELLED" || approach.code === "NOT_CONNECTED") return approach;
+        if (isAbortNavResult(approach)) return approach;
       }
     }
     const cells = rankedInteractionPositions(bot, block, 2).slice(0, 6);
@@ -76,7 +81,7 @@ export class MineflayerPathfinderBackend implements NavigationBackend {
       if (last.success) return last;
       const reached = closeInteractResult(bot, block);
       if (reached) return reached;
-      if (last.code === "CANCELLED" || last.code === "NOT_CONNECTED") return last;
+      if (isAbortNavResult(last)) return last;
     }
     const remaining = budget - (Date.now() - started);
     if (remaining >= 800) {

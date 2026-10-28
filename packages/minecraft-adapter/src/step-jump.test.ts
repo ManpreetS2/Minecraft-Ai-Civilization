@@ -270,8 +270,10 @@ describe("doors and two-block trunks", () => {
     const bot = fakeBot(cells);
     bot.activateBlock = async () => {
       toggles += 1;
-      cells["6,64,5"].open = true;
-      cells["6,65,5"].open = true;
+      const lower = cells["6,64,5"];
+      const upper = cells["6,65,5"];
+      if (lower) lower.open = true;
+      if (upper) upper.open = true;
     };
     const result = await tryOpenAdjacentDoor(bot);
     expect(result.handled).toBe(true);

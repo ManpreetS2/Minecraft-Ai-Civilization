@@ -35,7 +35,10 @@ function isBedBlock(block: { name: string } | null | undefined): boolean {
   return Boolean(block?.name.endsWith("_bed"));
 }
 
-export async function sleep(ctx: SkillContext, preferred?: Vec3): Promise<ActionResult<{ rested: boolean; designated: boolean }>> {
+export async function sleep(
+  ctx: SkillContext,
+  preferred?: Vec3,
+): Promise<ActionResult<{ rested: boolean; designated: boolean; position: Vec3; name: string }>> {
   const started = Date.now();
   const bot = ctx.bot;
   const knowledge = minecraftKnowledge();
@@ -117,7 +120,7 @@ export async function sleep(ctx: SkillContext, preferred?: Vec3): Promise<Action
     }
   }
   const bed = bot.blockAt(new Vec3Class(target.position.x, target.position.y, target.position.z));
-  if (!isBedBlock(bed)) {
+  if (!bed || !isBedBlock(bed)) {
     return fail(
       designated ? "BED_MISSING" : "BED_MISSING",
       designated ? "Designated home bed vanished; ownership was not reassigned" : "Bed vanished",
@@ -154,7 +157,7 @@ export async function sleep(ctx: SkillContext, preferred?: Vec3): Promise<Action
   } catch {
     // already awake is fine
   }
-  return ok({ rested: true, designated, position: target.position, name: isBedBlock(bed) ? bed.name : target.name }, Date.now() - started);
+  return ok({ rested: true, designated, position: target.position, name: bed.name }, Date.now() - started);
 }
 
 export async function attack(

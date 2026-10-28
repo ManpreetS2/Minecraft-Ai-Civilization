@@ -8,6 +8,7 @@ import {
   cancelCitizenWork,
   lastOutcomeFrom,
   loadCitizenLastOutcome,
+  mergeUnresolved,
   persistCitizenLastOutcome,
   physicalWorkComplete,
   RETRYABLE_FAILURE_LIMIT,
@@ -43,6 +44,22 @@ describe("physical vs planner results", () => {
     const outcome = lastOutcomeFrom(plan({ task: "mine_ore", action: "mineOre" }), fake);
     expect(outcome.success).toBe(false);
     expect(outcome.code).toBe("INTERRUPTED");
+  });
+
+  it("reads missing details from failures, not from success results", () => {
+    const denied = fail("ACCESS_DENIED", "no chest", 0, false, { missing: "authorized_storage" });
+    const unresolved = mergeUnresolved(undefined, plan(), denied, false);
+    expect(unresolved).toEqual([
+      {
+        action: "fishShore",
+        task: "fish_shore",
+        code: "ACCESS_DENIED",
+        item: undefined,
+        missing: "authorized_storage",
+      },
+    ]);
+    const interruptedSuccess = ok({ collected: 0, workComplete: false }, 4);
+    expect(mergeUnresolved(undefined, plan(), interruptedSuccess, false)).toEqual([]);
   });
 
   it("keeps ACCESS_DENIED as an unresolved block after a later observe success", () => {
