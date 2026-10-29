@@ -49,6 +49,19 @@ export function foodSearchBackoffReason(last: LastOutcome): string {
   return `Food search exhausted ${last.streak}× (${last.code}); not inventing food — backing off`;
 }
 
+/**
+ * Backoff suppresses the identical exhausted gatherFood loop.
+ * New environmental evidence (animals, farm, fishable shore) is a different
+ * acquisition path and must remain eligible.
+ */
+export function foodSearchHasAlternateOpportunity(facts: {
+  animalsNearby: boolean;
+  canFish: boolean;
+  farmReachable: boolean;
+}): boolean {
+  return facts.animalsNearby || facts.canFish || facts.farmReachable;
+}
+
 export function homeSleepBackoffReason(last: LastOutcome): string {
   const obstacle =
     typeof last.error === "string" && /obstacle=([^\s;]+)/.test(last.error)

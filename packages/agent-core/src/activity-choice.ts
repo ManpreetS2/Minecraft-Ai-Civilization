@@ -27,11 +27,15 @@ export type ActivityId =
   | "work_farm"
   | "gather_food"
   | "gather_wood"
+  | "obtain_tool"
   | "observe"
   | "return_home"
   | "claim_home"
   | "seek_housing"
   | "deposit";
+
+const BOOTSTRAP_LOGS = ["oak_log", "birch_log", "spruce_log", "jungle_log", "acacia_log", "dark_oak_log", "mangrove_log", "cherry_log"] as const;
+const BOOTSTRAP_PLANKS = ["oak_planks", "birch_planks", "spruce_planks", "jungle_planks", "acacia_planks", "dark_oak_planks", "mangrove_planks", "cherry_planks"] as const;
 
 export type BlockedActivity = {
   id: ActivityId;
@@ -314,8 +318,25 @@ export function listActivityOptions(input: ActivityChoiceInput): {
       }),
     );
   }
-  if (!hasAnyItem(obs, ["oak_log", "birch_log", "spruce_log"]) && !hasPickaxe) {
+  const hasLogs = hasAnyItem(obs, BOOTSTRAP_LOGS);
+  const hasPlanks = hasAnyItem(obs, BOOTSTRAP_PLANKS);
+  if (!hasLogs && !hasPickaxe && !hasPlanks) {
+    // Executor still maps gather_wood → mineBlock (excavation). Inventory gain is verified downstream.
     options.push(option("gather_wood", "mineBlock", "gather_wood", "bootstrap", "Need wood for tools", 0.55));
+  }
+  if (!hasPickaxe && (hasLogs || hasPlanks) && !suppressed.has("obtainItem") && !suppressed.has("obtain_item")) {
+    // After logs/planks exist, keep progressing the tool chain instead of idle observation.
+    options.push(
+      option(
+        "obtain_tool",
+        "obtainItem",
+        "obtain_item",
+        "bootstrap",
+        "Have wood materials; craft a wooden pickaxe through the recipe chain",
+        0.56,
+        { item: "wooden_pickaxe" },
+      ),
+    );
   }
   options.push(option("observe", "observeNearby", "observe", "idle", "Survey surroundings for work sites", 0.2));
 

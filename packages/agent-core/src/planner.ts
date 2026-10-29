@@ -3,6 +3,7 @@ import { FOOD_ITEM_NAMES } from "@civ/shared";
 import { minecraftKnowledge } from "@civ/minecraft-knowledge";
 import { intentToPlan, type DirectiveIntent, type DirectiveMode } from "./directive-parse.js";
 import {
+  animalsNearby,
   chooseActivity,
   plannedTaskFromOption,
   type ActivityChoiceInput,
@@ -16,6 +17,7 @@ import { evaluateCitizenCurfew, planCurfewBedtimeAction, workHandoffToCurfew } f
 import { shouldBackoffToObserve, suppressedHomeIds, type UnresolvedBlock } from "./task-recovery.js";
 import {
   foodSearchBackoffReason,
+  foodSearchHasAlternateOpportunity,
   homeSleepBackoffReason,
   shouldBackoffFoodSearch,
   shouldBackoffHomeSleepRoute,
@@ -158,18 +160,54 @@ export function planCitizen(input: PlannerInput): PlannedTask {
     if (shouldBackoffFoodSearch(input.lastOutcome)) {
       const hasRod = obs.inventory.some((item) => item.name === "fishing_rod");
       const shore = input.visibleShores?.[0]?.stand;
-      if (hasRod && shore) {
-        const planned = task(
-          "survive",
-          "fish_shore",
-          "fishShore",
-          "reflex",
-          `Hunger low; land food search exhausted — try fishing at a visible shore`,
-          0.92,
-          "gatherer",
-        );
-        planned.target = shore;
-        return planned;
+      const farm = nearestReachableSite(obs.position, input.knownSites ?? [], "farm");
+      const animals = animalsNearby(obs);
+      const canFish = Boolean(hasRod && shore);
+      // Observing must not pretend hunger is solved — but new evidence unlocks alternates.
+      if (
+        foodSearchHasAlternateOpportunity({
+          animalsNearby: animals,
+          canFish,
+          farmReachable: Boolean(farm),
+        })
+      ) {
+        if (animals) {
+          return task(
+            "survive",
+            "acquire_food",
+            "gatherFood",
+            "reflex",
+            "Hunger low; prior land search exhausted, but food animals are now in sight",
+            0.93,
+            "gatherer",
+          );
+        }
+        if (canFish) {
+          const planned = task(
+            "survive",
+            "fish_shore",
+            "fishShore",
+            "reflex",
+            "Hunger low; land food search exhausted — try fishing at a visible shore",
+            0.92,
+            "gatherer",
+          );
+          planned.target = shore;
+          return planned;
+        }
+        if (farm) {
+          const planned = task(
+            "survive",
+            "work_farm",
+            "workFarmPlot",
+            "reflex",
+            "Hunger low; prior food search exhausted — work a discovered farm plot",
+            0.91,
+            "gatherer",
+          );
+          planned.target = farm.origin;
+          return planned;
+        }
       }
       return task("idle", "observe", "observeNearby", "reflex", foodSearchBackoffReason(input.lastOutcome!), 0.4);
     }
@@ -719,7 +757,16 @@ function planHomelessHousing(input: PlannerInput): PlannedTask | undefined {
 function correctiveFromFailure(input: PlannerInput): PlannedTask | undefined {
   const last = input.lastOutcome;
   if (!last || last.success) return undefined;
-  if (workHandoffToCurfew(last.code) || last.code === "NOT_SLEEP_TIME" || last.code === "PATH_BLOCKED" || last.code === "HAZARD_BLOCKED" || last.code === "BED_MISSING" || last.code === "INTERIOR_UNREACHABLE") {
+  // PATH_BLOCKED is usually a soft handoff, but repeated seek_shelter blocks must still
+  // reach the bounded-backoff branch below (otherwise identical unreachable cover loops).
+  if (
+    workHandoffToCurfew(last.code) ||
+    last.code === "NOT_SLEEP_TIME" ||
+    last.code === "HAZARD_BLOCKED" ||
+    last.code === "BED_MISSING" ||
+    last.code === "INTERIOR_UNREACHABLE" ||
+    (last.code === "PATH_BLOCKED" && last.task !== "seek_shelter")
+  ) {
     return undefined;
   }
   if (last.workComplete === false && (last.code === "CURFEW_STOP" || last.code === "CANCELLED" || last.code === "INTERRUPTED")) {
@@ -810,6 +857,47 @@ function correctiveFromFailure(input: PlannerInput): PlannedTask | undefined {
     return task("idle", "observe", "observeNearby", "planner", "Seek shelter unreachable and no housing fallback; back off", 0.4);
   }
   if (shouldBackoffFoodSearch(last)) {
+    const hasRod = input.observation.inventory.some((item) => item.name === "fishing_rod");
+    const shore = input.visibleShores?.[0]?.stand;
+    const farm = nearestReachableSite(input.observation.position, input.knownSites ?? [], "farm");
+    const animals = animalsNearby(input.observation);
+    if (animals) {
+      return task(
+        "survive",
+        "acquire_food",
+        "gatherFood",
+        "planner",
+        "Prior food search exhausted; animals are now visible",
+        0.72,
+        "gatherer",
+      );
+    }
+    if (hasRod && shore) {
+      const planned = task(
+        "survive",
+        "fish_shore",
+        "fishShore",
+        "planner",
+        "Prior food search exhausted; try fishing",
+        0.7,
+        "gatherer",
+      );
+      planned.target = shore;
+      return planned;
+    }
+    if (farm) {
+      const planned = task(
+        "survive",
+        "work_farm",
+        "workFarmPlot",
+        "planner",
+        "Prior food search exhausted; try a discovered farm",
+        0.68,
+        "gatherer",
+      );
+      planned.target = farm.origin;
+      return planned;
+    }
     return task("idle", "observe", "observeNearby", "planner", foodSearchBackoffReason(last), 0.35);
   }
   if (shouldBackoffHomeSleepRoute(last)) {

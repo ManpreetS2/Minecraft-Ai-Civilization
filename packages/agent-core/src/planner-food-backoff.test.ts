@@ -68,4 +68,26 @@ describe("planner food-search backoff (Day 2)", () => {
     expect(planned.action).toBe("observeNearby");
     expect(planned.reason).toMatch(/exhausted/i);
   });
+
+  it("retries gatherFood when animals become visible after food-search backoff", () => {
+    const planned = planCitizen({
+      citizenId: "citizen_atlas",
+      observation: obs({
+        food: 6,
+        inventory: [],
+        nearby: [{ id: 1, name: "cow", type: "mob", hostile: false, position: { x: 1, y: 64, z: 1 }, distance: 4 }],
+      }),
+      settlement: emptySettlement(),
+      assignedNeeds: [],
+      lastOutcome: {
+        task: "acquire_food",
+        action: "gatherFood",
+        success: false,
+        code: "FOOD_NOT_FOUND",
+        streak: 3,
+      },
+    });
+    expect(planned.action).toBe("gatherFood");
+    expect(planned.reason).toMatch(/animals/i);
+  });
 });
