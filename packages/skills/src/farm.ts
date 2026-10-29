@@ -514,10 +514,26 @@ export async function harvestCropAt(
   position: Vec3,
   kind: CropKind = "wheat",
   opts?: { replant?: boolean },
-): Promise<ActionResult<{ crop: string; collected: number; replanted: boolean; position: Vec3 }>> {
+): Promise<
+  ActionResult<{
+    crop: string;
+    collected: number;
+    replanted: boolean;
+    position: Vec3;
+    cropBroken: boolean;
+    acquisitionVerified: boolean;
+  }>
+> {
   const started = Date.now();
   const spec = CROP_BLOCKS[kind];
   const replant = opts?.replant ?? true;
+  if (ctx.signal?.aborted) {
+    return fail("CANCELLED", "Harvest interrupted before crop dig", Date.now() - started, false, {
+      workComplete: false,
+      cropBroken: false,
+      collected: 0,
+    });
+  }
   const block = ctx.bot.blockAt(vecAt(position));
   if (!block || block.name !== spec.crop) {
     return fail("BLOCK_NOT_FOUND", `No ${spec.crop} at ${Math.floor(position.x)},${Math.floor(position.y)},${Math.floor(position.z)}`, Date.now() - started, true);
@@ -529,6 +545,13 @@ export async function harvestCropAt(
   }
   const move = await approachFarmBlock(ctx, block.position, ctx.timeoutMs ?? 12_000);
   if (!move.success) return move;
+  if (ctx.signal?.aborted) {
+    return fail("CANCELLED", "Harvest interrupted before crop dig", Date.now() - started, false, {
+      workComplete: false,
+      cropBroken: false,
+      collected: 0,
+    });
+  }
   await lookAtPosition(ctx, { x: block.position.x, y: block.position.y, z: block.position.z });
   const beforeSeed = countItem(ctx, spec.seed);
   const beforeCrop = countItem(ctx, cropYieldItem(kind));
@@ -542,10 +565,11 @@ export async function harvestCropAt(
     return fail("VERIFY_FAILED", `${spec.crop} still present after harvest`, Date.now() - started, true);
   }
   await wait(400);
-  const collected =
-    kind === "wheat"
-      ? countItem(ctx, "wheat") - beforeCrop + (countItem(ctx, spec.seed) - beforeSeed)
-      : countItem(ctx, spec.seed) - beforeSeed;
+  // Yield is inventory *delta* only — existing wheat/seeds must not count as new harvest.
+  // Measure before replant so seed consumption cannot conceal or inflate collected.
+  const seedDelta = countItem(ctx, spec.seed) - beforeSeed;
+  const cropDelta = countItem(ctx, cropYieldItem(kind)) - beforeCrop;
+  const collected = Math.max(0, kind === "wheat" ? cropDelta + seedDelta : seedDelta);
   let replanted = false;
   if (replant && countItem(ctx, spec.seed) >= 1) {
     const planted = await plantCrop(ctx, kind, { x: block.position.x, y: block.position.y, z: block.position.z });
@@ -554,9 +578,11 @@ export async function harvestCropAt(
   return ok(
     {
       crop: spec.crop,
-      collected: Math.max(0, collected),
+      collected,
       replanted,
       position: { x: block.position.x, y: block.position.y, z: block.position.z },
+      cropBroken: true,
+      acquisitionVerified: collected > 0,
     },
     Date.now() - started,
   );
@@ -717,8 +743,13 @@ export async function harvestPlot(
     collected += result.data.collected;
     if (result.data.replanted) replanted.push(cropPos);
   }
+  // Only add items newly picked up during drop collection — never absolute inventory.
+  const yieldBeforePickup = countItem(ctx, cropYieldItem(kind));
+  const seedBeforePickup = countItem(ctx, CROP_BLOCKS[kind].seed);
   await collectFarmDrops(ctx, kind);
-  collected = Math.max(collected, countItem(ctx, cropYieldItem(kind)));
+  const yieldPicked = Math.max(0, countItem(ctx, cropYieldItem(kind)) - yieldBeforePickup);
+  const seedPicked = Math.max(0, countItem(ctx, CROP_BLOCKS[kind].seed) - seedBeforePickup);
+  collected += kind === "wheat" ? yieldPicked + seedPicked : seedPicked;
   if (harvested.length === 0) {
     const first = failed[0];
     return fail(first?.code ?? "BLOCK_NOT_FOUND", first?.error ?? "No mature crops in plot", Date.now() - started, true);

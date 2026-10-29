@@ -22,14 +22,21 @@ export function classifyStaleTarget(expected?: string, actual?: string): ErrorCo
   return undefined;
 }
 
+/**
+ * Excavation-only: succeeds when the target block is verified gone.
+ * Does **not** claim inventory acquisition — use `collectResource` for that.
+ */
 export async function mineBlock(
   ctx: SkillContext,
   names: string[],
   maxDistance = 32,
-): Promise<ActionResult<{ name: string; position: Vec3 }>> {
+): Promise<ActionResult<{ name: string; position: Vec3; excavated: true; resourceAcquired: false }>> {
   return retry(
     async () => {
       const started = Date.now();
+      if (ctx.signal?.aborted) {
+        return fail("CANCELLED", "Cancelled before mining", Date.now() - started, false, { workComplete: false });
+      }
       const found = await findBlock(ctx, names, maxDistance);
       if (!found.success) return found;
       const target = found.data.position;
@@ -97,7 +104,11 @@ export async function mineBlock(
       if (after && after.name === block.name) {
         return fail("VERIFY_FAILED", `Block ${block.name} still present after dig`, Date.now() - started, true);
       }
-      return ok({ name: block.name, position: target }, Date.now() - started);
+      // Excavation verified only — callers must not treat this as inventory gain.
+      return ok(
+        { name: block.name, position: target, excavated: true as const, resourceAcquired: false as const },
+        Date.now() - started,
+      );
     },
     2,
     400,

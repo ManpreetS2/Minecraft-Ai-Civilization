@@ -655,6 +655,28 @@ export async function mineKnownOre(
     );
   }
 
+  // Resource-acquisition contract: excavation alone is not enough.
+  // Block removed without inventory/custody gain must not report success.
+  if (gained <= 0) {
+    return fail(
+      "ITEM_NOT_FOUND",
+      `Excavated ${mined.length} ${profile.displayName} block(s) but did not collect drops into inventory`,
+      Date.now() - started,
+      true,
+      {
+        resource: prereq.resource,
+        mined,
+        collected,
+        deposited,
+        hiddenIgnored,
+        excavated: true,
+        resourceAcquired: false,
+        workComplete: false,
+        notFound: false,
+      },
+    );
+  }
+
   return ok(
     {
       resource: prereq.resource,
@@ -663,6 +685,8 @@ export async function mineKnownOre(
       deposited,
       hiddenIgnored,
       notFound: false,
+      excavated: mined.length > 0,
+      resourceAcquired: true,
     },
     Date.now() - started,
   );

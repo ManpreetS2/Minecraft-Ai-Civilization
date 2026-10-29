@@ -52,8 +52,32 @@ export async function equipItem(
   return ok({ item: result.data.item }, result.durationMs);
 }
 
+function waitAbortable(ms: number, signal?: AbortSignal): Promise<"done" | "aborted"> {
+  return new Promise((resolve) => {
+    if (signal?.aborted) {
+      resolve("aborted");
+      return;
+    }
+    const timer = setTimeout(() => {
+      signal?.removeEventListener("abort", onAbort);
+      resolve("done");
+    }, ms);
+    const onAbort = () => {
+      clearTimeout(timer);
+      resolve("aborted");
+    };
+    signal?.addEventListener("abort", onAbort, { once: true });
+  });
+}
+
 export async function eatFood(ctx: SkillContext): Promise<ActionResult<{ item: string; food: number }>> {
   const started = Date.now();
+  if (ctx.signal?.aborted) {
+    return fail("CANCELLED", "eatFood cancelled before eating", Date.now() - started, false, {
+      inventoryPreserved: true,
+      workComplete: false,
+    });
+  }
   const knowledge = minecraftKnowledge();
   const hunger = ctx.bot.food ?? 20;
   const food = edibleItems(ctx)[0];
@@ -70,9 +94,43 @@ export async function eatFood(ctx: SkillContext): Promise<ActionResult<{ item: s
   const beforeHunger = hunger;
   const beforeCount = countItem(ctx, food.name);
   try {
+    if (ctx.signal?.aborted) {
+      return fail("CANCELLED", "eatFood cancelled before equip", Date.now() - started, false, {
+        inventoryPreserved: true,
+        workComplete: false,
+      });
+    }
     await ctx.bot.equip(stack, "hand");
+    if (ctx.signal?.aborted) {
+      return fail("CANCELLED", "eatFood cancelled before consume", Date.now() - started, false, {
+        inventoryPreserved: true,
+        workComplete: false,
+        item: food.name,
+      });
+    }
     await ctx.bot.consume();
-    await new Promise((resolve) => setTimeout(resolve, 800));
+    const waitResult = await waitAbortable(800, ctx.signal);
+    if (waitResult === "aborted") {
+      // Consume may already have applied; report inventory/hunger truthfully.
+      const midHunger = ctx.bot.food ?? 0;
+      const midCount = countItem(ctx, food.name);
+      const midConsumed = midCount < beforeCount;
+      const midRecovered = midHunger > beforeHunger;
+      if (midConsumed || midRecovered) {
+        return fail("INTERRUPTED", "eatFood cancelled after food was consumed", Date.now() - started, true, {
+          inventoryPreserved: !midConsumed,
+          workComplete: false,
+          item: food.name,
+          food: midHunger,
+          consumed: midConsumed,
+        });
+      }
+      return fail("CANCELLED", "eatFood cancelled during verification wait", Date.now() - started, false, {
+        inventoryPreserved: true,
+        workComplete: false,
+        item: food.name,
+      });
+    }
   } catch (error) {
     return fail("EAT_FAILED", error instanceof Error ? error.message : String(error), Date.now() - started, true);
   }
@@ -80,6 +138,22 @@ export async function eatFood(ctx: SkillContext): Promise<ActionResult<{ item: s
   const afterCount = countItem(ctx, food.name);
   const consumed = afterCount < beforeCount;
   const recovered = afterHunger > beforeHunger;
+  if (ctx.signal?.aborted) {
+    if (consumed || recovered) {
+      return fail("INTERRUPTED", "eatFood cancelled after food was consumed", Date.now() - started, true, {
+        inventoryPreserved: !consumed,
+        workComplete: false,
+        item: food.name,
+        food: afterHunger,
+        consumed,
+      });
+    }
+    return fail("CANCELLED", "eatFood cancelled without consumption", Date.now() - started, false, {
+      inventoryPreserved: true,
+      workComplete: false,
+      item: food.name,
+    });
+  }
   if (!consumed && !recovered) {
     return fail("VERIFY_FAILED", "Eating did not consume food or raise hunger", Date.now() - started, true);
   }
@@ -411,6 +485,13 @@ export async function craftItem(
   const pool = owned.slice(0, 6);
   let lastError = "no recipe attempted";
   for (const recipe of pool) {
+    if (ctx.signal?.aborted) {
+      return fail("CANCELLED", "Crafting cancelled for this citizen", Date.now() - started, false, {
+        item: name,
+        inventoryPreserved: true,
+        workComplete: false,
+      });
+    }
     const resultCount = Math.max(1, recipe.result?.count ?? (knowledge.getRecipeOutputCount(name) || 1));
     const crafts = Math.max(1, Math.ceil(count / resultCount));
     for (const [id, amount] of recipeIngredientIds(recipe)) {

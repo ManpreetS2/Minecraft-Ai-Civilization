@@ -114,6 +114,13 @@ export async function collectResource(
           return fail(protectedBlock.code, protectedBlock.error, Date.now() - started, false);
         }
         await lookAtPosition(ctx, best.position);
+        if (ctx.signal?.aborted) {
+          return fail("INTERRUPTED", "collectResource interrupted before dig", Date.now() - started, true, {
+            collected: countMatching(ctx, names) - before,
+            inventoryPreserved: true,
+            workComplete: false,
+          });
+        }
         try {
           await ctx.bot.dig(current, true);
         } catch (error) {

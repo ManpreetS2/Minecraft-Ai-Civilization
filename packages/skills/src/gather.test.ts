@@ -105,5 +105,19 @@ describe("mineBlock verifies the world change", () => {
     if (!result.success) throw new Error(result.error);
     expect(result.data.name).toBe("oak_log");
     expect(result.data.position).toEqual({ x: 6, y: 64, z: 5 });
+    expect(result.data.excavated).toBe(true);
+    expect(result.data.resourceAcquired).toBe(false);
+  });
+
+  it("cancels before dig without inventing excavation", async () => {
+    setNavigationBackend(inReachNav());
+    const ac = new AbortController();
+    ac.abort();
+    const ctx = mineCtx(true);
+    ctx.signal = ac.signal;
+    const result = await mineBlock(ctx, ["oak_log"]);
+    expect(result.success).toBe(false);
+    if (result.success) throw new Error("cancelled mine should fail");
+    expect(result.code).toBe("CANCELLED");
   });
 });
