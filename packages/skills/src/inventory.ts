@@ -228,6 +228,67 @@ function inventoryByName(bot: SkillContext["bot"]): Record<string, number> {
   return bag;
 }
 
+const PLANK_NAMES = [
+  "oak_planks",
+  "spruce_planks",
+  "birch_planks",
+  "jungle_planks",
+  "acacia_planks",
+  "dark_oak_planks",
+  "mangrove_planks",
+  "cherry_planks",
+  "bamboo_planks",
+  "crimson_planks",
+  "warped_planks",
+] as const;
+
+/**
+ * When Mineflayer has not exposed recipes yet (or offline fixtures omit them),
+ * synthesize a recipe from `@civ/minecraft-knowledge` using concrete inventory
+ * ingredient ids. Does not invent items — craft still requires inventory gain.
+ */
+export function synthesizeKnowledgeRecipe(
+  bot: SkillContext["bot"],
+  itemName: string,
+): MineflayerRecipe | undefined {
+  const knowledge = minecraftKnowledge();
+  const name = knowledge.normalizeItemName(itemName) || itemName;
+  const bag = inventoryByName(bot);
+  const known = knowledge.getRecipe(name, bag);
+  if (!known) return undefined;
+  const resultMeta = bot.registry.itemsByName[name] ?? knowledge.getItem(name);
+  if (!resultMeta || typeof resultMeta.id !== "number") return undefined;
+
+  const ingredients: Array<{ id: number; count: number }> = [];
+  for (const [rawName, amount] of Object.entries(known.ingredients)) {
+    let remaining = amount;
+    if (rawName === "any_planks") {
+      for (const plank of PLANK_NAMES) {
+        if (remaining <= 0) break;
+        const have = bag[plank] ?? 0;
+        if (have <= 0) continue;
+        const take = Math.min(have, remaining);
+        const id = bot.registry.itemsByName[plank]?.id ?? knowledge.getItem(plank)?.id;
+        if (typeof id !== "number") continue;
+        ingredients.push({ id, count: take });
+        remaining -= take;
+      }
+      if (remaining > 0) return undefined;
+      continue;
+    }
+    const id = bot.registry.itemsByName[rawName]?.id ?? knowledge.getItem(rawName)?.id;
+    if (typeof id !== "number") return undefined;
+    if ((bag[rawName] ?? 0) < amount) return undefined;
+    ingredients.push({ id, count: amount });
+  }
+  if (ingredients.length === 0) return undefined;
+  return {
+    requiresTable: Boolean(known.needsTable),
+    result: { id: resultMeta.id, count: known.resultCount ?? (knowledge.getRecipeOutputCount(name) || 1) },
+    ingredients,
+  };
+}
+
 function recipeIngredientsOwned(bot: SkillContext["bot"], recipe: MineflayerRecipe): boolean {
   const needed = recipeIngredientIds(recipe);
   if (needed.size === 0) return false;
@@ -435,7 +496,15 @@ export async function craftItem(
   }
 
   const tableContext = needsTable ? craftingTable : null;
-  const craftable = api.recipesFor(item.id, null, Math.max(1, count), tableContext);
+  let craftable = api.recipesFor(item.id, null, Math.max(1, count), tableContext);
+  if (craftable.length === 0) {
+    // Knowledge fallback: Mineflayer recipe list can be empty while the 1.21 recipe is known
+    // and ingredients are already held. Still requires a later inventory increase to succeed.
+    const synthesized = synthesizeKnowledgeRecipe(bot, name);
+    if (synthesized && (!needsTable || craftingTable)) {
+      craftable = [synthesized];
+    }
+  }
   if (craftable.length === 0) {
     const firstMissing = Object.entries(analysis.missingIngredients)[0];
     if (firstMissing) {

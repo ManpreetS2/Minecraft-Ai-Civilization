@@ -31,6 +31,7 @@ export {
 } from "./ore-search.js";
 export {
   craftItem,
+  synthesizeKnowledgeRecipe,
   eatFood,
   equipItem,
   depositItems,
