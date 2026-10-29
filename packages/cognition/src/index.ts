@@ -18,10 +18,12 @@ export { OllamaProvider } from "./ollama.js";
 export {
   DecisionSchema,
   extractJson,
+  GOALS,
   normalizeDecisionInput,
   normalizeGoal,
   validateDecision,
   type CognitionPrompt,
   type CognitionProvider,
+  type Goal,
   type HighLevelDecision,
 } from "./schema.js";

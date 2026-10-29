@@ -27,6 +27,34 @@ describe("CivilizationStore", () => {
     restored.close();
   });
 
+  it("safeRead returns closed instead of throwing after close", () => {
+    const dir = mkdtempSync(join(tmpdir(), "civ-"));
+    const path = join(dir, "read.sqlite");
+    const store = new CivilizationStore(path);
+    expect(store.safeRead("settlement", () => store.getSettlement()).ok).toBe(true);
+    store.close();
+    expect(store.safeRead("settlement", () => store.getSettlement())).toEqual({ ok: false, reason: "closed" });
+  });
+
+  it("distinguishes closed skips from unexpected write errors", () => {
+    const dir = mkdtempSync(join(tmpdir(), "civ-"));
+    const path = join(dir, "closed.sqlite");
+    const store = new CivilizationStore(path);
+    expect(
+      store.safeWrite("boom", () => {
+        throw new Error("sqlite exploded");
+      }),
+    ).toEqual({ ok: false, reason: "error", error: expect.any(Error) });
+    store.close();
+    expect(store.isOpen()).toBe(false);
+    expect(
+      store.safeWrite("late", () => {
+        throw new Error("should not run");
+      }),
+    ).toEqual({ ok: false, reason: "closed" });
+    store.close();
+  });
+
   it("records a Minecraft death once and keeps the identity deceased after reopen", () => {
     const dir = mkdtempSync(join(tmpdir(), "civ-"));
     const path = join(dir, "death.sqlite");

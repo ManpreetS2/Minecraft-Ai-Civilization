@@ -1,4 +1,5 @@
 import type { BodyObservation, DecisionSource, SettlementNeed, SettlementState } from "@civ/shared";
+import { dispatchCognitionGoal } from "./goal-dispatch.js";
 
 export type PlannedTask = {
   goal: string;
@@ -72,7 +73,28 @@ export function planCitizen(input: PlannerInput): PlannedTask {
   }
 
   if (llmGoal && llmReason) {
-    return task(llmGoal, llmGoal, llmGoal, "llm", llmReason, 0.8);
+    const dispatched = dispatchCognitionGoal(llmGoal);
+    if ("unsupported" in dispatched) {
+      return task(
+        "idle",
+        "unsupported_goal",
+        "deferCapability",
+        "llm",
+        `Unsupported cognition goal '${dispatched.goal}' — refusing fabricated work`,
+        0.25,
+      );
+    }
+    return task(
+      dispatched.goal,
+      dispatched.task,
+      dispatched.action,
+      "llm",
+      dispatched.deferred
+        ? `${llmReason} (deferred: no verified ${dispatched.task} capability in this build)`
+        : llmReason,
+      dispatched.deferred ? 0.2 : 0.8,
+      dispatched.occupation,
+    );
   }
 
   if (!hasAny(obs, TOOL_PICKAXES) && !hasAny(obs, LOG_ITEMS) && count(obs, ["oak_planks", "spruce_planks", "birch_planks"]) < 8) {

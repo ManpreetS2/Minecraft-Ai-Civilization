@@ -108,8 +108,19 @@ CREATE TABLE IF NOT EXISTS llm_calls (
 );
 `;
 
+export type StoreWriteResult =
+  | { ok: true }
+  | { ok: false; reason: "closed" }
+  | { ok: false; reason: "error"; error: unknown };
+
+export type StoreReadResult<T> =
+  | { ok: true; value: T }
+  | { ok: false; reason: "closed" }
+  | { ok: false; reason: "error"; error: unknown };
+
 export class CivilizationStore {
   readonly db: Database.Database;
+  private open = true;
 
   constructor(filePath: string) {
     mkdirSync(dirname(resolve(filePath)), { recursive: true });
@@ -118,6 +129,46 @@ export class CivilizationStore {
     this.db.exec(SCHEMA);
     this.migrate();
     this.seed();
+  }
+
+  isOpen(): boolean {
+    return this.open;
+  }
+
+  /**
+   * Read without throwing after close. Unexpected read errors are not treated as data.
+   */
+  safeRead<T>(label: string, read: () => T): StoreReadResult<T> {
+    if (!this.open) {
+      return { ok: false, reason: "closed" };
+    }
+    try {
+      return { ok: true, value: read() };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(`[store] unexpected read error (${label}): ${message}`);
+      return { ok: false, reason: "error", error };
+    }
+  }
+
+  /**
+   * Persist with an explicit outcome.
+   * - `closed`: expected skip after shutdown (not an action success).
+   * - `error`: unexpected SQLite/runtime failure — callers must not treat as durable success.
+   */
+  safeWrite(label: string, write: () => void): StoreWriteResult {
+    if (!this.open) {
+      console.warn(`[store] skipped write after close: ${label}`);
+      return { ok: false, reason: "closed" };
+    }
+    try {
+      write();
+      return { ok: true };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(`[store] unexpected write error (${label}): ${message}`);
+      return { ok: false, reason: "error", error };
+    }
   }
 
   private migrate(): void {
@@ -147,6 +198,8 @@ export class CivilizationStore {
   }
 
   close(): void {
+    if (!this.open) return;
+    this.open = false;
     this.db.close();
   }
 
