@@ -1,5 +1,8 @@
 # Architecture
 
+> **Current-first-demo note (Nov 1, 2026):** The code and architecture text below still reflect legacy five-citizen, single-settlement, and colony configurations. The approved demo is **1v1 then 2v2**, with **per-citizen private cognition and per-community information boundaries**, world-verifiable survival and no forced roles. The `@civ/session-isolation` package currently has mock GPT/Claude adapters; SEC-001 manager routing remains a separate, unmerged proposal. Do not treat the diagrams or historical `three_citizen` profile here as a tested 2v2 architecture. See [current status](CURRENT_STATUS_2026-11-01.md) and the [public charter](https://github.com/ManpreetS2/Minecraft-Ai-Civilization/blob/main/project.md).
+
+
 ## North star
 
 Give persistent people needs, memory, communication, physical capabilities, limited information, and meaningful decision freedom. Then watch what civilization they create.

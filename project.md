@@ -1,5 +1,8 @@
 # Minecraft AI Civilization — Project Charter and Current Design
 
+> **AUTHORITATIVE CHARTER NOTICE (November 1, 2026):** This private copy is a historical design snapshot dated October 26, 2026. The **current authoritative V1 design** is [the public root project.md](https://github.com/ManpreetS2/Minecraft-Ai-Civilization/blob/main/project.md): 1v1 GPT/Claude technical gate, then independent 2v2 / 60-minute wilderness demo. Historical five-citizen or mayor/economy sections below do **not** override that direction. This docs-only branch does not change the implementation or replace this private historical record. See [Current status](docs/CURRENT_STATUS_2026-11-01.md).
+
+
 > **Status:** Long-term design and active engineering plan. Features described below are goals unless explicitly labeled verified. Last design decision: October 26, 2026.
 
 **Core question:** What happens when independent persistent AI citizens, with different dispositions, survival needs and limited knowledge, must live together in a physically consequential Minecraft world long enough to create (or fail to create) a society?

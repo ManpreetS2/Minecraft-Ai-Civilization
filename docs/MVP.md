@@ -1,5 +1,8 @@
 # First Settlement MVP
 
+> **HISTORICAL MVP (superseded):** The five-citizen three-Minecraft-day starter settlement described below is no longer the first-public-demo acceptance gate. The [authoritative charter](https://github.com/ManpreetS2/Minecraft-Ai-Civilization/blob/main/project.md) instead requires an independent 1v1 GPT/Claude technical trial, followed by 2v2 / 60 minutes in a natural world with empty inventories and no human-built starting village. Preserve this file as design history; see [current engineering status](CURRENT_STATUS_2026-11-01.md).
+
+
 ## Goal
 
 Five citizens — Atlas, Maya, Theo, Ava, Kai — enter a shared Paper 1.21.11 world and autonomously attempt to survive together for at least three Minecraft days.

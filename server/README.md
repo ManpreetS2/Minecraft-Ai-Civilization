@@ -1,5 +1,8 @@
 # Paper 1.21.11 — local shared world
 
+> **Historical server setup — do not auto-upgrade.** This page describes one older local Paper **1.21.11 build 132** environment. The newer **1.21.6 build #48** is a proposed first-demo target chosen for parity experiments; it has **not** been validated as the project's live 2v2 runtime. Do not overwrite an existing world, `paper.jar`, `server.properties` or databases to match this page. Read [current status](../docs/CURRENT_STATUS_2026-11-01.md) and [development workflow](../docs/DEVELOPMENT_WORKFLOW.md) first. Live server actions require separate approval.
+
+
 This folder is the **one** Minecraft Java server for the civilization. Do not create a separate Minecraft install per agent. Mineflayer bots are protocol clients, not graphical game instances.
 
 The Paper jar, world, logs, cache, and generated runtime files are **not** in git. After cloning, recreate the server from this document.

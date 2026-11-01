@@ -1,5 +1,8 @@
 # Local developer notes
 
+> **Legacy local runtime instructions.** This page documents a previously configured Paper 1.21.11 development environment, the Atlas CLI and an older shared-settlement simulator; it is **not** an approved 2v2 runbook. The selected future demo target is Paper **1.21.6 build #48**, pending offline version compatibility/parity checks. New laptops should first follow [offline setup and multi-agent workflow](DEVELOPMENT_WORKFLOW.md). No live Paper run, real provider billing, production DB migration or world change is authorized by these examples.
+
+
 ## Connect
 
 Use **`127.0.0.1:25565`**. On this machine `localhost` has produced a network-unreachable error.
