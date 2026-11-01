@@ -51,7 +51,7 @@ import { travelTowardHousingResult } from "./home-discovery.js";
 import { rememberDiscoveredSite, visibleShoresFromWorld } from "./discovered-sites.js";
 import { skipProtectedPropertyCell, assertMayUseChest } from "./property-safety.js";
 import { communityConstruction } from "./community-construction.js";
-import { communityPhysicalState } from "./community-physical-state.js";
+import { communityPhysicalState, physicalBlockKey } from "./community-physical-state.js";
 import { decisionKind, physicalWorkComplete, skillStatusOf } from "./task-recovery.js";
 
 export type FoodGatherSuccess = {
@@ -806,7 +806,7 @@ async function gatherFood(ctx: SkillContext, store: CivilizationStore, events: E
   }
 
   const chest = knownChest(ctx, store);
-  const storedFood = Object.entries(store.hasCommunities() ? {} : store.getSettlement().storageContents ?? {}).find(
+  const storedFood = Object.entries(storedContentsFor(ctx, store, chest)).find(
     ([name, count]) => FOOD_ITEM_NAMES.has(name) && count > 0,
   );
   if (!heldFood && chest && storedFood) {
@@ -899,6 +899,28 @@ async function gatherFood(ctx: SkillContext, store: CivilizationStore, events: E
   );
 }
 
+/** Community mode: last-observed contents of the chest this citizen may use; legacy mode: the settlement snapshot. */
+function storedContentsFor(ctx: SkillContext, store: CivilizationStore, chest: Vec3 | undefined): Record<string, number> {
+  if (!store.hasCommunities()) return store.getSettlement().storageContents ?? {};
+  const dimension = ctx.bot.game?.dimension;
+  if (!ctx.citizenId || !chest || typeof dimension !== "string" || !dimension.trim()) return {};
+  const key = physicalBlockKey(dimension.replace(/^minecraft:/, ""), chest);
+  return communityPhysicalState(store).forCitizen(ctx.citizenId).observedContainerContents(key) ?? {};
+}
+
+/** Persists only counts the adapter just observed, scoped to the container's owner/grantees. */
+function recordObservedContents(ctx: SkillContext, store: CivilizationStore, chest: Vec3, observed: Record<string, number>): void {
+  const dimension = ctx.bot.game?.dimension;
+  if (!ctx.citizenId || typeof dimension !== "string" || !dimension.trim()) return;
+  const key = physicalBlockKey(dimension.replace(/^minecraft:/, ""), chest);
+  try {
+    communityPhysicalState(store).forCitizen(ctx.citizenId).recordContainerObservation(key, observed);
+  } catch (error) {
+    // The physical transfer already happened; a lost observation only makes the next withdrawal re-verify live.
+    console.error(`[executor] container observation not recorded: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
 async function depositToSettlement(
   ctx: SkillContext,
   store: CivilizationStore,
@@ -932,7 +954,9 @@ async function depositToSettlement(
   if (result.success) {
     // Container contents are restricted to the actual readers, not every community
     // member. Do not publish them to the legacy or community-wide stock snapshots.
-    if (!store.hasCommunities()) {
+    if (store.hasCommunities()) {
+      recordObservedContents(ctx, store, chest, result.data.contents);
+    } else {
       const settlement = store.getSettlement();
       settlement.storage = chest;
       settlement.storageContents = result.data.contents;
@@ -947,7 +971,7 @@ async function depositToSettlement(
 
 async function withdrawFood(ctx: SkillContext, store: CivilizationStore, events: EventBus): Promise<ActionResult> {
   const chest = knownChest(ctx, store);
-  const foodName = Object.entries(store.hasCommunities() ? {} : store.getSettlement().storageContents ?? {}).find(
+  const foodName = Object.entries(storedContentsFor(ctx, store, chest)).find(
     ([name, count]) => FOOD_ITEM_NAMES.has(name) && count > 0,
   )?.[0];
   if (!chest || !foodName) {
@@ -971,7 +995,9 @@ async function withdrawItemsNamed(
   if (!access.success) return access;
   const result = await withdrawItems(ctx, itemName, count, chest);
   if (result.success) {
-    if (!store.hasCommunities()) {
+    if (store.hasCommunities()) {
+      recordObservedContents(ctx, store, chest, result.data.contents);
+    } else {
       const settlement = store.getSettlement();
       settlement.storageContents = result.data.contents;
       store.saveSettlement(settlement);
