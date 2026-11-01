@@ -287,6 +287,9 @@ export function evaluateConstructionExperimentLive(env: NodeJS.ProcessEnv = proc
 
   const paperPort = Number(env.MINECRAFT_PORT ?? ISOLATED_PAPER_PORT);
   const rconPort = Number(env.CONSTRUCTION_EXPERIMENT_RCON_PORT ?? ISOLATED_RCON_PORT);
+  if (![paperPort, rconPort].every((port) => Number.isInteger(port) && port >= 1 && port <= 65535)) {
+    return { allowed: false, error: "Paper and RCON ports must be integers from 1 to 65535" };
+  }
   if (paperPort === ORIGINAL_PAPER_PORT || paperPort === LIVE_CIVILIZATION_PORT) {
     return {
       allowed: false,

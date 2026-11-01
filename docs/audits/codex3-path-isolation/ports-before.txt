@@ -1,0 +1,107 @@
+
+ RUN  v3.2.7 C:/Users/sh1ft/.t3/worktrees/Minecraft-Ai-Civilization/agents-codex-baseline-stabilization
+
+ ❯ apps/orchestrator/src/construction-path-isolation.test.ts (47 tests | 8 failed) 163ms
+   ✓ host-independent path syntax (lexical semantics, not foreign OS execution) > compares C:\a\world-lab\ and c:/a/world-lab/world 1ms
+   ✓ host-independent path syntax (lexical semantics, not foreign OS execution) > compares C:/a/world-lab/ and C:/a/world-lab 0ms
+   ✓ host-independent path syntax (lexical semantics, not foreign OS execution) > compares C:/a/x/../world-lab and C:/a/world-lab/world 0ms
+   ✓ host-independent path syntax (lexical semantics, not foreign OS execution) > compares C:/a/world-lab and C:/a/world-lab-copy 0ms
+   ✓ host-independent path syntax (lexical semantics, not foreign OS execution) > compares C:/ and C:/a/world-lab 0ms
+   ✓ host-independent path syntax (lexical semantics, not foreign OS execution) > compares C:/a/world-lab and D:/a/world-lab 0ms
+   ✓ host-independent path syntax (lexical semantics, not foreign OS execution) > compares \\server\share\world-lab\ and //SERVER/SHARE/world-lab/world 0ms
+   ✓ host-independent path syntax (lexical semantics, not foreign OS execution) > compares //server/share/ and //server/share/world 0ms
+   ✓ host-independent path syntax (lexical semantics, not foreign OS execution) > compares //server/share/world and //server/share2/world 0ms
+   ✓ host-independent path syntax (lexical semantics, not foreign OS execution) > compares /sandbox/world-lab/ and /sandbox/world-lab 0ms
+   ✓ host-independent path syntax (lexical semantics, not foreign OS execution) > compares / and /sandbox/world-lab 0ms
+   ✓ host-independent path syntax (lexical semantics, not foreign OS execution) > compares /sandbox/World and /sandbox/world 0ms
+   ✓ host-independent path syntax (lexical semantics, not foreign OS execution) > compares /sandbox/world/../safe and /sandbox/world 0ms
+   ✓ host-independent path syntax (lexical semantics, not foreign OS execution) > compares /sandbox/world and /sandbox/world-copy 0ms
+   ✓ host-independent path syntax (lexical semantics, not foreign OS execution) > compares C:/sandbox/world and /sandbox/world 0ms
+   ✓ host-independent path syntax (lexical semantics, not foreign OS execution) > refuses to certify ambiguous identity "" 0ms
+   ✓ host-independent path syntax (lexical semantics, not foreign OS execution) > refuses to certify ambiguous identity "relative/world" 0ms
+   ✓ host-independent path syntax (lexical semantics, not foreign OS execution) > refuses to certify ambiguous identity "C:world" 0ms
+   ✓ host-independent path syntax (lexical semantics, not foreign OS execution) > refuses to certify ambiguous identity "\\world" 0ms
+   ✓ host-independent path syntax (lexical semantics, not foreign OS execution) > refuses to certify ambiguous identity "C:/world." 0ms
+   ✓ host-independent path syntax (lexical semantics, not foreign OS execution) > refuses to certify ambiguous identity "C:/world " 0ms
+   ✓ host-independent path syntax (lexical semantics, not foreign OS execution) > refuses to certify ambiguous identity "C:/world:stream" 0ms
+   ✓ host-independent path syntax (lexical semantics, not foreign OS execution) > refuses to certify ambiguous identity "\\\\?\\C:\\world" 0ms
+   ✓ host-independent path syntax (lexical semantics, not foreign OS execution) > refuses to certify ambiguous identity "//server" 0ms
+   ✓ host-independent path syntax (lexical semantics, not foreign OS execution) > refuses to certify ambiguous identity "bad\u0000path" 0ms
+   ✓ canonical isolation on the actual host filesystem > allows physically distinct disposable targets 8ms
+   ✓ canonical isolation on the actual host filesystem > rejects an isolated directory junction/symlink to the protected world 7ms
+   ✓ canonical isolation on the actual host filesystem > rejects an isolated database inside the protected world 7ms
+   ✓ canonical isolation on the actual host filesystem > rejects a database hard link to the protected database 7ms
+   ✓ canonical isolation on the actual host filesystem > fails closed when canonical identity cannot be read 5ms
+   ✓ canonical isolation on the actual host filesystem > rejects missing candidates 5ms
+   ✓ canonical isolation on the actual host filesystem > allows a valid gate with canonical paths and a new evidence directory 8ms
+   ✓ canonical isolation on the actual host filesystem > rejects evidence redirected through a junction into the protected world 8ms
+   ✓ canonical isolation on the actual host filesystem > returns a refusal for an unsupported evidence path without throwing 6ms
+   ✓ canonical isolation on the actual host filesystem > fails closed when the isolated candidate canonical lookup fails 6ms
+   ✓ canonical isolation on the actual host filesystem > rejects a dangling evidence junction/symlink rather than treating it as a new directory 8ms
+   ✓ canonical isolation on the actual host filesystem > requires native unambiguous syntax before touching the filesystem 5ms
+   ✓ canonical isolation on the actual host filesystem > rejects a directory used as SQLite target: isolated 6ms
+   ✓ canonical isolation on the actual host filesystem > rejects a directory used as SQLite target: world-lab 6ms
+   × canonical isolation on the actual host filesystem > refuses invalid paper and RCON ports "" 13ms
+     → expected true to be false // Object.is equality
+   × canonical isolation on the actual host filesystem > refuses invalid paper and RCON ports "0" 8ms
+     → expected true to be false // Object.is equality
+   × canonical isolation on the actual host filesystem > refuses invalid paper and RCON ports "-1" 7ms
+     → expected true to be false // Object.is equality
+   × canonical isolation on the actual host filesystem > refuses invalid paper and RCON ports "65536" 8ms
+     → expected true to be false // Object.is equality
+   × canonical isolation on the actual host filesystem > refuses invalid paper and RCON ports "NaN" 8ms
+     → expected true to be false // Object.is equality
+   × canonical isolation on the actual host filesystem > refuses invalid paper and RCON ports "Infinity" 7ms
+     → expected true to be false // Object.is equality
+   × canonical isolation on the actual host filesystem > refuses invalid paper and RCON ports "25568.5" 7ms
+     → expected true to be false // Object.is equality
+   × canonical isolation on the actual host filesystem > refuses invalid paper and RCON ports "not-a-port" 8ms
+     → expected true to be false // Object.is equality
+pnpm :
+At line:2 char:1
++ pnpm exec vitest run apps/orchestrator/src/construction-path-isolatio ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 8 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  apps/orchestrator/src/construction-path-isolation.test.ts > canonical isolation on the actual host filesystem >
+refuses invalid paper and RCON ports ""
+ FAIL  apps/orchestrator/src/construction-path-isolation.test.ts > canonical isolation on the actual host filesystem >
+refuses invalid paper and RCON ports "0"
+ FAIL  apps/orchestrator/src/construction-path-isolation.test.ts > canonical isolation on the actual host filesystem >
+refuses invalid paper and RCON ports "-1"
+ FAIL  apps/orchestrator/src/construction-path-isolation.test.ts > canonical isolation on the actual host filesystem >
+refuses invalid paper and RCON ports "65536"
+ FAIL  apps/orchestrator/src/construction-path-isolation.test.ts > canonical isolation on the actual host filesystem >
+refuses invalid paper and RCON ports "NaN"
+ FAIL  apps/orchestrator/src/construction-path-isolation.test.ts > canonical isolation on the actual host filesystem >
+refuses invalid paper and RCON ports "Infinity"
+ FAIL  apps/orchestrator/src/construction-path-isolation.test.ts > canonical isolation on the actual host filesystem >
+refuses invalid paper and RCON ports "25568.5"
+ FAIL  apps/orchestrator/src/construction-path-isolation.test.ts > canonical isolation on the actual host filesystem >
+refuses invalid paper and RCON ports "not-a-port"
+AssertionError: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ apps/orchestrator/src/construction-path-isolation.test.ts:139:100
+    137|   });
+    138|   it.each(["", "0", "-1", "65536", "NaN", "Infinity", "25568.5", "not-…
+    139|     expect(evaluateConstructionExperimentLive({ ...approvedEnv(), MINE…
+       |                                                                                                    ^
+    140|     expect(evaluateConstructionExperimentLive({ ...approvedEnv(), CONS…
+    141|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/8]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  8 failed | 39 passed (47)
+   Start at  09:56:56
+   Duration  3.28s (transform 885ms, setup 0ms, collect 2.70s, tests 163ms, environment 0ms, prepare 176ms)

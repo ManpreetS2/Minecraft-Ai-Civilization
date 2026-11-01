@@ -135,4 +135,16 @@ describe("canonical isolation on the actual host filesystem", () => {
   it.each(["isolated", "world-lab"])("rejects a directory used as SQLite target: %s", (path) => {
     expect(check("isolated", path).ok).toBe(false);
   });
+  it.each(["", "0", "-1", "65536", "NaN", "Infinity", "25568.5", "not-a-port"])("refuses invalid paper and RCON ports %j", (port) => {
+    expect(evaluateConstructionExperimentLive({ ...approvedEnv(), MINECRAFT_PORT: port }).allowed).toBe(false);
+    expect(evaluateConstructionExperimentLive({ ...approvedEnv(), CONSTRUCTION_EXPERIMENT_RCON_PORT: port }).allowed).toBe(false);
+  });
+  it.each([
+    ["MINECRAFT_PORT", "25565"],
+    ["MINECRAFT_PORT", "25567"],
+    ["CONSTRUCTION_EXPERIMENT_RCON_PORT", "25575"],
+    ["CONSTRUCTION_EXPERIMENT_RCON_PORT", "25577"],
+  ])("keeps the existing protected port refusal for %s=%s", (key, port) => {
+    expect(evaluateConstructionExperimentLive({ ...approvedEnv(), [key]: port }).allowed).toBe(false);
+  });
 });
