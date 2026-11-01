@@ -36,3 +36,13 @@ export {
   offlineRegistry,
   type ScriptedReply,
 } from "./offline-fixture.js";
+export {
+  LIVE_SMOKE_MAX_SPEND_USD,
+  liveSmokeRefusal,
+  parseCitizenAssignments,
+  preflightCitizenAssignments,
+  runLiveSmoke,
+  type LiveSmokeAuthorization,
+  type LiveSmokeResult,
+  type PreflightReport,
+} from "./preflight.js";

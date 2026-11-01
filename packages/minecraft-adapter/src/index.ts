@@ -1,5 +1,5 @@
 export { MinecraftBody } from "./minecraft-body.js";
-export { declaredRootCommands, sanitizeWhisperText, WHISPER_COMMAND } from "./server-commands.js";
+export { declaredRootCommands, sanitizeWhisperText, VALID_USERNAME, WHISPER_COMMAND } from "./server-commands.js";
 export { patchMineflayerCrafting } from "./craft-patch.js";
 export { BodyLock, DuplicateBodyError, pidAlive } from "./body-lock.js";
 export {
