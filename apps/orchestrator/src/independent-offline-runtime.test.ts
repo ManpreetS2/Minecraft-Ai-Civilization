@@ -105,4 +105,12 @@ describe("independent offline composition and normal manager startup", () => {
     expect(fx.resolveSecret).not.toHaveBeenCalled(); expect(fx.createBody).not.toHaveBeenCalled();
     expect(fx.openai.calls).toHaveLength(0); expect(fx.claude.size).toBe(0);
   });
+  it("refuses a paid Claude transport in the offline composition without sending or constructing bodies", () => {
+    const fx = fixture();
+    const send = vi.fn(async (): Promise<never> => { throw new Error("paid transport must not send"); });
+    expect(() => createIndependentOfflineRuntime({ ...fx.args, claudeTransportFor: () => ({ paid: true, create: send }) })).toThrow(/paid|allowPaidRequests/i);
+    expect(send).not.toHaveBeenCalled();
+    expect(fx.createBody).not.toHaveBeenCalled();
+    expect(fx.openai.calls).toHaveLength(0);
+  });
 });

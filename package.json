@@ -31,8 +31,8 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "vitest run",
-    "test:security": "vitest run sec001 knowledge-provenance downstream-prompt-isolation persistent-fact-provenance citizen-context-2v2 bulletin-2v2 visibility-2v2 untrusted-model-output pr16-review http-server-origin",
-    "test:ai": "vitest run packages/cognition manager-citizen-routing",
+    "test:security": "vitest run sec001 knowledge-provenance downstream-prompt-isolation persistent-fact-provenance citizen-context-2v2 bulletin-2v2 visibility-2v2 untrusted-model-output pr16-review http-server-origin workstations-community storage-community-access",
+    "test:ai": "vitest run packages/cognition manager-citizen-routing manager-physical-integration manager-roster-start independent-offline-runtime",
     "test:watch": "vitest",
     "experiment:preflight": "tsx scripts/experiment-preflight.ts"
   },
