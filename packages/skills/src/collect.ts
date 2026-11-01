@@ -16,6 +16,7 @@ import type { SkillContext } from "./context.js";
 import { findBlockCandidates } from "./observe.js";
 import { collectItem } from "./gather.js";
 import { inventorySpace, canFitDrop } from "./inventory.js";
+import { expectedDropItems } from "./drop-mapping.js";
 import { lookAtPosition } from "./look.js";
 import { equipForBlock } from "./tools.js";
 
@@ -25,6 +26,7 @@ export async function collectResource(
   amount = 1,
   maxDistance = 48,
   prefer?: Vec3,
+  opts: { dropWaitMs?: number } = {},
 ): Promise<ActionResult<{ name: string; collected: number; position: Vec3 }>> {
   const started = Date.now();
   const knowledge = minecraftKnowledge();
@@ -45,6 +47,7 @@ export async function collectResource(
     if (!canFitDrop(ctx, names) && inventorySpace(ctx) <= 0) {
       return fail("INVENTORY_FULL", "Inventory is full; store items before mining more", Date.now() - started, true);
     }
+    const countAtIterationStart = countMatching(ctx, names);
     const candidates = [
       ...(prefer ? [{ name: names[0] ?? "block", position: prefer }] : []),
       ...findBlockCandidates(ctx, names, maxDistance),
@@ -138,6 +141,8 @@ export async function collectResource(
     lastPos = best.position;
     lastName = block.name;
     await collectItem(ctx, undefined, 8);
+    // Drops can land a few ticks after the dig: poll the real inventory delta (bounded) before judging possession.
+    await waitForInventoryGain(ctx, () => countMatching(ctx, names), countAtIterationStart, opts.dropWaitMs ?? DROP_WAIT_MS);
     if (mined >= Math.max(1, amount)) break;
   }
 
@@ -163,11 +168,27 @@ function blockMissing(ctx: SkillContext, position: Vec3, expected: string): bool
   return !after || after.name === "air" || after.name === "cave_air" || after.name !== expected;
 }
 
+const DROP_WAIT_MS = 1_200;
+const DROP_POLL_MS = 40;
+
+async function waitForInventoryGain(
+  ctx: SkillContext,
+  current: () => number,
+  baseline: number,
+  timeoutMs: number,
+): Promise<boolean> {
+  const deadline = Date.now() + Math.max(0, timeoutMs);
+  while (current() <= baseline) {
+    if (ctx.signal?.aborted || Date.now() >= deadline) return false;
+    await new Promise((resolve) => setTimeout(resolve, DROP_POLL_MS));
+  }
+  return true;
+}
+
 function countMatching(ctx: SkillContext, names: string[]): number {
-  const knowledge = minecraftKnowledge();
-  const set = new Set(names.map((name) => knowledge.normalizeItemName(name) || name));
+  const set = expectedDropItems(names);
   return ctx.bot.inventory
     .items()
-    .filter((item) => set.has(item.name) || names.some((name) => item.name.includes(name.replace(/_log$/, ""))))
+    .filter((item) => set.has(item.name))
     .reduce((sum, item) => sum + item.count, 0);
 }

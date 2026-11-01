@@ -110,7 +110,7 @@ export type PlannerInput = {
 
 const TOOL_PICKAXES = ["wooden_pickaxe", "stone_pickaxe", "iron_pickaxe", "diamond_pickaxe", "netherite_pickaxe"];
 const TOOL_AXES = ["wooden_axe", "stone_axe", "iron_axe"];
-const LOG_ITEMS = ["oak_log", "birch_log", "spruce_log", "jungle_log", "acacia_log", "dark_oak_log", "cherry_log"];
+const LOG_ITEMS = ["oak_log", "birch_log", "spruce_log", "jungle_log", "acacia_log", "dark_oak_log", "mangrove_log", "cherry_log", "pale_oak_log"];
 
 function count(obs: BodyObservation, names: string[]): number {
   const set = new Set(names);

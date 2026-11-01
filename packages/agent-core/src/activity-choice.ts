@@ -1,5 +1,5 @@
 import { evaluateReturnHome } from "@civ/minecraft-adapter";
-import type { BodyObservation, ErrorCode, Vec3 } from "@civ/shared";
+import { LOG_BLOCK_NAMES, type BodyObservation, type ErrorCode, type Vec3 } from "@civ/shared";
 import {
   HOME_CLAIM_REACH_BLOCKS,
   isCatalogPersonalChest,
@@ -34,8 +34,9 @@ export type ActivityId =
   | "seek_housing"
   | "deposit";
 
-const BOOTSTRAP_LOGS = ["oak_log", "birch_log", "spruce_log", "jungle_log", "acacia_log", "dark_oak_log", "mangrove_log", "cherry_log"] as const;
-const BOOTSTRAP_PLANKS = ["oak_planks", "birch_planks", "spruce_planks", "jungle_planks", "acacia_planks", "dark_oak_planks", "mangrove_planks", "cherry_planks"] as const;
+// Derived from the shared log list so anything the executor can gather (incl. pale_oak) also counts as bootstrap wood.
+const BOOTSTRAP_LOGS: readonly string[] = LOG_BLOCK_NAMES;
+const BOOTSTRAP_PLANKS: readonly string[] = LOG_BLOCK_NAMES.map((name) => name.replace(/_log$/, "_planks"));
 
 export type BlockedActivity = {
   id: ActivityId;

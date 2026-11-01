@@ -25,6 +25,7 @@ import { Vec3 as Vec3Class } from "vec3";
 import type { Bot } from "mineflayer";
 import type { SkillContext } from "./context.js";
 import { ItemReservationBook } from "./inventory-reservations.js";
+import { expectedDropItems } from "./drop-mapping.js";
 import { lookAtPosition } from "./look.js";
 import { moveTo } from "./movement.js";
 import { findBlock } from "./observe.js";
@@ -230,7 +231,8 @@ export function listInventory(ctx: SkillContext): Array<{ name: string; count: n
 
 export function canFitDrop(ctx: SkillContext, names: string[]): boolean {
   if (inventorySpace(ctx) > 0) return true;
-  return names.some((name) => freeCapacity(ctx, name) > 0);
+  // `names` may be block names ("stone", "coal_ore"); room is judged against the items they actually drop.
+  return [...expectedDropItems(names)].some((item) => freeCapacity(ctx, item) > 0);
 }
 
 export function compactInventoryFacts(ctx: SkillContext): CompactCarriedFacts {
