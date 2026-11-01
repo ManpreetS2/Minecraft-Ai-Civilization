@@ -76,7 +76,7 @@ describe("Mission 018M autonomous survival cycles", () => {
   it("scenario 1 — food unavailable: attempt, bound retries, honest observe without inventing food", () => {
     const traces: TraceStep[] = [];
     let last: LastOutcome | undefined;
-    let observation = obs({ food: 6, inventory: [] });
+    const observation = obs({ food: 6, inventory: [] });
 
     for (let tick = 1; tick <= 5; tick += 1) {
       const planned = planCitizen({

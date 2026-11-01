@@ -342,7 +342,7 @@ async function main(): Promise<void> {
     const fishingFailed = fishingVerdict === "FAIL";
     const fishingMissing = fishingVerdict === "NOT FOUND";
     const homeFailed = returnHomeVerdict === "FAIL";
-    await finish(fishingFailed || homeFailed ? 1 : fishingMissing ? 3 : fishingVerdict === "UNVERIFIED" ? 2 : 0);
+    await finish(fishingFailed || homeFailed ? 1 : fishingMissing ? 3 : 0);
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error));
     printNeeds();

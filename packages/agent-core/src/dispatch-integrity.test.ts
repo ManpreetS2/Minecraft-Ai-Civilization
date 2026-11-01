@@ -163,7 +163,7 @@ describe("dispatch integrity — cognition allowlist", () => {
       home: claimedHome,
       humanDirective: {
         id: "dir_1",
-        intent: "OBTAIN_ITEM",
+        intent: "obtain_item",
         mode: "ADMIN_OVERRIDE",
         args: { item: "wooden_pickaxe" },
       },

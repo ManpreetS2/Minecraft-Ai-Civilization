@@ -101,7 +101,7 @@ export type CraftFixtureOptions = {
 const GROUND_Y = 63;
 const FEET_Y = 64;
 const PICKUP_RADIUS = 1.3;
-const BLOCK_REACH = 4.5;
+const _BLOCK_REACH = 4.5;
 
 export function createMineflayerCraftFixture(options: CraftFixtureOptions = {}) {
   const knowledge = minecraftKnowledge();

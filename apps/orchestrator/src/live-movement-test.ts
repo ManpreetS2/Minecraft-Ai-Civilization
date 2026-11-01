@@ -7,7 +7,7 @@ import { evaluateHomeTestLaunch } from "./home-test-guard.js";
 type Stage = { name: string; passed: boolean; detail: string; durationMs: number };
 type Cell = { x: number; y: number; z: number };
 
-const PAD: Cell = { x: 200, y: 67, z: 400 };
+const _PAD: Cell = { x: 200, y: 67, z: 400 };
 
 function wait(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));

@@ -902,7 +902,7 @@ export function expandBlueprint(
     const storageNeed = blueprint.materialRequirements.STORAGE_MATERIAL ?? 0;
     if (storageNeed >= 2 && blueprint.structureType === "STORAGE_SHED") {
       // Avoid bed cell (width-2, depth-2) and first chest (1, interiorZ≈1).
-      const { width, depth } = blueprint.footprint;
+      const { depth } = blueprint.footprint;
       blocks.push({
         dx: 1,
         dy: 1,

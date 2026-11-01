@@ -468,7 +468,7 @@ async function main(): Promise<void> {
         await wait(800);
         bot = body.requireBot();
         ctx = { body, bot, citizenId: "probe_home", timeoutMs: 120_000 };
-        console.log(`sleep attempt timeOfDay=${bot.time.timeOfDay} isNight=${Boolean(bot.time.isNight)} at ${fmt(body.position() ?? { x: 0, y: 0, z: 0 })}`);
+        console.log(`sleep attempt timeOfDay=${bot.time.timeOfDay} isNight=${Boolean(body.observe().isNight)} at ${fmt(body.position() ?? { x: 0, y: 0, z: 0 })}`);
         const before = body.position();
         await walkOntoH1Stoop(bot);
         await openH1Door(bot);
@@ -487,7 +487,7 @@ async function main(): Promise<void> {
         console.log(`sleep interact-nav ${toSleep.success ? "ok" : `${toSleep.code} ${toSleep.error}`} at ${atBed ? fmt(atBed) : "?"}`);
         if (!toSleep.success) throw new Error(`BED_UNREACHABLE ${toSleep.code} ${toSleep.error}`);
         if (!atBed || xzDist(atBed, fixtures.bedA) > 3.0) {
-          throw new Error(`still too far from H1 bed at ${fmt(atBed)}`);
+          throw new Error(`still too far from H1 bed at ${atBed ? fmt(atBed) : "unknown"}`);
         }
         const result = await sleep(ctx, fixtures.bedA);
         const after = body.position();
@@ -642,8 +642,8 @@ async function main(): Promise<void> {
         const moved = await navigationBackend().navigateToInteractWithBlock(ctx.bot, fixtures.chestA, { timeoutMs: 20_000 });
         const atChest = body.position();
         if (!moved.success) throw new Error(`post-reconnect interact ${moved.code} ${moved.error} at ${atChest ? fmt(atChest) : "?"}`);
-        if (!atChest || xzDist(atChest, fixtures.chestA) > 3.2) throw new Error(`post-reconnect ended ${fmt(atChest)} not at H1 chest`);
-        return `sqlite home_h1 bed -1097,69,728 chest -1096,69,729; spawn ${spawn2 ? fmt(spawn2) : "?"} then walked ${start ? fmt(start) : "?"} -> ${fmt(atChest)}`;
+        if (!atChest || xzDist(atChest, fixtures.chestA) > 3.2) throw new Error(`post-reconnect ended ${atChest ? fmt(atChest) : "unknown"} not at H1 chest`);
+        return `sqlite home_h1 bed -1097,69,728 chest -1096,69,729; spawn ${spawn2 ? fmt(spawn2) : "?"} then walked ${start ? fmt(start) : "?"} -> ${atChest ? fmt(atChest) : "unknown"}`;
       }),
     );
 

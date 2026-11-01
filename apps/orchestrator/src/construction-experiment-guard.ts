@@ -3,7 +3,7 @@
  * Default: refuse live connect. Isolation paths must not alias the original World-Lab.
  */
 import { existsSync, realpathSync, statSync } from "node:fs";
-import { isAbsolute, join, normalize, resolve, sep } from "node:path";
+import { isAbsolute, join, normalize, sep } from "node:path";
 import { resolveFromRoot, workspaceRoot, type Vec3 } from "@civ/shared";
 import { WORLD_LAB_CLAIMABLE_HOMES } from "@civ/agent-core";
 import { LIVE_CIVILIZATION_PORT, RED_WORLD_LAB_PORT } from "./mine-test-guard.js";
@@ -216,12 +216,12 @@ export function evaluateConstructionExperimentLive(env: NodeJS.ProcessEnv = proc
   const evidenceDir = env.CONSTRUCTION_EXPERIMENT_EVIDENCE_DIR ?? ISOLATED_EVIDENCE_REL;
 
   const isolation = assertIsolatedNotOriginal({ isolatedWorldLab: worldLabDir, isolatedSqlite: sqlitePath });
-  if (!isolation.ok) return isolation;
+  if (!isolation.ok) return { allowed: false, error: isolation.error };
 
   const wl = validatePathExists(worldLabDir, "isolated world-lab");
-  if (!wl.ok) return wl;
+  if (!wl.ok) return { allowed: false, error: wl.error };
   const db = validatePathExists(sqlitePath, "isolated sqlite");
-  if (!db.ok) return db;
+  if (!db.ok) return { allowed: false, error: db.error };
 
   const pad = PROPOSED_CONSTRUCTION_PAD;
   const safe = padSafeFromSettlementHomes(pad);

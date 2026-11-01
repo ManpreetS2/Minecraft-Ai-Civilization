@@ -3,7 +3,7 @@
  * Distinguishes placement *requests* from confirmed world updates.
  * Never treat harness success as physical Minecraft proof.
  */
-import { fail, ok, type ActionResult, type Vec3 } from "@civ/shared";
+import { fail, ok, type Vec3 } from "@civ/shared";
 import type { SkillContext } from "@civ/skills";
 import { Vec3 as Vec3Class } from "vec3";
 

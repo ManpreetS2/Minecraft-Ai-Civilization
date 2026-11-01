@@ -272,7 +272,6 @@ export async function runWorkshopCabinOfflineAcceptance(args?: {
   const expanded = expandBlueprint(blueprint, materials, site.site.facing, extras);
   const satisfied = new Set<number>();
   let placed = 0;
-  let interruptedAt: number | undefined;
 
   // Place until interrupt
   while (placed < interruptAfter) {
@@ -288,7 +287,7 @@ export async function runWorkshopCabinOfflineAcceptance(args?: {
     if (!step.ok) break;
     placed += 1;
   }
-  interruptedAt = placed;
+  const interruptedAt = placed;
 
   // Persist project checkpoint (stale high placed count) then reload
   let project = dispatched.project;

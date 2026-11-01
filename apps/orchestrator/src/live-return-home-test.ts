@@ -5,7 +5,7 @@ import { loadEnv } from "./env.js";
 import { loadConfig, isMechanicsProbeUsername } from "@civ/shared";
 import { MinecraftBody, evaluateReturnHome, executeReturnHome } from "@civ/minecraft-adapter";
 import { CivilizationStore, claimHome, leaveHome } from "@civ/agent-core";
-import { tryRcon, type RconClient } from "./rcon.js";
+import { tryRcon } from "./rcon.js";
 import { evaluateHomeTestLaunch, parseApprovedHomeFixtures, type Cell } from "./home-test-guard.js";
 
 type Stage = { name: string; passed: boolean; detail: string; durationMs: number };

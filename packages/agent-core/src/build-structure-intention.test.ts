@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { WORKSHOP_CABIN_ID, expandBlueprint, getBlueprint, resolveMaterials, worldPosition } from "@civ/minecraft-knowledge";
-import { createBuildSession, type BuildSession, type SkillContext } from "@civ/skills";
-import { ok, fail, type ActionResult, type Vec3 } from "@civ/shared";
+import { createBuildSession, type BuildSession, type BuildAdvance, type SkillContext } from "@civ/skills";
+import { fail, type ActionResult, type Vec3 } from "@civ/shared";
 import { SettlementRuntime } from "./settlement-runtime.js";
 import {
   applyWorldReconcileToSession,
@@ -196,7 +196,7 @@ describe("intention integration reliability", () => {
   it("failed placement does not silently advance placed count beyond world truth", async () => {
     const runtime = new SettlementRuntime();
     const origin = { x: 240, y: 70, z: 240 };
-    const advance = async (_ctx: SkillContext, session: BuildSession): Promise<ActionResult> => {
+    const advance = async (_ctx: SkillContext, session: BuildSession): Promise<ActionResult<BuildAdvance>> => {
       session.placed = session.placed + 50; // dishonest advance attempt
       return fail("BUILD_BLOCKED", "placement failed", 1, true, { session });
     };
@@ -319,6 +319,7 @@ describe("intention integration reliability", () => {
         isNight: false,
       },
       settlement: {
+        id: "fixture", name: "Fixture", needs: [],
         wood: 0,
         food: 0,
         stone: 0,

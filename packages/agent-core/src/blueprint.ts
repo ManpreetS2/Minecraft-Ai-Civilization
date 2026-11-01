@@ -1,6 +1,7 @@
 import type { Vec3 } from "@civ/shared";
 import {
   BASIC_SHELTER_ID,
+  concreteBlock,
   expandBlueprint,
   getBlueprint,
   resolveMaterials,
@@ -31,7 +32,7 @@ const LEGACY_STAGE: Record<string, BlueprintBlock["stage"]> = {
 };
 
 function toLegacy(block: PlannedBlock, item: string): BlueprintBlock | undefined {
-  if (block.stage === "FOUNDATION") return undefined;
+  if (block.stage === "FOUNDATION" || block.impliedBySibling) return undefined;
   return {
     dx: block.dx,
     dy: block.dy,
@@ -55,10 +56,10 @@ export function starterHut(): Blueprint {
     torch: 1,
     crafting_table: 1,
   });
-  const expanded = expandBlueprint(spec, materials, "south", ["chest", "lighting"]);
+  const expanded = expandBlueprint(spec, materials, "south", ["chest", "lighting", "crafting_table"]);
   const blocks: BlueprintBlock[] = [];
   for (const block of expanded.blocks) {
-    const mapped = toLegacy(block, block.role === "door" ? "oak_door" : block.role === "chest" ? "chest" : block.role === "lighting" ? "torch" : "oak_planks");
+    const mapped = toLegacy(block, concreteBlock(block, materials));
     if (mapped) blocks.push(mapped);
   }
   return { id: spec.id, name: spec.name, blocks };

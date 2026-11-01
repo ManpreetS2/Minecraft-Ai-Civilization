@@ -259,7 +259,7 @@ describe("Mission 005 advanceBlueprintBuild production entry", () => {
         crafting_table: 1,
       },
       ctx: harness.ctx,
-      persist: (project) => {
+      persist: (_project) => {
         persistCalls += 1;
         return { ok: true };
       },

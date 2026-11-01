@@ -134,7 +134,7 @@ export function personalFoodCount(obs: BodyObservation): number {
 }
 
 export function planCitizen(input: PlannerInput): PlannedTask {
-  const { observation: obs, settlement, assignedNeeds, llmGoal, llmReason, workRole, projectStatus, humanDirective } = input;
+  const { observation: obs, settlement, assignedNeeds, workRole, projectStatus, humanDirective } = input;
   const hostile = obs.nearby.find((e) => e.hostile && e.distance < 10);
   const heldFood = personalFoodCount(obs);
   const shelterReady = settlement.shelterComplete || projectStatus === "COMPLETED";
@@ -638,7 +638,6 @@ function attachDiscoveredTarget(planned: PlannedTask, input: PlannerInput): Plan
   }
   if (planned.action === "claimHome" || planned.action === "travelTowardHousing") {
     const opportunity = housingOpportunity(input.observation.position, homesForClaim(input));
-    planned.trace = planned.trace;
     if (opportunity.kind === "claim") {
       planned.action = "claimHome";
       planned.task = "claim_home";
