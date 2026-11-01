@@ -209,10 +209,23 @@ export class OpenAiResponsesProvider implements CognitionProvider {
       prompt_tokens?: number;
       completion_tokens?: number;
     };
+    const inputTokens = usageRaw.input_tokens ?? usageRaw.prompt_tokens;
+    const outputTokens = usageRaw.output_tokens ?? usageRaw.completion_tokens;
+    if (
+      !Number.isSafeInteger(inputTokens) ||
+      inputTokens < 0 ||
+      !Number.isSafeInteger(outputTokens) ||
+      outputTokens < 0
+    ) {
+      // A successful response may still be billable when usage is absent.
+      // Refuse further calls rather than silently treating an unknown cost as zero.
+      this.config.budget.close();
+      throw new Error("OpenAI response missing or invalid token usage; cloud admissions disabled");
+    }
     const usage = {
       model: this.config.model,
-      inputTokens: Number(usageRaw.input_tokens ?? usageRaw.prompt_tokens ?? 0),
-      outputTokens: Number(usageRaw.output_tokens ?? usageRaw.completion_tokens ?? 0),
+      inputTokens,
+      outputTokens,
     };
     return {
       decision,
