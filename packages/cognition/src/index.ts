@@ -4,7 +4,8 @@ import { CloudBudgetGate } from "./cloud-budget.js";
 import { CloudDecisionLedger } from "./decision-record.js";
 import { HeuristicProvider } from "./heuristic.js";
 import { OllamaProvider } from "./ollama.js";
-import { OpenAiResponsesProvider } from "./openai-responses.js";
+import { OpenAiResponsesProvider, isLoopbackHostname } from "./openai-responses.js";
+import { LocalFallbackCognitionProvider } from "./cloud-fallback.js";
 import type { CognitionProvider } from "./schema.js";
 
 export type CreateCognitionOptions = {
@@ -30,17 +31,26 @@ export function createCognition(config: AppConfig, options: CreateCognitionOptio
         maxRequestsPerRun: cog.cloud.maxRequestsPerRun,
         spendAllowanceUsd: cog.cloud.spendAllowanceUsd,
       });
-    return new OpenAiResponsesProvider({
+    const provider = new OpenAiResponsesProvider({
       apiKey: cog.cloud.apiKey,
       model: cog.cloud.model,
       baseUrl: cog.cloud.baseUrl,
+      customEndpointHost: cog.cloud.customEndpointHost,
       timeoutMs: cog.cloud.timeoutMs,
+      maxInputTokens: cog.cloud.maxInputTokens,
       maxOutputTokens: cog.cloud.maxOutputTokens,
       maxRetries: cog.cloud.maxRetries,
       budget,
       ledger: options.ledger,
       fetchImpl: options.fetchImpl,
     });
+    if (cog.cloud.fallbackProvider === "heuristic") {
+      return new LocalFallbackCognitionProvider(provider, new HeuristicProvider());
+    }
+    if (cog.cloud.fallbackProvider === "ollama") {
+      return new LocalFallbackCognitionProvider(provider, createLoopbackOllama(cog.host, cog.routineModel));
+    }
+    return provider;
   }
   if (cog.provider === "ollama") {
     return new OllamaProvider(cog.host, cog.routineModel);
@@ -48,19 +58,36 @@ export function createCognition(config: AppConfig, options: CreateCognitionOptio
   return new HeuristicProvider();
 }
 
+/** Ollama can proxy hosted models, so only a server on this machine counts as a non-paid fallback. */
+function createLoopbackOllama(host: string, model: string): OllamaProvider {
+  let hostname: string;
+  try {
+    hostname = new URL(host).hostname;
+  } catch {
+    throw new Error("OLLAMA_HOST must be a valid URL to use CLOUD_FALLBACK_PROVIDER=ollama");
+  }
+  if (!isLoopbackHostname(hostname)) {
+    throw new Error("CLOUD_FALLBACK_PROVIDER=ollama requires a loopback OLLAMA_HOST");
+  }
+  return new OllamaProvider(host, model);
+}
+
 export { HeuristicProvider } from "./heuristic.js";
+export { LocalFallbackCognitionProvider } from "./cloud-fallback.js";
 export { OllamaProvider, formatPrompt } from "./ollama.js";
 export {
   OpenAiResponsesProvider,
   assertOpenAiConfig,
   extractResponsesOutputText,
 } from "./openai-responses.js";
-export { CloudBudgetGate } from "./cloud-budget.js";
+export { CloudAdmissionError, CloudBudgetGate } from "./cloud-budget.js";
 export { CloudDecisionLedger, type CloudDecisionRecord } from "./decision-record.js";
 export {
   OPENAI_ALLOWED_MODELS,
   OPENAI_MODEL_PRICES,
+  boundCloudAttemptCostUsd,
   estimateCloudCostUsd,
+  hasCloudModelPrice,
   isAllowedOpenAiModel,
 } from "./cloud-prices.js";
 export {

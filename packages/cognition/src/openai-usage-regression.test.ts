@@ -1,5 +1,8 @@
+import { createServer } from "node:http";
+import type { AddressInfo } from "node:net";
 import { describe, expect, it, vi } from "vitest";
 import { CloudBudgetGate } from "./cloud-budget.js";
+import { estimateCloudCostUsd } from "./cloud-prices.js";
 import { OpenAiResponsesProvider } from "./openai-responses.js";
 
 const prompt = {
@@ -48,23 +51,29 @@ function mockProvider(rawUsage?: unknown) {
 
 describe("OpenAI Responses metered usage validation (mock-only)", () => {
   it.each([
-    ["missing usage", undefined],
-    ["negative input", { input_tokens: -1, output_tokens: 5 }],
-    ["fractional output", { input_tokens: 10, output_tokens: 0.5 }],
-    ["string input", { input_tokens: "10", output_tokens: 5 }],
-    ["null output", { input_tokens: 10, output_tokens: null }],
-    ["missing output", { input_tokens: 10 }],
-    ["non-object usage", "lots"],
-  ])("fails closed for %s rather than recording a free successful request", async (_description, usage) => {
+    ["missing usage", undefined, /missing token usage/],
+    ["negative input", { input_tokens: -1, output_tokens: 5 }, /invalid token usage/],
+    ["fractional output", { input_tokens: 10, output_tokens: 0.5 }, /invalid token usage/],
+    ["string input", { input_tokens: "10", output_tokens: 5 }, /invalid token usage/],
+    ["null output", { input_tokens: 10, output_tokens: null }, /invalid token usage/],
+    ["missing output", { input_tokens: 10 }, /invalid token usage/],
+    ["non-object usage", "lots", /invalid token usage/],
+  ])("fails closed for %s rather than recording a free successful request", async (_description, usage, reason) => {
     const { budget, provider, fetchImpl } = mockProvider(usage);
-    await expect(provider.decide(prompt)).rejects.toThrow(/missing or invalid token usage/);
+    await expect(provider.decide(prompt)).rejects.toThrow(reason);
     expect(fetchImpl).toHaveBeenCalledTimes(1);
     expect(budget.snapshot.closed).toBe(true);
+    expect(budget.snapshot.closedReason).toMatch(reason);
     expect(budget.snapshot.inFlight).toBe(0);
-    // The default reserve stays counted because the unknown-cost call may have been billed.
-    expect(budget.snapshot.spendUsd).toBeCloseTo(0.01);
-    expect(budget.tryAdmit()).toMatchObject({ ok: false, reason: "cloud cognition shut down" });
-    expect(provider.recentDecisions[0]).toMatchObject({ ok: false, estimatedCostUsd: 0.01, httpStatus: 200 });
+    // The hold stays counted against the allowance but is not reported as estimated spend.
+    expect(budget.snapshot.spendUsd).toBe(0);
+    expect(budget.snapshot.heldUsd).toBeGreaterThan(0);
+    const record = provider.recentDecisions[0];
+    expect(record).toMatchObject({ ok: false, httpStatus: 200, unverifiedHoldUsd: budget.snapshot.heldUsd });
+    expect(record?.estimatedCostUsd).toBeUndefined();
+    // Later refusals keep naming the cause instead of a generic shutdown.
+    await expect(provider.decide(prompt)).rejects.toThrow(reason);
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -90,8 +99,8 @@ function billingProvider(fetchImpl: unknown, over: { maxRetries?: number; timeou
 const json = (status: number, body: unknown) => new Response(JSON.stringify(body), { status });
 
 describe("OpenAI Responses billing settlement (mock-only)", () => {
-  // Enough tokens that each call costs ~$0.075 at gpt-4o-mini rates.
-  const usage = { input_tokens: 500_000, output_tokens: 0 };
+  const usage = { input_tokens: 200, output_tokens: 10 };
+  const cost = estimateCloudCostUsd({ model: "gpt-4o-mini", inputTokens: 200, outputTokens: 10 });
 
   it.each([
     ["malformed JSON text", { output_text: "not-json", usage }],
@@ -100,42 +109,33 @@ describe("OpenAI Responses billing settlement (mock-only)", () => {
   ])("charges actual usage when a successful response contains %s", async (_description, body) => {
     const { budget, provider } = billingProvider(async () => json(200, body));
     await expect(provider.decide(prompt)).rejects.toThrow();
-    expect(budget.snapshot.spendUsd).toBeCloseTo(0.075);
+    expect(budget.snapshot.spendUsd).toBe(cost);
+    expect(budget.snapshot.heldUsd).toBe(0);
     expect(budget.snapshot.inFlight).toBe(0);
     expect(budget.snapshot.closed).toBe(false);
     expect(provider.recentDecisions[0]).toMatchObject({
       ok: false,
-      inputTokens: 500_000,
-      outputTokens: 0,
-      estimatedCostUsd: 0.075,
+      inputTokens: 200,
+      outputTokens: 10,
+      estimatedCostUsd: cost,
       httpStatus: 200,
     });
   });
 
-  it("stops paid calls at the allowance when every billed response is unusable", async () => {
-    const fetchImpl = vi.fn(async () => json(200, { output_text: "not-json", usage }));
-    const { budget, provider } = billingProvider(fetchImpl);
-    for (let i = 0; i < 30; i += 1) {
-      await provider.decide(prompt).catch(() => undefined);
-    }
-    // Admission only sees the reserve, so the last admitted call may overshoot by its actual cost.
-    expect(fetchImpl.mock.calls.length).toBe(14);
-    expect(budget.snapshot.spendUsd).toBeCloseTo(1.05);
-  });
-
-  it("keeps the reserve and closes when a successful response body cannot be read", async () => {
+  it("keeps a hold and closes with a specific reason when a successful response body cannot be read", async () => {
     const { budget, provider } = billingProvider(
       async () => new Response("{truncated", { status: 200, headers: { "content-type": "application/json" } }),
     );
-    await expect(provider.decide(prompt)).rejects.toThrow();
-    expect(budget.snapshot).toMatchObject({ inFlight: 0, closed: true });
-    expect(budget.snapshot.spendUsd).toBeCloseTo(0.01);
+    await expect(provider.decide(prompt)).rejects.toThrow(/body was unreadable/);
+    expect(budget.snapshot).toMatchObject({ inFlight: 0, closed: true, spendUsd: 0, reservedUsd: 0 });
+    expect(budget.snapshot.closedReason).toMatch(/body was unreadable/);
+    expect(budget.snapshot.heldUsd).toBeGreaterThan(0);
   });
 
   it("still refunds requests the provider rejected", async () => {
     const { budget, provider } = billingProvider(async () => json(400, { error: "bad" }));
     await expect(provider.decide(prompt)).rejects.toThrow(/400/);
-    expect(budget.snapshot).toMatchObject({ inFlight: 0, spendUsd: 0, closed: false });
+    expect(budget.snapshot).toMatchObject({ inFlight: 0, spendUsd: 0, heldUsd: 0, reservedUsd: 0, closed: false });
   });
 
   it("releases the slot when a timeout lands between retry attempts", async () => {
@@ -146,10 +146,10 @@ describe("OpenAI Responses billing settlement (mock-only)", () => {
     const { budget, provider } = billingProvider(fetchImpl, { maxRetries: 1, timeoutMs: 10 });
     await expect(provider.decide(prompt)).rejects.toThrow(/cancelled/);
     expect(fetchImpl).toHaveBeenCalledTimes(1);
-    expect(budget.snapshot).toMatchObject({ inFlight: 0, spendUsd: 0, closed: false });
+    expect(budget.snapshot).toMatchObject({ inFlight: 0, spendUsd: 0, heldUsd: 0, reservedUsd: 0, closed: false });
     expect(provider.recentDecisions.at(-1)).toMatchObject({ ok: false, failureReason: "OpenAI request cancelled" });
     // Nothing is held against concurrency, so the next call is admitted.
-    expect(budget.tryAdmit().ok).toBe(true);
+    expect(budget.tryAdmit({ attemptBoundUsd: 0.01, maxAttempts: 1 }).ok).toBe(true);
   });
 
   it("counts retries against the request budget", async () => {
@@ -170,5 +170,38 @@ describe("OpenAI Responses billing settlement (mock-only)", () => {
     const { provider } = billingProvider(fetchImpl);
     await provider.decide(prompt);
     expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not deliver the prompt to a redirect target with real fetch (loopback only)", async () => {
+    const delivered: string[] = [];
+    const target = createServer((req, res) => {
+      delivered.push(req.url ?? "");
+      req.resume();
+      res.writeHead(200).end(JSON.stringify({ output_text: "{}", usage }));
+    });
+    await new Promise<void>((resolve) => target.listen(0, "127.0.0.1", resolve));
+    const origin = createServer((req, res) => {
+      req.resume();
+      res.writeHead(307, { location: `http://127.0.0.1:${(target.address() as AddressInfo).port}/elsewhere` }).end();
+    });
+    await new Promise<void>((resolve) => origin.listen(0, "127.0.0.1", resolve));
+    try {
+      const budget = new CloudBudgetGate({ maxConcurrency: 1, maxRequestsPerRun: 5, spendAllowanceUsd: 1 });
+      const provider = new OpenAiResponsesProvider({
+        apiKey: "sk-test-offline",
+        model: "gpt-4o-mini",
+        baseUrl: `http://127.0.0.1:${(origin.address() as AddressInfo).port}/v1`,
+        timeoutMs: 2000,
+        maxOutputTokens: 128,
+        maxRetries: 0,
+        budget,
+      });
+      await expect(provider.decide(prompt)).rejects.toThrow();
+      expect(delivered).toEqual([]);
+      expect(budget.snapshot).toMatchObject({ inFlight: 0, reservedUsd: 0 });
+    } finally {
+      origin.close();
+      target.close();
+    }
   });
 });

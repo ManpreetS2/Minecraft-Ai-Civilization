@@ -57,12 +57,18 @@ const envSchema = z.object({
   OPENAI_API_KEY: z.string().optional().default(""),
   OPENAI_MODEL: z.string().default("gpt-4o-mini"),
   OPENAI_BASE_URL: z.string().default("https://api.openai.com/v1"),
+  /** Exact host[:port] required before the API key may be sent to a non-OpenAI HTTPS endpoint. */
+  OPENAI_CUSTOM_ENDPOINT_HOST: z.string().default(""),
   CLOUD_TIMEOUT_MS: z.coerce.number().int().positive().default(30_000),
+  /** Largest request admitted, as an upper bound on input tokens. Oversized requests are refused unsent. */
+  CLOUD_MAX_INPUT_TOKENS: z.coerce.number().int().positive().default(16_000),
   CLOUD_MAX_OUTPUT_TOKENS: z.coerce.number().int().positive().max(512).default(128),
   CLOUD_MAX_CONCURRENCY: z.coerce.number().int().min(1).max(8).default(1),
   CLOUD_MAX_REQUESTS_PER_RUN: z.coerce.number().int().min(0).default(60),
   CLOUD_SPEND_ALLOWANCE_USD: z.coerce.number().nonnegative().default(1.0),
   CLOUD_MAX_RETRIES: z.coerce.number().int().min(0).max(2).default(1),
+  /** Used when cost policy stops cloud calls. Only non-paid providers are valid; default is no fallback. */
+  CLOUD_FALLBACK_PROVIDER: z.enum(["none", "heuristic", "ollama"]).default("none"),
   /**
    * Opt-in demonstration profile. `none` preserves historical five-citizen defaults.
    * `three_citizen` selects Atlas/Maya/Theo with charter demo constraints (validated separately).
