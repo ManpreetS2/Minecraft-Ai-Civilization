@@ -55,7 +55,7 @@ No Cognition V2, no second planner, no tool/function calling to the model.
 | `CLOUD_TIMEOUT_MS` | 30000 | |
 | `CLOUD_MAX_OUTPUT_TOKENS` | 128 | Cap ≤ 512 |
 | `CLOUD_MAX_CONCURRENCY` | 1 | |
-| `CLOUD_MAX_REQUESTS_PER_RUN` | 60 | Run budget |
+| `CLOUD_MAX_REQUESTS_PER_RUN` | 60 | Run budget; every HTTP attempt counts, including retries |
 | `CLOUD_SPEND_ALLOWANCE_USD` | 1.0 | Local estimate ceiling |
 | `CLOUD_MAX_RETRIES` | 1 | 429/500/503 only; **never** retry 401 |
 | `LLM_COOLDOWN_MS` | 60000 | Existing manager cooldown |

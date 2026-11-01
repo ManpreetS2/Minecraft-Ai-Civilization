@@ -14,7 +14,7 @@ This review deliberately excludes protected `manager.ts`, `executor.ts`, Windows
 
 2. **Unknown or duplicate CloudBudgetGate settlements freed unrelated capacity** (`packages/cognition/src/cloud-budget.ts`). The previous `get(id) ?? 0` and unconditional `inFlight -= 1` decremented active concurrency when the ID was absent or already settled. The patch checks reservation membership first and rejects invalid settlement without mutating counters.
 
-3. **Invalid/missing metered usage could fail open** (`cloud-budget.ts`, `openai-responses.ts`). A non-finite token count could poison `spendUsd` with `NaN`, causing subsequent spend checks to fail open. A successful Responses payload without `usage` was converted to 0 input/0 output tokens, refunding its reserved budget despite potentially billable API activity. The patch requires valid nonnegative safe-integer token counts and refuses further paid admissions on invalid/missing usage. The provider still records a failed call, and its existing catch path releases the provisional reservation; the budget remains closed. Run-limit NaNs/negative values are rejected.
+3. **Invalid/missing metered usage could fail open** (`cloud-budget.ts`, `openai-responses.ts`). A non-finite token count could poison `spendUsd` with `NaN`, causing subsequent spend checks to fail open. A successful Responses payload without `usage` was converted to 0 input/0 output tokens, refunding its reserved budget despite potentially billable API activity. The patch requires valid nonnegative safe-integer token counts and refuses further paid admissions on invalid/missing usage. The provider still records a failed call, and its existing catch path releases the provisional reservation; the budget remains closed. Run-limit NaNs/negative values are rejected. *Review correction: releasing the reservation under-reported spend. It is now kept; see `CLAUDE_PR1_REVIEW_2026-11-01.md`.*
 
 4. **Plaintext API-key exfiltration through fake-localhost URLs** (`openai-responses.ts`). The prior `baseUrl.includes("localhost")` / `includes("127.0.0.1")` check accepted nonlocal HTTP hosts with those substrings in path or hostname. The patch parses the URL and checks the actual protocol/hostname: HTTPS is allowed; plaintext HTTP is allowed only for exact localhost, 127.0.0.1, or IPv6 loopback. Embedded URL credentials and invalid URLs are rejected.
 
@@ -22,7 +22,8 @@ This review deliberately excludes protected `manager.ts`, `executor.ts`, Windows
 
 - `packages/cognition/src/inference-queue-regression.test.ts`: synchronous exception recovery, mixed async/sync failures, invalid concurrency.
 - `packages/cognition/src/cloud-budget-regression.test.ts`: unknown/double settlement, malformed and missing usage, validation of limits, normal reconciliation.
-- `packages/cognition/src/openai-usage-regression.test.ts`: mocked Responses requests with missing, negative, fractional, string, null and partial token usage.\n- `packages/cognition/src/openai-config-regression.test.ts`: rejects fake-localhost HTTP destinations, malformed/credential-bearing URLs, permits legitimate HTTPS and exact loopback endpoints.
+- `packages/cognition/src/openai-usage-regression.test.ts`: mocked Responses requests with missing, negative, fractional, string, null and partial token usage.
+- `packages/cognition/src/openai-config-regression.test.ts`: rejects fake-localhost HTTP destinations, malformed/credential-bearing URLs, permits legitimate HTTPS and exact loopback endpoints.
 
 ## Validation honestly performed
 
