@@ -24,6 +24,8 @@ describe("InferenceQueue failure recovery", () => {
       value: "continued",
       meta: { citizenId: "claude-a", type: "reflection" },
     });
+    // Promise settlement precedes the queue's finally handler by a microtask.
+    await new Promise<void>((resolve) => setImmediate(resolve));
     expect(queue.snapshot()).toEqual({ queued: 0, inFlight: 0, maxConcurrency: 1 });
   });
 
@@ -55,6 +57,7 @@ describe("InferenceQueue failure recovery", () => {
     await expect(first).rejects.toThrow("asynchronous failure");
     await expect(second).rejects.toThrow("synchronous failure");
     await expect(third).resolves.toMatchObject({ value: 42 });
+    await new Promise<void>((resolve) => setImmediate(resolve));
     expect(queue.snapshot().inFlight).toBe(0);
     expect(queue.snapshot().queued).toBe(0);
   });
