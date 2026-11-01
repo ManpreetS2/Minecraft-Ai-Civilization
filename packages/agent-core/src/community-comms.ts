@@ -180,17 +180,13 @@ export function scopeSettlementForCitizen(
   };
 }
 
-/** Sites this citizen could know about: found by itself or its own community, not by a rival group. */
+/** Community membership is not communication: only this body's own observations are implicit planner knowledge. */
 export function sitesKnownTo(
-  store: CivilizationStore,
+  _store: CivilizationStore,
   citizenId: string,
   sites: readonly DiscoveredSite[],
   scoped: boolean,
 ): DiscoveredSite[] {
   if (!scoped) return [...sites];
-  const directory = store.getCommunityDirectory();
-  const community = directory.communityOf(citizenId);
-  return sites.filter(
-    (site) => site.citizenId === citizenId || (community !== undefined && directory.communityOf(site.citizenId) === community),
-  );
+  return sites.filter((site) => site.citizenId === citizenId);
 }

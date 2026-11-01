@@ -45,9 +45,10 @@ export function parseDiscoveredSites(raw: string | undefined): DiscoveredSite[] 
       const site = entry as DiscoveredSite;
       return (
         (site.kind === "shore" || site.kind === "ore" || site.kind === "farm") &&
-        typeof site.citizenId === "string" &&
-        site.origin &&
-        Number.isFinite(site.origin.x)
+        typeof site.citizenId === "string" && site.citizenId.length > 0 &&
+        typeof site.seenAt === "string" && Number.isFinite(Date.parse(site.seenAt)) &&
+        site.origin && [site.origin.x, site.origin.y, site.origin.z].every(Number.isFinite) &&
+        (!site.stand || [site.stand.x, site.stand.y, site.stand.z].every(Number.isFinite))
       );
     });
   } catch {
@@ -60,9 +61,10 @@ export function listDiscoveredSites(store: CivilizationStore): DiscoveredSite[] 
 }
 
 export function rememberDiscoveredSite(store: CivilizationStore, site: DiscoveredSite): DiscoveredSite[] {
+  if (parseDiscoveredSites(JSON.stringify([site])).length !== 1) throw new Error("invalid discovered site");
   const origin = floor(site.origin);
   const current = listDiscoveredSites(store);
-  const next = current.filter((entry) => !(entry.kind === site.kind && sameCell(entry.origin, origin)));
+  const next = current.filter((entry) => !(entry.citizenId === site.citizenId && entry.kind === site.kind && sameCell(entry.origin, origin)));
   next.push({ ...site, origin, stand: site.stand ? floor(site.stand) : undefined });
   store.setMeta(META_KEY, JSON.stringify(next));
   return next;

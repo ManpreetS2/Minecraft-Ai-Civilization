@@ -19,6 +19,7 @@ import type { CivilizationStore } from "./store.js";
 
 export type CitizenContextPack = {
   citizenId: string;
+  acknowledge: () => string[];
   personality?: PersonalityRecord;
   personalityContext?: string;
   bulletin: BulletinBuildResult;
@@ -56,6 +57,8 @@ export function buildCitizenContextPack(options: {
   config: AppConfig;
   citizenId: string;
   events?: SimEvent[];
+  /** Manager requests acknowledgement only after a validated cognition answer. */
+  deferDelivery?: boolean;
 }): CitizenContextPack {
   const { store, config, citizenId } = options;
   const demo = isThreeCitizenDemo(config) ? validateThreeCitizenDemo(config) : undefined;
@@ -91,7 +94,8 @@ export function buildCitizenContextPack(options: {
   const recheck = (eventId: string): boolean => {
     const stored = store.getEventById(eventId);
     if (!stored) return false;
-    return authorizeEventWithAudience(citizenId, stored.payload, store.getCommunityDirectory(), stored.citizenId).allowed;
+    return store.knowledge.wasInAudienceAtEvent(citizenId, stored) &&
+      authorizeEventWithAudience(citizenId, stored.payload, store.getCommunityDirectory(), stored.citizenId).allowed;
   };
   const rejected = new Set(bulletin.deliveredEventIds.filter((id) => !recheck(id)));
   if (rejected.size > 0) {
@@ -100,8 +104,14 @@ export function buildCitizenContextPack(options: {
     bulletin = build();
   }
 
-  // Persist delivery checkpoint after bulletin is built (restart-safe incremental delivery).
-  store.markEventsDelivered(citizenId, bulletin.deliveredEventIds);
+  // A provider refusal/timeout must leave low-urgency lines available for retry.
+  // Reauthorize again at acknowledgement, since a request can outlive membership changes.
+  const acknowledge = (): string[] => {
+    const accepted = bulletin.deliveredEventIds.filter(recheck);
+    store.markEventsDelivered(citizenId, accepted);
+    return accepted;
+  };
+  if (!options.deferDelivery) acknowledge();
 
   for (const line of bulletin.lines) {
     if (line.urgency >= 70) {
@@ -125,6 +135,7 @@ export function buildCitizenContextPack(options: {
 
   return {
     citizenId,
+    acknowledge,
     personality,
     personalityContext,
     bulletin,

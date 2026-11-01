@@ -6,6 +6,7 @@ import { formatPrompt, validateDecision, type CognitionPrompt, type HighLevelDec
 import type { MinecraftBody } from "@civ/minecraft-adapter";
 import {
   fail,
+  createEvent,
   loadConfig,
   ok,
   withEventVisibility,
@@ -37,7 +38,9 @@ vi.mock("@civ/cognition", async (importOriginal) => {
       async decide(prompt: CognitionPrompt): Promise<HighLevelDecision> {
         capture.prompts.push(structuredClone(prompt));
         // Through the real validator, exactly as a provider's model output goes.
-        return actual.validateDecision(capture.next.shift() ?? { goal: "explore", priority: 0.5, reason: "offline" });
+        const next = await capture.next.shift();
+        if (next instanceof Error) throw next;
+        return actual.validateDecision(next ?? { goal: "explore", priority: 0.5, reason: "offline" });
       },
     }),
   };
@@ -350,13 +353,13 @@ describe("settlement information (criterion 1)", () => {
     expect(capture.planInputs.at(-1)!.settlement).toMatchObject({ id: "no_community" });
   });
 
-  it("sites a rival discovered are not handed to the planner; a teammate's and one's own are", async () => {
+  it("sites discovered by rivals and teammates require communication; only own observations are implicit", async () => {
     const w = world();
     const site = (citizenId: string, x: number) => ({ kind: "ore", origin: { x, y: 60, z: 0 }, citizenId, seenAt: NOW });
     w.store.setMeta("discovered_resource_sites", JSON.stringify([site("cal", 1), site("dee", 2), site("ada", 3)]));
     await w.tick("cal");
     const known = capture.planInputs.at(-1)!.knownSites as Array<{ citizenId: string }>;
-    expect(known.map((s) => s.citizenId).sort()).toEqual(["cal", "dee"]);
+    expect(known.map((s) => s.citizenId).sort()).toEqual(["cal"]);
   });
 
   it("scoped citizens keep thinking without a shared needs list keeping them awake", async () => {
@@ -588,5 +591,19 @@ describe("speech trust", () => {
     const facts = persistentFactsForCognition(w.store, "cal");
     expect(facts).toContain("food by the river");
     expect(facts.filter((f) => f.startsWith("Heard"))).toHaveLength(3);
+  });
+});
+
+describe("O3: real manager deferred bulletin acknowledgement", () => {
+  it("retries a low urgency bulletin after provider rejection and acknowledges only a valid answer", async () => {
+    const w = world(); const line = createEvent("TaskCompleted", { message: "low urgency test observation", visibility: { class: "actor_private" } }, "ada");
+    line.timestamp = NOW; w.store.appendEvent(line);
+    capture.next.push(new Error("offline provider rejected request"));
+    const rejected = await w.tick("ada"); expect(rejected?.bulletin).toContain("low urgency test observation");
+    expect(w.store.getDeliveredEventIds("ada")).not.toContain(line.id);
+    expect(w.store.listPersistentFacts("ada")).toEqual([]);
+    w.citizens.get("ada")!.lastLlmAt = 0;
+    const retried = await w.tick("ada"); expect(retried?.bulletin).toContain("low urgency test observation");
+    expect(w.store.getDeliveredEventIds("ada")).toContain(line.id);
   });
 });

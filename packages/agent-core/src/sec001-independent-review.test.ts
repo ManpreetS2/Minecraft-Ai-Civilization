@@ -761,10 +761,10 @@ describe("KnowledgeProvenance.review operator boundary", () => {
  * fixed, this test fails and should be replaced by the secure assertion.
  */
 describe("open findings characterized for the integration owner", () => {
-  it("OPEN O1: a teammate's discovered site reaches a citizen's planner without any communication", () => {
+  it("FIXED O1: community membership alone never grants a teammate's discovered site", () => {
     const w = world();
     const site = { id: "site", citizenId: "bea", kind: "tree", position: { x: 1, y: 64, z: 1 } } as never;
-    expect(sitesKnownTo(w.store, "ada", [site], true)).toEqual([site]);
+    expect(sitesKnownTo(w.store, "ada", [site], true)).toEqual([]);
     expect(sitesKnownTo(w.store, "cal", [site], true)).toEqual([]);
   });
 
@@ -778,12 +778,14 @@ describe("open findings characterized for the integration owner", () => {
     expect(persistentFactsForCognition(w.store, "dee")).toEqual([]);
   });
 
-  it("OPEN O3: a bulletin line is marked delivered before the model answers, so a failed call loses a low-urgency line", () => {
+  it("FIXED O3: deferred delivery survives context construction until acknowledged", () => {
     const w = world();
     const line = w.ownObservation("ada", "low urgency observation");
-    buildCitizenContextPack({ store: w.store, config: loadConfig({ DEMO_PROFILE: "none" }), citizenId: "ada" });
-    expect(w.store.getDeliveredEventIds("ada")).toContain(line.id);
+    const pack = buildCitizenContextPack({ store: w.store, config: loadConfig({ DEMO_PROFILE: "none" }), citizenId: "ada", deferDelivery: true });
+    expect(w.store.getDeliveredEventIds("ada")).not.toContain(line.id);
     expect(w.store.listPersistentFacts("ada")).toEqual([]);
+    pack.acknowledge();
+    expect(w.store.getDeliveredEventIds("ada")).toContain(line.id);
   });
 });
 

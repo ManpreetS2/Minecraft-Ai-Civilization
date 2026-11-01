@@ -509,6 +509,7 @@ export class AgentManager {
         store: this.store,
         config: this.config,
         citizenId: citizen.record.id,
+        deferDelivery: true,
       });
       const persistentFacts = persistentFactsForCognition(this.store, citizen.record.id);
       const decisionWork = this.cognition
@@ -533,7 +534,7 @@ export class AgentManager {
           lastLlmMs = Date.now() - started;
           if (!this.ops.canWrite()) return;
           citizen.pendingLlm = decision;
-          citizen.pendingBulletinEventIds = contextPack.bulletin.deliveredEventIds;
+          citizen.pendingBulletinEventIds = contextPack.acknowledge();
           this.writeLlmCall({
             citizenId: citizen.record.id,
             latencyMs: lastLlmMs,
