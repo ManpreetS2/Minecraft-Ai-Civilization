@@ -333,7 +333,7 @@ export function createMineflayerCraftFixture(options: CraftFixtureOptions = {}) 
           type: "other",
           objectType: "Item",
           position: entry.position,
-          getDroppedItem: () => ({ name: drop, count: dropCount }),
+          getDroppedItem: () => ({ name: drop, count: entry.item.count }),
         };
       }
     },
@@ -404,6 +404,8 @@ export function createMineflayerCraftFixture(options: CraftFixtureOptions = {}) 
       const added = addItem(entry.item.name, entry.item.count);
       if (added <= 0) continue; // inventory full: stays on the ground
       stats.pickups.push(entry.item.name);
+      entry.item.count -= added;
+      if (entry.item.count > 0) continue; // Partial pickup: another body can still collect the remainder.
       dropped.splice(dropped.indexOf(entry), 1);
       delete bot.entities[String(entry.id)];
     }
