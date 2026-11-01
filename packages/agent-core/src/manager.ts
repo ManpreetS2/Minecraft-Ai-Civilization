@@ -653,7 +653,10 @@ export class AgentManager {
       llmReason: llmDecision?.reason,
       projectStatus: scoped ? undefined : this.runtime.project?.status,
       constructionProject: (() => {
-        const project = this.runtime.project;
+        const communityId = scoped ? this.store.getCommunityDirectory().communityOf(citizen.record.id) : undefined;
+        const project = scoped
+          ? communityId ? this.runtime.forCommunity(communityId, this.store).project : undefined
+          : this.runtime.project;
         if (!project || project.type !== "STRUCTURE_BUILD") return undefined;
         const owner = (project as { ownerCitizenId?: string }).ownerCitizenId;
         if (owner && owner !== citizen.record.id) return undefined;
@@ -1131,7 +1134,7 @@ export class AgentManager {
       developmentMode: !this.config.SIM_PERMADEATH_ENABLED,
       citizens,
       settlement,
-      project: this.runtime.project,
+      project: this.store.hasCommunities() ? undefined : this.runtime.project,
       inventoryView,
       workers: citizens
         .filter((c) => c.status !== "dead")

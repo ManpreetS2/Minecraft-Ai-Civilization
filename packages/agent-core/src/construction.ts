@@ -1,3 +1,4 @@
+import { communityConstruction } from "./community-construction.js";
 import { createEvent, type ActionResult, type EventBus } from "@civ/shared";
 import {
   advanceBlueprintBuild,
@@ -41,7 +42,7 @@ export async function buildShelter(
   runtime: SettlementRuntime,
   events: EventBus,
 ): Promise<ActionResult> {
-  const project = loadProject(store, runtime);
+  const project = loadProject(store, runtime, ctx.citizenId);
   const hut = starterHut();
   const settlement = store.getSettlement();
 
@@ -57,12 +58,13 @@ export async function buildShelter(
     };
   }
 
-  if (project.status === "COMPLETED" || settlement.shelterComplete) {
+  if (project.status === "COMPLETED" || (!store.hasCommunities() && settlement.shelterComplete)) {
     if (!store.isOpen()) {
       return { success: true, data: { complete: true, persisted: false, persistReason: "closed" }, durationMs: 0 };
     }
     if (store.hasCommunities()) {
-      return { success: true, data: { complete: true, persisted: false, persistReason: "community_scoped" }, durationMs: 0 };
+      const persisted = persistProject(store, runtime, ctx.citizenId);
+      return { success: true, data: { complete: true, persisted, persistReason: persisted ? undefined : "write_failed" }, durationMs: 0 };
     }
     settlement.shelterComplete = true;
     settlement.housingCapacity = Math.max(settlement.housingCapacity, 4);
@@ -102,7 +104,7 @@ export async function buildShelter(
     if (!planks.success) {
       runtime.project = transitionProject(project, { type: "materials_missing" });
       runtime.project.session = session;
-      persistProject(store, runtime);
+      persistProject(store, runtime, ctx.citizenId);
       return planks;
     }
   }
@@ -110,7 +112,7 @@ export async function buildShelter(
   if (project.status === "PROCURING" || project.status === "PLANNED") {
     runtime.project = transitionProject(project, { type: "materials_ready" });
     runtime.project.session = session;
-    persistProject(store, runtime);
+    persistProject(store, runtime, ctx.citizenId);
   }
 
   const liveValidate = session.stage === "FINAL_VALIDATION";
@@ -139,7 +141,7 @@ export async function buildShelter(
     settlement.shelterComplete = true;
     settlement.housingCapacity = Math.max(settlement.housingCapacity, 4);
     rememberKnown(store, result.data.reused);
-    const persisted = persistProject(store, runtime);
+    const persisted = persistProject(store, runtime, ctx.citizenId);
     if (persisted) {
       events.emit(
         createEvent("ConstructionCompleted", { blueprint: session.blueprintId, reused: true, persisted: true }, ctx.citizenId),
@@ -157,7 +159,7 @@ export async function buildShelter(
   }
 
   if (!result.success) {
-    persistProject(store, runtime);
+    persistProject(store, runtime, ctx.citizenId);
     if (result.code === "SITE_UNSUITABLE" || result.code === "INTERRUPTED") {
       events.emit(createEvent("SettlementProjectBlocked", { reason: result.error, code: result.code }, ctx.citizenId));
       return result;
@@ -176,7 +178,7 @@ export async function buildShelter(
     return completeShelter(ctx, store, runtime, events, session, hut);
   }
 
-  persistProject(store, runtime);
+  persistProject(store, runtime, ctx.citizenId);
   events.emit(createEvent("ConstructionProgress", { placed: session.placed, total: session.total, stage: session.stage }, ctx.citizenId));
   return result;
 }
@@ -202,7 +204,7 @@ function completeShelter(
   rememberWorkstations(store, session);
   const recorded = knownFromSession(session, "usable");
   if (recorded) rememberKnown(store, recorded);
-  const persisted = persistProject(store, runtime);
+  const persisted = persistProject(store, runtime, ctx.citizenId);
   runtime.reservations.releasePurpose("construction");
   if (persisted) {
     events.emit(
@@ -274,7 +276,7 @@ function rememberKnown(store: CivilizationStore, record: KnownStructureRecord): 
   store.saveSettlement(settlement);
 }
 
-function loadProject(store: CivilizationStore, runtime: SettlementRuntime): SettlementProject {
+function loadProject(store: CivilizationStore, runtime: SettlementRuntime, citizenId?: string): SettlementProject {
   if (runtime.project) return runtime.project;
   const settlement = store.getSettlement();
   if (settlement.projectJson && !store.hasCommunities()) {
@@ -286,15 +288,20 @@ function loadProject(store: CivilizationStore, runtime: SettlementRuntime): Sett
     }
   }
   runtime.project = runtime.ensureShelterProject();
-  persistProject(store, runtime);
+  persistProject(store, runtime, citizenId);
   return runtime.project;
 }
 
 /** Returns true only when the settlement write succeeded while the store was open. */
-function persistProject(store: CivilizationStore, runtime: SettlementRuntime): boolean {
+function persistProject(store: CivilizationStore, runtime: SettlementRuntime, citizenId?: string): boolean {
   if (!store.isOpen()) return false;
-  // Community mode: never publish a project/site/shelter flag into the shared settlement row.
-  if (store.hasCommunities()) return true;
+  if (store.hasCommunities()) {
+    // Community mode: the shared settlement row is never written. True only when the community row is durable.
+    if (!runtime.project || !runtime.communityId) return false;
+    const handle = communityConstruction(store).forCitizen(citizenId);
+    if (handle.communityId !== runtime.communityId) throw new Error("project runtime does not belong to the caller's community");
+    return handle.save(runtime.project);
+  }
   const write = store.safeWrite("saveSettlement:project", () => {
     const settlement = store.getSettlement();
     settlement.projectJson = runtime.project ? JSON.stringify(runtime.project) : undefined;
