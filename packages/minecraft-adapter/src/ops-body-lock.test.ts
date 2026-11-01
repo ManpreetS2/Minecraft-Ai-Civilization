@@ -1,8 +1,8 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, describe, expect, it } from "vitest";
 import { spawn, type ChildProcess } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join, relative, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import { BodyLock, DuplicateBodyError, pidAlive } from "./body-lock.js";
 
 /**
@@ -13,7 +13,23 @@ afterEach(() => {
   for (const child of children.splice(0)) child.kill("SIGKILL");
 });
 
-const lockDir = () => mkdtempSync(join(tmpdir(), "ops-lock-"));
+const tmpDirs: string[] = [];
+const lockDir = () => {
+  const dir = mkdtempSync(join(tmpdir(), "ops-lock-"));
+  tmpDirs.push(dir);
+  return dir;
+};
+afterAll(() => {
+  for (const dir of tmpDirs.splice(0)) {
+    try {
+      rmSync(dir, { recursive: true, force: true, maxRetries: 3 });
+    } catch {
+      // best effort (Windows may still hold a handle)
+    }
+  }
+});
+// pid 0 / negative semantics are POSIX kill() semantics: not meaningful on Windows.
+const posixIt = it.skipIf(process.platform === "win32");
 
 function liveForeignPid(): number {
   const child = spawn(process.execPath, ["-e", "setInterval(()=>{},1000)"], { stdio: "ignore" });
@@ -77,13 +93,51 @@ describe("OPS-001 BodyLock crash recovery", () => {
     lock.release();
   });
 
-  // CONFIRMED (OPS-001): body-lock.ts:24-25 accepts any finite pid, and pidAlive (:45-52) calls process.kill(pid, 0).
-  // kill(0, 0) targets the caller's own process group and succeeds, so a lock file containing "0" (truncated write,
-  // manual edit) reads as a live foreign body and blocks that citizen's startup until someone deletes the file by hand.
-  it.fails("KNOWN BUG: a lock file containing pid 0 must be treated as corrupt, not as a live duplicate body", () => {
-    const lock = new BodyLock("Maya", lockDir());
-    writeFileSync(lock.filePath, "0", "utf8");
-    expect(() => lock.acquire()).not.toThrow();
+  // FIXED (OPS-002): pidAlive used process.kill(pid, 0) for any finite pid, and kill(0, 0) targets the caller's own
+  // process group and succeeds, so a lock file containing "0" (truncated write, manual edit) read as a live foreign body and
+  // blocked that citizen's startup until the file was deleted by hand. pid <= 0 (and non-integers) are now never alive.
+  posixIt("a lock file containing pid 0 (or negative) is stale: acquire takes it over and release() clears it", () => {
+    for (const content of ["0", "-1", "-999999"]) {
+      const lock = new BodyLock("Maya", lockDir());
+      writeFileSync(lock.filePath, content, "utf8");
+      expect(() => lock.acquire(), content).not.toThrow();
+      expect(readFileSync(lock.filePath, "utf8")).toBe(String(process.pid));
+      lock.release();
+      writeFileSync(lock.filePath, content, "utf8");
+      lock.release(); // a stale 0 lock must also be removable
+      expect(existsSync(lock.filePath), content).toBe(false);
+    }
+  });
+
+  posixIt("pidAlive: rejects non-positive and non-integer pids, still true for this process", () => {
+    for (const pid of [0, -1, -1234, 1.5, Number.NaN, Number.POSITIVE_INFINITY]) expect(pidAlive(pid), String(pid)).toBe(false);
+    expect(pidAlive(process.pid)).toBe(true);
+  });
+
+  // FIXED (OPS-002): the pid was read with parseInt, so "<livepid>abc" / "<livepid>.5" parsed as that live pid. Only /^\d+$/ counts now.
+  it("a lock file whose content merely STARTS with a live pid is corrupt, not a live duplicate (strict /^\\d+$/ parse)", () => {
+    const pid = liveForeignPid();
+    for (const content of [`${pid}abc`, `${pid}.5`, `0x${pid.toString(16)}`, `${pid} ${pid}`, `+${pid}`, `${pid}e0`]) {
+      const lock = new BodyLock("Maya", lockDir());
+      writeFileSync(lock.filePath, content, "utf8");
+      expect(() => lock.acquire(), content).not.toThrow();
+      expect(readFileSync(lock.filePath, "utf8")).toBe(String(process.pid));
+      lock.release();
+    }
+    // surrounding whitespace / trailing newline is still a valid pid file
+    const lock = new BodyLock("Kai", lockDir());
+    writeFileSync(lock.filePath, `${pid}\n`, "utf8");
+    expect(() => lock.acquire()).toThrow(DuplicateBodyError);
+  });
+
+  // FIXED (OPS-002): acquire used exists() + write, so two starters could both pass the check and both "win". The create is now
+  // atomic ("wx"); a live foreign holder is never overwritten and a stale lock is replaced through the same atomic create.
+  it("acquire never overwrites a live holder's lock file (atomic create)", () => {
+    const pid = liveForeignPid();
+    const lock = new BodyLock("Atlas", lockDir());
+    writeFileSync(lock.filePath, String(pid), "utf8");
+    expect(() => lock.acquire()).toThrow(DuplicateBodyError);
+    expect(readFileSync(lock.filePath, "utf8")).toBe(String(pid));
   });
 
   it("locks are per citizen and case-insensitive on the username", () => {
@@ -95,13 +149,21 @@ describe("OPS-001 BodyLock crash recovery", () => {
     expect(a.filePath).not.toBe(c.filePath);
   });
 
-  // CONFIRMED (OPS-001): body-lock.ts:17 builds the path with resolve(lockDir, `${username.toLowerCase()}.lock`) and
-  // never sanitises the username, so "../x" escapes lockDir (and an absolute-looking name rewrites an arbitrary *.lock file,
-  // including one that release() may later unlink). Usernames are operator-configured today, so severity is low.
-  it.fails("KNOWN BUG: a username with path separators must not place the lock file outside the lock directory", () => {
+  // FIXED (OPS-002): the lock path used resolve(lockDir, `${username.toLowerCase()}.lock`) with no sanitising, so "../x" escaped
+  // lockDir (and an absolute-looking name could rewrite an arbitrary *.lock file that release() may later unlink). The username
+  // is now reduced to [a-z0-9_-] and the resolved path must sit directly inside the lock directory.
+  it.each(["../../escape", "..\\..\\escape", "/etc/passwd", "a/b", "C:\\x", "..", "...", "", "Atlas\u0000x"])("username %j cannot place the lock file outside the lock directory", (name) => {
     const dir = lockDir();
-    const lock = new BodyLock("../../escape", dir);
-    const rel = relative(resolve(dir), dirname(lock.filePath));
-    expect(rel.startsWith("..")).toBe(false);
+    const lock = new BodyLock(name, dir);
+    expect(dirname(lock.filePath)).toBe(resolve(dir));
+    expect(basename(lock.filePath)).toMatch(/^[a-z0-9_-]*\.lock$/);
+    lock.acquire();
+    expect(existsSync(lock.filePath)).toBe(true);
+    lock.release();
+  });
+
+  it("real Minecraft-style usernames are unchanged by sanitising (only lower-cased, as before)", () => {
+    const dir = lockDir();
+    expect(new BodyLock("Atlas_01", dir).filePath).toBe(resolve(dir, "atlas_01.lock"));
   });
 });

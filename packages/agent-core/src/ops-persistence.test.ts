@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { mkdtempSync } from "node:fs";
+import { afterAll, describe, expect, it, vi } from "vitest";
+import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import Database from "better-sqlite3";
@@ -20,7 +20,22 @@ import type { PlannedTask } from "./planner.js";
  * OPS-001 (persistence + restore after a restart). A "restart" is store.close() + a new CivilizationStore on the
  * same file, or (for crashes) a second connection opened while the first is never closed. Offline, temp dirs only.
  */
-const dbPath = (tag: string) => join(mkdtempSync(join(tmpdir(), `ops-persist-${tag}-`)), "civ.sqlite");
+const tmpDirs: string[] = [];
+const mkTmp = (prefix: string) => {
+  const dir = mkdtempSync(join(tmpdir(), prefix));
+  tmpDirs.push(dir);
+  return dir;
+};
+afterAll(() => {
+  for (const dir of tmpDirs.splice(0)) {
+    try {
+      rmSync(dir, { recursive: true, force: true, maxRetries: 3 });
+    } catch {
+      // best effort (Windows may still hold a handle)
+    }
+  }
+});
+const dbPath = (tag: string) => join(mkTmp(`ops-persist-${tag}-`), "civ.sqlite");
 const citizens = [
   { id: "citizen_atlas", name: "Atlas" },
   { id: "citizen_maya", name: "Maya" },
@@ -130,6 +145,27 @@ describe("OPS-001 restart: crash (no close) and in-flight writes", () => {
     crashed.close();
   });
 
+  it("markEventsDelivered is idempotent: re-delivering an id keeps the FIRST delivered_at and never duplicates (INSERT OR IGNORE)", () => {
+    const path = dbPath("idem");
+    const store = new CivilizationStore(path);
+    store.markEventsDelivered("citizen_atlas", ["evt-1", "evt-2"], "2026-10-31T10:00:00.000Z");
+    store.markEventsDelivered("citizen_atlas", ["evt-2", "evt-3", "evt-3"], "2026-10-31T11:00:00.000Z");
+    store.markEventsDelivered("citizen_maya", ["evt-2"], "2026-10-31T12:00:00.000Z"); // same event id, other citizen: independent
+    store.close();
+    const raw = new Database(path, { readonly: true });
+    const rows = raw.prepare(`SELECT citizen_id, event_id, delivered_at FROM citizen_event_delivery ORDER BY citizen_id, event_id`).all();
+    raw.close();
+    expect(rows).toEqual([
+      { citizen_id: "citizen_atlas", event_id: "evt-1", delivered_at: "2026-10-31T10:00:00.000Z" },
+      { citizen_id: "citizen_atlas", event_id: "evt-2", delivered_at: "2026-10-31T10:00:00.000Z" }, // NOT overwritten by the 11:00 re-delivery
+      { citizen_id: "citizen_atlas", event_id: "evt-3", delivered_at: "2026-10-31T11:00:00.000Z" },
+      { citizen_id: "citizen_maya", event_id: "evt-2", delivered_at: "2026-10-31T12:00:00.000Z" },
+    ]);
+    const again = new CivilizationStore(path);
+    expect([...again.getDeliveredEventIds("citizen_atlas")].sort()).toEqual(["evt-1", "evt-2", "evt-3"]);
+    again.close();
+  });
+
   it("a multi-row write is all-or-nothing: a failing markEventsDelivered batch leaves nothing half-applied", () => {
     const path = dbPath("txn");
     const store = new CivilizationStore(path);
@@ -193,24 +229,36 @@ describe("OPS-001 restart: directives", () => {
     c.close();
   });
 
-  // SUSPECTED (OPS-001): directives.ts:32 / store.ts:358-362 read only the newest 40 rows (LIMIT 40, ORDER BY created_at DESC),
-  // and activeFor() searches that window. After a restart (or just a busy session) an ACTIVE directive older than the 40
-  // newest rows is invisible, so a citizen silently stops obeying it. Characterisation of today's behaviour.
-  it("characterisation: an ACTIVE directive older than the 40 newest is invisible to activeFor", () => {
+  // FIXED (OPS-002): activeFor / suggestionsFor / cancelForCitizen searched only the newest 40 rows (LIMIT 40), so an ACTIVE
+  // directive older than that was invisible and the citizen silently stopped obeying it. They now select by status (ACTIVE or
+  // PENDING) with no row limit; the 40-row window remains only for display (list()).
+  it("an ACTIVE directive older than the 40 newest is still seen by activeFor / suggestionsFor, and cancelForCitizen cancels it", () => {
     const store = new CivilizationStore(dbPath("window"));
     const base = Date.parse("2026-10-31T00:00:00.000Z");
     store.saveDirective({ id: "old-active", targetIds: ["citizen_atlas"], mode: "DIRECTIVE", rawText: "Atlas get wood", parsedIntent: "gather_wood", status: "ACTIVE", createdAt: new Date(base).toISOString(), outcomes: { citizen_atlas: "ACTIVE" } });
     for (let i = 1; i <= 40; i += 1) {
       store.saveDirective({ id: `done-${i}`, targetIds: ["citizen_maya"], mode: "DIRECTIVE", rawText: "x", parsedIntent: "gather_wood", status: "COMPLETED", createdAt: new Date(base + i * 1000).toISOString(), outcomes: { citizen_maya: "COMPLETED" } });
     }
-    expect(store.getDirective("old-active")?.status).toBe("ACTIVE"); // it is on disk...
-    expect(board(store).activeFor("citizen_atlas")).toBeUndefined(); // ...but the board cannot see it
+    store.saveDirective({ id: "old-pending-suggestion", targetIds: ["citizen_atlas"], mode: "SUGGESTION", rawText: "Atlas try fishing", parsedIntent: "gather_wood", status: "PENDING", createdAt: new Date(base - 1000).toISOString(), outcomes: { citizen_atlas: "PENDING" } });
+    expect(board(store).list().map((d) => d.id)).not.toContain("old-active"); // the display window is still 40
+    expect(board(store).activeFor("citizen_atlas")?.id).toBe("old-active");
+    expect(board(store).suggestionsFor("citizen_atlas").map((d) => d.id)).toEqual(["old-pending-suggestion"]);
+    expect(board(store).activeFor("citizen_maya")).toBeUndefined(); // completed ones stay closed
+    // no hidden row limit on the status query either: 45 NEWER open directives for someone else must not push it out
+    for (let i = 0; i < 45; i += 1) {
+      store.saveDirective({ id: `open-${i}`, targetIds: ["citizen_theo"], mode: "DIRECTIVE", rawText: "x", parsedIntent: "gather_wood", status: "ACTIVE", createdAt: new Date(base + 100_000 + i * 1000).toISOString(), outcomes: { citizen_theo: "ACTIVE" } });
+    }
+    expect(store.listDirectivesByStatus(["ACTIVE", "PENDING"])).toHaveLength(47);
+    expect(board(store).activeFor("citizen_atlas")?.id).toBe("old-active");
+    expect(board(store).cancelForCitizen("citizen_atlas", "user cancelled").map((d) => d.id).sort()).toEqual(["old-active", "old-pending-suggestion"]);
+    expect(store.getDirective("old-active")?.status).toBe("CANCELLED");
+    expect(board(store).activeFor("citizen_atlas")).toBeUndefined();
     store.close();
   });
 
-  // CONFIRMED (OPS-001): store.ts:355,362 JSON.parse every row with no guard, so ONE corrupt/truncated directive row makes
-  // listDirectives() throw, and DirectiveBoard.list/activeFor/cancelForCitizen throw with it (the bad row also hides the good ones).
-  it.fails("KNOWN BUG: one corrupt directive row must not hide the valid ones after a restart", () => {
+  // FIXED (OPS-002): listDirectives used to JSON.parse every row unguarded, so ONE corrupt/truncated row made it throw and
+  // DirectiveBoard.list/activeFor/cancelForCitizen with it. Corrupt rows are now skipped and logged.
+  it("one corrupt directive row is skipped (and logged), not fatal: the valid ones survive the restart", () => {
     const path = dbPath("corrupt-dir");
     const a = new CivilizationStore(path);
     a.saveDirective({ id: "good", targetIds: ["citizen_atlas"], mode: "DIRECTIVE", rawText: "Atlas get wood", parsedIntent: "gather_wood", status: "ACTIVE", createdAt: "2026-10-31T10:00:00.000Z", outcomes: { citizen_atlas: "ACTIVE" } });
@@ -219,7 +267,18 @@ describe("OPS-001 restart: directives", () => {
     raw.prepare(`INSERT INTO human_directives (id, json, created_at) VALUES ('bad', '{"id":"bad","tar', '2026-10-31T11:00:00.000Z')`).run();
     raw.close();
     const b = new CivilizationStore(path);
-    expect(b.listDirectives().map((d) => d.id)).toEqual(["good"]);
+    const logged = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    try {
+      expect(b.listDirectives().map((d) => d.id)).toEqual(["good"]);
+      expect(board(b).activeFor("citizen_atlas")?.id).toBe("good");
+      expect(b.getDirective("bad")).toBeUndefined(); // by-id read of the corrupt row: undefined, not a throw
+      expect(() => board(b).mark("bad", "CANCELLED")).not.toThrow();
+      expect(() => board(b).cancel("bad")).not.toThrow();
+      expect(b.listDirectivesByStatus(["ACTIVE"]).map((d) => d.id)).toEqual(["good"]);
+      expect(logged.mock.calls.some((c) => String(c[0]).includes("corrupt directive row"))).toBe(true);
+    } finally {
+      logged.mockRestore();
+    }
     b.close();
   });
 });
@@ -296,15 +355,29 @@ describe("OPS-001 restart: last-outcome persistence feeds failure backoff", () =
     store.close();
   });
 
-  // CONFIRMED (OPS-001): task-recovery.ts:176-185 (check at :181) validates only task/action. A persisted outcome from an older schema
-  // (no `streak`) loads as valid with streak === undefined, and lastOutcomeFrom (:163) computes `previous.streak + 1` = NaN.
-  // NaN >= 3 is false, so shouldBackoffToObserve can never fire again for that task until a success resets it.
-  it.fails("KNOWN BUG: a persisted outcome missing `streak` must not poison the failure streak with NaN", () => {
+  // FIXED (OPS-002): a persisted outcome from an older schema (no `streak`) loads as valid with streak === undefined, and
+  // lastOutcomeFrom computed `previous.streak + 1` = NaN; NaN >= 3 is false so backoff could never fire again for that task.
+  // A missing / non-finite streak now counts as 0.
+  it("a persisted outcome missing `streak` restarts the count at 1 (no NaN), and backoff still fires 2 failures later", () => {
     const store = new CivilizationStore(dbPath("nan"));
     store.setMeta(`${LAST_OUTCOME_META_PREFIX}citizen_atlas`, JSON.stringify({ task: "gather_wood", action: "mineBlock", success: false, code: "BLOCK_NOT_FOUND" }));
     const restored = loadCitizenLastOutcome(store, "citizen_atlas");
+    expect(restored?.streak).toBe(0); // validated on load: a missing streak is 0, never undefined/NaN
+    for (const bad of [null, "3", -4, Number.NaN, {}, [2]]) {
+      store.setMeta(`${LAST_OUTCOME_META_PREFIX}citizen_maya`, JSON.stringify({ task: "gather_wood", action: "mineBlock", success: false, streak: bad }));
+      expect(loadCitizenLastOutcome(store, "citizen_maya")?.streak, JSON.stringify(bad)).toBe(0);
+    }
+    store.setMeta(`${LAST_OUTCOME_META_PREFIX}citizen_maya`, JSON.stringify({ task: "gather_wood", action: "mineBlock", success: false, streak: 2 }));
+    expect(loadCitizenLastOutcome(store, "citizen_maya")?.streak).toBe(2);
     const next = lastOutcomeFrom(plan(), fail("BLOCK_NOT_FOUND", "none", 1, true), restored);
-    expect(Number.isFinite(next.streak)).toBe(true);
+    expect(next.streak).toBe(1);
+    const f = fail("BLOCK_NOT_FOUND", "none", 1, true);
+    const third = lastOutcomeFrom(plan(), f, lastOutcomeFrom(plan(), f, next));
+    expect(third.streak).toBe(3);
+    expect(shouldBackoffToObserve(third)).toBe(true);
+    for (const bad of [Number.NaN, Number.POSITIVE_INFINITY, "2" as never, null as never]) {
+      expect(lastOutcomeFrom(plan(), f, { task: "gather_wood", action: "mineBlock", success: false, streak: bad }).streak).toBe(1);
+    }
     store.close();
   });
 });

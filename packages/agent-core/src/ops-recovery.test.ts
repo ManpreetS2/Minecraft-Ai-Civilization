@@ -1,5 +1,5 @@
-import { afterEach, describe, expect, it } from "vitest";
-import { mkdtempSync } from "node:fs";
+import { afterAll, afterEach, describe, expect, it } from "vitest";
+import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { EventBus, fail, ok } from "@civ/shared";
@@ -112,7 +112,34 @@ function world(opts: {
 }
 
 
-const newStore = () => new CivilizationStore(join(mkdtempSync(join(tmpdir(), "ops-recov-")), "civ.sqlite"));
+const tmpDirs: string[] = [];
+const openStores: CivilizationStore[] = [];
+const mkTmp = (prefix: string) => {
+  const dir = mkdtempSync(join(tmpdir(), prefix));
+  tmpDirs.push(dir);
+  return dir;
+};
+afterAll(() => {
+  for (const store of openStores.splice(0)) {
+    try {
+      store.close();
+    } catch {
+      // already closed
+    }
+  }
+  for (const dir of tmpDirs.splice(0)) {
+    try {
+      rmSync(dir, { recursive: true, force: true, maxRetries: 3 });
+    } catch {
+      // best effort (Windows may still hold a handle)
+    }
+  }
+});
+const trackStore = (store: CivilizationStore): CivilizationStore => {
+  openStores.push(store);
+  return store;
+};
+const newStore = () => trackStore(new CivilizationStore(join(mkTmp("ops-recov-"), "civ.sqlite")));
 const woodPlan = { goal: "gather_wood", task: "gather_wood", action: "mineBlock", source: "planner", reason: "t", priority: 0.5 } as PlannedTask;
 const plan = (over: Partial<PlannedTask> = {}): PlannedTask => ({ ...woodPlan, ...over });
 const failing = (code: string, retryable = true) => fail(code as never, `${code} happened`, 1, retryable);
@@ -242,6 +269,14 @@ describe("OPS-001 failure recovery: executor failure paths", () => {
     expect(runtime.claims.ownerOf("tree", "6,64,5", t0 + 60_001)).toBe("citizen_maya");
   });
 
+  it("a claim can only be released by its owner, and an omitted owner can no longer free anyone's claim (owner is required)", () => {
+    const rt = new SettlementRuntime();
+    rt.claims.tryClaim("ore", "9,9,9", "citizen_atlas", 60_000);
+    expect(rt.claims.release("ore", "9,9,9", undefined as never)).toBe(false);
+    expect(rt.claims.release("ore", "9,9,9", "" as never)).toBe(false);
+    expect(rt.claims.ownerOf("ore", "9,9,9")).toBe("citizen_atlas");
+  });
+
   it("a claim can only be released by its owner (a stale release from a dead task cannot free a rival's claim)", () => {
     const runtime = new SettlementRuntime();
     runtime.claims.tryClaim("ore", "1,2,3", "citizen_atlas", 60_000);
@@ -282,19 +317,36 @@ describe("OPS-001 failure recovery: backoff policy boundaries", () => {
     expect(good).toMatchObject({ success: true, streak: 0, workComplete: true });
   });
 
-  // SUSPECTED (OPS-001): lastOutcomeFrom (task-recovery.ts:163) increments the streak for CANCELLED / INTERRUPTED too, and
-  // shouldBackoffToObserve only ignores the cancel itself, so two genuine failures + one user cancel + one more failure
-  // reaches streak 4 and backs off after only 3 real failures; a cancel never resets the count. Characterisation only.
-  it("characterisation: a cancel in the middle of a failure streak still counts toward the streak", () => {
+  // FIXED (OPS-002). The real defect (OPS-001 review): lastOutcomeFrom counted a CANCELLED / INTERRUPTED / CURFEW_STOP /
+  // NOT_SLEEP_TIME stop as a failure, so fail -> CANCEL -> fail reached streak 3 and backed the citizen off after only 2 REAL
+  // failures. A stop now keeps the previous streak (neither adds nor resets it).
+  it("fail -> CANCEL -> fail is a streak of 2 (not 3): no backoff after only 2 real failures; the 3rd real failure backs off", () => {
     const f = failing("STUCK");
     let o = lastOutcomeFrom(plan(), f);
-    o = lastOutcomeFrom(plan(), f, o);
-    o = lastOutcomeFrom(plan(), failing("CANCELLED", false), o);
+    o = lastOutcomeFrom(plan(), failing("CANCELLED", false), lastOutcomeFrom(plan(), f, o)); // fail, fail, CANCEL
+    expect(o.streak).toBe(2); // the cancel did not add one
+    o = lastOutcomeFrom(plan(), f, lastOutcomeFrom(plan(), failing("CANCELLED", false), lastOutcomeFrom(plan(), f))); // fail, CANCEL, fail
+    expect(o.streak).toBe(2);
+    expect(shouldBackoffToObserve(o)).toBe(false);
+    o = lastOutcomeFrom(plan(), f, o); // 3rd REAL failure
     expect(o.streak).toBe(3);
-    expect(shouldBackoffToObserve(o)).toBe(false); // the cancel itself is exempt
-    o = lastOutcomeFrom(plan(), f, o);
-    expect(o.streak).toBe(4);
-    expect(shouldBackoffToObserve(o)).toBe(true); // only 3 real failures happened
+    expect(shouldBackoffToObserve(o)).toBe(true);
+  });
+
+  it.each(["CANCELLED", "INTERRUPTED", "CURFEW_STOP", "NOT_SLEEP_TIME"])("%s keeps the previous streak for the same task and does not start one for a new task", (code) => {
+    const f = failing("STUCK");
+    const two = lastOutcomeFrom(plan(), f, lastOutcomeFrom(plan(), f));
+    expect(lastOutcomeFrom(plan(), failing(code, false), two).streak).toBe(2);
+    expect(lastOutcomeFrom(plan({ task: "go_home" }), failing(code, false), two).streak).toBe(0);
+    expect(lastOutcomeFrom(plan(), failing(code, false), undefined).streak).toBe(0);
+  });
+
+  it("a real (non-stop) failure still increments, and a verified success still resets to 0", () => {
+    const f = failing("BLOCK_NOT_FOUND");
+    const one = lastOutcomeFrom(plan(), f);
+    expect(one.streak).toBe(1);
+    expect(lastOutcomeFrom(plan(), f, one).streak).toBe(2);
+    expect(lastOutcomeFrom(plan(), ok({ collected: 1 }, 1), one).streak).toBe(0);
   });
 
   // SUSPECTED (OPS-001): task-recovery.ts:164 marks a "success but not physically complete" result retryable:false, and
@@ -304,7 +356,7 @@ describe("OPS-001 failure recovery: backoff policy boundaries", () => {
     const incomplete = ok({ collected: 0 }, 1);
     let o: LastOutcome | undefined;
     for (let i = 0; i < 10; i += 1) o = lastOutcomeFrom(plan(), incomplete, o);
-    expect(o?.streak).toBe(10);
+    expect(o?.streak).toBe(0); // "incomplete success" is coded INTERRUPTED, which (OPS-002) no longer moves the streak
     expect(o?.retryable).toBe(false);
     expect(shouldBackoffToObserve(o)).toBe(false);
   });

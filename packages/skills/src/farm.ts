@@ -2,6 +2,7 @@ import { fail, ok, type ActionResult, type ErrorCode, type Vec3 } from "@civ/sha
 import { isWithinBlockReach, navigationBackend } from "@civ/minecraft-adapter";
 import { Vec3 as Vec3Class } from "vec3";
 import type { SkillContext } from "./context.js";
+import { digUnlessAborted } from "./dig-abort.js";
 import { lookAtPosition } from "./look.js";
 import { pickupDroppedItem, countItem, equipItem } from "./inventory-service.js";
 import { depositItems, withdrawItems } from "./inventory.js";
@@ -488,7 +489,9 @@ export async function tillSoil(
   if (!equipped.success) return equipped;
   if (above && REPLACEABLE_ABOVE.has(above.name) && above.name !== "air" && above.name !== "cave_air") {
     try {
-      await ctx.bot.dig(above, true);
+      if ((await digUnlessAborted(ctx, above)) === "aborted") {
+        return fail("CANCELLED", "Tilling cancelled during dig", Date.now() - started, false, { workComplete: false });
+      }
     } catch (error) {
       return fail("DIG_FAILED", error instanceof Error ? error.message : String(error), Date.now() - started, true);
     }
@@ -556,7 +559,9 @@ export async function harvestCropAt(
   const beforeSeed = countItem(ctx, spec.seed);
   const beforeCrop = countItem(ctx, cropYieldItem(kind));
   try {
-    await ctx.bot.dig(block, true);
+    if ((await digUnlessAborted(ctx, block)) === "aborted") {
+      return fail("CANCELLED", "Harvest cancelled during crop dig", Date.now() - started, false, { workComplete: false });
+    }
   } catch (error) {
     return fail("DIG_FAILED", error instanceof Error ? error.message : String(error), Date.now() - started, true);
   }

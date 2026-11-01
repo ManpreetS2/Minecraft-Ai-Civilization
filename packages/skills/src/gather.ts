@@ -4,6 +4,7 @@ import { refuseAccidentalPropertyBreak } from "@civ/minecraft-knowledge";
 import { Vec3 as Vec3Class } from "vec3";
 import type { SkillContext } from "./context.js";
 import { findBlock } from "./observe.js";
+import { digUnlessAborted } from "./dig-abort.js";
 import { lookAtPosition } from "./look.js";
 import { moveTo } from "./movement.js";
 import { isStandingInLiquid } from "./fish.js";
@@ -90,7 +91,9 @@ export async function mineBlock(
         if (ctx.signal?.aborted) {
           return fail("CANCELLED", "Cancelled before dig", Date.now() - started, false, { workComplete: false });
         }
-        await bot.dig(block, true);
+        if ((await digUnlessAborted(ctx, block)) === "aborted") {
+          return fail("CANCELLED", "Cancelled during dig", Date.now() - started, false, { workComplete: false });
+        }
       } catch (error) {
         ctx.body.unreachable.mark(target, 20_000);
         return fail(

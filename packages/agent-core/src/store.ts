@@ -165,6 +165,15 @@ export type StoreReadResult<T> =
   | { ok: false; reason: "closed" }
   | { ok: false; reason: "error"; error: unknown };
 
+function parseDirectiveRow(json: string): HumanDirective | undefined {
+  try {
+    return JSON.parse(json) as HumanDirective;
+  } catch (error) {
+    console.error(`[store] skipping corrupt directive row: ${error instanceof Error ? error.message : String(error)}`);
+    return undefined;
+  }
+}
+
 export class CivilizationStore {
   readonly db: Database.Database;
   private open = true;
@@ -352,14 +361,27 @@ export class CivilizationStore {
   getDirective(id: string): HumanDirective | undefined {
     const row = this.db.prepare(`SELECT json FROM human_directives WHERE id = ?`).get(id) as { json: string } | undefined;
     if (!row) return undefined;
-    return JSON.parse(row.json) as HumanDirective;
+    return parseDirectiveRow(row.json);
   }
 
   listDirectives(limit = 40): HumanDirective[] {
     const rows = this.db
       .prepare(`SELECT json FROM human_directives ORDER BY created_at DESC LIMIT ?`)
       .all(limit) as Array<{ json: string }>;
-    return rows.map((row) => JSON.parse(row.json) as HumanDirective);
+    return rows.flatMap((row) => parseDirectiveRow(row.json) ?? []);
+  }
+
+  /** Every directive in one of the given statuses, newest first, with NO row limit (an old ACTIVE one must never fall out of a window). */
+  listDirectivesByStatus(statuses: readonly HumanDirective["status"][]): HumanDirective[] {
+    if (statuses.length === 0) return [];
+    const rows = this.db
+      .prepare(
+        `SELECT json FROM human_directives
+         WHERE json_valid(json) AND json_extract(json, '$.status') IN (${statuses.map(() => "?").join(",")})
+         ORDER BY created_at DESC`,
+      )
+      .all(...statuses) as Array<{ json: string }>;
+    return rows.flatMap((row) => parseDirectiveRow(row.json) ?? []);
   }
 
   private seed(): void {

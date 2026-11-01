@@ -1,5 +1,5 @@
-import { afterEach, describe, expect, it } from "vitest";
-import { mkdtempSync } from "node:fs";
+import { afterAll, afterEach, describe, expect, it } from "vitest";
+import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { EventBus, fail, ok, type ActionResult } from "@civ/shared";
@@ -96,7 +96,34 @@ function world(opts: {
   return { ctx, digs: () => digs, logsLeft: () => logs.size, count: (n: string) => items.filter((i) => i.name === n).reduce((s, i) => s + i.count, 0) };
 }
 
-const newStore = () => new CivilizationStore(join(mkdtempSync(join(tmpdir(), "ops-cancel-")), "civ.sqlite"));
+const tmpDirs: string[] = [];
+const openStores: CivilizationStore[] = [];
+const mkTmp = (prefix: string) => {
+  const dir = mkdtempSync(join(tmpdir(), prefix));
+  tmpDirs.push(dir);
+  return dir;
+};
+afterAll(() => {
+  for (const store of openStores.splice(0)) {
+    try {
+      store.close();
+    } catch {
+      // already closed
+    }
+  }
+  for (const dir of tmpDirs.splice(0)) {
+    try {
+      rmSync(dir, { recursive: true, force: true, maxRetries: 3 });
+    } catch {
+      // best effort (Windows may still hold a handle)
+    }
+  }
+});
+const trackStore = (store: CivilizationStore): CivilizationStore => {
+  openStores.push(store);
+  return store;
+};
+const newStore = () => trackStore(new CivilizationStore(join(mkTmp("ops-cancel-"), "civ.sqlite")));
 const woodPlan = { goal: "gather_wood", task: "gather_wood", action: "mineBlock", source: "planner", reason: "t", priority: 0.5 } as PlannedTask;
 
 describe("OPS-001 cancellation: collectResource", () => {
@@ -163,10 +190,9 @@ describe("OPS-001 cancellation: collectResource", () => {
     if (!result.success) expect(result.code).toBe("INTERRUPTED");
   });
 
-  // CONFIRMED (OPS-001): nothing in the repo ever calls bot.stopDigging() (rg: zero hits), and collectResource awaits
-  // bot.dig() with no race against ctx.signal. A dig that never settles therefore pins the citizen forever even
-  // though cancelCitizenWork() has aborted its signal. Desired behaviour: abort settles the skill promptly.
-  it.fails("KNOWN BUG: aborting while bot.dig is hung settles collectResource promptly", async () => {
+  // FIXED (OPS-002): collectResource used to await bot.dig() with no race against ctx.signal and nothing called
+  // bot.stopDigging(), so a dig that never settled pinned the citizen even after cancelCitizenWork() aborted its signal.
+  it("aborting while bot.dig is hung stops the dig and settles collectResource promptly as INTERRUPTED", async () => {
     setNavigationBackend(stubNav());
     const controller = new AbortController();
     // The abort fires from inside the dig call itself, so the ordering is deterministic (no timer race).
@@ -178,6 +204,8 @@ describe("OPS-001 cancellation: collectResource", () => {
         return new Promise<void>(() => undefined);
       },
     });
+    let stopped = 0;
+    (w.ctx.bot as unknown as { stopDigging: () => void }).stopDigging = () => void (stopped += 1);
     const run = collectResource(w.ctx, ["oak_log"], 1, 48);
     const outcome = await Promise.race([
       run.then((r) => ({ settled: true as const, r })),
@@ -185,6 +213,49 @@ describe("OPS-001 cancellation: collectResource", () => {
     ]);
     expect(w.digs()).toBe(1);
     expect(outcome.settled).toBe(true);
+    expect(stopped).toBe(1);
+    if (outcome.settled) {
+      expect(outcome.r.success).toBe(false);
+      if (!outcome.r.success) expect(outcome.r.code).toBe("INTERRUPTED");
+    }
+  });
+
+  it("an abort that arrives later (timer) during a hung dig also settles it, and a throwing stopDigging cannot break the cancel", async () => {
+    setNavigationBackend(stubNav());
+    const controller = new AbortController();
+    const w = world({ logs: [{ x: 6, y: 64, z: 5 }], controller, dig: () => new Promise<void>(() => undefined) });
+    (w.ctx.bot as unknown as { stopDigging: () => void }).stopDigging = () => {
+      throw new Error("bot gone");
+    };
+    const run = collectResource(w.ctx, ["oak_log"], 1, 48);
+    setTimeout(() => controller.abort(), 150);
+    const r = await Promise.race([run, new Promise<"hung">((resolve) => setTimeout(() => resolve("hung"), 1500))]);
+    expect(r).not.toBe("hung");
+    if (r !== "hung") expect(r.success).toBe(false);
+  });
+
+  it("an abandoned dig that later REJECTS (stopDigging makes mineflayer reject) causes no unhandled rejection", async () => {
+    setNavigationBackend(stubNav());
+    const unhandled: unknown[] = [];
+    const onUnhandled = (reason: unknown) => void unhandled.push(reason);
+    process.on("unhandledRejection", onUnhandled);
+    try {
+      const controller = new AbortController();
+      let rejectDig!: (e: Error) => void;
+      const w = world({
+        logs: [{ x: 6, y: 64, z: 5 }],
+        controller,
+        dig: () => new Promise<void>((_, reject) => { rejectDig = reject; controller.abort(); }),
+      });
+      (w.ctx.bot as unknown as { stopDigging: () => void }).stopDigging = () => rejectDig(new Error("Digging aborted"));
+      const r = await collectResource(w.ctx, ["oak_log"], 1, 48);
+      expect(r.success).toBe(false);
+      if (!r.success) expect(r.code).toBe("INTERRUPTED"); // not DIG_FAILED: a cancel is not a dig failure
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(unhandled).toEqual([]);
+    } finally {
+      process.off("unhandledRejection", onUnhandled);
+    }
   });
 });
 
@@ -247,7 +318,7 @@ describe("OPS-001 cancellation: per-citizen abort + body death lifecycle", () =>
   };
 
   it("temporary body death aborts ONLY that citizen, stops pathing, frees only their claims/holds, persists 'respawning'", () => {
-    const path = join(mkdtempSync(join(tmpdir(), "ops-life-")), "civ.sqlite");
+    const path = join(mkTmp("ops-life-"), "civ.sqlite");
     const store = new CivilizationStore(path);
     const runtime = new SettlementRuntime();
     const atlas = makeCitizen(store, "citizen_atlas");
@@ -276,7 +347,7 @@ describe("OPS-001 cancellation: per-citizen abort + body death lifecycle", () =>
   });
 
   it("terminal death aborts, stops pathing, releases holds, and the death + position survive a restart", () => {
-    const path = join(mkdtempSync(join(tmpdir(), "ops-life-")), "civ.sqlite");
+    const path = join(mkTmp("ops-life-"), "civ.sqlite");
     const store = new CivilizationStore(path);
     const runtime = new SettlementRuntime();
     const kai = makeCitizen(store, "citizen_kai");
@@ -347,13 +418,19 @@ describe("OPS-001 cancellation: per-citizen abort + body death lifecycle", () =>
   // body is rebuilt) is never persisted via store.markDeceased. Characterisation only: this documents today's behaviour.
   it("characterisation: a terminal death with no runtime citizen is silently dropped (store NOT marked)", () => {
     const store = newStore();
+    // Precondition (without it the assertion below is vacuous): the citizen EXISTS in the store and is online.
+    const theo = store.getCitizen("citizen_theo");
+    if (!theo) throw new Error("citizen_theo is not seeded");
+    store.upsertCitizen({ ...theo, status: "online" });
+    expect(store.getCitizen("citizen_theo")?.status).toBe("online");
     applyTerminalDeath({
       event: { id: "e3", type: "CitizenDied", timestamp: "2026-10-31T12:00:00.000Z", citizenId: "citizen_theo", payload: {} } as never,
       store,
       runtime: new SettlementRuntime(),
       citizen: undefined,
     });
-    expect(store.getCitizen("citizen_theo")?.status).not.toBe("dead");
+    expect(store.getCitizen("citizen_theo")?.status).toBe("online"); // still alive in the store: the death was lost
+    expect(store.isDeceased("citizen_theo")).toBe(false);
     store.close();
   });
 });
