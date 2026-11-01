@@ -58,8 +58,16 @@ import { applyBodyRespawn, applyTemporaryBodyDeath, applyTerminalDeath } from ".
 import { OperationTracker, type DrainResult } from "./operation-tracker.js";
 import type { DirectiveMode, HumanDirective } from "./directive-parse.js";
 
+/** One provider per citizen. Structural, so a registry from @civ/cognition/routing satisfies it directly. */
+export type CitizenCognitionRouter = {
+  providerFor(citizenId: string): CognitionProvider & { cancel(): void };
+  closeAll(): void;
+};
+
 export type AgentManagerHooks = {
   drainTimeoutMs?: number;
+  /** When set, every citizen decides through its own provider and the shared provider is never used. */
+  cognitionRouter?: CitizenCognitionRouter;
 };
 
 type RuntimeCitizen = {
@@ -68,6 +76,8 @@ type RuntimeCitizen = {
   busy: boolean;
   abort?: AbortController;
   lastLlmAt: number;
+  /** A decision of this citizen's own is pending. Used only with a cognitionRouter. */
+  llmBusy?: boolean;
   lastChatAt: number;
   lastPlan?: PlannedTask;
   lastOutcome?: LastOutcome;
@@ -353,6 +363,7 @@ export class AgentManager {
     for (const citizen of this.citizens.values()) {
       citizen.abort?.abort();
     }
+    this.hooks.cognitionRouter?.closeAll();
     this.lastDrain = await this.ops.drainAndClose(this.hooks.drainTimeoutMs ?? 8_000);
     if (!this.lastDrain.fullyDrained) {
       console.warn(
@@ -486,7 +497,7 @@ export class AgentManager {
     const now = Date.now();
     const llmDue =
       this.config.LLM_ENABLED &&
-      llmInFlight === 0 &&
+      (this.hooks.cognitionRouter ? !citizen.llmBusy : llmInFlight === 0) &&
       now - citizen.lastLlmAt > this.config.LLM_COOLDOWN_MS &&
       !(activeDirective && activeDirective.mode !== "SUGGESTION") &&
       // Scoped citizens have no shared needs list, so that list can't be what keeps them thinking.
@@ -495,6 +506,7 @@ export class AgentManager {
     if (llmDue && this.ops.canAcceptWork()) {
       citizen.lastLlmAt = now;
       llmInFlight += 1;
+      citizen.llmBusy = true;
       const started = Date.now();
       const memories = retrieveRelevant(this.store.getMemories(citizen.record.id), assignedNeeds.join(" "), 5);
       const gameFacts = minecraftKnowledge().getRelevantRules({
@@ -511,7 +523,8 @@ export class AgentManager {
         citizenId: citizen.record.id,
       });
       const persistentFacts = persistentFactsForCognition(this.store, citizen.record.id);
-      const decisionWork = this.cognition
+      const cognition = this.cognitionFor(citizen.record.id);
+      const decisionWork = cognition
         .decide({
           citizenName: citizen.record.name,
           health: observation.health,
@@ -544,7 +557,7 @@ export class AgentManager {
           this.emitIfLive(
             createEvent(
               "LLMDecisionMade",
-              { goal: decision.goal, reason: decision.reason, provider: this.cognition.name },
+              { goal: decision.goal, reason: decision.reason, provider: cognition.name },
               citizen.record.id,
             ),
           );
@@ -561,13 +574,14 @@ export class AgentManager {
           this.emitIfLive(
             createEvent(
               "LLMSkipped",
-              { error: error instanceof Error ? error.message : String(error), provider: this.cognition.name },
+              { error: error instanceof Error ? error.message : String(error), provider: cognition.name },
               citizen.record.id,
             ),
           );
         })
         .finally(() => {
           llmInFlight = Math.max(0, llmInFlight - 1);
+          citizen.llmBusy = false;
         });
       void this.ops.track(decisionWork);
     }
@@ -848,9 +862,32 @@ export class AgentManager {
     if (citizen) this.directives.cancelForCitizen(citizen.record.id, "terminal_death");
   }
 
+  /** Never falls back to the shared provider: an unassigned citizen simply cannot think. */
+  private cognitionFor(citizenId: string): CognitionProvider {
+    const router = this.hooks.cognitionRouter;
+    if (!router) return this.cognition;
+    try {
+      return router.providerFor(citizenId);
+    } catch (error) {
+      return { name: "unassigned", decide: () => Promise.reject(error) };
+    }
+  }
+
+  /** Whatever this citizen was deciding no longer applies. Any late reply is discarded by its session. */
+  private cancelCognition(citizenId: string): void {
+    const router = this.hooks.cognitionRouter;
+    if (!router) return;
+    try {
+      router.providerFor(citizenId).cancel();
+    } catch {
+      // An unassigned citizen has nothing in flight.
+    }
+  }
+
   private handleBodyDied(event: SimEvent): void {
     const citizen = this.citizens.get(event.citizenId ?? "");
     if (!citizen) return;
+    this.cancelCognition(citizen.record.id);
     applyTemporaryBodyDeath({ citizen, store: this.store, runtime: this.runtime });
     this.directives.cancelForCitizen(citizen.record.id, "body_died");
     this.writeCitizen(citizen.record);
@@ -893,6 +930,7 @@ export class AgentManager {
       [...this.citizens.values()].find((c) => c.record.name.toLowerCase() === nameOrId.toLowerCase());
     if (!citizen) return { ok: false as const, reason: "Citizen not found", status: 404 };
     cancelCitizenWork(citizen);
+    this.cancelCognition(citizen.record.id);
     citizen.body.stopPathfinding();
     citizen.busy = false;
     this.runtime.releaseCitizen(citizen.record.id);
