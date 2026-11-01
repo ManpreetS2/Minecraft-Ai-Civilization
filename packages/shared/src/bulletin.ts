@@ -40,11 +40,10 @@ export type BulletinBuildOptions = {
   targetTokens?: number;
   maxLines?: number;
   /**
-   * SEC-001: when given, broadcast events must carry a verified audience (world or a community in this
-   * directory) or they reach nobody. The production path (buildCitizenContextPack) always passes it.
-   * Without it only the legacy visibility-class rule applies, and settlement_public fails closed.
+   * SEC-001: REQUIRED. Broadcast events must carry a verified audience (world or a community in this directory)
+   * or they reach nobody. The production path (buildCitizenContextPack) always passes it.
    */
-  directory?: CommunityDirectory;
+  directory: CommunityDirectory;
 };
 
 const DEFAULT_TARGET_TOKENS = 200;
@@ -131,10 +130,12 @@ export function buildCitizenBulletin(options: BulletinBuildOptions): BulletinBui
       continue;
     }
     const visibility = readEventVisibility(event.payload);
+    // SEC-001: `directory` is REQUIRED by type, so every typechecked caller must supply it. The untyped-caller fallback
+    // below (no directory) keeps the legacy class-only rule, under which settlement_public fails closed; it exists only
+    // so the unchanged Codex PRIV-001 contract tests (which omit the directory) keep passing, and is NOT reachable
+    // from production code (buildCitizenContextPack always passes the persisted directory).
     const auth: VisibilityDecision = options.directory
-      ? toDecision(
-          authorizeEventWithAudience(options.readerCitizenId, event.payload, options.directory, event.citizenId),
-        )
+      ? toDecision(authorizeEventWithAudience(options.readerCitizenId, event.payload, options.directory, event.citizenId))
       : authorizeEventForCitizen(options.readerCitizenId, visibility, event.citizenId);
     if (!auth.visible) {
       excluded.push({ eventId: event.id, reason: auth.reason });

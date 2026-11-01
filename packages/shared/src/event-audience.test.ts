@@ -124,7 +124,8 @@ describe("SEC-001 bulletin", () => {
       expect(out.excluded.find((e) => e.eventId === "unlabeled")?.reason).toMatch(/audience/);
     }
   });
-  it("without a directory settlement_public still reaches nobody", () => {
+  it("a JS caller that omits the (required) directory gets fail-closed: settlement_public reaches nobody", () => {
+    // @ts-expect-error directory is required by type; this is the runtime fail-closed path
     const out = buildCitizenBulletin({
       readerCitizenId: "Claude-A",
       alreadyDeliveredIds: new Set(),

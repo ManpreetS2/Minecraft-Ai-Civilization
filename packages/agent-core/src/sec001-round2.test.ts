@@ -228,8 +228,8 @@ describe("fix 5: membership is writable only through the orchestrator-config pat
   });
   it("the config seed is additive, idempotent and audited", () => {
     const store = open(dbPath());
-    expect(applyCommunityConfig(store, config)).toEqual({ communitiesTouched: 2, membersAdded: 4 });
-    expect(applyCommunityConfig(store, config)).toEqual({ communitiesTouched: 2, membersAdded: 0 });
+    expect(applyCommunityConfig(store, config)).toEqual({ communitiesTouched: 2, membersAdded: 4, membersRemoved: 0 });
+    expect(applyCommunityConfig(store, config)).toEqual({ communitiesTouched: 2, membersAdded: 0, membersRemoved: 0 });
     const audit = store.listCommunityAudit();
     expect(audit.filter((a) => a.action === "add_member")).toHaveLength(4);
     expect(audit.every((a) => a.actor === "orchestrator-config" && a.reason === "COMMUNITIES_JSON seed")).toBe(true);

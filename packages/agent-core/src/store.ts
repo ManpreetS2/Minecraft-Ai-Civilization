@@ -21,7 +21,9 @@ import {
 import type { CitizenHome, HomeMembership, HomeRecord } from "./home-types.js";
 
 /** True for the existing row of an upsert when it is quarantined: a flagged fact is never overwritten, only released manually. */
-const FLAGGED_FACT_SQL = `EXISTS (SELECT 1 FROM citizen_persistent_fact_flags g WHERE g.fact_id = citizen_persistent_facts.id AND g.released_at IS NULL)`;
+// A flag covers the fact row it was raised on AND any row for the same (citizen, key): a re-written fact with a
+// fresh id must not shed the quarantine.
+const FLAGGED_FACT_SQL = `EXISTS (SELECT 1 FROM citizen_persistent_fact_flags g WHERE g.released_at IS NULL AND (g.fact_id = citizen_persistent_facts.id OR (g.citizen_id = citizen_persistent_facts.citizen_id AND g.fact_key = citizen_persistent_facts.fact_key)))`;
 const FACT_FLAG_MIGRATION_KEY = "sec001_fact_flags_v1";
 
 /** SEC-001: result of re-checking legacy facts / deliveries against their source events (never contains fact content). */
@@ -37,6 +39,10 @@ export type LegacyFactMigrationReport = {
   deliveries: {
     examined: number;
     unauthorized: Array<{ citizenId: string; eventId: string; reason: string }>;
+  };
+  /** Memories whose text contains a to-be-flagged fact's text (best-effort second-order taint; ids only). */
+  memories: {
+    toFlag: Array<{ memoryId: string; citizenId: string; viaFactId: string }>;
   };
 };
 
@@ -338,6 +344,14 @@ export class CivilizationStore {
         flagged_at TEXT NOT NULL,
         released_at TEXT
       );
+      CREATE TABLE IF NOT EXISTS citizen_memory_flags (
+        memory_id TEXT PRIMARY KEY,
+        citizen_id TEXT NOT NULL,
+        via_fact_id TEXT,
+        reason TEXT NOT NULL,
+        flagged_at TEXT NOT NULL,
+        released_at TEXT
+      );
       CREATE TABLE IF NOT EXISTS citizen_event_delivery_flags (
         citizen_id TEXT NOT NULL,
         event_id TEXT NOT NULL,
@@ -417,6 +431,7 @@ export class CivilizationStore {
       communitiesKnown: (this.db.prepare(`SELECT COUNT(*) AS n FROM communities`).get() as { n: number }).n,
       facts: { examined: 0, kept: 0, alreadyFlagged: 0, toFlag: [] },
       deliveries: { examined: 0, unauthorized: [] },
+      memories: { toFlag: [] },
     };
     const flagged = new Set(
       (this.db.prepare(`SELECT fact_id FROM citizen_persistent_fact_flags WHERE released_at IS NULL`).all() as Array<{ fact_id: string }>).map((r) => r.fact_id),
@@ -453,7 +468,51 @@ export class CivilizationStore {
       const decision = authorizeEventWithAudience(d.citizen_id, event.payload, directory, event.citizenId);
       if (!decision.allowed) report.deliveries.unauthorized.push({ citizenId: d.citizen_id, eventId: d.event_id, reason: decision.reason });
     }
+    report.memories.toFlag = this.findTaintedMemories(report.facts.toFlag.map((f) => ({ factId: f.factId, citizenId: f.citizenId })));
     return report;
+  }
+
+  /**
+   * Best-effort second-order quarantine: memories carry no provenance, so a memory is treated as tainted when its
+   * text contains a flagged fact's text (or is wholly contained in it). Paraphrases cannot be traced. READ-ONLY.
+   */
+  private findTaintedMemories(facts: Array<{ factId: string; citizenId: string }>): Array<{ memoryId: string; citizenId: string; viaFactId: string }> {
+    const out: Array<{ memoryId: string; citizenId: string; viaFactId: string }> = [];
+    const seen = new Set<string>();
+    const getFact = this.db.prepare(`SELECT content FROM citizen_persistent_facts WHERE id = ?`);
+    const memories = this.db.prepare(
+      `SELECT id, content FROM memories WHERE citizen_id = ? AND id NOT IN (SELECT memory_id FROM citizen_memory_flags WHERE released_at IS NULL)`,
+    );
+    for (const fact of facts) {
+      const row = getFact.get(fact.factId) as { content: string } | undefined;
+      const needle = row?.content.trim().toLowerCase() ?? "";
+      if (needle.length < 12) continue; // too short to match without false positives
+      for (const memory of memories.all(fact.citizenId) as Array<{ id: string; content: string }>) {
+        if (seen.has(memory.id)) continue;
+        const text = memory.content.toLowerCase();
+        if (text.includes(needle) || (text.length >= 20 && needle.includes(text))) {
+          seen.add(memory.id);
+          out.push({ memoryId: memory.id, citizenId: fact.citizenId, viaFactId: fact.factId });
+        }
+      }
+    }
+    return out;
+  }
+
+  private flagMemories(items: Array<{ memoryId: string; citizenId: string; viaFactId: string }>, reason: string, at: string): number {
+    const insert = this.db.prepare(
+      `INSERT OR IGNORE INTO citizen_memory_flags (memory_id, citizen_id, via_fact_id, reason, flagged_at) VALUES (?, ?, ?, ?, ?)`,
+    );
+    let n = 0;
+    for (const m of items) n += insert.run(m.memoryId, m.citizenId, m.viaFactId, reason, at).changes;
+    return n;
+  }
+
+  listFlaggedMemoryIds(citizenId?: string): string[] {
+    const rows = (citizenId
+      ? this.db.prepare(`SELECT memory_id FROM citizen_memory_flags WHERE released_at IS NULL AND citizen_id = ? ORDER BY memory_id`).all(citizenId)
+      : this.db.prepare(`SELECT memory_id FROM citizen_memory_flags WHERE released_at IS NULL ORDER BY memory_id`).all()) as Array<{ memory_id: string }>;
+    return rows.map((r) => r.memory_id);
   }
 
   /**
@@ -472,23 +531,36 @@ export class CivilizationStore {
     this.db.transaction(() => {
       for (const f of report.facts.toFlag) factsFlagged += flagFact.run(f.factId, f.citizenId, f.factKey, f.reason, at).changes;
       for (const d of report.deliveries.unauthorized) deliveriesFlagged += flagDelivery.run(d.citizenId, d.eventId, d.reason, at).changes;
+      this.flagMemories(report.memories.toFlag, "text derived from a quarantined fact", at);
     })();
     return { factsFlagged, deliveriesFlagged };
   }
 
-  /** Fill source_event_id / audience for event-derived facts written before those columns existed. Idempotent. */
+  /**
+   * Fill source_event_id (provenance) for event-derived facts written before the column existed. The AUDIENCE stamp is
+   * only written when the fact is not flagged AND its source event authorizes this fact's reader today, so a stamp
+   * never vouches for a fact the migration refused. Idempotent.
+   */
   private backfillFactProvenance(): void {
     const rows = this.db
-      .prepare(`SELECT id, fact_key FROM citizen_persistent_facts WHERE source_event_id IS NULL AND fact_key LIKE 'event:%'`)
-      .all() as Array<{ id: string; fact_key: string }>;
+      .prepare(`SELECT id, citizen_id, fact_key FROM citizen_persistent_facts WHERE source_event_id IS NULL AND fact_key LIKE 'event:%'`)
+      .all() as Array<{ id: string; citizen_id: string; fact_key: string }>;
     if (rows.length === 0) return;
+    const directory = this.getCommunityDirectory();
+    const flagged = new Set(
+      (this.db.prepare(`SELECT fact_id FROM citizen_persistent_fact_flags WHERE released_at IS NULL`).all() as Array<{ fact_id: string }>).map((r) => r.fact_id),
+    );
     const update = this.db.prepare(`UPDATE citizen_persistent_facts SET source_event_id = ?, audience = ? WHERE id = ?`);
     this.db.transaction(() => {
       for (const row of rows) {
         const eventId = row.fact_key.slice("event:".length);
         const event = this.getEventById(eventId);
-        const audience = event ? readEventAudience(event.payload) : undefined;
-        update.run(eventId, audience ? JSON.stringify(audience) : null, row.id);
+        let stamp: string | null = null;
+        if (event && !flagged.has(row.id) && authorizeEventWithAudience(row.citizen_id, event.payload, directory, event.citizenId).allowed) {
+          const audience = readEventAudience(event.payload);
+          stamp = audience ? JSON.stringify(audience) : null;
+        }
+        update.run(eventId, stamp, row.id);
       }
     })();
   }
@@ -560,6 +632,7 @@ export class CivilizationStore {
         `INSERT OR IGNORE INTO citizen_persistent_fact_flags (fact_id, citizen_id, fact_key, reason, source, flagged_at)
          VALUES (?, ?, ?, ?, 'membership-removal', ?)`,
       );
+      const flaggedNow: Array<{ factId: string; citizenId: string }> = [];
       for (const fact of facts) {
         let audienceCommunity: string | undefined;
         try {
@@ -570,7 +643,9 @@ export class CivilizationStore {
         }
         if (audienceCommunity !== communityId) continue;
         flag.run(fact.id, fact.citizen_id, fact.fact_key, `membership of ${communityId} removed`, at);
+        flaggedNow.push({ factId: fact.id, citizenId: fact.citizen_id });
       }
+      this.flagMemories(this.findTaintedMemories(flaggedNow), `derived from a fact flagged when ${communityId} membership was removed`, at);
       this.auditCommunity(audit, "remove_member", communityId, citizenId, at);
     })();
     return true;
@@ -900,7 +975,7 @@ export class CivilizationStore {
         // SEC-001: flagged (quarantined) facts stay in the table but are excluded from every read. This is the single
         // chokepoint for facts that reach a prompt (manager.ts:485 and anything else).
         `SELECT * FROM citizen_persistent_facts
-         WHERE citizen_id = ? AND id NOT IN (SELECT fact_id FROM citizen_persistent_fact_flags WHERE released_at IS NULL)
+         WHERE citizen_id = ? AND NOT ${FLAGGED_FACT_SQL}
          ORDER BY created_at DESC LIMIT ?`,
       )
       .all(citizenId, limit) as Array<{
@@ -1014,7 +1089,7 @@ export class CivilizationStore {
   getMemories(citizenId: string, limit = 20): MemoryRecord[] {
     const rows = this.db
       .prepare(
-        `SELECT * FROM memories WHERE citizen_id = ? ORDER BY importance DESC, created_at DESC LIMIT ?`,
+        `SELECT * FROM memories WHERE citizen_id = ? AND id NOT IN (SELECT memory_id FROM citizen_memory_flags WHERE released_at IS NULL) ORDER BY importance DESC, created_at DESC LIMIT ?`,
       )
       .all(citizenId, limit) as MemoryRow[];
     return rows.map((row) => ({
