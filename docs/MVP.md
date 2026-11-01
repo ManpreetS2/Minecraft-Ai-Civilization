@@ -1,5 +1,8 @@
 # First Settlement MVP
 
+> **Historical design, not the active demo plan (November 1, 2026).** The five-citizen starter-village MVP below has been superseded by the [locked 1v1 → 2v2 design](../project.md). The first public demonstration is four independent GPT/Claude-family citizens in two starting communities, empty inventories and natural survival, for 60 continuous real-world minutes. Preserve the older proposal for project history; do not interpret its milestones as currently completed.
+
+
 ## Goal
 
 Five citizens — Atlas, Maya, Theo, Ava, Kai — enter a shared Paper 1.21.11 world and autonomously attempt to survive together for at least three Minecraft days.

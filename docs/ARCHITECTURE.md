@@ -1,5 +1,8 @@
 # Architecture
 
+> **Architecture-in-progress notice:** The design below contains legacy five-citizen and single-settlement assumptions. The approved first demo is a 1v1 technical gate followed by 2v2 independent survival; restricted perception, per-citizen memory and authenticated cross-community communication are requirements, **not verified live features**. Read [project.md](../project.md) before treating historical architecture details as current.
+
+
 ## North star
 
 Give persistent people needs, memory, communication, physical capabilities, limited information, and meaningful decision freedom. Then watch what civilization they create.

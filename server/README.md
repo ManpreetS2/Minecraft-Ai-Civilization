@@ -1,5 +1,8 @@
 # Paper 1.21.11 — local shared world
 
+> **Historical Paper setup:** This guide documents an earlier local Minecraft version and five-citizen development configuration. The active [first-demo charter](../project.md) instead requires a separately verified 1v1 → 2v2 setup and its own version-parity checks. Do not overwrite an existing server, world, Jar or credentials based on this document alone.
+
+
 This folder is the **one** Minecraft Java server for the civilization. Do not create a separate Minecraft install per agent. Mineflayer bots are protocol clients, not graphical game instances.
 
 The Paper jar, world, logs, cache, and generated runtime files are **not** in git. After cloning, recreate the server from this document.
