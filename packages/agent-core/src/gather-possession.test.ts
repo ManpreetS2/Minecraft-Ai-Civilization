@@ -19,10 +19,11 @@ function nav(): NavigationBackend {
   };
 }
 
-function world(opts: { inventoryFullOfDirt?: boolean; dropOnDig?: boolean }, events?: EventBus) {
+function world(opts: { inventoryFullOfDirt?: boolean; dropOnDig?: boolean; startLogs?: number }, events?: EventBus) {
   const logs = new Map<string, string>([["6,64,5", "oak_log"], ["7,64,5", "oak_log"]]);
   const items: Array<{ name: string; count: number; slot: number }> = opts.inventoryFullOfDirt
-    ? Array.from({ length: 36 }, (_, i) => ({ name: "dirt", count: 64, slot: 9 + i })) : [];
+    ? Array.from({ length: 36 }, (_, i) => ({ name: "dirt", count: 64, slot: 9 + i }))
+    : opts.startLogs ? [{ name: "oak_log", count: opts.startLogs, slot: 9 }] : [];
   const slots: Array<unknown> = Array.from({ length: 46 }, () => null);
   items.forEach((i) => (slots[i.slot] = i));
   const bot = {
@@ -69,17 +70,45 @@ describe("gather_wood possession vs excavation", () => {
     expect(physicalWorkComplete(result)).toBe(true);
   });
 
-  // F11 (CONFIRMED gap): the inventory-verified collectResource path never emits ResourceCollected; the event is
-  // only emitted from the excavation fallback. Dashboard/world-lab markers (MISSION017:72) rely on that event.
-  // it.fails documents the gap until production code emits it after the verified delta; delete .fails when fixed.
-  it.fails("F11: verified collectResource gather emits ResourceCollected", async () => {
+  // F11 (fixed): the inventory-verified collectResource path emits ResourceCollected with the REAL inventory delta.
+  it("F11: verified collectResource gather emits ResourceCollected whose count is the observed inventory delta", async () => {
+    setNavigationBackend(nav());
+    const events = new EventBus();
+    const { ctx, items } = world({ dropOnDig: true, startLogs: 2 }, events);
+    const collected: Array<Record<string, unknown>> = [];
+    events.on((e) => {
+      if (e.type === "ResourceCollected") collected.push(e.payload as Record<string, unknown>);
+    });
+    const before = countOf(items, "oak_log");
+    const result = await executePlan(ctx, gatherPlan, newStore(), events);
+    const delta = countOf(items, "oak_log") - before;
+    expect(result.success).toBe(true);
+    expect(delta).toBe(1);
+    expect(collected).toHaveLength(1);
+    expect(collected[0]).toMatchObject({ name: "oak_log", item: "oak_log", count: delta }); // delta, not the 3 logs now held
+    expect(collected[0]?.position).toBeDefined();
+  });
+
+  it("F11: no ResourceCollected when the verified path fails (nothing entered inventory)", async () => {
+    setNavigationBackend(nav());
+    const events = new EventBus();
+    const { ctx, items } = world({ startLogs: 2 }, events);
+    const seen: string[] = [];
+    events.on((e) => seen.push(e.type));
+    const result = await executePlan(ctx, gatherPlan, newStore(), events);
+    expect(countOf(items, "oak_log")).toBe(2); // unchanged
+    expect(result.success).toBe(false);
+    expect(seen).not.toContain("ResourceCollected");
+  });
+
+  it("F11: exactly one ResourceCollected per gather (the fallback does not double-emit)", async () => {
     setNavigationBackend(nav());
     const events = new EventBus();
     const { ctx } = world({ dropOnDig: true }, events);
     const seen: string[] = [];
     events.on((e) => seen.push(e.type));
     await executePlan(ctx, gatherPlan, newStore(), events);
-    expect(seen).toContain("ResourceCollected");
+    expect(seen.filter((t) => t === "ResourceCollected")).toHaveLength(1);
   });
 
   it("excavation without an inventory gain is not success, workComplete, a ResourceCollected event, or a completion memory", async () => {

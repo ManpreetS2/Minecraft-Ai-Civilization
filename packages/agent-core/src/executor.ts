@@ -622,13 +622,23 @@ async function gatherByTask(ctx: SkillContext, task: string, runtime: Settlement
       if (!crafted.success) return crafted;
     }
     await equipBestTool(ctx, "pickaxe");
+    const before = inventoryCounts(ctx);
     const collected = await collectResource(ctx, ["stone", "cobblestone", "deepslate"], 1, 48);
-    if (collected.success || !mayFallBackToExcavation(collected.code)) return collected;
+    if (collected.success) {
+      emitResourceCollected(ctx, before, collected.data.position);
+      return collected;
+    }
+    if (!mayFallBackToExcavation(collected.code)) return collected;
     return mineClaimed(ctx, ["stone", "cobblestone", "deepslate"], runtime, "ore");
   }
   await equipBestTool(ctx, "axe");
+  const before = inventoryCounts(ctx);
   const collected = await collectResource(ctx, [...LOG_BLOCK_NAMES], 1, 48);
-  if (collected.success || !mayFallBackToExcavation(collected.code)) return collected;
+  if (collected.success) {
+    emitResourceCollected(ctx, before, collected.data.position);
+    return collected;
+  }
+  if (!mayFallBackToExcavation(collected.code)) return collected;
   return mineClaimed(ctx, LOG_BLOCK_NAMES, runtime, "tree");
 }
 
@@ -640,6 +650,27 @@ async function gatherByTask(ctx: SkillContext, task: string, runtime: Settlement
  */
 function mayFallBackToExcavation(code: string): boolean {
   return !["INVENTORY_FULL", "ITEM_NOT_FOUND", "MISSING_TOOL", "CANCELLED", "INTERRUPTED"].includes(code);
+}
+
+function inventoryCounts(ctx: SkillContext): Map<string, number> {
+  const counts = new Map<string, number>();
+  for (const item of ctx.bot.inventory.items()) counts.set(item.name, (counts.get(item.name) ?? 0) + item.count);
+  return counts;
+}
+
+/**
+ * Emits one ResourceCollected per item whose inventory count really increased since `before`.
+ * `count` is the observed inventory delta (never the number of blocks dug), `item`/`name` is the item that
+ * entered inventory (a stone block yields cobblestone, so this is the drop, not the block).
+ * Emits nothing when the inventory did not grow.
+ */
+function emitResourceCollected(ctx: SkillContext, before: Map<string, number>, position: Vec3 | undefined): void {
+  if (!ctx.events) return;
+  for (const [name, after] of inventoryCounts(ctx)) {
+    const delta = after - (before.get(name) ?? 0);
+    if (delta <= 0) continue;
+    ctx.events.emit(createEvent("ResourceCollected", { name, item: name, count: delta, position }, ctx.citizenId));
+  }
 }
 
 function totalInventoryItems(ctx: SkillContext): number {
@@ -674,6 +705,7 @@ async function mineClaimedTarget(
     return mineBlock(ctx, names, 48);
   }
   const itemsBefore = totalInventoryItems(ctx);
+  const countsBefore = inventoryCounts(ctx);
   const mined = await mineBlock(ctx, names, 48);
   runtime.claims.release(kind, key, ctx.citizenId);
   if (!mined.success) return mined;
@@ -689,7 +721,7 @@ async function mineClaimedTarget(
       position: mined.data.position,
     });
   }
-  ctx.events?.emit(createEvent("ResourceCollected", { name: mined.data.name, position: mined.data.position }, ctx.citizenId));
+  emitResourceCollected(ctx, countsBefore, mined.data.position);
   return ok({ name: mined.data.name, position: mined.data.position, collected: gained }, mined.durationMs);
 }
 
