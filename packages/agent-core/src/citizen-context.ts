@@ -71,7 +71,7 @@ export function buildCitizenContextPack(options: {
   // Authorization of an ID alone cannot authenticate a caller-supplied summary.
   let events = (options.events ?? store.listEventsAscending(400)).flatMap((candidate) => {
     const stored = store.getEventById(candidate.id);
-    return stored ? [stored] : [];
+    return stored && store.knowledge.wasInAudienceAtEvent(citizenId, stored) ? [stored] : [];
   });
   const already = store.getDeliveredEventIds(citizenId);
   const build = () =>

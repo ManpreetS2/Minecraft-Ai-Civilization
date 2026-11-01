@@ -21,11 +21,20 @@ const MIME: Record<string, string> = {
   ".ico": "image/x-icon",
 };
 
-const CORS = {
-  "access-control-allow-origin": "*",
-  "access-control-allow-methods": "GET,POST,OPTIONS",
-  "access-control-allow-headers": "content-type",
-};
+/**
+ * The dashboard is served from this same origin, so no cross-origin access is granted. Any web page open on the
+ * operator's machine could otherwise read every citizen's private state or issue directives during a timed run.
+ */
+export function isForeignBrowserRequest(req: Pick<IncomingMessage, "headers">): boolean {
+  const { origin, host, "sec-fetch-site": fetchSite } = req.headers;
+  if (fetchSite === "cross-site" || fetchSite === "same-site") return true;
+  if (origin === undefined) return false;
+  try {
+    return new URL(origin).host !== host;
+  } catch {
+    return true;
+  }
+}
 
 export function startDashboardServer(manager: AgentManager, host: string, port: number): Promise<string> {
   const publicDir = resolve(workspaceRoot(), "apps/dashboard/public");
@@ -34,9 +43,13 @@ export function startDashboardServer(manager: AgentManager, host: string, port: 
   const enrich = () => enrichSnapshot(manager, config, startedAt);
 
   const server = createServer((req, res) => {
-    void handle(req, res, manager, publicDir, enrich);
+    void handleDashboardRequest(req, res, manager, publicDir, enrich);
   });
-  const wss = new WebSocketServer({ server, path: "/ws" });
+  const wss = new WebSocketServer({
+    server,
+    path: "/ws",
+    verifyClient: ({ req }: { req: IncomingMessage }) => !isForeignBrowserRequest(req),
+  });
   const unsubscribe = manager.events.on((event) => {
     const payload = JSON.stringify({ type: "event", event, snapshot: enrich() });
     for (const client of wss.clients) {
@@ -53,7 +66,7 @@ export function startDashboardServer(manager: AgentManager, host: string, port: 
   });
 }
 
-async function handle(
+export async function handleDashboardRequest(
   req: IncomingMessage,
   res: ServerResponse,
   manager: AgentManager,
@@ -61,8 +74,12 @@ async function handle(
   enrich: () => unknown,
 ): Promise<void> {
   const url = new URL(req.url ?? "/", "http://127.0.0.1");
+  if (url.pathname.startsWith("/api/") && isForeignBrowserRequest(req)) {
+    json(res, { ok: false, error: "Cross-origin requests are not allowed." }, 403);
+    return;
+  }
   if (req.method === "OPTIONS") {
-    res.writeHead(204, CORS);
+    res.writeHead(204);
     res.end();
     return;
   }
@@ -247,6 +264,6 @@ function readBody(req: IncomingMessage, maxBytes: number): Promise<string> {
 }
 
 function json(res: ServerResponse, value: unknown, status = 200): void {
-  res.writeHead(status, { "content-type": "application/json", ...CORS });
+  res.writeHead(status, { "content-type": "application/json" });
   res.end(JSON.stringify(value));
 }

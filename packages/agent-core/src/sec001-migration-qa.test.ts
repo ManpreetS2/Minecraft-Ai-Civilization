@@ -194,7 +194,7 @@ describe("Independent SEC-001 authentic legacy SQLite migration QA", () => {
 
   it("preserves public announcements, directed speech and explicit cross-community sharing without widening the source", () => {
     const s = fixture().open();
-    applyCommunityConfig(s, config);
+    applyCommunityConfig(s, config, "2026-01-01T00:00:00.000Z");
     s.appendEvent(
       source(
         "new-world",
@@ -250,7 +250,7 @@ describe("Independent SEC-001 authentic legacy SQLite migration QA", () => {
   it("membership removal flags community-derived facts but preserves private and directed historical knowledge", () => {
     const f = fixture(),
       s = f.open();
-    applyCommunityConfig(s, config);
+    applyCommunityConfig(s, config, "2026-01-01T00:00:00.000Z");
     s.appendEvent(
       source(
         "community",

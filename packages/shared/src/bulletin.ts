@@ -87,6 +87,11 @@ function urgencyFor(event: SimEvent): number {
   }
 }
 
+/** Replaces control, format (bidi, zero-width) and line/paragraph separator characters with one space. */
+export function sanitizePromptText(text: string): string {
+  return text.replace(/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]+/gu, " ");
+}
+
 /** Canonical event-derived fact text. Callers must supply the stored, authorized source event. */
 export function summarizeBulletinEvent(event: SimEvent): string {
   const actor = event.citizenId ? ` by ${event.citizenId}` : "";
@@ -100,8 +105,8 @@ export function summarizeBulletinEvent(event: SimEvent): string {
           : typeof event.payload.goal === "string"
             ? String(event.payload.goal)
             : "";
-  // SEC-001: speech is untrusted text; it must not be able to start a forged bulletin line.
-  const clip = note ? `: ${note.replace(/[\r\n\t\f\v\u2028\u2029]+/g, " ").slice(0, 80)}` : "";
+  // SEC-001: speech is untrusted text; it must not be able to start a forged bulletin line or reorder what follows it.
+  const clip = note ? `: ${sanitizePromptText(note).slice(0, 80)}` : "";
   return `${event.type}${actor}${clip}`;
 }
 

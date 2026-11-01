@@ -20,6 +20,7 @@ const REVOKE_AUDIT: CommunityAudit = { actor: "orchestrator-config", reason: "me
 export function applyCommunityConfig(
   store: CivilizationStore,
   config: Pick<AppConfig, "COMMUNITIES_JSON">,
+  at = new Date().toISOString(),
 ): CommunitySeedResult {
   const entries: CommunityConfigEntry[] = parseCommunityConfig(config.COMMUNITIES_JSON);
   const directory = store.getCommunityDirectory();
@@ -34,18 +35,18 @@ export function applyCommunityConfig(
   let membersAdded = 0;
   let membersRemoved = 0;
   for (const entry of entries) {
-    store.upsertCommunity(entry.id, entry.name, AUDIT);
+    store.upsertCommunity(entry.id, entry.name, AUDIT, at);
     // The config is the source of truth for the communities it lists: a persisted member it no longer lists loses
     // membership through the AUDITED removal path (which also flags the facts that membership authorized).
     const listed = new Set(entry.memberIds);
     for (const current of store.getCommunityDirectory().membersOf(entry.id)) {
-      if (!listed.has(current) && store.removeCommunityMember(entry.id, current, REVOKE_AUDIT)) membersRemoved += 1;
+      if (!listed.has(current) && store.removeCommunityMember(entry.id, current, REVOKE_AUDIT, at)) membersRemoved += 1;
     }
     for (const memberId of entry.memberIds) {
       // An explicit audited removal is a tombstone: the config seed must not silently undo it on the next start.
       // (Re-admitting is a deliberate orchestrator act: store.addCommunityMember with its own audit.)
       if (store.wasMemberRemoved(entry.id, memberId)) continue;
-      if (store.addCommunityMember(entry.id, memberId, AUDIT)) membersAdded += 1;
+      if (store.addCommunityMember(entry.id, memberId, AUDIT, at)) membersAdded += 1;
     }
   }
   return { communitiesTouched: entries.length, membersAdded, membersRemoved };

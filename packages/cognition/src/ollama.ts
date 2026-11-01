@@ -1,3 +1,4 @@
+import { sanitizePromptText } from "@civ/shared";
 import type { CognitionPrompt, CognitionProvider, HighLevelDecision } from "./schema.js";
 import { extractJson, validateDecision } from "./schema.js";
 
@@ -48,6 +49,9 @@ export class OllamaProvider implements CognitionProvider {
   }
 }
 
+/** Room for 5 retrieved memories, 8 persistent facts and a few human suggestions, so one group cannot displace another. */
+const MAX_PROMPT_MEMORIES = 16;
+
 export function formatPrompt(prompt: CognitionPrompt): string {
   return [
     `Citizen: ${prompt.citizenName}`,
@@ -59,7 +63,7 @@ export function formatPrompt(prompt: CognitionPrompt): string {
     `Settlement needs: ${prompt.settlementNeeds.join(", ") || "none"}`,
     `Nearby citizens: ${prompt.nearbyCitizens.join(", ") || "none"}`,
     prompt.bulletin ?? "",
-    `Relevant memories: ${prompt.memories.slice(0, 5).join(" | ") || "none"}`,
+    `Relevant memories: ${prompt.memories.slice(0, MAX_PROMPT_MEMORIES).map(sanitizePromptText).join(" | ") || "none"}`,
     prompt.gameFacts?.length ? `Relevant Minecraft facts:\n- ${prompt.gameFacts.slice(0, 8).join("\n- ")}` : "",
     prompt.communicationGuide ?? "",
     "Choose the single most useful high-level goal.",

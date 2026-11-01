@@ -79,7 +79,7 @@ const evt = (id: string, payload: Record<string, unknown>, citizenId = "GPT-A"):
 function seed(path: string): CivilizationStore {
   const store = open(path);
   for (const id of READERS) store.upsertCitizen(record(id));
-  applyCommunityConfig(store, config);
+  applyCommunityConfig(store, config, "2026-01-01T00:00:00.000Z");
   return store;
 }
 
@@ -230,7 +230,7 @@ describe("SEC-001 real store: migration of a pre-SEC-001 database", () => {
     expect(quarantined.find((q) => q.factKey === "event:settlement-no-audience")?.content).toBe(SECRET); // kept for review, not live
     expect(quarantined.find((q) => q.factKey === "event:missing-event")?.reason).toMatch(/not found/);
     // old events fail closed for everyone, even with a fresh directory
-    applyCommunityConfig(store, config);
+    applyCommunityConfig(store, config, "2026-01-01T00:00:00.000Z");
     expect(deliveredFor(store, "Claude-A")).toEqual(["everyone"]); // only the already-labeled one; unlabeled/old ones stay dark
     expect(store.getCommunityDirectory().membersOf("claude")).toEqual(["Claude-A", "Claude-B"]);
   });
