@@ -434,18 +434,67 @@ describe("identity across membership changes, death and restart", () => {
       expect(restarted.openai.calls).toEqual([]);
     });
 
-    it("a store that cannot save closes the budget instead of breaking the call in hand or leaking a reservation", async () => {
+    it.each(["gpt-a", "claude-a"])("%s: a reservation that cannot be saved is refused before anything is sent", async (id) => {
       const store = createInMemoryCitizenSessionStore();
       const fixture = offlineRegistry({ store });
       vi.spyOn(store, "save").mockImplementation(() => {
         throw new Error("disk full");
       });
+      const refused = await fixture.registry.providerFor(id).decide(promptFor(id)).catch((error: unknown) => error);
+      expect(refused).toBeInstanceOf(CloudAdmissionError);
+      expect(String(refused)).toMatch(/could not be persisted/);
+      expect(fixture.openai.calls).toEqual([]);
+      expect(fixture.claude.get("claude-a")!.calls).toEqual([]);
+      const { experiment, citizens } = fixture.registry.accounting();
+      expect(experiment).toMatchObject({ inFlight: 0, reservedUsd: 0, spendUsd: 0, heldUsd: 0, closed: true });
+      expect(citizens[id]).toMatchObject({ requests: 0, reservedUsd: 0, estimatedSpendUsd: 0, unverifiedHoldUsd: 0 });
+    });
+
+    it("a save failing after the call was made settles the call, keeps its charge and closes the budget", async () => {
+      const store = createInMemoryCitizenSessionStore();
+      const fixture = offlineRegistry({ store });
+      const realSave = store.save.bind(store);
+      let admitted = false;
+      vi.spyOn(store, "save").mockImplementation((record) => {
+        // Let the save that records the admission through, then fail every later one.
+        if (admitted) throw new Error("disk full");
+        if (record.citizenId === "gpt-a" && record.account.requests === 1) admitted = true;
+        realSave(record);
+      });
       await expect(fixture.registry.providerFor("gpt-a").decide(promptFor("gpt-a"))).resolves.toBeDefined();
       const { experiment, citizens } = fixture.registry.accounting();
+      expect(fixture.openai.calls).toHaveLength(1);
       expect(experiment).toMatchObject({ inFlight: 0, reservedUsd: 0, closed: true });
       expect(experiment.closedReason).toMatch(/could not be persisted/);
       expect(citizens["gpt-a"]!.estimatedSpendUsd).toBeGreaterThan(0);
       await expect(fixture.registry.providerFor("gpt-b").decide(promptFor("gpt-b"))).rejects.toThrow(/could not be persisted/);
+      expect(fixture.openai.calls).toHaveLength(1);
+    });
+
+    it("a retry that cannot be saved is not sent", async () => {
+      const store = createInMemoryCitizenSessionStore();
+      const fixture = offlineRegistry({ store, script: () => ({ status: 429 }) });
+      const realSave = store.save.bind(store);
+      vi.spyOn(store, "save").mockImplementation((record) => {
+        if (record.citizenId === "gpt-a" && record.account.requests >= 2) throw new Error("disk full");
+        realSave(record);
+      });
+      await expect(fixture.registry.providerFor("gpt-a").decide(promptFor("gpt-a"))).rejects.toThrow(/429/);
+      expect(fixture.openai.calls).toHaveLength(1);
+      const { experiment, citizens } = fixture.registry.accounting();
+      expect(experiment).toMatchObject({ inFlight: 0, reservedUsd: 0, closed: true });
+      expect(citizens["gpt-a"]).toMatchObject({ requests: 1, retries: 0 });
+    });
+
+    it("the explicit local fallback answers when a reservation cannot be saved, with no paid request", async () => {
+      const store = createInMemoryCitizenSessionStore();
+      const assignments = OFFLINE_2V2_ASSIGNMENTS.map((a) => ({ ...a, fallback: { kind: "heuristic" as const } }));
+      const fixture = offlineRegistry({ store, assignments });
+      vi.spyOn(store, "save").mockImplementation(() => {
+        throw new Error("disk full");
+      });
+      await expect(fixture.registry.providerFor("gpt-a").decide(promptFor("gpt-a", [], { settlementNeeds: ["NEED_WOOD"] }))).resolves.toMatchObject({ goal: "gather_wood" });
+      expect(fixture.openai.calls).toEqual([]);
     });
 
     it("a normal shutdown does not close the run for its next start", async () => {

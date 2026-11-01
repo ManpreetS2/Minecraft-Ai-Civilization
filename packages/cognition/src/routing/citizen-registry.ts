@@ -354,7 +354,8 @@ export class CitizenProviderRegistry {
         experimentClosedReason: this.gate.snapshot.closedReason,
       });
       records.push(record);
-      const persist = () => {
+      const persist = (): boolean => {
+        if (!options.store) return true;
         try {
           options.store?.save(record());
           // The first save that sees a closure writes it to every citizen, so no single record is the only copy.
@@ -362,9 +363,11 @@ export class CitizenProviderRegistry {
             for (const write of records) options.store?.save(write());
             closurePersisted = true;
           }
+          return true;
         } catch {
-          // In-memory accounting stays correct and the work in hand can settle, but a restart could now forget spending.
+          // A restart could now forget spending. Work not yet sent is refused, and work already sent can only settle.
           this.gate.close("cloud admissions closed for this run: session accounting could not be persisted");
+          return false;
         }
       };
       const budget = new CitizenBudgetView(this.gate, assignment.limits ?? {}, account, persist);
