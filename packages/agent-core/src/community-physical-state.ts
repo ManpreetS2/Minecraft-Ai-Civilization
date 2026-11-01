@@ -39,6 +39,10 @@ export function migratePhysicalState(db: Database.Database): void {
         resource_key TEXT NOT NULL REFERENCES physical_assets(resource_key), citizen_id TEXT NOT NULL,
         PRIMARY KEY(resource_key,citizen_id)
       );
+      CREATE TABLE IF NOT EXISTS physical_asset_contents (
+        resource_key TEXT PRIMARY KEY REFERENCES physical_assets(resource_key),
+        contents_json TEXT NOT NULL, observed_by TEXT NOT NULL, observed_at TEXT NOT NULL
+      );
       CREATE TABLE IF NOT EXISTS physical_state_audit (
         seq INTEGER PRIMARY KEY, at TEXT NOT NULL, citizen_id TEXT NOT NULL,
         community_id TEXT NOT NULL, action TEXT NOT NULL, record_id TEXT NOT NULL
@@ -58,6 +62,7 @@ export function migratePhysicalState(db: Database.Database): void {
       "SELECT resource_key,kind,community_id,owner_id,position_json FROM physical_assets LIMIT 0",
     ).all();
     db.prepare("SELECT resource_key,citizen_id FROM physical_asset_grants LIMIT 0").all();
+    db.prepare("SELECT resource_key,contents_json,observed_by,observed_at FROM physical_asset_contents LIMIT 0").all();
     db.prepare(
       "SELECT seq,at,citizen_id,community_id,action,record_id FROM physical_state_audit LIMIT 0",
     ).all();
@@ -322,6 +327,55 @@ export class CitizenPhysicalState {
     });
   }
 
+  private mayUse(key: string): boolean {
+    return Boolean(
+      this.store.db
+        .prepare(
+          `SELECT 1 FROM physical_assets a WHERE a.resource_key=? AND a.kind='chest' AND (a.owner_id=? OR EXISTS(
+        SELECT 1 FROM physical_asset_grants g WHERE g.resource_key=a.resource_key AND g.citizen_id=?))`,
+        )
+        .get(key, this.citizenId, this.citizenId),
+    );
+  }
+
+  /**
+   * Records counts the adapter actually observed in a container this citizen may use. Observed items are merged over
+   * earlier observations (an adapter transfer reports only the items it touched), so values are last-observed, not
+   * authoritative stock: every physical use must still be verified live. Contents are visible only to the owner and
+   * explicit grantees, never to the community-wide snapshot.
+   */
+  recordContainerObservation(key: string, observed: Record<string, number>): boolean {
+    for (const [item, count] of Object.entries(observed)) {
+      if (!item || !Number.isSafeInteger(count) || count < 0) throw new Error("invalid observed container count");
+    }
+    return this.transaction(() => {
+      if (!this.mayUse(key)) return false;
+      const row = this.store.db
+        .prepare("SELECT contents_json FROM physical_asset_contents WHERE resource_key=?")
+        .get(key) as { contents_json: string } | undefined;
+      const merged = { ...(row ? (JSON.parse(row.contents_json) as Record<string, number>) : {}), ...observed };
+      for (const item of Object.keys(merged)) if (merged[item] === 0) delete merged[item];
+      this.store.db
+        .prepare(
+          `INSERT INTO physical_asset_contents(resource_key,contents_json,observed_by,observed_at) VALUES (?,?,?,?)
+        ON CONFLICT(resource_key) DO UPDATE SET contents_json=excluded.contents_json,observed_by=excluded.observed_by,observed_at=excluded.observed_at`,
+        )
+        .run(key, JSON.stringify(merged), this.citizenId, new Date().toISOString());
+      this.audit("observe_container", key);
+      return true;
+    });
+  }
+
+  observedContainerContents(key: string): Record<string, number> | undefined {
+    return this.transaction(() => {
+      if (!this.mayUse(key)) return undefined;
+      const row = this.store.db
+        .prepare("SELECT contents_json FROM physical_asset_contents WHERE resource_key=?")
+        .get(key) as { contents_json: string } | undefined;
+      return row ? (JSON.parse(row.contents_json) as Record<string, number>) : undefined;
+    });
+  }
+
   /** Owner may abandon a bed/home/workstation; prior ownership remains in the audit. */
   abandonAsset(key: string): boolean {
     return this.transaction(() => {
@@ -330,6 +384,7 @@ export class CitizenPhysicalState {
         .get(key, this.citizenId) as { kind: PhysicalAssetKind } | undefined;
       if (!asset) return false;
       this.store.db.prepare("DELETE FROM physical_asset_grants WHERE resource_key=?").run(key);
+      this.store.db.prepare("DELETE FROM physical_asset_contents WHERE resource_key=?").run(key);
       this.store.db
         .prepare("DELETE FROM physical_assets WHERE resource_key=? AND owner_id=?")
         .run(key, this.citizenId);
