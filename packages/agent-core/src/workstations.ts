@@ -4,6 +4,7 @@ import type { SkillContext } from "@civ/skills";
 import { isCatalogPersonalChest } from "./available-homes.js";
 import type { CivilizationStore } from "./store.js";
 import { isTestFixtureChest } from "./test-fixtures.js";
+import { communityPhysicalState, physicalBlockKey } from "./community-physical-state.js";
 
 export type WorkstationKind = "crafting_table" | "chest" | "furnace";
 
@@ -33,6 +34,7 @@ export function rememberWorkstation(
   kind: WorkstationKind,
   pos: Vec3,
 ): KnownWorkstations {
+  if (store.hasCommunities()) throw new Error("Community workstation writes require an authenticated owner; legacy global cache write refused");
   const settlement = store.getSettlement();
   const current = settlement.workstations ?? emptyWorkstations();
   const list =
@@ -53,6 +55,7 @@ export function forgetWorkstation(
   kind: WorkstationKind,
   pos: Vec3,
 ): void {
+  if (store.hasCommunities()) throw new Error("Community workstation removal requires an authenticated owner; legacy global cache delete refused");
   const settlement = store.getSettlement();
   const current = settlement.workstations ?? emptyWorkstations();
   const filter = (entry: Vec3) => !sameBlock(entry, pos);
@@ -68,6 +71,7 @@ export function forgetWorkstation(
 }
 
 export function knownCraftingTable(ctx: SkillContext, store: CivilizationStore): Vec3 | undefined {
+  if (store.hasCommunities()) return scopedKnownWorkstation(ctx, store, "crafting_table");
   const settlement = store.getSettlement();
   const known = [...(settlement.workstations?.craftingTables ?? [])];
   for (const pos of known) {
@@ -78,6 +82,7 @@ export function knownCraftingTable(ctx: SkillContext, store: CivilizationStore):
 }
 
 export function knownChest(ctx: SkillContext, store: CivilizationStore): Vec3 | undefined {
+  if (store.hasCommunities()) return scopedKnownWorkstation(ctx, store, "chest");
   const settlement = store.getSettlement();
   if (settlement.storage && usableSettlementChest(store, settlement.storage) && verifyWorkstation(ctx, settlement.storage, "chest")) {
     return settlement.storage;
@@ -90,6 +95,22 @@ export function knownChest(ctx: SkillContext, store: CivilizationStore): Vec3 | 
     if (verifyWorkstation(ctx, pos, "chest")) return pos;
     forgetWorkstation(store, "chest", pos);
   }
+  return undefined;
+}
+
+/** Ownership/grants authorize metadata; checking a remote block alone does not prove the citizen learned its location. */
+function scopedKnownWorkstation(ctx: SkillContext, store: CivilizationStore, kind: WorkstationKind): Vec3 | undefined {
+  const citizenId = ctx.citizenId;
+  const rawDimension = ctx.bot.game?.dimension;
+  if (!citizenId || !store.getCitizen(citizenId) || !store.getCommunityDirectory().communityOf(citizenId) || typeof rawDimension !== "string" || !rawDimension.trim()) return undefined;
+  const dimension = rawDimension.replace(/^minecraft:/, "");
+  const assets = communityPhysicalState(store).forCitizen(citizenId).accessibleAssets();
+  for (const asset of assets) {
+    if (asset.kind !== kind || asset.key !== physicalBlockKey(dimension, asset.position)) continue;
+    if (kind === "chest" && !usableSettlementChest(store, asset.position)) continue;
+    if (verifyWorkstation(ctx, asset.position, kind)) return asset.position;
+  }
+  // Missing blocks do not authorize a reader to delete someone else's ownership or original legacy rows.
   return undefined;
 }
 
