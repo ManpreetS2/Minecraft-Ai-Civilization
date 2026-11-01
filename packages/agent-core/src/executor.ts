@@ -6,6 +6,7 @@ import {
   fail,
   FOOD_ITEM_NAMES,
   LOG_BLOCK_NAMES,
+  ok,
   type ActionResult,
   type EventBus,
   type Vec3,
@@ -622,13 +623,27 @@ async function gatherByTask(ctx: SkillContext, task: string, runtime: Settlement
     }
     await equipBestTool(ctx, "pickaxe");
     const collected = await collectResource(ctx, ["stone", "cobblestone", "deepslate"], 1, 48);
-    if (collected.success) return collected;
+    if (collected.success || !mayFallBackToExcavation(collected.code)) return collected;
     return mineClaimed(ctx, ["stone", "cobblestone", "deepslate"], runtime, "ore");
   }
   await equipBestTool(ctx, "axe");
   const collected = await collectResource(ctx, [...LOG_BLOCK_NAMES], 1, 48);
-  if (collected.success) return collected;
+  if (collected.success || !mayFallBackToExcavation(collected.code)) return collected;
   return mineClaimed(ctx, LOG_BLOCK_NAMES, runtime, "tree");
+}
+
+/**
+ * The excavation-only fallback is for "could not reach/claim this target" failures only.
+ * It must never run when the world is fine but possession failed (INVENTORY_FULL, ITEM_NOT_FOUND),
+ * when the citizen was cancelled, or when a tool is missing: digging more blocks there destroys
+ * resources without acquiring any.
+ */
+function mayFallBackToExcavation(code: string): boolean {
+  return !["INVENTORY_FULL", "ITEM_NOT_FOUND", "MISSING_TOOL", "CANCELLED", "INTERRUPTED"].includes(code);
+}
+
+function totalInventoryItems(ctx: SkillContext): number {
+  return ctx.bot.inventory.items().reduce((sum, item) => sum + item.count, 0);
 }
 
 async function mineClaimed(
@@ -658,13 +673,24 @@ async function mineClaimedTarget(
     ctx.body.unreachable.mark(position, 8_000);
     return mineBlock(ctx, names, 48);
   }
+  const itemsBefore = totalInventoryItems(ctx);
   const mined = await mineBlock(ctx, names, 48);
   runtime.claims.release(kind, key, ctx.citizenId);
-  if (mined.success) {
-    ctx.events?.emit(createEvent("ResourceCollected", { name: mined.data.name, position: mined.data.position }, ctx.citizenId));
-    await collectItem(ctx, undefined, 8);
+  if (!mined.success) return mined;
+  await collectItem(ctx, undefined, 8);
+  const gained = totalInventoryItems(ctx) - itemsBefore;
+  if (gained <= 0) {
+    // Excavation is not possession: do not emit ResourceCollected or report workComplete.
+    return fail("ITEM_NOT_FOUND", `Excavated ${mined.data.name} but no item entered inventory`, 0, true, {
+      excavated: true,
+      resourceAcquired: false,
+      collected: 0,
+      workComplete: false,
+      position: mined.data.position,
+    });
   }
-  return mined;
+  ctx.events?.emit(createEvent("ResourceCollected", { name: mined.data.name, position: mined.data.position }, ctx.citizenId));
+  return ok({ name: mined.data.name, position: mined.data.position, collected: gained }, mined.durationMs);
 }
 
 /**
