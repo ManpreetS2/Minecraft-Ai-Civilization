@@ -39,37 +39,60 @@ export async function collectResource(
 
   while (countMatching(ctx, names) - before < amount) {
     if (ctx.signal?.aborted) {
-      return fail("INTERRUPTED", "collectResource interrupted for this citizen", Date.now() - started, true, {
-        collected: countMatching(ctx, names) - before,
-        inventoryPreserved: true,
-        workComplete: false,
-      });
+      return fail(
+        "INTERRUPTED",
+        "collectResource interrupted for this citizen",
+        Date.now() - started,
+        true,
+        {
+          collected: countMatching(ctx, names) - before,
+          inventoryPreserved: true,
+          workComplete: false,
+        },
+      );
     }
     if (!canFitDrop(ctx, names) && inventorySpace(ctx) <= 0) {
-      return fail("INVENTORY_FULL", "Inventory is full; store items before mining more", Date.now() - started, true);
+      return fail(
+        "INVENTORY_FULL",
+        "Inventory is full; store items before mining more",
+        Date.now() - started,
+        true,
+      );
     }
     const countAtIterationStart = countMatching(ctx, names);
     const candidates = [
       ...(prefer ? [{ name: names[0] ?? "block", position: prefer }] : []),
       ...findBlockCandidates(ctx, names, maxDistance),
     ].filter(
-      (candidate) => !skipped.has(`${candidate.position.x},${candidate.position.y},${candidate.position.z}`),
+      (candidate) =>
+        !skipped.has(`${candidate.position.x},${candidate.position.y},${candidate.position.z}`),
     );
     if (candidates.length === 0) break;
     const best = pickBestResourceTarget(ctx.bot, candidates, {
       blacklisted: (pos) => ctx.body.unreachable.has(pos),
       hazardsNear: (pos) =>
-        ctx.body.nearbyEntities(8).filter((e) => e.hostile && Math.hypot(e.position.x - pos.x, e.position.z - pos.z) < 6)
+        ctx.body
+          .nearbyEntities(8)
+          .filter((e) => e.hostile && Math.hypot(e.position.x - pos.x, e.position.z - pos.z) < 6)
           .length,
     });
     if (!best || best.score < -100) {
-      return fail("TARGET_UNREACHABLE", `No reachable ${names.join("/")} target`, Date.now() - started, true);
+      return fail(
+        "TARGET_UNREACHABLE",
+        `No reachable ${names.join("/")} target`,
+        Date.now() - started,
+        true,
+      );
     }
     const key = `${best.position.x},${best.position.y},${best.position.z}`;
     const block = ctx.bot.blockAt(
-      new Vec3Class(Math.floor(best.position.x), Math.floor(best.position.y), Math.floor(best.position.z)),
+      new Vec3Class(
+        Math.floor(best.position.x),
+        Math.floor(best.position.y),
+        Math.floor(best.position.z),
+      ),
     );
-    if (!block || block.name === "air") {
+    if (!block || !names.includes(block.name)) {
       skipped.add(key);
       ctx.body.unreachable.mark(best.position, 8_000);
       continue;
@@ -77,9 +100,15 @@ export async function collectResource(
     await lookAtPosition(ctx, best.position);
     const pluginEquip = await equipToolForBlock(ctx.bot, block);
     if (!pluginEquip.equipped && pluginEquip.error?.includes("NoItem")) {
-      return fail("MISSING_TOOL", `Need a suitable tool to harvest ${block.name}`, Date.now() - started, true, {
-        item: block.name,
-      });
+      return fail(
+        "MISSING_TOOL",
+        `Need a suitable tool to harvest ${block.name}`,
+        Date.now() - started,
+        true,
+        {
+          item: block.name,
+        },
+      );
     }
     if (!pluginEquip.equipped) {
       const equipped = await equipForBlock(ctx, best.name);
@@ -87,16 +116,26 @@ export async function collectResource(
     }
     const held = ctx.bot.heldItem?.name;
     if (!knowledge.canHarvest(best.name, held)) {
-      return fail("MISSING_TOOL", `Need a suitable tool to harvest ${best.name}`, Date.now() - started, true, {
-        item: best.name,
-      });
+      return fail(
+        "MISSING_TOOL",
+        `Need a suitable tool to harvest ${best.name}`,
+        Date.now() - started,
+        true,
+        {
+          item: best.name,
+        },
+      );
     }
     let gone = blockMissing(ctx, best.position, block.name);
     if (!gone) {
-      const approach = await navigationBackend().navigateToInteractWithBlock(ctx.bot, best.position, {
-        timeoutMs: ctx.timeoutMs ?? 18_000,
-        signal: ctx.signal,
-      });
+      const approach = await navigationBackend().navigateToInteractWithBlock(
+        ctx.bot,
+        best.position,
+        {
+          timeoutMs: ctx.timeoutMs ?? 18_000,
+          signal: ctx.signal,
+        },
+      );
       const here = ctx.bot.entity?.position;
       const reach = here
         ? Math.hypot(best.position.x - here.x, best.position.y - here.y, best.position.z - here.z)
@@ -106,41 +145,83 @@ export async function collectResource(
         skipped.add(key);
         continue;
       }
-      const current = ctx.bot.blockAt(
-        new Vec3Class(Math.floor(best.position.x), Math.floor(best.position.y), Math.floor(best.position.z)),
+      let current = ctx.bot.blockAt(
+        new Vec3Class(
+          Math.floor(best.position.x),
+          Math.floor(best.position.y),
+          Math.floor(best.position.z),
+        ),
       );
       if (!current || current.name === "air") {
         gone = true;
       } else {
+        if (!names.includes(current.name)) {
+          skipped.add(key);
+          continue;
+        }
         const protectedBlock = refuseAccidentalPropertyBreak(current.name);
         if (!protectedBlock.ok) {
           skipped.add(key);
           return fail(protectedBlock.code, protectedBlock.error, Date.now() - started, false);
         }
         await lookAtPosition(ctx, best.position);
-        if (ctx.signal?.aborted) {
-          return fail("INTERRUPTED", "collectResource interrupted before dig", Date.now() - started, true, {
-            collected: countMatching(ctx, names) - before,
-            inventoryPreserved: true,
-            workComplete: false,
-          });
+        // Navigation/look yield to other clients. Never dig a newly substituted block.
+        current = ctx.bot.blockAt(
+          new Vec3Class(
+            Math.floor(best.position.x),
+            Math.floor(best.position.y),
+            Math.floor(best.position.z),
+          ),
+        );
+        if (!current || !names.includes(current.name)) {
+          skipped.add(key);
+          continue;
         }
-        try {
-          if ((await digUnlessAborted(ctx, current)) === "aborted") {
-            return fail("INTERRUPTED", "collectResource interrupted during dig", Date.now() - started, true, {
+        if (ctx.signal?.aborted) {
+          return fail(
+            "INTERRUPTED",
+            "collectResource interrupted before dig",
+            Date.now() - started,
+            true,
+            {
               collected: countMatching(ctx, names) - before,
               inventoryPreserved: true,
               workComplete: false,
-            });
+            },
+          );
+        }
+        try {
+          if ((await digUnlessAborted(ctx, current)) === "aborted") {
+            return fail(
+              "INTERRUPTED",
+              "collectResource interrupted during dig",
+              Date.now() - started,
+              true,
+              {
+                collected: countMatching(ctx, names) - before,
+                inventoryPreserved: true,
+                workComplete: false,
+              },
+            );
           }
         } catch (error) {
           ctx.body.unreachable.mark(best.position, 20_000);
           skipped.add(key);
-          return fail("DIG_FAILED", error instanceof Error ? error.message : String(error), Date.now() - started, true);
+          return fail(
+            "DIG_FAILED",
+            error instanceof Error ? error.message : String(error),
+            Date.now() - started,
+            true,
+          );
         }
         gone = blockMissing(ctx, best.position, current.name);
         if (!gone) {
-          return fail("VERIFY_FAILED", `Block ${current.name} still present after dig`, Date.now() - started, true);
+          return fail(
+            "VERIFY_FAILED",
+            `Block ${current.name} still present after dig`,
+            Date.now() - started,
+            true,
+          );
         }
       }
     }
@@ -149,7 +230,12 @@ export async function collectResource(
     lastName = block.name;
     await collectItem(ctx, undefined, 8);
     // Drops can land a few ticks after the dig: poll the real inventory delta (bounded) before judging possession.
-    await waitForInventoryGain(ctx, () => countMatching(ctx, names), countAtIterationStart, opts.dropWaitMs ?? DROP_WAIT_MS);
+    await waitForInventoryGain(
+      ctx,
+      () => countMatching(ctx, names),
+      countAtIterationStart,
+      opts.dropWaitMs ?? DROP_WAIT_MS,
+    );
     if (mined >= Math.max(1, amount)) break;
   }
 
@@ -165,7 +251,10 @@ export async function collectResource(
       { mined, collected: 0, workComplete: false, position: lastPos },
     );
   }
-  return ok({ name: lastName, collected: gained, position: lastPos ?? { x: 0, y: 0, z: 0 } }, Date.now() - started);
+  return ok(
+    { name: lastName, collected: gained, position: lastPos ?? { x: 0, y: 0, z: 0 } },
+    Date.now() - started,
+  );
 }
 
 function blockMissing(ctx: SkillContext, position: Vec3, expected: string): boolean {

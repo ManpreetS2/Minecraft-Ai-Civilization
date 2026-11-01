@@ -1,7 +1,11 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Bot } from "mineflayer";
 import { ok } from "@civ/shared";
-import { createNavigationBackend, setNavigationBackend, type NavigationBackend } from "@civ/minecraft-adapter";
+import {
+  createNavigationBackend,
+  setNavigationBackend,
+  type NavigationBackend,
+} from "@civ/minecraft-adapter";
 import { collectResource } from "./collect.js";
 import type { SkillContext } from "./context.js";
 
@@ -32,7 +36,10 @@ function collectCtx(opts: {
   const items: Array<{ name: string; count: number; slot: number }> = opts.inventoryFull
     ? Array.from({ length: 36 }, (_, i) => ({ name: "dirt", count: 64, slot: 9 + i }))
     : [];
-  const slots: Array<{ name: string; count: number; slot: number } | null> = Array.from({ length: 46 }, () => null);
+  const slots: Array<{ name: string; count: number; slot: number } | null> = Array.from(
+    { length: 46 },
+    () => null,
+  );
   items.forEach((item) => {
     slots[item.slot] = item;
   });
@@ -56,10 +63,17 @@ function collectCtx(opts: {
       return logName === "oak_log" ? [logPos] : [];
     },
     blockAt(pos: { x: number; y: number; z: number }) {
-      if (Math.floor(pos.x) === logPos.x && Math.floor(pos.y) === logPos.y && Math.floor(pos.z) === logPos.z) {
+      if (
+        Math.floor(pos.x) === logPos.x &&
+        Math.floor(pos.y) === logPos.y &&
+        Math.floor(pos.z) === logPos.z
+      ) {
         return { name: logName, position: logPos };
       }
-      return { name: "air", position: { x: Math.floor(pos.x), y: Math.floor(pos.y), z: Math.floor(pos.z) } };
+      return {
+        name: "air",
+        position: { x: Math.floor(pos.x), y: Math.floor(pos.y), z: Math.floor(pos.z) },
+      };
     },
     async lookAt() {
       return undefined;
@@ -95,7 +109,12 @@ describe("collectResource inventory truthfulness", () => {
 
   it("succeeds only when the expected item enters inventory", async () => {
     setNavigationBackend(inReachNav());
-    const result = await collectResource(collectCtx({ removeOnDig: true, grantDrop: true }), ["oak_log"], 1, 48);
+    const result = await collectResource(
+      collectCtx({ removeOnDig: true, grantDrop: true }),
+      ["oak_log"],
+      1,
+      48,
+    );
     expect(result.success).toBe(true);
     if (!result.success) throw new Error(result.error);
     expect(result.data.collected).toBe(1);
@@ -104,7 +123,12 @@ describe("collectResource inventory truthfulness", () => {
 
   it("fails ITEM_NOT_FOUND when the block is removed but no drop is collected", async () => {
     setNavigationBackend(inReachNav());
-    const result = await collectResource(collectCtx({ removeOnDig: true, grantDrop: false }), ["oak_log"], 1, 48);
+    const result = await collectResource(
+      collectCtx({ removeOnDig: true, grantDrop: false }),
+      ["oak_log"],
+      1,
+      48,
+    );
     expect(result.success).toBe(false);
     if (result.success) throw new Error("excavation without pickup must not invent collection");
     expect(result.code).toBe("ITEM_NOT_FOUND");
@@ -144,10 +168,49 @@ describe("collectResource inventory truthfulness", () => {
     setNavigationBackend(inReachNav());
     const ac = new AbortController();
     ac.abort();
-    const result = await collectResource(collectCtx({ signal: ac.signal, grantDrop: true }), ["oak_log"], 1, 48);
+    const result = await collectResource(
+      collectCtx({ signal: ac.signal, grantDrop: true }),
+      ["oak_log"],
+      1,
+      48,
+    );
     expect(result.success).toBe(false);
     if (result.success) throw new Error("aborted collect should fail");
     expect(result.code === "INTERRUPTED" || result.code === "CANCELLED").toBe(true);
     expect(result.details?.workComplete).toBe(false);
+  });
+});
+
+describe("collectResource target changes while navigating", () => {
+  afterEach(() => setNavigationBackend(createNavigationBackend("pathfinder")));
+
+  it.each(
+    ["dirt", "crafting_table", "stone"].flatMap((replacement) =>
+      ["navigation", "look"].map((timing) => [replacement, timing]),
+    ),
+  )("never digs a log replaced with %s during %s", async (replacement, timing) => {
+    const ctx = collectCtx({ grantDrop: false });
+    let replaced = false;
+    const originalBlockAt = ctx.bot.blockAt.bind(ctx.bot);
+    vi.spyOn(ctx.bot, "blockAt").mockImplementation((position, extraInfos) => {
+      const block = originalBlockAt(position, extraInfos);
+      if (block && replaced && block.name === "oak_log") block.name = replacement;
+      return block;
+    });
+    const dig = vi.spyOn(ctx.bot, "dig");
+    let looks = 0;
+    vi.spyOn(ctx.bot, "lookAt").mockImplementation(async () => {
+      if (++looks >= 2 && timing === "look") replaced = true;
+    });
+    const nav = inReachNav();
+    nav.navigateToInteractWithBlock = async () => {
+      if (timing === "navigation") replaced = true;
+      return ok({ position: { x: 6, y: 64, z: 5 }, distance: 1 }, 1);
+    };
+    setNavigationBackend(nav);
+    const result = await collectResource(ctx, ["oak_log"], 1, 48, undefined, { dropWaitMs: 0 });
+    expect(dig).not.toHaveBeenCalled();
+    expect(result.success).toBe(false);
+    expect(ctx.bot.inventory.items()).toEqual([]);
   });
 });

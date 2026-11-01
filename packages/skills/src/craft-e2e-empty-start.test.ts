@@ -11,7 +11,10 @@ import { createNavigationBackend, setNavigationBackend } from "@civ/minecraft-ad
 import { collectResource } from "./collect.js";
 import { craftItem } from "./inventory.js";
 import { obtainItem } from "./obtain.js";
-import { createMineflayerCraftFixture, type MineflayerCraftFixture } from "./testing/mineflayer-craft-fixture.js";
+import {
+  createMineflayerCraftFixture,
+  type MineflayerCraftFixture,
+} from "./testing/mineflayer-craft-fixture.js";
 
 const TREES = [
   { x: 6, z: 3, height: 4 },
@@ -39,15 +42,23 @@ describe("CRAFT-001 offline bootstrap from an empty inventory", { timeout: E2E_T
     const table = fx.bot.recipesAll(fx.bot.registry.itemsByName.crafting_table!.id, null, true)[0]!;
     expect(table.inShape!.flat().every((cell) => typeof cell.id === "number")).toBe(true);
     expect(table.requiresTable).toBe(false);
-    const pickaxe = fx.bot.recipesAll(fx.bot.registry.itemsByName.wooden_pickaxe!.id, null, true)[0]!;
+    const pickaxe = fx.bot.recipesAll(
+      fx.bot.registry.itemsByName.wooden_pickaxe!.id,
+      null,
+      true,
+    )[0]!;
     expect(pickaxe.requiresTable).toBe(true);
     expect(pickaxe.inShape!.flat().some((cell) => cell.id === -1)).toBe(true); // blanks are {id:-1}, not null
     const planks = fx.bot.recipesAll(fx.bot.registry.itemsByName.oak_planks!.id, null, true)[0]!;
     expect(planks.ingredients![0]!.count).toBe(-1); // shapeless ingredients carry count -1
     // table recipes are hidden without a table (mineflayer rule)
-    expect(fx.bot.recipesAll(fx.bot.registry.itemsByName.wooden_pickaxe!.id, null, false)).toHaveLength(0);
+    expect(
+      fx.bot.recipesAll(fx.bot.registry.itemsByName.wooden_pickaxe!.id, null, false),
+    ).toHaveLength(0);
     // nothing craftable from nothing
-    expect(fx.bot.recipesFor(fx.bot.registry.itemsByName.oak_planks!.id, null, 1, null)).toHaveLength(0);
+    expect(
+      fx.bot.recipesFor(fx.bot.registry.itemsByName.oak_planks!.id, null, 1, null),
+    ).toHaveLength(0);
   });
 
   it("staged chain: logs -> planks -> sticks -> crafting table (placed) -> wooden pickaxe, with inventory deltas at every step", async () => {
@@ -110,13 +121,19 @@ describe("CRAFT-001 offline bootstrap from an empty inventory", { timeout: E2E_T
     expect(fx.stats.windowOpens).toBe(1);
     const pickaxeCraft = fx.stats.craftCalls.find((call) => call.result === "wooden_pickaxe");
     expect(pickaxeCraft?.withTable).toBe(true);
-    expect(fx.stats.craftCalls.filter((call) => call.result !== "wooden_pickaxe").every((call) => !call.withTable)).toBe(true);
+    expect(
+      fx.stats.craftCalls
+        .filter((call) => call.result !== "wooden_pickaxe")
+        .every((call) => !call.withTable),
+    ).toBe(true);
     // wood accounting: 3+ logs gathered; planks/sticks/table consumed what the pickaxe chain needs
     // plank-equivalents: 4 per log dug == leftovers + table(4) + pickaxe(3) + the planks spent on the sticks
     // (2 sticks stay in the pickaxe; every other stick pair came from 1 plank)
     const logsDug = fx.stats.digs.filter((name) => name.endsWith("_log")).length;
     const sticksProduced = fx.count("stick") + 2;
-    expect(logsDug * 4).toBe(fx.count("oak_log") * 4 + fx.count("oak_planks") + 4 + 3 + sticksProduced / 2);
+    expect(logsDug * 4).toBe(
+      fx.count("oak_log") * 4 + fx.count("oak_planks") + 4 + 3 + sticksProduced / 2,
+    );
     expect(fx.currentWindowClosed()).toBe(true);
   });
 
@@ -151,3 +168,54 @@ describe("CRAFT-001 offline bootstrap from an empty inventory", { timeout: E2E_T
     expect(fx.count("oak_planks")).toBe(0);
   });
 });
+
+describe(
+  "deterministic resource capability seeds (fake Mineflayer only)",
+  { timeout: E2E_TIMEOUT_MS },
+  () => {
+    afterEach(() => setNavigationBackend(createNavigationBackend("pathfinder")));
+    it.each([17, 41, 99])("seed %i verifies an empty-start tool and stone chain", async (seed) => {
+      const x = 3 + (seed % 4);
+      const z = 3 + (seed % 3);
+      const fx = createMineflayerCraftFixture({
+        trees: [
+          { x, z, height: 6 },
+          { x: -x, z: -z, height: 4 },
+        ],
+      });
+      setNavigationBackend(fx.nav);
+      expect(fx.totalItems()).toBe(0);
+      const pickaxe = await obtainItem(fx.ctx, "wooden_pickaxe", 1);
+      expect(pickaxe.success, JSON.stringify(pickaxe)).toBe(true);
+      expect(fx.count("wooden_pickaxe")).toBe(1);
+      expect(fx.blocksNamed("crafting_table")).toBe(1);
+      // Natural ground in this fixture is stone; publish a discoverable ground cell, not gifted inventory.
+      fx.world.set(`${x + 1},63,${z}`, "stone");
+      const stone = await collectResource(fx.ctx, ["stone"], 1, 48);
+      expect(stone.success, JSON.stringify(stone)).toBe(true);
+      expect(fx.count("cobblestone")).toBe(1);
+      expect(fx.stats.digs).toContain("stone");
+      expect(fx.stats.pickups).toContain("cobblestone");
+      expect(fx.dropped).toHaveLength(0);
+      console.log(
+        JSON.stringify({
+          scenario: "empty-start-capability",
+          seed,
+          mode: "offline-fixture",
+          humanInterventions: 0,
+          suppliedInventory: [],
+          finalInventory: fx.items.map(({ name, count }) => ({ name, count })),
+          verifiedWorldModifications: fx.stats.placed,
+          digs: fx.stats.digs,
+          crafts: fx.stats.craftCalls,
+          modelDecisions: 0,
+          skillRequests: ["obtain wooden_pickaxe", "collect stone"],
+          health: [20, fx.bot.health],
+          hunger: [20, fx.bot.food],
+          deaths: 0,
+          unmodeled: ["hostiles", "server physics", "provider decisions", "hunger progression"],
+        }),
+      );
+    });
+  },
+);
