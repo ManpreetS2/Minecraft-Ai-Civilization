@@ -1,3 +1,4 @@
+import { createCommunityDirectory } from "@civ/shared";
 import { describe, expect, it } from "vitest";
 import { createEvent } from "@civ/shared";
 import { observersForEvent, tryAdaptSimEvent } from "./events.js";
@@ -36,7 +37,7 @@ describe("objective event adapters", () => {
         { id: "citizen_maya", position: { x: 2, y: 64, z: 1 } },
         { id: "citizen_kai", position: { x: 200, y: 64, z: 200 } },
       ],
-    });
+    }, createCommunityDirectory([]));
     expect(observers.map((o) => o.citizenId).sort()).toEqual(["citizen_atlas", "citizen_maya"]);
   });
 });

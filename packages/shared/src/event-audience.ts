@@ -10,6 +10,7 @@
  * Cross-community sharing is never a widening of an existing event: it is a NEW event (new id) whose audience
  * names the receiving community, created by `createCommunityShareEvent` from a sharer who could read the source.
  */
+import { z } from "zod";
 import type { SimEvent } from "./events.js";
 import {
   authorizeEventForCitizen,
@@ -137,38 +138,84 @@ export type CommunityShareResult =
   | { ok: true; event: SimEvent }
   | { ok: false; reason: string };
 
+/** Trusted event lookup (the store). The share path never accepts a caller-supplied source event. */
+export interface TrustedEventLookup {
+  getEventById(id: string): SimEvent | undefined;
+}
+
 /**
  * Explicit cross-community sharing. Creates a NEW event addressed to `toCommunityId`.
- * The sharer must be able to read the source event; only the sharer-supplied `message` is copied
- * (never the source payload), and the new event records provenance (`sharedFromEventId`, `sharedBy`).
+ *  - The source event is LOADED BY ID from the trusted lookup; a caller cannot hand in its own copy.
+ *  - `actingCitizenId` is the citizen actually acting, supplied by the caller's trusted context (the runtime that
+ *    owns the citizen), never read from model/tool/HTTP input. It must be known to the directory and able to read
+ *    the stored source event.
+ *  - Only the supplied `message` is copied (never the source payload); provenance is recorded.
  */
 export function createCommunityShareEvent(args: {
-  source: SimEvent;
-  sharerCitizenId: string;
+  lookup: TrustedEventLookup;
+  sourceEventId: string;
+  actingCitizenId: string;
   toCommunityId: string;
   message: string;
   directory: CommunityDirectory;
   now?: Date;
   id?: string;
 }): CommunityShareResult {
-  const { source, sharerCitizenId, toCommunityId, message, directory } = args;
-  if (!message.trim()) return { ok: false, reason: "empty share message" };
-  if (!directory.hasCommunity(toCommunityId)) return { ok: false, reason: "unknown receiving community" };
-  if (!directory.knowsCitizen(sharerCitizenId)) return { ok: false, reason: "sharer unknown to directory" };
-  const canRead = authorizeEventWithAudience(sharerCitizenId, source.payload, directory, source.citizenId);
-  if (!canRead.allowed) return { ok: false, reason: `sharer cannot read the source event (${canRead.reason})` };
+  const { lookup, sourceEventId, actingCitizenId, toCommunityId, message, directory } = args;
+  if (typeof message !== "string" || !message.trim()) return { ok: false, reason: "empty share message" };
+  if (typeof toCommunityId !== "string" || !directory.hasCommunity(toCommunityId)) {
+    return { ok: false, reason: "unknown receiving community" };
+  }
+  if (typeof actingCitizenId !== "string" || !directory.knowsCitizen(actingCitizenId)) {
+    return { ok: false, reason: "acting citizen unknown to directory" };
+  }
+  const source = typeof sourceEventId === "string" ? lookup.getEventById(sourceEventId) : undefined;
+  if (!source) return { ok: false, reason: "source event not found" };
+  const canRead = authorizeEventWithAudience(actingCitizenId, source.payload, directory, source.citizenId);
+  if (!canRead.allowed) return { ok: false, reason: `acting citizen cannot read the source event (${canRead.reason})` };
   return {
     ok: true,
     event: {
       id: args.id ?? crypto.randomUUID(),
       type: "ConversationOccurred",
       timestamp: (args.now ?? new Date()).toISOString(),
-      citizenId: sharerCitizenId,
+      citizenId: actingCitizenId,
       payload: withAudience(
-        { message, sharedFromEventId: source.id, sharedBy: sharerCitizenId },
+        { message, sharedFromEventId: source.id, sharedBy: actingCitizenId },
         "settlement_public",
         { scope: "community", communityId: toCommunityId },
       ),
     },
   };
+}
+
+const idString = z
+  .string()
+  .min(1)
+  .max(64)
+  .regex(/^[A-Za-z0-9_.:-]+$/);
+const communityConfigSchema = z
+  .array(
+    z
+      .object({
+        id: idString,
+        name: z.string().min(1).max(120).optional(),
+        memberIds: z.array(idString).max(200),
+      })
+      .strict(),
+  )
+  .max(50);
+
+export type CommunityConfigEntry = { id: string; name: string; memberIds: string[] };
+
+/**
+ * Parse the orchestrator's COMMUNITIES_JSON. Strict: unknown keys, bad ids, a citizen in two communities or a
+ * duplicate community id all throw (the caller keeps the existing directory = fail closed).
+ */
+export function parseCommunityConfig(json: string | undefined): CommunityConfigEntry[] {
+  if (json === undefined || json.trim() === "") return [];
+  const parsed = communityConfigSchema.parse(JSON.parse(json));
+  const entries = parsed.map((c) => ({ id: c.id, name: c.name ?? c.id, memberIds: [...new Set(c.memberIds)] }));
+  createCommunityDirectory(entries); // validates uniqueness (throws)
+  return entries;
 }

@@ -9,6 +9,7 @@ import {
   type SimEvent,
 } from "@civ/shared";
 import { CivilizationStore } from "./store.js";
+import { applyCommunityConfig } from "./community-config.js";
 import { buildCitizenContextPack, ensureCitizenPersonality } from "./citizen-context.js";
 import { experimentWorkAssignment } from "./planner.js";
 
@@ -77,8 +78,9 @@ describe("Mission 012 — delivery isolation and context packs", () => {
   it("multiple citizens retain isolated delivery state from shared history", () => {
     const store = tempDb();
     // SEC-001: broadcast events need a verified audience; one colony community holds all three citizens.
-    store.upsertCommunity("colony");
-    for (const id of ["citizen_atlas", "citizen_maya", "citizen_theo"]) store.addCommunityMember("colony", id);
+    applyCommunityConfig(store, {
+      COMMUNITIES_JSON: JSON.stringify([{ id: "colony", memberIds: ["citizen_atlas", "citizen_maya", "citizen_theo"] }]),
+    });
     const config = demoCfg();
     const events: SimEvent[] = [
       {
@@ -157,18 +159,24 @@ describe("Mission 012 — delivery isolation and context packs", () => {
     expect(store.getDeliveredEventIds("citizen_atlas").has("secret-atlas")).toBe(true);
     expect(store.getDeliveredEventIds("citizen_theo").has("secret-atlas")).toBe(false);
 
-    // Late visibility: promote observer-only to public for Theo without losing it.
+    // Late visibility: a caller-supplied "promotion" of a stored observer-only event is NOT trusted (SEC-001 write-time
+    // re-check reads the stored event), so the forged copy stays undelivered ...
     const late: SimEvent = {
       ...events[4]!,
       payload: withEventVisibility({ summary: "observer debug only" }, { class: "world_public", audience: { scope: "world" } }),
     };
-    const latePack = buildCitizenContextPack({
+    const forgedPack = buildCitizenContextPack({
       store,
       config,
       citizenId: "citizen_theo",
       events: [...events.slice(0, 4), late],
     });
-    expect(latePack.bulletin.lines.some((l) => l.eventId === "dbg")).toBe(true);
+    expect(forgedPack.bulletin.lines.some((l) => l.eventId === "dbg")).toBe(false);
+    // ... whereas a real promotion (a new stored event) is delivered, and the original observer record is untouched.
+    store.appendEvent({ ...late, id: "dbg-public", timestamp: new Date(Date.parse(late.timestamp) + 1000).toISOString() });
+    const latePack = buildCitizenContextPack({ store, config, citizenId: "citizen_theo" });
+    expect(latePack.bulletin.lines.some((l) => l.eventId === "dbg-public")).toBe(true);
+    expect(store.listAllEventsForObserver(50).some((e) => e.id === "dbg")).toBe(true);
 
     expect(atlas.sharedObjective).toContain("Survive");
     expect(atlas.promptExtras.personalityContext).toContain("tendencies");

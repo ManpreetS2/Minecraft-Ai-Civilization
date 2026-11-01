@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { CognitiveStore, dangerEncounteredEvent, itemReceivedEvent, createIdFactory, mutableClock } from "@civ/memory";
 import { CitizenMind } from "@civ/psychology";
-import { loadConfig } from "@civ/shared";
+import { createCommunityDirectory, loadConfig } from "@civ/shared";
 import { scoreHeuristic } from "./benchmark.js";
 import { resolveCognitionConfig } from "./config.js";
 import { CognitionContextBuilder } from "./context-builder.js";
@@ -172,7 +172,7 @@ describe("normalization", () => {
 describe("context trim and prompt", () => {
   it("keeps a compact relevant subset and avoids personality injection", () => {
     const store = new CognitiveStore(":memory:");
-    const mind = new CitizenMind(store, { id: createIdFactory("ctx") });
+    const mind = new CitizenMind(store, { directory: () => createCommunityDirectory([]), id: createIdFactory("ctx") });
     mind.ingest(
       itemReceivedEvent({
         giverId: "citizen_maya",
@@ -402,7 +402,7 @@ describe("reflection validation and bounded apply", () => {
       },
     };
     const store = new CognitiveStore(":memory:");
-    const mind = new CitizenMind(store, { id: createIdFactory("ref") });
+    const mind = new CitizenMind(store, { directory: () => createCommunityDirectory([]), id: createIdFactory("ref") });
     const service = new CognitionService({
       config: { ...cfg, enabled: true, reflectionEnabled: true },
       mind,
@@ -446,7 +446,7 @@ describe("reflection validation and bounded apply", () => {
 describe("two citizens, same event, different context", () => {
   it("differs because of memory, needs, and associations rather than personality sliders", () => {
     const store = new CognitiveStore(":memory:");
-    const mind = new CitizenMind(store, { clock: mutableClock(), id: createIdFactory("two") });
+    const mind = new CitizenMind(store, { directory: () => createCommunityDirectory([]), clock: mutableClock(), id: createIdFactory("two") });
     const farKai = {
       nearbyRadius: 24,
       citizens: [

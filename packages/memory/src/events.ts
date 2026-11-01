@@ -2,6 +2,7 @@ import {
   distance,
   isReaderInAudience,
   readEventAudience,
+  readEventVisibility,
   type CommunityDirectory,
   type SimEvent,
   type Vec3,
@@ -277,7 +278,11 @@ export function tryAdaptSimEvent(event: SimEvent): ObjectiveWorldEvent | null {
   if (!adapted) return null;
   // SEC-001: carry the (unverified) audience label through so observersForEvent can check it against a directory.
   const audience = readEventAudience(event.payload);
-  return audience ? { ...adapted, facts: { ...adapted.facts, audience } } : adapted;
+  const visibilityClass = readEventVisibility(event.payload).class;
+  return {
+    ...adapted,
+    facts: { ...adapted.facts, visibilityClass, ...(audience ? { audience } : {}) },
+  };
 }
 
 function adaptSimEvent(event: SimEvent): ObjectiveWorldEvent | null {
@@ -399,11 +404,13 @@ export function observersForEvent(
   event: ObjectiveWorldEvent,
   snapshot: WorldSnapshot,
   /**
-   * SEC-001: when a directory is given, anyone who learns of the event second-hand (WITNESSED / HEARD / RECORD)
-   * must be inside its verified audience (facts.audience); a missing or unknown audience means nobody.
-   * DIRECT observers (actor, target, listed participants) lived the event and are not audience-gated.
+   * SEC-001: REQUIRED. Broadcast events (facts.visibilityClass world_public / settlement_public) may only be
+   * learned second-hand (WITNESSED / HEARD / RECORD) by readers inside their verified audience (facts.audience);
+   * a missing or unknown audience means nobody. Everything else (physical observations, directed, private,
+   * unclassified) is not audience-gated, so legitimate nearby witnesses are kept. DIRECT observers (actor, target,
+   * listed participants) lived the event and are never gated.
    */
-  options: { directory?: CommunityDirectory } = {},
+  directory: CommunityDirectory,
 ): ObserverRole[] {
   const radius = snapshot.nearbyRadius ?? DEFAULT_NEARBY_RADIUS;
   const found = new Map<string, ObserverRole>();
@@ -437,8 +444,8 @@ export function observersForEvent(
   for (const id of recordReaders) add(id, "RECORD");
 
   const roles = [...found.values()];
-  const directory = options.directory;
-  if (!directory) return roles;
+  const klass = asString(event.facts.visibilityClass);
+  if (klass !== "world_public" && klass !== "settlement_public") return roles;
   const audience = readEventAudience({ visibility: { audience: event.facts.audience } });
   return roles.filter(
     (role) => role.source === "DIRECT" || isReaderInAudience(role.citizenId, audience, directory).allowed,

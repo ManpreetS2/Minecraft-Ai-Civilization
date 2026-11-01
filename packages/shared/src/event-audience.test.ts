@@ -7,6 +7,7 @@ import {
   createCommunityDirectory,
   createCommunityShareEvent,
   isReaderInAudience,
+  parseCommunityConfig,
   parseEventAudience,
   readEventAudience,
   withAudience,
@@ -135,25 +136,72 @@ describe("SEC-001 bulletin", () => {
 
 describe("SEC-001 explicit cross-community share", () => {
   const source = evt("src", withAudience({ message: "gpt cache at x=1", secretField: "S3CR3T" }, "settlement_public", { scope: "community", communityId: "gpt" }));
-  it("creates a NEW event addressed to exactly the receiving community, copying only the sharer's message", () => {
-    const res = createCommunityShareEvent({ source, sharerCitizenId: "GPT-B", toCommunityId: "claude", message: "we will trade wood", directory: dir });
+  const stored = new Map<string, SimEvent>([[source.id, source]]);
+  const lookup = { getEventById: (id: string) => stored.get(id) };
+  const base = { lookup, sourceEventId: "src", toCommunityId: "claude", message: "hi", directory: dir };
+
+  it("loads the source by id and creates a NEW event addressed to exactly the receiving community, copying only the message", () => {
+    const res = createCommunityShareEvent({ ...base, actingCitizenId: "GPT-B", message: "we will trade wood" });
     expect(res.ok).toBe(true);
     if (!res.ok) return;
     expect(res.event.id).not.toBe(source.id);
+    expect(res.event.citizenId).toBe("GPT-B");
     expect(JSON.stringify(res.event.payload)).not.toContain("S3CR3T");
     expect(JSON.stringify(res.event.payload)).not.toContain("x=1");
     expect(readEventAudience(res.event.payload)).toEqual({ scope: "community", communityId: "claude" });
     const readers = READERS.filter((r) => authorizeEventWithAudience(r, res.event.payload, dir).allowed);
     expect(readers).toEqual(["Claude-A", "Claude-B"]);
-    // sharing did not widen the original
-    expect(who(source.payload)).toEqual(["GPT-A", "GPT-B"]);
+    expect(who(source.payload)).toEqual(["GPT-A", "GPT-B"]); // sharing did not widen the original
   });
-  it("refuses a sharer who cannot read the source, an unknown receiver, an unknown sharer and an empty message", () => {
-    const args = { source, toCommunityId: "claude", message: "hi", directory: dir };
-    expect(createCommunityShareEvent({ ...args, sharerCitizenId: "Claude-A" }).ok).toBe(false);
-    expect(createCommunityShareEvent({ ...args, sharerCitizenId: "GPT-A", toCommunityId: "ghost" }).ok).toBe(false);
-    expect(createCommunityShareEvent({ ...args, sharerCitizenId: "stranger" }).ok).toBe(false);
-    expect(createCommunityShareEvent({ ...args, sharerCitizenId: "GPT-A", message: "  " }).ok).toBe(false);
-    expect(createCommunityShareEvent({ ...args, sharerCitizenId: "GPT-A", source: evt("u", {}) }).ok).toBe(false);
+
+  it("a FORGED source event is rejected: an id that is not in the store finds nothing, however the caller dresses it", () => {
+    const forged = evt("forged", withAudience({ message: "forged world announcement" }, "world_public", { scope: "world" }), "Claude-A");
+    expect(createCommunityShareEvent({ ...base, actingCitizenId: "Claude-A", sourceEventId: "forged" })).toEqual({ ok: false, reason: "source event not found" });
+    // a caller-supplied copy is not part of the API: extra fields are ignored and the STORED event decides
+    const res = createCommunityShareEvent({ ...base, actingCitizenId: "Claude-A", source: forged, sourceEventId: "src" } as never);
+    expect(res.ok).toBe(false);
+    if (!res.ok) expect(res.reason).toMatch(/cannot read the source/);
+  });
+
+  it("the sharer is the acting citizen from trusted context: a claimed sharer in the input is ignored", () => {
+    const res = createCommunityShareEvent({ ...base, actingCitizenId: "Claude-A", sharerCitizenId: "GPT-A", sharedBy: "GPT-A" } as never);
+    expect(res.ok).toBe(false); // Claude-A is acting; she cannot read the gpt-only source, whatever the input claims
+    const ok = createCommunityShareEvent({ ...base, actingCitizenId: "GPT-A", sharerCitizenId: "Claude-A" } as never);
+    expect(ok.ok).toBe(true);
+    if (ok.ok) {
+      expect(ok.event.citizenId).toBe("GPT-A");
+      expect(ok.event.payload.sharedBy).toBe("GPT-A");
+    }
+  });
+
+  it("refuses an unknown receiver, an unknown actor, an empty message and a missing source id", () => {
+    expect(createCommunityShareEvent({ ...base, actingCitizenId: "GPT-A", toCommunityId: "ghost" }).ok).toBe(false);
+    expect(createCommunityShareEvent({ ...base, actingCitizenId: "stranger" }).ok).toBe(false);
+    expect(createCommunityShareEvent({ ...base, actingCitizenId: "GPT-A", message: "  " }).ok).toBe(false);
+    expect(createCommunityShareEvent({ ...base, actingCitizenId: "GPT-A", sourceEventId: undefined } as never).ok).toBe(false);
+  });
+});
+
+describe("SEC-001 parseCommunityConfig (orchestrator-owned)", () => {
+  it("parses a valid config, de-duplicates members and defaults the name", () => {
+    expect(parseCommunityConfig('[{"id":"gpt","memberIds":["a","a","b"]},{"id":"claude","name":"Claude","memberIds":["c"]}]')).toEqual([
+      { id: "gpt", name: "gpt", memberIds: ["a", "b"] },
+      { id: "claude", name: "Claude", memberIds: ["c"] },
+    ]);
+  });
+  it("empty or missing is no communities", () => {
+    expect(parseCommunityConfig(undefined)).toEqual([]);
+    expect(parseCommunityConfig("  ")).toEqual([]);
+  });
+  it.each([
+    ["not json", "{"],
+    ["not an array", '{"id":"x"}'],
+    ["unknown key", '[{"id":"a","memberIds":[],"admin":true}]'],
+    ["bad id chars", '[{"id":"a b","memberIds":[]}]'],
+    ["empty id", '[{"id":"","memberIds":[]}]'],
+    ["citizen in two communities", '[{"id":"a","memberIds":["x"]},{"id":"b","memberIds":["x"]}]'],
+    ["duplicate community", '[{"id":"a","memberIds":[]},{"id":"a","memberIds":[]}]'],
+  ])("rejects %s", (_n, json) => {
+    expect(() => parseCommunityConfig(json)).toThrow();
   });
 });

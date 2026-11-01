@@ -1,6 +1,8 @@
 import type { CognitionPrompt } from "@civ/cognition";
 import {
+  authorizeEventWithAudience,
   buildCitizenBulletin,
+  readEventAudience,
   formatPersonalityTendencies,
   generatePersonality,
   isThreeCitizenDemo,
@@ -11,6 +13,7 @@ import {
   type PersonalityRecord,
   type SimEvent,
 } from "@civ/shared";
+import { seedCommunitiesOnce } from "./community-config.js";
 import type { CivilizationStore } from "./store.js";
 
 export type CitizenContextPack = {
@@ -60,28 +63,52 @@ export function buildCitizenContextPack(options: {
   const personality = ensureCitizenPersonality(store, citizenId, seed);
   const personalityContext = personality ? formatPersonalityTendencies(personality.traits) : undefined;
 
-  const events = options.events ?? store.listEventsAscending(400);
+  // SEC-001: the directory is orchestrator-seeded from config (never from model/tool/HTTP input).
+  seedCommunitiesOnce(store, config);
+
+  let events = options.events ?? store.listEventsAscending(400);
   const already = store.getDeliveredEventIds(citizenId);
-  const bulletin = buildCitizenBulletin({
-    readerCitizenId: citizenId,
-    events,
-    alreadyDeliveredIds: already,
-    // SEC-001: always verify broadcast audiences against the persisted directory (unlabeled events reach nobody).
-    directory: store.getCommunityDirectory(),
-    targetTokens: config.DEMO_BULLETIN_TARGET_TOKENS,
-  });
+  const build = () =>
+    buildCitizenBulletin({
+      readerCitizenId: citizenId,
+      events,
+      alreadyDeliveredIds: already,
+      // SEC-001: always verify broadcast audiences against the persisted directory (unlabeled events reach nobody).
+      directory: store.getCommunityDirectory(),
+      targetTokens: config.DEMO_BULLETIN_TARGET_TOKENS,
+    });
+  let bulletin = build();
+
+  // SEC-001 write-time re-check: before anything is acknowledged or stored, authorize each delivered line again
+  // against the STORED event (not the caller-supplied copy) and a freshly loaded directory. A line that fails is
+  // dropped from the bulletin, never marked delivered and never stored as a fact.
+  const recheck = (eventId: string): boolean => {
+    const stored = store.getEventById(eventId);
+    if (!stored) return false;
+    return authorizeEventWithAudience(citizenId, stored.payload, store.getCommunityDirectory(), stored.citizenId).allowed;
+  };
+  const rejected = new Set(bulletin.deliveredEventIds.filter((id) => !recheck(id)));
+  if (rejected.size > 0) {
+    console.warn(`[bulletin] ${citizenId}: write-time audience re-check rejected ${[...rejected].join(", ")}`);
+    events = events.filter((event) => !rejected.has(event.id));
+    bulletin = build();
+  }
 
   // Persist delivery checkpoint after bulletin is built (restart-safe incremental delivery).
   store.markEventsDelivered(citizenId, bulletin.deliveredEventIds);
 
   for (const line of bulletin.lines) {
     if (line.urgency >= 70) {
+      const stored = store.getEventById(line.eventId);
+      if (!stored || !recheck(line.eventId)) continue; // belt and braces: no unaudited fact is ever written
       store.upsertPersistentFact({
         id: crypto.randomUUID(),
         citizenId,
         factKey: `event:${line.eventId}`,
         content: line.summary,
         kind: "observed_fact",
+        audience: readEventAudience(stored.payload),
+        sourceEventId: stored.id,
       });
     }
   }

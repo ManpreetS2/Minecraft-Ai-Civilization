@@ -1,3 +1,4 @@
+import { createCommunityDirectory } from "@civ/shared";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -41,6 +42,7 @@ function mind(store = new CognitiveStore(":memory:")): { mind: CitizenMind; stor
   return {
     store,
     mind: new CitizenMind(store, {
+      directory: () => createCommunityDirectory([]),
       clock: mutableClock("2026-09-16T12:00:00.000Z"),
       id: createIdFactory("t"),
     }),

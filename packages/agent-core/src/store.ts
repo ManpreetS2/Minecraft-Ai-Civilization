@@ -5,6 +5,7 @@ import {
   DEFAULT_CITIZENS,
   createCommunityDirectory,
   readEventAudience,
+  type EventAudience,
   type CommunityDirectory,
   type CitizenRecord,
   type ConstructionState,
@@ -19,6 +20,18 @@ import {
 import type { CitizenHome, HomeMembership, HomeRecord } from "./home-types.js";
 
 const EVENT_AUDIENCE_MIGRATION_KEY = "sec001_event_audience_v1";
+
+/**
+ * SEC-001: every community / membership write must carry this audit context. The only legitimate actor is the
+ * orchestrator's own configuration path (community-config.ts); nothing derived from LLM, tool or HTTP input may
+ * construct one. The literal type plus the runtime check make an accidental pass-through fail loudly.
+ */
+export type CommunityAudit = { actor: "orchestrator-config"; reason: string };
+function assertCommunityAudit(audit: CommunityAudit): void {
+  if (!audit || audit.actor !== "orchestrator-config" || typeof audit.reason !== "string" || !audit.reason.trim()) {
+    throw new Error("community writes require an orchestrator-config audit context");
+  }
+}
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -282,6 +295,15 @@ export class CivilizationStore {
         community_id TEXT NOT NULL REFERENCES communities(id),
         joined_at TEXT NOT NULL
       );
+      CREATE TABLE IF NOT EXISTS community_audit (
+        seq INTEGER PRIMARY KEY AUTOINCREMENT,
+        at TEXT NOT NULL,
+        action TEXT NOT NULL,
+        community_id TEXT NOT NULL,
+        citizen_id TEXT,
+        actor TEXT NOT NULL,
+        reason TEXT NOT NULL
+      );
       CREATE TABLE IF NOT EXISTS citizen_persistent_facts_quarantine (
         id TEXT PRIMARY KEY,
         citizen_id TEXT NOT NULL,
@@ -293,8 +315,17 @@ export class CivilizationStore {
         reason TEXT NOT NULL
       );
     `);
+    // Persistent facts record which audience authorized them and which event they came from (idempotent).
+    const factCols = new Set(
+      (this.db.prepare(`PRAGMA table_info(citizen_persistent_facts)`).all() as Array<{ name: string }>).map((c) => c.name),
+    );
+    if (!factCols.has("audience")) this.db.exec(`ALTER TABLE citizen_persistent_facts ADD COLUMN audience TEXT`);
+    if (!factCols.has("source_event_id")) this.db.exec(`ALTER TABLE citizen_persistent_facts ADD COLUMN source_event_id TEXT`);
     const done = this.db.prepare(`SELECT value FROM sim_meta WHERE key = ?`).get(EVENT_AUDIENCE_MIGRATION_KEY);
-    if (done) return;
+    if (done) {
+      this.backfillFactProvenance();
+      return;
+    }
     const now = new Date().toISOString();
     const facts = this.db
       .prepare(`SELECT * FROM citizen_persistent_facts WHERE fact_key LIKE 'event:%'`)
@@ -339,30 +370,124 @@ export class CivilizationStore {
         .prepare(`INSERT OR REPLACE INTO sim_meta (key, value) VALUES (?, ?)`)
         .run(EVENT_AUDIENCE_MIGRATION_KEY, now);
     })();
+    this.backfillFactProvenance();
   }
 
-  /** Create (or rename) a community. */
-  upsertCommunity(id: string, name = id, at = new Date().toISOString()): void {
-    if (!id.trim() || id !== id.trim()) throw new Error("community id must be a non-empty trimmed string");
+  /** Fill source_event_id / audience for event-derived facts written before those columns existed. Idempotent. */
+  private backfillFactProvenance(): void {
+    const rows = this.db
+      .prepare(`SELECT id, fact_key FROM citizen_persistent_facts WHERE source_event_id IS NULL AND fact_key LIKE 'event:%'`)
+      .all() as Array<{ id: string; fact_key: string }>;
+    if (rows.length === 0) return;
+    const update = this.db.prepare(`UPDATE citizen_persistent_facts SET source_event_id = ?, audience = ? WHERE id = ?`);
+    this.db.transaction(() => {
+      for (const row of rows) {
+        const eventId = row.fact_key.slice("event:".length);
+        const event = this.getEventById(eventId);
+        const audience = event ? readEventAudience(event.payload) : undefined;
+        update.run(eventId, audience ? JSON.stringify(audience) : null, row.id);
+      }
+    })();
+  }
+
+  private auditCommunity(audit: CommunityAudit, action: string, communityId: string, citizenId: string | null, at: string): void {
     this.db
-      .prepare(
-        `INSERT INTO communities (id, name, created_at) VALUES (?, ?, ?)
-         ON CONFLICT(id) DO UPDATE SET name = excluded.name`,
-      )
-      .run(id, name, at);
+      .prepare(`INSERT INTO community_audit (at, action, community_id, citizen_id, actor, reason) VALUES (?, ?, ?, ?, ?, ?)`)
+      .run(at, action, communityId, citizenId, audit.actor, audit.reason);
   }
 
-  /** A citizen belongs to at most one community (PRIMARY KEY on citizen_id). Re-adding to another community throws. */
-  addCommunityMember(communityId: string, citizenId: string, at = new Date().toISOString()): void {
+  /** Create (or rename) a community. Orchestrator-config path only (see CommunityAudit). */
+  upsertCommunity(id: string, name: string, audit: CommunityAudit, at = new Date().toISOString()): void {
+    assertCommunityAudit(audit);
+    if (!id.trim() || id !== id.trim()) throw new Error("community id must be a non-empty trimmed string");
+    this.db.transaction(() => {
+      this.db
+        .prepare(
+          `INSERT INTO communities (id, name, created_at) VALUES (?, ?, ?)
+           ON CONFLICT(id) DO UPDATE SET name = excluded.name`,
+        )
+        .run(id, name, at);
+      this.auditCommunity(audit, "upsert_community", id, null, at);
+    })();
+  }
+
+  /**
+   * A citizen belongs to at most one community (PRIMARY KEY on citizen_id). Re-adding to another community throws.
+   * Orchestrator-config path only (see CommunityAudit). Returns true when a row was added.
+   */
+  addCommunityMember(communityId: string, citizenId: string, audit: CommunityAudit, at = new Date().toISOString()): boolean {
+    assertCommunityAudit(audit);
     const existing = this.db
       .prepare(`SELECT community_id FROM community_members WHERE citizen_id = ?`)
       .get(citizenId) as { community_id: string } | undefined;
     if (existing && existing.community_id !== communityId) {
       throw new Error(`citizen ${citizenId} already belongs to community ${existing.community_id}`);
     }
-    this.db
-      .prepare(`INSERT OR IGNORE INTO community_members (citizen_id, community_id, joined_at) VALUES (?, ?, ?)`)
-      .run(citizenId, communityId, at);
+    if (existing) return false;
+    if (!this.db.prepare(`SELECT 1 FROM communities WHERE id = ?`).get(communityId)) {
+      throw new Error(`unknown community ${communityId}`);
+    }
+    this.db.transaction(() => {
+      this.db
+        .prepare(`INSERT INTO community_members (citizen_id, community_id, joined_at) VALUES (?, ?, ?)`)
+        .run(citizenId, communityId, at);
+      this.auditCommunity(audit, "add_member", communityId, citizenId, at);
+    })();
+    return true;
+  }
+
+  /**
+   * Audited removal. Facts the citizen stored on the strength of that community's audience are moved to the
+   * quarantine table (not deleted), because the authorization that justified them is gone.
+   * Orchestrator-config path only (see CommunityAudit). Returns false when the citizen was not a member.
+   */
+  removeCommunityMember(communityId: string, citizenId: string, audit: CommunityAudit, at = new Date().toISOString()): boolean {
+    assertCommunityAudit(audit);
+    const row = this.db
+      .prepare(`SELECT community_id FROM community_members WHERE citizen_id = ? AND community_id = ?`)
+      .get(citizenId, communityId);
+    if (!row) return false;
+    this.db.transaction(() => {
+      this.db.prepare(`DELETE FROM community_members WHERE citizen_id = ? AND community_id = ?`).run(citizenId, communityId);
+      const facts = this.db
+        .prepare(`SELECT * FROM citizen_persistent_facts WHERE citizen_id = ? AND audience IS NOT NULL`)
+        .all(citizenId) as Array<{ id: string; citizen_id: string; fact_key: string; content: string; kind: string; created_at: string; audience: string }>;
+      for (const fact of facts) {
+        let audienceCommunity: string | undefined;
+        try {
+          const parsed = JSON.parse(fact.audience) as { scope?: string; communityId?: string };
+          if (parsed.scope === "community") audienceCommunity = parsed.communityId;
+        } catch {
+          audienceCommunity = communityId; // unreadable audience: treat as revoked (fail closed)
+        }
+        if (audienceCommunity !== communityId) continue;
+        this.db
+          .prepare(
+            `INSERT OR IGNORE INTO citizen_persistent_facts_quarantine
+               (id, citizen_id, fact_key, content, kind, created_at, quarantined_at, reason)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          )
+          .run(fact.id, fact.citizen_id, fact.fact_key, fact.content, fact.kind, fact.created_at, at, `membership of ${communityId} removed`);
+        this.db.prepare(`DELETE FROM citizen_persistent_facts WHERE id = ?`).run(fact.id);
+      }
+      this.auditCommunity(audit, "remove_member", communityId, citizenId, at);
+    })();
+    return true;
+  }
+
+  listCommunityAudit(): Array<{ seq: number; at: string; action: string; communityId: string; citizenId?: string; actor: string; reason: string }> {
+    const rows = this.db.prepare(`SELECT * FROM community_audit ORDER BY seq ASC`).all() as Array<{
+      seq: number; at: string; action: string; community_id: string; citizen_id: string | null; actor: string; reason: string;
+    }>;
+    return rows.map((r) => ({ seq: r.seq, at: r.at, action: r.action, communityId: r.community_id, citizenId: r.citizen_id ?? undefined, actor: r.actor, reason: r.reason }));
+  }
+
+  /** True when the most recent audited action for this (community, citizen) pair is an explicit removal. */
+  wasMemberRemoved(communityId: string, citizenId: string): boolean {
+    const row = this.db
+      .prepare(`SELECT action FROM community_audit WHERE community_id = ? AND citizen_id = ? AND action IN ('add_member','remove_member') ORDER BY seq DESC LIMIT 1`)
+      .get(communityId, citizenId) as { action: string } | undefined;
+    return row?.action === "remove_member";
   }
 
   /** Fresh directory snapshot from the persisted tables (survives restart; never cached across calls). */
@@ -622,14 +747,21 @@ export class CivilizationStore {
     content: string;
     kind?: "observed_fact" | "suspicion";
     createdAt?: string;
+    /** SEC-001: the verified audience that authorized this fact (omit for private/non-broadcast facts). */
+    audience?: EventAudience;
+    /** SEC-001: the event this fact was derived from. */
+    sourceEventId?: string;
   }): void {
     this.db
       .prepare(
-        `INSERT INTO citizen_persistent_facts (id, citizen_id, fact_key, content, kind, created_at)
-         VALUES (@id, @citizenId, @factKey, @content, @kind, @createdAt)
-         ON CONFLICT(citizen_id, fact_key) DO UPDATE SET content = excluded.content`,
+        `INSERT INTO citizen_persistent_facts (id, citizen_id, fact_key, content, kind, created_at, audience, source_event_id)
+         VALUES (@id, @citizenId, @factKey, @content, @kind, @createdAt, @audience, @sourceEventId)
+         ON CONFLICT(citizen_id, fact_key) DO UPDATE SET
+           content = excluded.content, audience = excluded.audience, source_event_id = excluded.source_event_id`,
       )
       .run({
+        audience: fact.audience ? JSON.stringify(fact.audience) : null,
+        sourceEventId: fact.sourceEventId ?? null,
         id: fact.id,
         citizenId: fact.citizenId,
         factKey: fact.factKey,
@@ -646,10 +778,16 @@ export class CivilizationStore {
     content: string;
     kind: string;
     createdAt: string;
+    audience?: EventAudience;
+    sourceEventId?: string;
   }> {
     const rows = this.db
       .prepare(
-        `SELECT * FROM citizen_persistent_facts WHERE citizen_id = ? ORDER BY created_at DESC LIMIT ?`,
+        // SEC-001: quarantined facts are excluded at read time as well (defense in depth: a row present in both
+        // tables, e.g. after an interrupted move, must never reach a prompt). Quarantine rows are never deleted.
+        `SELECT * FROM citizen_persistent_facts
+         WHERE citizen_id = ? AND id NOT IN (SELECT id FROM citizen_persistent_facts_quarantine)
+         ORDER BY created_at DESC LIMIT ?`,
       )
       .all(citizenId, limit) as Array<{
       id: string;
@@ -658,15 +796,29 @@ export class CivilizationStore {
       content: string;
       kind: string;
       created_at: string;
+      audience: string | null;
+      source_event_id: string | null;
     }>;
-    return rows.map((row) => ({
-      id: row.id,
-      citizenId: row.citizen_id,
-      factKey: row.fact_key,
-      content: row.content,
-      kind: row.kind,
-      createdAt: row.created_at,
-    }));
+    return rows.map((row) => {
+      let audience: EventAudience | undefined;
+      if (row.audience) {
+        try {
+          audience = readEventAudience({ visibility: { audience: JSON.parse(row.audience) } });
+        } catch {
+          audience = undefined;
+        }
+      }
+      return {
+        id: row.id,
+        citizenId: row.citizen_id,
+        factKey: row.fact_key,
+        content: row.content,
+        kind: row.kind,
+        createdAt: row.created_at,
+        audience,
+        sourceEventId: row.source_event_id ?? undefined,
+      };
+    });
   }
 
   /** Observer audit: all events newest-first (no citizen visibility filter). */
@@ -674,9 +826,29 @@ export class CivilizationStore {
     return this.recentEvents(limit);
   }
 
+  /** One stored event by id (the trusted source for sharing and write-time audience re-checks). */
+  getEventById(id: string): SimEvent | undefined {
+    const row = this.db.prepare(`SELECT * FROM events WHERE id = ?`).get(id) as EventRow | undefined;
+    if (!row) return undefined;
+    try {
+      return {
+        id: row.id,
+        type: row.type as SimEvent["type"],
+        timestamp: row.timestamp,
+        citizenId: row.citizen_id ?? undefined,
+        payload: JSON.parse(row.payload) as Record<string, unknown>,
+      };
+    } catch {
+      return undefined;
+    }
+  }
+
+  /** The NEWEST `limit` events, returned oldest-first (so a long history never hides the latest events). */
   listEventsAscending(limit = 500): SimEvent[] {
     const rows = this.db
-      .prepare(`SELECT * FROM events ORDER BY timestamp ASC, id ASC LIMIT ?`)
+      .prepare(
+        `SELECT * FROM (SELECT * FROM events ORDER BY timestamp DESC, id DESC LIMIT ?) ORDER BY timestamp ASC, id ASC`,
+      )
       .all(limit) as EventRow[];
     return rows.map((row) => ({
       id: row.id,

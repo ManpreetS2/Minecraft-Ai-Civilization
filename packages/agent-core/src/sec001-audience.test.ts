@@ -5,20 +5,26 @@ import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 import {
   buildCitizenBulletin,
-  createCommunityShareEvent,
   loadConfig,
   withAudience,
   type CitizenRecord,
   type SimEvent,
 } from "@civ/shared";
 import { buildCitizenContextPack } from "./citizen-context.js";
-import { CivilizationStore } from "./store.js";
+import { applyCommunityConfig } from "./community-config.js";
+import { shareEventWithCommunity } from "./community-share.js";
+import { CivilizationStore, type CommunityAudit } from "./store.js";
 
 /**
- * SEC-001 part A, against a REAL store: four readers (two communities of two), restart, and the migration.
+ * SEC-001 part A, against a REAL store: four readers (two communities of two), restart, the migration,
+ * write-time re-check, share-by-id, newest-N events and orchestrator-only membership writes.
  */
 const READERS = ["GPT-A", "GPT-B", "Claude-A", "Claude-B"] as const;
 const SECRET = "unshared settlement at x=137 z=-211";
+const COMMUNITIES_JSON = JSON.stringify([
+  { id: "gpt", name: "GPT community", memberIds: ["GPT-A", "GPT-B"] },
+  { id: "claude", name: "Claude community", memberIds: ["Claude-A", "Claude-B"] },
+]);
 const config = loadConfig({
   DEMO_PROFILE: "none",
   SIM_CITIZEN_COUNT: "4",
@@ -26,7 +32,9 @@ const config = loadConfig({
   LLM_PROVIDER: "none",
   LLM_ENABLED: "false",
   CLOUD_LLM_ENABLED: "false",
+  COMMUNITIES_JSON,
 });
+const AUDIT: CommunityAudit = { actor: "orchestrator-config", reason: "test" };
 
 const tmpDirs: string[] = [];
 const stores: CivilizationStore[] = [];
@@ -62,20 +70,16 @@ let tick = 0;
 const evt = (id: string, payload: Record<string, unknown>, citizenId = "GPT-A"): SimEvent => ({
   id,
   type: "ConversationOccurred",
-  timestamp: new Date(Date.UTC(2026, 9, 31, 0, 0, tick++)).toISOString(),
+  timestamp: new Date(Date.UTC(2026, 9, 31, 0, 0, 0, tick++)).toISOString(),
   citizenId,
   payload,
 });
 
+/** Citizens + the directory seeded through the orchestrator-config path (applyCommunityConfig). */
 function seed(path: string): CivilizationStore {
   const store = open(path);
   for (const id of READERS) store.upsertCitizen(record(id));
-  store.upsertCommunity("gpt", "GPT community");
-  store.upsertCommunity("claude", "Claude community");
-  store.addCommunityMember("gpt", "GPT-A");
-  store.addCommunityMember("gpt", "GPT-B");
-  store.addCommunityMember("claude", "Claude-A");
-  store.addCommunityMember("claude", "Claude-B");
+  applyCommunityConfig(store, config);
   return store;
 }
 
@@ -118,9 +122,9 @@ describe("SEC-001 real store: four readers", () => {
 
   it("a citizen can belong to only one community", () => {
     const store = seed(dbPath());
-    expect(() => store.addCommunityMember("claude", "GPT-A")).toThrow(/already belongs/);
-    expect(() => store.upsertCommunity(" bad ")).toThrow();
-    store.addCommunityMember("gpt", "GPT-A"); // idempotent for the same community
+    expect(() => store.addCommunityMember("claude", "GPT-A", AUDIT)).toThrow(/already belongs/);
+    expect(() => store.upsertCommunity(" bad ", "x", AUDIT)).toThrow();
+    expect(store.addCommunityMember("gpt", "GPT-A", AUDIT)).toBe(false); // idempotent for the same community
     expect(store.getCommunityDirectory().communityOf("GPT-A")).toBe("gpt");
   });
 
@@ -163,29 +167,26 @@ describe("SEC-001 real store: restart", () => {
     expect(deliveredFor(b, "GPT-B")).toEqual(["everyone", "gpt-only"]);
 
     // explicit cross-community sharing: GPT-A (who can read gpt-only) tells the claude community something
-    const shared = createCommunityShareEvent({
-      source: gptOnly(),
-      sharerCitizenId: "GPT-A",
-      toCommunityId: "claude",
-      message: "we would like to trade wood",
-      directory: b.getCommunityDirectory(),
-      id: "share-1",
-    });
+    const shared = shareEventWithCommunity(
+      b,
+      { actingCitizenId: "GPT-A" },
+      { sourceEventId: "gpt-only", toCommunityId: "claude", message: "we would like to trade wood" },
+    );
     expect(shared.ok).toBe(true);
     if (!shared.ok) return;
-    b.appendEvent(shared.event);
-    expect(deliveredFor(b, "Claude-A")).toContain("share-1");
-    expect(deliveredFor(b, "Claude-B")).toContain("share-1");
-    expect(deliveredFor(b, "GPT-B")).not.toContain("share-1");
+    const sharedId = shared.event.id;
+    expect(deliveredFor(b, "Claude-A")).toContain(sharedId);
+    expect(deliveredFor(b, "Claude-B")).toContain(sharedId);
+    expect(deliveredFor(b, "GPT-B")).not.toContain(sharedId);
     const claudeText = buildCitizenContextPack({ store: b, config, citizenId: "Claude-B" }).bulletin.text;
     expect(claudeText).toContain("trade wood");
     expect(claudeText).not.toContain(SECRET);
     b.close();
 
     const c = open(path);
-    expect(deliveredFor(c, "Claude-B")).toContain("share-1");
-    expect(deliveredFor(c, "GPT-B")).not.toContain("share-1");
-    expect([...c.getDeliveredEventIds("Claude-B")]).toContain("share-1");
+    expect(deliveredFor(c, "Claude-B")).toContain(sharedId);
+    expect(deliveredFor(c, "GPT-B")).not.toContain(sharedId);
+    expect([...c.getDeliveredEventIds("Claude-B")]).toContain(sharedId);
   });
 });
 
@@ -209,7 +210,10 @@ describe("SEC-001 real store: migration of a pre-SEC-001 database", () => {
     store.close();
     // make it look like a database from before the migration ever ran
     const raw = new Database(path);
-    raw.exec(`DROP TABLE community_members; DROP TABLE communities; DROP TABLE citizen_persistent_facts_quarantine;`);
+    raw.exec(
+      `DROP TABLE community_members; DROP TABLE communities; DROP TABLE citizen_persistent_facts_quarantine; DROP TABLE community_audit;
+       ALTER TABLE citizen_persistent_facts DROP COLUMN audience; ALTER TABLE citizen_persistent_facts DROP COLUMN source_event_id;`,
+    );
     raw.prepare(`DELETE FROM sim_meta WHERE key = 'sec001_event_audience_v1'`).run();
     raw.close();
     return { path };
@@ -225,10 +229,9 @@ describe("SEC-001 real store: migration of a pre-SEC-001 database", () => {
     expect(quarantined.find((q) => q.factKey === "event:settlement-no-audience")?.content).toBe(SECRET); // kept for review, not live
     expect(quarantined.find((q) => q.factKey === "event:missing-event")?.reason).toMatch(/not found/);
     // old events fail closed for everyone, even with a fresh directory
-    store.upsertCommunity("claude");
-    store.addCommunityMember("claude", "Claude-A");
+    applyCommunityConfig(store, config);
     expect(deliveredFor(store, "Claude-A")).toEqual(["everyone"]); // only the already-labeled one; unlabeled/old ones stay dark
-    expect(store.getCommunityDirectory().membersOf("claude")).toEqual(["Claude-A"]);
+    expect(store.getCommunityDirectory().membersOf("claude")).toEqual(["Claude-A", "Claude-B"]);
   });
 
   it("runs once: reopening neither re-quarantines new facts nor loses quarantined ones", () => {
