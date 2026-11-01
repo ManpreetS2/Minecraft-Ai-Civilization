@@ -65,8 +65,8 @@ No Cognition V2, no second planner, no tool/function calling to the model.
 
 ## Cost safeguards
 
-1. **Per-attempt bound:** `(request UTF-8 bytes + 64)` input tokens plus `CLOUD_MAX_OUTPUT_TOKENS`, at the configured model's price.  
-2. **Admission:** the bound × `(1 + CLOUD_MAX_RETRIES)` must fit the allowance after reported spend, unverified holds and all live reservations. Otherwise the call is refused unsent.  
+1. **Per-attempt bound:** `(request UTF-8 bytes + 64)` input tokens plus `CLOUD_MAX_OUTPUT_TOKENS`, at the configured model's price.
+2. **Admission:** the bound × `(1 + CLOUD_MAX_RETRIES)` must fit the allowance after reported spend, unverified holds and all live reservations. Otherwise the call is refused unsent.
 3. **Settlement:**
 
 | Outcome | Budget effect | Budget stays open? |
@@ -76,8 +76,8 @@ No Cognition V2, no second planner, no tool/function calling to the model.
 | Timeout, network failure or 5xx | Hold one attempt's bound | Yes |
 | 4xx, or cancelled before sending | Refund | Yes |
 
-4. **Holds are not billing:** ledger `unverifiedHoldUsd` is a conservative accounting hold. `estimatedCostUsd` comes only from reported usage.  
-5. **Unbounded cost fails closed:** an unpriced model is rejected at startup, and reported usage above the bound closes the budget.  
+4. **Holds are not billing:** ledger `unverifiedHoldUsd` is a conservative accounting hold. `estimatedCostUsd` comes only from reported usage.
+5. **Unbounded cost fails closed:** an unpriced model is rejected at startup, and reported usage above the bound closes the budget.
 6. **Fallback:** after a cost-policy stop, only `CLOUD_FALLBACK_PROVIDER` may serve the request. It defaults to `none`, and paid providers are not accepted.
 
 **What this establishes:** local estimates cannot pass the allowance as long as the price table is accurate, the provider honors `max_output_tokens`, and tokenizers emit at most one token per UTF-8 byte. It is not an invoice guarantee. Provider surcharges, non-default service tiers and price changes are outside it. Cost above the bound is detected only after that call has been made, so that call can pass the allowance.
@@ -85,7 +85,7 @@ No Cognition V2, no second planner, no tool/function calling to the model.
 ## Decision lifecycle
 
 1. Manager eligibility (`LLM_ENABLED`, cooldown, etc.)  
-2. `decide()` → bound the request → budget admit  
+2. `decide()` → bound the request → budget admit
 3. HTTP Responses call (or mock)  
 4. Validate JSON → `HighLevelDecision`  
 5. Ledger success/failure record  
