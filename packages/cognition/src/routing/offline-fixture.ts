@@ -22,6 +22,8 @@ export type ScriptedReply = {
   stopReason?: string;
   /** Claude only: the model the response claims served it. */
   model?: string;
+  /** GPT only: the `service_tier` the response reports. */
+  serviceTier?: string;
 };
 
 const DEFAULT_USAGE = { input: 100, output: 20 };
@@ -68,6 +70,7 @@ export function createScriptedOpenAiFetch(script: (apiKey: string, body: Record<
     return new Response(
       JSON.stringify({
         id: `resp_${calls.length}`,
+        ...(reply.serviceTier ? { service_tier: reply.serviceTier } : {}),
         output_text: decisionText(reply, "a gpt citizen"),
         ...(usage ? { usage: { input_tokens: usage.input, output_tokens: usage.output } } : {}),
       }),
