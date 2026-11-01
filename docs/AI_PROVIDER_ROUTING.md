@@ -6,7 +6,7 @@ Status on 2026-11-01: **implemented and tested offline. Not wired into `AgentMan
 | --- | --- |
 | Four independent citizen sessions through the real decision interface | Yes, offline |
 | GPT path uses the real `OpenAiResponsesProvider` | Yes, against a scripted fetch |
-| Claude path | Real provider logic against a scripted transport. **No live transport exists** |
+| Claude path | Real provider logic against a scripted transport, plus a default-deny SDK transport contract-tested offline. See [CLAUDE_TRANSPORT.md](./CLAUDE_TRANSPORT.md) |
 | `AgentManager` routes per citizen | **No, not on this branch.** See "Manager wiring" |
 | Any paid or real API request | **Never made** |
 | Real 1v1 or 2v2 | **Not run** |
@@ -72,7 +72,7 @@ No production Claude adapter existed. `ClaudeMessagesProvider` applies the same 
 
 | Topic | Decision |
 | --- | --- |
-| Live transport | **Not included.** It needs the official `@anthropic-ai/sdk` dependency, which is deliberately not added |
+| Live transport | `claude-sdk-transport.ts`, behind a default-deny gate. See [CLAUDE_TRANSPORT.md](./CLAUDE_TRANSPORT.md) |
 | Schema | Separate from OpenAI's, because Claude's structured outputs reject `minimum`, `maximum`, `minLength` and `maxLength`. `validateDecision` enforces those ranges |
 | Server-side `fallbacks` | **Deliberately off**, and differs from the provider's general recommendation. You prohibited automatic switching to another paid model. A refusal stays a refusal |
 | Model check | A response naming a different model than requested closes the budget |

@@ -75,6 +75,19 @@ export function validateDecision(input: unknown): HighLevelDecision {
   return DecisionSchema.parse(normalizeDecisionInput(input));
 }
 
+/**
+ * For model output on its way to logs. A schema error quotes the rejected value, and a model can put anything there,
+ * including text from its private prompt. Other validation errors name only allowlisted fields.
+ */
+export function validateDecisionForLogging(input: unknown): HighLevelDecision {
+  try {
+    return validateDecision(input);
+  } catch (error) {
+    if (error instanceof z.ZodError) throw new Error("model output failed decision validation");
+    throw error;
+  }
+}
+
 export function validateCognitionDecision(input: unknown): CognitionDecision {
   const parsed = CognitionDecisionSchema.parse(normalizeDecisionInput(input));
   if (

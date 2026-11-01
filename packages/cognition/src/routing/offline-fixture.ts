@@ -11,6 +11,8 @@ export type ScriptedReply = {
   goal?: string;
   /** Rejects with this HTTP status. */
   status?: number;
+  /** Sent with a rejection, as a real retry-after header would be. */
+  retryAfterMs?: number;
   /** Never settles until aborted. */
   hang?: boolean;
   /** Settles only when the promise resolves, ignoring abort, to simulate a late reply. */
@@ -81,7 +83,7 @@ export function createScriptedClaudeTransport(
       const reply = script(request);
       if (reply.hang) await abortable(signal);
       if (reply.after) await reply.after;
-      if (reply.status) throw Object.assign(new Error(`Claude HTTP ${reply.status}`), { status: reply.status });
+      if (reply.status) throw Object.assign(new Error(`Claude HTTP ${reply.status}`), { status: reply.status, retryAfterMs: reply.retryAfterMs });
       const usage = reply.usage === undefined ? DEFAULT_USAGE : reply.usage;
       return {
         id: `msg_${calls.length}`,
@@ -121,6 +123,7 @@ export function offlineRegistry(
   const claude = new Map<string, ReturnType<typeof createScriptedClaudeTransport>>();
   const registry = new CitizenProviderRegistry({
     runId: "offline-run",
+    retryBaseDelayMs: 0,
     experiment: { maxConcurrency: 8, maxRequestsPerRun: 100, spendAllowanceUsd: 1 },
     resolveSecret: (ref) => `synthetic-${ref.env}`,
     fetchImpl: openai.fetchImpl,

@@ -54,7 +54,7 @@ describe("assignment configuration", () => {
 });
 
 describe("configuration preflight", () => {
-  const present = () => "synthetic-secret-value";
+  const present = (ref: { env: string }) => (ref.env.includes("CLAUDE") ? "sk-ant-api03-synthetic-secret-value" : "synthetic-secret-value");
 
   it("by default reports not ready, with paid requests disabled, and sends nothing", () => {
     const report = preflightCitizenAssignments({ assignments: OFFLINE_2V2_ASSIGNMENTS, resolveSecret: () => undefined });
@@ -74,6 +74,17 @@ describe("configuration preflight", () => {
       citizens: OFFLINE_2V2_ASSIGNMENTS.map((a) => ({ citizenId: a.citizenId, family: a.family, model: a.model, credentialPresent: true })),
     });
     expect(JSON.stringify(report)).not.toContain("synthetic-secret-value");
+  });
+
+  it.each([
+    ["a subscription OAuth token", "sk-ant-oat01-synthetic"],
+    ["an admin key", "sk-ant-admin01-synthetic"],
+    ["some other value", "not-a-key"],
+  ])("rejects %s for a Claude citizen without echoing it", (_name, value) => {
+    const report = preflightCitizenAssignments({ assignments: OFFLINE_2V2_ASSIGNMENTS, resolveSecret: (ref) => (ref.env.includes("CLAUDE") ? value : "gpt-key"), allowPaidRequests: true, hasClaudeTransport: true });
+    expect(report.ready).toBe(false);
+    expect(report.problems).toContain("claude-a: credential KEY_CLAUDE_A is not a Claude Console API key");
+    expect(JSON.stringify(report)).not.toContain(value);
   });
 
   it("names bad models, duplicates and a missing family", () => {

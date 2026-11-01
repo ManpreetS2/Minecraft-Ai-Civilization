@@ -2,6 +2,7 @@ import { z } from "zod";
 import { CLAUDE_ALLOWED_MODELS, hasCloudModelPrice, OPENAI_ALLOWED_MODELS } from "../cloud-prices.js";
 import type { CognitionPrompt } from "../schema.js";
 import type { CitizenAssignment, CitizenProviderRegistry, CredentialRef } from "./citizen-registry.js";
+import { isClaudeApiKeyFormat } from "./paid-request-gate.js";
 
 const fallbackSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("none") }).strict(),
@@ -65,8 +66,12 @@ export function preflightCitizenAssignments(args: {
     const allowed: readonly string[] = family === "gpt" ? OPENAI_ALLOWED_MODELS : CLAUDE_ALLOWED_MODELS;
     if (!allowed.includes(model)) problems.push(`${citizenId}: '${model}' is not an allowed ${family} model`);
     else if (!hasCloudModelPrice(model)) problems.push(`${citizenId}: no configured price for '${model}'`);
-    const credentialPresent = Boolean(args.resolveSecret(credential)?.trim());
+    const secret = args.resolveSecret(credential);
+    const credentialPresent = Boolean(secret?.trim());
     if (!credentialPresent) problems.push(`${citizenId}: credential ${credential.env} is not set`);
+    else if (family === "claude" && !isClaudeApiKeyFormat(secret)) {
+      problems.push(`${citizenId}: credential ${credential.env} is not a Claude Console API key`);
+    }
     if (family === "claude" && !args.hasClaudeTransport) problems.push(`${citizenId}: no Claude transport is available`);
     return { citizenId, family, model, credentialPresent };
   });
