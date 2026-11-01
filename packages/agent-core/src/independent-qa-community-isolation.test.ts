@@ -2,16 +2,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { mkdtempSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { loadConfig } from "@civ/shared";
+import { EventBus, loadConfig } from "@civ/shared";
 import { createJsonFileCitizenSessionStore } from "@civ/cognition/routing";
+import { executePlan } from "./executor.js";
+import { communityPhysicalState } from "./community-physical-state.js";
+import { knownCraftingTable } from "./workstations.js";
 import { OfflinePhysicalWorld } from "./testing/physical-world.js";
 
 /**
  * Independent QA of PR #33 (8389e8c), test-only. Real manager, planner, executor, skills and SQLite against simulated
  * bodies and scripted provider replies. This is not live Minecraft evidence.
  *
- * `it.fails` marks a defect that is reproduced today: the test passes while the defect exists and turns red the moment
- * it is fixed, which is the signal to change it to a plain `it`. The same defect is also scripted in
+ * The original expected-failure assertions are now passing regressions. The original defect is also scripted in
  * scripts/repro-manager-executor-isolation.ts.
  */
 const worlds: OfflinePhysicalWorld[] = [];
@@ -55,14 +57,14 @@ const legacy = (w: OfflinePhysicalWorld) => {
 const EMPTY = { food: 0, wood: 0, stone: 0, tools: 0 };
 
 describe("QA: personal inventory must not become the legacy settlement_first stock", { timeout: 60_000 }, () => {
-  it.fails("DEFECT: gathering berries raises settlement_first.food (0 -> 2)", async () => {
+  it("Regression: gathering berries raises settlement_first.food (0 -> 2)", async () => {
     const w = world();
     await w.tick();
     expect(w.bodies.get("gpt-a")!.count("sweet_berries")).toBe(2);
     expect(legacy(w)).toEqual(EMPTY);
   });
 
-  it.fails("DEFECT: chopping and crafting raise settlement_first.wood and .tools from personal inventory", async () => {
+  it("Regression: chopping and crafting raise settlement_first.wood and .tools from personal inventory", async () => {
     const w = world();
     await w.tick();
     await w.tick();
@@ -72,7 +74,7 @@ describe("QA: personal inventory must not become the legacy settlement_first sto
     expect(legacy(w)).toEqual(EMPTY);
   });
 
-  it.fails("DEFECT: the leaked stock is written to SQLite and survives a manager restart", async () => {
+  it("Regression: the leaked stock is written to SQLite and survives a manager restart", async () => {
     const dir = mkdtempSync(join(tmpdir(), "qa-isolation-"));
     dirs.push(dir);
     const w = world({ databasePath: join(dir, "qa.sqlite"), sessionStore: createJsonFileCitizenSessionStore(join(dir, "sessions.json")) });
@@ -147,3 +149,42 @@ describe("QA: event provenance", { timeout: 60_000 }, () => {
     expect(collected).not.toContain("claude-a");
   });
 });
+
+
+describe("legacy single-settlement compatibility", { timeout: 60_000 }, () => {
+  it("still aggregates physically gathered personal food when communities are absent", async () => {
+    const w = new OfflinePhysicalWorld({ config: loadConfig({
+      DEMO_PROFILE: "none", LLM_PROVIDER: "none", LLM_ENABLED: "true",
+      CLOUD_LLM_ENABLED: "false", LLM_COOLDOWN_MS: "1", COMMUNITIES_JSON: "[]",
+    }) });
+    worlds.push(w);
+    expect(w.store.hasCommunities()).toBe(false);
+    await w.tick();
+    expect(w.bodies.get("gpt-a")!.count("sweet_berries")).toBe(2);
+    expect(w.store.getSettlement().food).toBe(2);
+  });
+});
+
+
+describe("authenticated executor workstation creation", { timeout: 60_000 }, () => {
+  it("records a physically placed table only for its creator and preserves legacy rows", async () => {
+    const w = world();
+    const fx = w.bodies.get("gpt-a")!;
+    fx.ctx.citizenId = "gpt-a";
+    Object.assign(fx.ctx.bot, { game: { dimension: "minecraft:overworld" } });
+    const before = w.store.getSettlement();
+    const result = await executePlan(fx.ctx, {
+      action: "craftItem", task: "craft_table", goal: "craft_table",
+      source: "planner", reason: "offline physical creation regression", priority: 1,
+    }, w.store, new EventBus());
+    expect(result.success, JSON.stringify(result)).toBe(true);
+    expect(fx.blocksNamed("crafting_table")).toBe(1);
+    const assets = communityPhysicalState(w.store).forCitizen("gpt-a").accessibleAssets();
+    expect(assets).toHaveLength(1);
+    expect(assets[0]).toMatchObject({ kind: "crafting_table", ownerId: "gpt-a" });
+    expect(knownCraftingTable(fx.ctx, w.store)).toEqual(assets[0]!.position);
+    expect(communityPhysicalState(w.store).forCitizen("claude-a").accessibleAssets()).toEqual([]);
+    expect(w.store.getSettlement()).toEqual(before);
+  });
+});
+

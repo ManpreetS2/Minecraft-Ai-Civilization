@@ -50,6 +50,7 @@ import { catalogHomeById, evaluateClaimHomeAction } from "./available-homes.js";
 import { travelTowardHousingResult } from "./home-discovery.js";
 import { rememberDiscoveredSite, visibleShoresFromWorld } from "./discovered-sites.js";
 import { skipProtectedPropertyCell, assertMayUseChest } from "./property-safety.js";
+import { communityPhysicalState } from "./community-physical-state.js";
 import { decisionKind, physicalWorkComplete, skillStatusOf } from "./task-recovery.js";
 
 export type FoodGatherSuccess = {
@@ -331,6 +332,8 @@ export async function executePlan(
         runtime,
         persist: (project) => {
           if (!store.isOpen()) return { ok: false, reason: "store_closed" };
+          // The settlement row is community-global; a citizen's project/site must not be published into it.
+          if (store.hasCommunities()) return { ok: true };
           const write = store.safeWrite("saveSettlement:structureProject", () => {
             const settlement = store.getSettlement();
             settlement.projectJson = JSON.stringify(project);
@@ -540,7 +543,7 @@ async function executeCraftChain(
     if (target === "crafting_table" && !table) {
       const existing = await findBlock(ctx, ["crafting_table"], 24);
       if (existing.success) {
-        rememberWorkstation(store, "crafting_table", existing.data.position);
+        if (!store.hasCommunities()) rememberWorkstation(store, "crafting_table", existing.data.position);
         return obtained;
       }
       return placeWorkstation(ctx, store, events, "crafting_table");
@@ -565,11 +568,11 @@ async function placeWorkstation(
   if (kind === "crafting_table") {
     const existing = await findBlock(ctx, ["crafting_table"], 24);
     if (existing.success) {
-      rememberWorkstation(store, "crafting_table", existing.data.position);
+      if (!store.hasCommunities()) rememberWorkstation(store, "crafting_table", existing.data.position);
       return { success: true, data: { reused: true, position: existing.data.position }, durationMs: 0 };
     }
   }
-  const origin = store.getSettlement().origin;
+  const origin = store.hasCommunities() ? undefined : store.getSettlement().origin;
   const intent: PlacementIntent =
     kind === "chest"
       ? { purpose: "household_storage", item: kind, structureId: "starter_hut" }
@@ -600,7 +603,17 @@ async function placeWorkstation(
   for (const dest of candidates) {
     const placed = await placeBlock(ctx, kind, dest, intent);
     if (placed.success) {
-      rememberWorkstation(store, kind, dest);
+      if (store.hasCommunities()) {
+        // Creation, unlike merely finding a nearby block, establishes ownership.
+        const dimension = ctx.bot.game?.dimension;
+        if (!ctx.citizenId || typeof dimension !== "string" || !dimension.trim()) {
+          return fail("VERIFY_FAILED", "Placed workstation has no authenticated owner/dimension", placed.durationMs, false);
+        }
+        const recorded = communityPhysicalState(store).forCitizen(ctx.citizenId).registerAsset(kind, dimension.replace(/^minecraft:/, ""), dest);
+        if (!recorded) return fail("VERIFY_FAILED", "Placed workstation ownership could not be recorded", placed.durationMs, false);
+      } else {
+        rememberWorkstation(store, kind, dest);
+      }
       events.emit(createEvent("WorkstationCreated", { kind, position: dest, temporary: intent.temporary === true }, ctx.citizenId));
       return placed;
     }
@@ -775,7 +788,7 @@ async function gatherFood(ctx: SkillContext, store: CivilizationStore, events: E
   }
 
   const chest = knownChest(ctx, store);
-  const storedFood = Object.entries(store.getSettlement().storageContents ?? {}).find(
+  const storedFood = Object.entries(store.hasCommunities() ? {} : store.getSettlement().storageContents ?? {}).find(
     ([name, count]) => FOOD_ITEM_NAMES.has(name) && count > 0,
   );
   if (!heldFood && chest && storedFood) {
@@ -886,12 +899,12 @@ async function depositToSettlement(
   }
   if (!chest || !verifyWorkstation(ctx, chest, "chest")) {
     if (chest) {
-      forgetWorkstation(store, "chest", chest);
+      if (!store.hasCommunities()) forgetWorkstation(store, "chest", chest);
       events.emit(createEvent("WorkstationDestroyed", { kind: "chest", position: chest }, ctx.citizenId));
     }
     return { success: false, code: "CONTAINER_NOT_FOUND", error: "Settlement chest is gone", durationMs: 0, retryable: true };
   }
-  const access = assertMayUseChest(store, ctx.citizenId, chest, "communal");
+  const access = assertMayUseChest(store, ctx.citizenId, chest, "communal", ctx.bot.game?.dimension);
   if (!access.success) return access;
   if (ctx.citizenId && !runtime.claims.tryClaim("container", cellClaimKey(chest.x, chest.y, chest.z), ctx.citizenId, 30_000)) {
     return { success: false, code: "CONTAINER_BUSY", error: "Chest is in use", durationMs: 0, retryable: true };
@@ -899,10 +912,14 @@ async function depositToSettlement(
   const result = await depositItems(ctx, undefined, chest);
   runtime.claims.release("container", cellClaimKey(chest.x, chest.y, chest.z), ctx.citizenId);
   if (result.success) {
-    const settlement = store.getSettlement();
-    settlement.storage = chest;
-    settlement.storageContents = result.data.contents;
-    store.saveSettlement(settlement);
+    // Container contents are restricted to the actual readers, not every community
+    // member. Do not publish them to the legacy or community-wide stock snapshots.
+    if (!store.hasCommunities()) {
+      const settlement = store.getSettlement();
+      settlement.storage = chest;
+      settlement.storageContents = result.data.contents;
+      store.saveSettlement(settlement);
+    }
     events.emit(
       createEvent("ItemDeposited", { count: result.data.deposited, contents: result.data.contents, position: chest }, ctx.citizenId),
     );
@@ -912,7 +929,7 @@ async function depositToSettlement(
 
 async function withdrawFood(ctx: SkillContext, store: CivilizationStore, events: EventBus): Promise<ActionResult> {
   const chest = knownChest(ctx, store);
-  const foodName = Object.entries(store.getSettlement().storageContents ?? {}).find(
+  const foodName = Object.entries(store.hasCommunities() ? {} : store.getSettlement().storageContents ?? {}).find(
     ([name, count]) => FOOD_ITEM_NAMES.has(name) && count > 0,
   )?.[0];
   if (!chest || !foodName) {
@@ -932,13 +949,15 @@ async function withdrawItemsNamed(
   if (!chest) {
     return { success: false, code: "CONTAINER_NOT_FOUND", error: "No settlement chest", durationMs: 0, retryable: true };
   }
-  const access = assertMayUseChest(store, ctx.citizenId, chest, "communal");
+  const access = assertMayUseChest(store, ctx.citizenId, chest, "communal", ctx.bot.game?.dimension);
   if (!access.success) return access;
   const result = await withdrawItems(ctx, itemName, count, chest);
   if (result.success) {
-    const settlement = store.getSettlement();
-    settlement.storageContents = result.data.contents;
-    store.saveSettlement(settlement);
+    if (!store.hasCommunities()) {
+      const settlement = store.getSettlement();
+      settlement.storageContents = result.data.contents;
+      store.saveSettlement(settlement);
+    }
     events.emit(createEvent("ItemWithdrawn", { item: itemName, count: result.data.count, position: chest }, ctx.citizenId));
   }
   return result;
@@ -1096,6 +1115,10 @@ export async function completeVerifiedTransfer(args: {
 }
 
 function updateSettlementFromInventory(ctx: SkillContext, store: CivilizationStore): void {
+  // This compatibility aggregate predates authenticated community ownership. Personal
+  // possession is not a transfer into shared storage, even for one's own community.
+  // Keep this check at the write boundary so future callers cannot reintroduce it.
+  if (store.hasCommunities()) return;
   const settlement = store.getSettlement();
   const items = ctx.bot.inventory.items();
   const wood = items.filter((i) => i.name.endsWith("_log") || i.name.endsWith("_planks")).reduce((s, i) => s + i.count, 0);

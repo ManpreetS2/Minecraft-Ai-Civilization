@@ -438,7 +438,7 @@ export class AgentManager {
     const started = Date.now();
     const online = [...this.citizens.values()].filter((c) => c.body.connected && !c.body.isDeceased());
     const settlement = this.store.getSettlement();
-    if (settlement.projectJson && !this.runtime.project) {
+    if (settlement.projectJson && !this.runtime.project && !this.store.hasCommunities()) {
       try {
         this.runtime.project = JSON.parse(settlement.projectJson) as SettlementProject;
       } catch {

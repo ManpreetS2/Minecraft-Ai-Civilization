@@ -61,6 +61,9 @@ export async function buildShelter(
     if (!store.isOpen()) {
       return { success: true, data: { complete: true, persisted: false, persistReason: "closed" }, durationMs: 0 };
     }
+    if (store.hasCommunities()) {
+      return { success: true, data: { complete: true, persisted: false, persistReason: "community_scoped" }, durationMs: 0 };
+    }
     settlement.shelterComplete = true;
     settlement.housingCapacity = Math.max(settlement.housingCapacity, 4);
     const write = store.safeWrite("saveSettlement:shelterAlreadyComplete", () => store.saveSettlement(settlement));
@@ -253,6 +256,7 @@ function mergeKnown(
 }
 
 function rememberKnown(store: CivilizationStore, record: KnownStructureRecord): void {
+  if (store.hasCommunities()) return; // shared settlement row; not a per-community record
   const settlement = store.getSettlement();
   const list = settlement.knownStructures ?? [];
   if (!list.some((entry) => entry.id === record.id)) {
@@ -273,7 +277,7 @@ function rememberKnown(store: CivilizationStore, record: KnownStructureRecord): 
 function loadProject(store: CivilizationStore, runtime: SettlementRuntime): SettlementProject {
   if (runtime.project) return runtime.project;
   const settlement = store.getSettlement();
-  if (settlement.projectJson) {
+  if (settlement.projectJson && !store.hasCommunities()) {
     try {
       runtime.project = JSON.parse(settlement.projectJson) as SettlementProject;
       return runtime.project;
@@ -289,6 +293,8 @@ function loadProject(store: CivilizationStore, runtime: SettlementRuntime): Sett
 /** Returns true only when the settlement write succeeded while the store was open. */
 function persistProject(store: CivilizationStore, runtime: SettlementRuntime): boolean {
   if (!store.isOpen()) return false;
+  // Community mode: never publish a project/site/shelter flag into the shared settlement row.
+  if (store.hasCommunities()) return true;
   const write = store.safeWrite("saveSettlement:project", () => {
     const settlement = store.getSettlement();
     settlement.projectJson = runtime.project ? JSON.stringify(runtime.project) : undefined;

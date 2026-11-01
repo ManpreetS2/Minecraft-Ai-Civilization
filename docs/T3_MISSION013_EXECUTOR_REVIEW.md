@@ -1,0 +1,9 @@
+﻿# Mission 013 executor ownership and conflict review
+
+Scope: isolated proposal only, parent PR37 / 9945f02f38e14a7d63b3eed66279d191ad06ad3d. Current owner instruction assigns CODEX1 the P0 executor repair after this review. Historical HANDOFF_2026-10-31.md permits manager/executor changes on isolated private proposal branches, preserving Windows WIP and documenting conflicts. CODEX1.2 owns adapter/guard files; Claude2 and Gemini do not own executor production edits.
+
+Before editing, current executor blob is db9170536075212338d883643eb914d6cf0bb834. Compared published Windows backup1a0756c921ee7ac4417e399f8bab7931f910b9c8 and dev snapshot39e98a44f248df04e6ec819f4af9a736c694ded9. The dev executor differs from the current candidate in previously integrated gather/fallback verification and ResourceCollected attribution. Those hunks must remain intact. The post-success inventory aggregate block is unchanged and can receive a narrow community-mode guard without replacing Windows source or reverting gathering fixes. Scoped workstation/chest changes must preserve existing farming, sleep, navigation and storage paths and be independently tested.
+
+All edits will be in this own branch/worktree, never the original Windows checkout, other owners' worktrees, protected branches or production data. No whole-file ours/theirs replacement, proxy store or merge into Windows is authorized. Original checkout was clean at inspection. Unpublished Mission013 material is not available here for a complete future Windows merge certification; that integration must retain this explicit limitation. This review resolves local proposal ownership/conflicting published hunks, not approval to overwrite unpublished work.
+
+QA38 exact53f8999 is test-only and imported unchanged before the fix. Preserve the intact standalone reproducer and record its failing baseline before changing executor behavior. Convert expected-failure markers only after verifying an implementation repair.
