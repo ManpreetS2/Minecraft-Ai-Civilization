@@ -169,8 +169,13 @@ describe("fix 2: write-time re-check, fact provenance columns and the idempotent
       expect(facts["note:home"]?.sourceEventId).toBeUndefined();
       s.close();
     }
-    const cols = new Database(path, { readonly: true }).prepare(`PRAGMA table_info(citizen_persistent_facts)`).all() as Array<{ name: string }>;
-    expect(cols.filter((c) => c.name === "audience" || c.name === "source_event_id")).toHaveLength(2);
+    const inspection = new Database(path, { readonly: true });
+    try {
+      const cols = inspection.prepare(`PRAGMA table_info(citizen_persistent_facts)`).all() as Array<{ name: string }>;
+      expect(cols.filter((c) => c.name === "audience" || c.name === "source_event_id")).toHaveLength(2);
+    } finally {
+      inspection.close();
+    }
   });
 });
 
@@ -270,7 +275,8 @@ describe("fix 5: membership is writable only through the orchestrator-config pat
     store.appendEvent(gptSecret("gpt-plan", "gpt hidden plan at x=1"));
     packOf(store, "GPT-B");
     expect(store.listPersistentFacts("GPT-B").map((f) => f.factKey)).toContain("event:gpt-plan");
-    store.upsertPersistentFact({ id: "keep", citizenId: "GPT-B", factKey: "note:mine", content: "my own note" });
+    store.appendEvent(evt("personal", { message: "my own note", visibility: { class: "actor_private" } }, "GPT-B"));
+    store.upsertPersistentFact({ id: "keep", citizenId: "GPT-B", factKey: "note:mine", content: "my own note", sourceEventId: "personal" });
     expect(store.removeCommunityMember("claude", "GPT-B", AUDIT)).toBe(false); // not a member of claude
     expect(store.removeCommunityMember("gpt", "GPT-B", { actor: "orchestrator-config", reason: "left the colony" })).toBe(true);
     expect(store.removeCommunityMember("gpt", "GPT-B", AUDIT)).toBe(false);
@@ -325,7 +331,9 @@ describe("(a) quarantined facts never reach a context pack or prompt, before or 
   it("a flag row alone is enough to hide a fact: the fact row stays in place and is excluded at read time", () => {
     const path = dbPath();
     const store = seed(path);
-    store.upsertPersistentFact({ id: "dup", citizenId: "GPT-A", factKey: "note:dup", content: needle });
+    store.appendEvent(evt("personal", { message: needle, visibility: { class: "actor_private" } }, "GPT-A"));
+    store.upsertPersistentFact({ id: "dup", citizenId: "GPT-A", factKey: "note:dup", content: needle, sourceEventId: "personal" });
+    store.markEventsDelivered("GPT-A", ["personal"]);
     store.close();
     const raw = new Database(path);
     raw.prepare(

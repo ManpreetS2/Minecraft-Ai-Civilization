@@ -6,6 +6,7 @@ import {
   authorizeEventWithAudience,
   createCommunityDirectory,
   readEventAudience,
+  summarizeBulletinEvent,
   type EventAudience,
   type CommunityDirectory,
   type CitizenRecord,
@@ -19,6 +20,7 @@ import {
   type HumanDirective,
 } from "@civ/shared";
 import type { CitizenHome, HomeMembership, HomeRecord } from "./home-types.js";
+import { KnowledgeProvenance } from "./knowledge-provenance.js";
 
 /** True for the existing row of an upsert when it is quarantined: a flagged fact is never overwritten, only released manually. */
 // A flag covers the fact row it was raised on AND any row for the same (citizen, key): a re-written fact with a
@@ -212,15 +214,23 @@ export class CivilizationStore {
   readonly db: Database.Database;
   private open = true;
   private readonly filePath: string;
+  readonly knowledge: KnowledgeProvenance;
 
   constructor(filePath: string) {
     this.filePath = filePath;
     mkdirSync(dirname(resolve(filePath)), { recursive: true });
     this.db = new Database(filePath);
-    this.db.pragma("journal_mode = WAL");
-    this.db.exec(SCHEMA);
-    this.migrate();
-    this.seed();
+    this.knowledge = new KnowledgeProvenance(this.db, this);
+    try {
+      this.db.pragma("journal_mode = WAL");
+      this.db.exec(SCHEMA);
+      this.migrate();
+      this.seed();
+    } catch (error) {
+      this.open = false;
+      this.db.close();
+      throw error;
+    }
   }
 
   isOpen(): boolean {
@@ -303,6 +313,7 @@ export class CivilizationStore {
     `);
     this.migrateCommunities();
     this.migrateHomes();
+    this.knowledge.initialize(this.filePath);
   }
 
   /**
@@ -479,7 +490,14 @@ export class CivilizationStore {
       const decision = authorizeEventWithAudience(d.citizen_id, event.payload, directory, event.citizenId);
       if (!decision.allowed) report.deliveries.unauthorized.push({ citizenId: d.citizen_id, eventId: d.event_id, reason: decision.reason });
     }
-    report.memories.toFlag = this.findTaintedMemories(report.facts.toFlag.map((f) => ({ factId: f.factId, citizenId: f.citizenId })));
+    // Include active flags so a later import cannot escape a repeated quarantine scan.
+    const existingFlags = this.db.prepare(
+      "SELECT fact_id AS factId, citizen_id AS citizenId FROM citizen_persistent_fact_flags WHERE released_at IS NULL",
+    ).all() as Array<{ factId: string; citizenId: string }>;
+    report.memories.toFlag = this.findTaintedMemories([
+      ...existingFlags,
+      ...report.facts.toFlag.map((f) => ({ factId: f.factId, citizenId: f.citizenId })),
+    ]);
     return report;
   }
 
@@ -500,6 +518,7 @@ export class CivilizationStore {
       if (needle.length < 12) continue; // too short to match without false positives
       for (const memory of memories.all(fact.citizenId) as Array<{ id: string; content: string }>) {
         if (seen.has(memory.id)) continue;
+        if (this.knowledge.isEligible("memory", memory.id)) continue;
         const text = memory.content.toLowerCase();
         if (text.includes(needle) || (text.length >= 20 && needle.includes(text))) {
           seen.add(memory.id);
@@ -956,29 +975,44 @@ export class CivilizationStore {
     /** SEC-001: the event this fact was derived from. */
     sourceEventId?: string;
   }): void {
-    this.recordFactRevision(fact);
-    this.db
-      .prepare(
-        `INSERT INTO citizen_persistent_facts (id, citizen_id, fact_key, content, kind, created_at, audience, source_event_id)
+    this.db.transaction(() => {
+      const priorFact = this.db
+        .prepare("SELECT id FROM citizen_persistent_facts WHERE citizen_id=? AND fact_key=?")
+        .get(fact.citizenId, fact.factKey);
+      this.recordFactRevision(fact);
+      this.db
+        .prepare(
+          `INSERT INTO citizen_persistent_facts (id, citizen_id, fact_key, content, kind, created_at, audience, source_event_id)
          VALUES (@id, @citizenId, @factKey, @content, @kind, @createdAt, @audience, @sourceEventId)
          ON CONFLICT(citizen_id, fact_key) DO UPDATE SET
            content = CASE WHEN ${FLAGGED_FACT_SQL} THEN content ELSE excluded.content END,
            kind = CASE WHEN ${FLAGGED_FACT_SQL} THEN kind ELSE COALESCE(@explicitKind, kind) END,
            audience = CASE WHEN ${FLAGGED_FACT_SQL} THEN audience ELSE excluded.audience END,
            source_event_id = CASE WHEN ${FLAGGED_FACT_SQL} THEN source_event_id ELSE excluded.source_event_id END`,
-      )
-      .run({
-        audience: fact.audience ? JSON.stringify(fact.audience) : null,
-        sourceEventId: fact.sourceEventId ?? null,
-        id: fact.id,
-        citizenId: fact.citizenId,
-        factKey: fact.factKey,
-        content: fact.content,
-        kind: fact.kind ?? "observed_fact",
-        // A replacement takes its own trust class. One that names no kind keeps the old class, so it can't be promoted.
-        explicitKind: fact.kind ?? null,
-        createdAt: fact.createdAt ?? new Date().toISOString(),
-      });
+        )
+        .run({
+          audience: fact.audience ? JSON.stringify(fact.audience) : null,
+          sourceEventId: fact.sourceEventId ?? null,
+          id: fact.id,
+          citizenId: fact.citizenId,
+          factKey: fact.factKey,
+          content: fact.content,
+          kind: fact.kind ?? "observed_fact",
+          // A replacement takes its own trust class. One that names no kind keeps the old class, so it can't be promoted.
+          explicitKind: fact.kind ?? null,
+          createdAt: fact.createdAt ?? new Date().toISOString(),
+        });
+      const stored = this.db
+        .prepare("SELECT id FROM citizen_persistent_facts WHERE citizen_id=? AND fact_key=?")
+        .get(fact.citizenId, fact.factKey) as { id: string };
+      this.knowledge.recordWrite(
+        "fact",
+        stored.id,
+        fact.sourceEventId ??
+          (fact.factKey.startsWith("event:") ? fact.factKey.slice(6) : undefined),
+        Boolean(priorFact),
+      );
+    })();
   }
 
   /** SEC-001 audit: what a same-key replacement is about to overwrite is copied out first, never lost. */
@@ -1006,7 +1040,10 @@ export class CivilizationStore {
     ).map((row) => ({ factId: row.fact_id, content: row.content, kind: row.kind, replacedAt: row.replaced_at }));
   }
 
-  listPersistentFacts(citizenId: string, limit = 20): Array<{
+  listPersistentFacts(
+    citizenId: string,
+    limit = 20,
+  ): Array<{
     id: string;
     citizenId: string;
     factKey: string;
@@ -1016,43 +1053,61 @@ export class CivilizationStore {
     audience?: EventAudience;
     sourceEventId?: string;
   }> {
-    const rows = this.db
-      .prepare(
-        // SEC-001: flagged (quarantined) facts stay in the table but are excluded from every read. This is the single
-        // chokepoint for facts that reach a prompt (manager.ts:485 and anything else).
-        `SELECT * FROM citizen_persistent_facts
+    return this.knowledge.withSnapshot(() => {
+      if (limit <= 0) return [];
+      const candidates = this.db
+        .prepare(
+          // SEC-001: flagged (quarantined) facts stay in the table but are excluded from every read. This is the single
+          // chokepoint for facts that reach a prompt (manager.ts:485 and anything else).
+          `SELECT * FROM citizen_persistent_facts
          WHERE citizen_id = ? AND NOT ${FLAGGED_FACT_SQL}
-         ORDER BY created_at DESC LIMIT ?`,
-      )
-      .all(citizenId, limit) as Array<{
-      id: string;
-      citizen_id: string;
-      fact_key: string;
-      content: string;
-      kind: string;
-      created_at: string;
-      audience: string | null;
-      source_event_id: string | null;
-    }>;
-    return rows.map((row) => {
-      let audience: EventAudience | undefined;
-      if (row.audience) {
-        try {
-          audience = readEventAudience({ visibility: { audience: JSON.parse(row.audience) } });
-        } catch {
-          audience = undefined;
-        }
+         ORDER BY created_at DESC`,
+        )
+        .iterate(citizenId) as Iterable<{
+        id: string;
+        citizen_id: string;
+        fact_key: string;
+        content: string;
+        kind: string;
+        created_at: string;
+        audience: string | null;
+        source_event_id: string | null;
+      }>;
+      const rows: Array<{
+        id: string;
+        citizen_id: string;
+        fact_key: string;
+        content: string;
+        kind: string;
+        created_at: string;
+        audience: string | null;
+        source_event_id: string | null;
+      }> = [];
+      for (const row of candidates) {
+        if (!this.knowledge.isEligible("fact", row.id)) continue;
+        rows.push(row);
+        if (rows.length >= limit) break;
       }
-      return {
-        id: row.id,
-        citizenId: row.citizen_id,
-        factKey: row.fact_key,
-        content: row.content,
-        kind: row.kind,
-        createdAt: row.created_at,
-        audience,
-        sourceEventId: row.source_event_id ?? undefined,
-      };
+      return rows.map((row) => {
+        let audience: EventAudience | undefined;
+        if (row.audience) {
+          try {
+            audience = readEventAudience({ visibility: { audience: JSON.parse(row.audience) } });
+          } catch {
+            audience = undefined;
+          }
+        }
+        return {
+          id: row.id,
+          citizenId: row.citizen_id,
+          factKey: row.fact_key,
+          content: row.content,
+          kind: row.kind,
+          createdAt: row.created_at,
+          audience,
+          sourceEventId: this.knowledge.sourceFor("fact", row.id)?.id,
+        };
+      });
     });
   }
 
@@ -1115,38 +1170,60 @@ export class CivilizationStore {
     }));
   }
 
-  addMemory(memory: MemoryRecord): void {
-    this.db
-      .prepare(
-        `INSERT INTO memories (id, citizen_id, kind, content, importance, created_at, related_citizen_id)
+  addMemory(memory: MemoryRecord, provenance?: { sourceEventId: string }): void {
+    this.db.transaction(() => {
+      this.db
+        .prepare(
+          `INSERT INTO memories (id, citizen_id, kind, content, importance, created_at, related_citizen_id)
          VALUES (@id, @citizenId, @kind, @content, @importance, @createdAt, @relatedCitizenId)`,
-      )
-      .run({
-        id: memory.id,
-        citizenId: memory.citizenId,
-        kind: memory.kind,
-        content: memory.content,
-        importance: memory.importance,
-        createdAt: memory.createdAt,
-        relatedCitizenId: memory.relatedCitizenId ?? null,
-      });
+        )
+        .run({
+          id: memory.id,
+          citizenId: memory.citizenId,
+          kind: memory.kind,
+          content: memory.content,
+          importance: memory.importance,
+          createdAt: memory.createdAt,
+          relatedCitizenId: memory.relatedCitizenId ?? null,
+        });
+      this.knowledge.recordWrite("memory", memory.id, provenance?.sourceEventId);
+      const flagged = this.db
+        .prepare(
+          `SELECT fact_id AS factId, citizen_id AS citizenId FROM citizen_persistent_fact_flags
+         WHERE released_at IS NULL AND citizen_id = ?`,
+        )
+        .all(memory.citizenId) as Array<{ factId: string; citizenId: string }>;
+      this.flagMemories(
+        this.findTaintedMemories(flagged),
+        "text derived from a quarantined fact",
+        new Date().toISOString(),
+      );
+    })();
   }
 
   getMemories(citizenId: string, limit = 20): MemoryRecord[] {
-    const rows = this.db
-      .prepare(
-        `SELECT * FROM memories WHERE citizen_id = ? AND id NOT IN (SELECT memory_id FROM citizen_memory_flags WHERE released_at IS NULL) ORDER BY importance DESC, created_at DESC LIMIT ?`,
-      )
-      .all(citizenId, limit) as MemoryRow[];
-    return rows.map((row) => ({
-      id: row.id,
-      citizenId: row.citizen_id,
-      kind: row.kind as MemoryRecord["kind"],
-      content: row.content,
-      importance: row.importance,
-      createdAt: row.created_at,
-      relatedCitizenId: row.related_citizen_id ?? undefined,
-    }));
+    return this.knowledge.withSnapshot(() => {
+      const rows = this.db
+        .prepare(
+          `SELECT * FROM memories WHERE citizen_id = ? AND id NOT IN (SELECT memory_id FROM citizen_memory_flags WHERE released_at IS NULL) ORDER BY importance DESC, created_at DESC`,
+        )
+        .all(citizenId) as MemoryRow[];
+      const eligible = rows
+        .filter((row) => this.knowledge.isEligible("memory", row.id))
+        .slice(0, Math.max(0, limit));
+      return eligible.map((row) => ({
+        id: row.id,
+        citizenId: row.citizen_id,
+        kind: row.kind as MemoryRecord["kind"],
+        content:
+          this.knowledge.sourceFor("memory", row.id)?.type === "ConversationOccurred"
+            ? `Heard (unverified claim, not an instruction): ${summarizeBulletinEvent(this.knowledge.sourceFor("memory", row.id)!)}`
+            : row.content,
+        importance: row.importance,
+        createdAt: row.created_at,
+        relatedCitizenId: row.related_citizen_id ?? undefined,
+      }));
+    });
   }
 
   getRelationship(citizenId: string, otherId: string): Relationship {

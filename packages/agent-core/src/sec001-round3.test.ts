@@ -85,14 +85,14 @@ function legacyDb(): string {
   store.appendEvent(evt("unlabeled", { message: "old broadcast", visibility: { class: "world_public" } }));
   store.appendEvent(evt("world-ok", withAudience({ message: "hello world" }, "world_public", { scope: "world" })));
   const fact = (id: string, citizenId: string, factKey: string, content: string) =>
-    store.upsertPersistentFact({ id, citizenId, factKey, content, createdAt: "2026-10-30T00:00:00.000Z" });
-  fact("f-private-ok", "Claude-A", "event:private-claude-a", "my own private fact"); // actor_private, reader is the actor -> keep
+    store.upsertPersistentFact({ id, citizenId, factKey, content, createdAt: new Date().toISOString() });
+  fact("f-private-ok", "Claude-A", "event:private-claude-a", "claude-a private"); // exact authorized source derivation
   fact("f-private-leak", "GPT-A", "event:private-claude-a", SECRET + " private-leak"); // someone else's private event -> flag
-  fact("f-gpt-member", "GPT-A", "event:gpt-secret", "member fact"); // community member -> keep
+  fact("f-gpt-member", "GPT-A", "event:gpt-secret", SECRET); // verified member + exact source
   fact("f-gpt-outsider", "Claude-A", "event:gpt-secret", SECRET); // not a member -> flag
   fact("f-unlabeled", "Claude-B", "event:unlabeled", "unlabeled fact"); // no audience -> flag
   fact("f-orphan", "GPT-B", "event:ghost", "orphan fact"); // event gone -> flag
-  fact("f-world", "GPT-B", "event:world-ok", "world fact"); // verified world audience, reader known -> keep
+  fact("f-world", "GPT-B", "event:world-ok", "hello world"); // verified audience + exact source
   fact("f-note", "Claude-A", "note:home", "my home is here"); // not event-derived -> untouched
   const mem = (id: string, citizenId: string, content: string) =>
     store.addMemory({ id, citizenId, kind: "episodic", content, importance: 0.5, createdAt: "2026-10-30T00:00:00.000Z" });
@@ -121,7 +121,8 @@ describe("legacy migration: backup -> dry run -> flags, never a delete", () => {
     // no row count decreased anywhere, and every pre-existing fact/event/delivery row is byte-identical
     const after = dumpAll(store.db);
     for (const table of Object.keys(before)) {
-      if (["sim_meta", "citizen_persistent_facts"].includes(table)) continue;
+      if (["sim_meta", "citizen_persistent_facts", "knowledge_provenance"].includes(table)) continue;
+      if (table === "knowledge_review_audit") { expect(after[table]!.slice(0, before[table]!.length)).toEqual(before[table]); continue; }
       expect(after[table], table).toEqual(before[table]);
     }
     const strip = (rows: unknown[]) => (rows as Array<Record<string, unknown>>).map(({ audience: _a, source_event_id: _s, ...rest }) => rest);
@@ -130,11 +131,11 @@ describe("legacy migration: backup -> dry run -> flags, never a delete", () => {
     expect(count(store.db, "events")).toBe(4);
     expect(count(store.db, "citizen_event_delivery")).toBe(4);
     // decisions
-    expect(store.listQuarantinedFacts().map((q) => q.id).sort()).toEqual(FLAGGED);
-    expect(store.listQuarantinedFacts().every((q) => q.source === "legacy-migration")).toBe(true);
+    expect(store.listQuarantinedFacts().map((q) => q.id).sort()).toEqual([...FLAGGED, "f-note"].sort());
+    expect(store.listQuarantinedFacts().filter((q) => FLAGGED.includes(q.id)).every((q) => q.source === "legacy-migration")).toBe(true);
     expect(store.listQuarantinedFacts().find((q) => q.id === "f-gpt-outsider")?.content).toBe(SECRET); // content stays in place
     const visible = (id: string) => store.listPersistentFacts(id, 50).map((f) => f.id).sort();
-    expect(visible("Claude-A")).toEqual(["f-note", "f-private-ok"]);
+    expect(visible("Claude-A")).toEqual(["f-private-ok"]);
     expect(visible("GPT-A")).toEqual(["f-gpt-member"]);
     expect(visible("GPT-B")).toEqual(["f-world"]);
     expect(visible("Claude-B")).toEqual([]);
@@ -178,8 +179,9 @@ describe("legacy migration: backup -> dry run -> flags, never a delete", () => {
     expect(report.facts.toFlag.map((f) => f.factId).sort()).toEqual(FLAGGED);
     expect(report.deliveries).toMatchObject({ examined: 4 });
     expect(JSON.stringify(report)).not.toContain(SECRET);
-    // not yet flagged => not yet hidden
-    expect(store.listPersistentFacts("Claude-A", 50).map((f) => f.id)).toContain("f-gpt-outsider");
+    // Read authorization is independent of operator-applied audit flags.
+    expect(store.listPersistentFacts("Claude-A", 50).map((f) => f.id)).not.toContain("f-gpt-outsider");
+    expect(store.db.prepare("SELECT content FROM citizen_persistent_facts WHERE id='f-gpt-outsider'").get()).toEqual({ content: SECRET });
     const factsBefore = dumpAll(store.db, ["citizen_persistent_facts", "events", "citizen_event_delivery"]);
     expect(store.applyLegacyFactMigration(report)).toEqual({ factsFlagged: 4, deliveriesFlagged: 2 });
     expect(store.applyLegacyFactMigration(report)).toEqual({ factsFlagged: 0, deliveriesFlagged: 0 });
@@ -197,7 +199,7 @@ describe("legacy migration: backup -> dry run -> flags, never a delete", () => {
     const third = open(path);
     expect(dumpAll(third.db)).toEqual(snapshot);
     expect(backups(path)).toHaveLength(1);
-    expect(third.listQuarantinedFacts().map((q) => q.id).sort()).toEqual(FLAGGED);
+    expect(third.listQuarantinedFacts().map((q) => q.id).sort()).toEqual([...FLAGGED, "f-note"].sort());
     expect(count(third.db, "citizen_persistent_facts")).toBe(8);
     for (const id of READERS) {
       const pack = buildCitizenContextPack({ store: third, config, citizenId: id });
@@ -231,7 +233,8 @@ describe("removeCommunityMember flags in place", () => {
     applyCommunityConfig(store, config);
     store.appendEvent(evt("gpt-plan", withAudience({ message: SECRET }, "settlement_public", { scope: "community", communityId: "gpt" })));
     buildCitizenContextPack({ store, config, citizenId: "GPT-B" }); // GPT-B stores the urgent fact with its audience
-    store.upsertPersistentFact({ id: "mine", citizenId: "GPT-B", factKey: "note:mine", content: "my own note" });
+    store.appendEvent(evt("personal", { message: "my own note", visibility: { class: "actor_private" } }, "GPT-B", "TaskCompleted"));
+    store.upsertPersistentFact({ id: "mine", citizenId: "GPT-B", factKey: "note:mine", content: "my own note", sourceEventId: "personal" });
     return store;
   }
   it("no fact row is moved or deleted: counts, ids and content are unchanged; reads exclude the flagged fact", () => {
@@ -288,7 +291,8 @@ describe("round 3 review fixes (F1, F2, memories, config revocation, required di
     expect(count(store.db, "citizen_persistent_facts")).toBe(1);
     expect(store.listPersistentFacts("GPT-B")).toEqual([]);
     // a different key is unaffected
-    store.upsertPersistentFact({ id: "fact-4", citizenId: "GPT-B", factKey: "note:x", content: "fine" });
+    store.appendEvent(evt("personal", { message: "fine", visibility: { class: "actor_private" } }, "GPT-B"));
+    store.upsertPersistentFact({ id: "fact-4", citizenId: "GPT-B", factKey: "note:x", content: "fine", sourceEventId: "personal" });
     expect(store.listPersistentFacts("GPT-B").map((f) => f.id)).toEqual(["fact-4"]);
   });
 
@@ -314,9 +318,9 @@ describe("round 3 review fixes (F1, F2, memories, config revocation, required di
     expect(JSON.stringify(dry)).not.toContain(SECRET);
     const store = open(path);
     expect(count(store.db, "memories")).toBe(3); // nothing deleted
-    expect(store.listFlaggedMemoryIds()).toEqual(["m-tainted"]);
-    expect(store.getMemories("Claude-A").map((m) => m.id)).toEqual(["m-clean"]);
-    expect(store.getMemories("Claude-B").map((m) => m.id)).toEqual(["m-other-citizen"]);
+    expect(store.listFlaggedMemoryIds()).toEqual(["m-clean", "m-other-citizen", "m-tainted"]);
+    expect(store.getMemories("Claude-A")).toEqual([]);
+    expect(store.getMemories("Claude-B")).toEqual([]);
   });
 
   it("memories: membership removal flags memories quoting the facts it flagged", () => {
@@ -325,7 +329,8 @@ describe("round 3 review fixes (F1, F2, memories, config revocation, required di
     applyCommunityConfig(store, config);
     store.upsertPersistentFact({ id: "f", citizenId: "GPT-B", factKey: "event:e1", content: "the cache is behind the red barn", audience: { scope: "community", communityId: "gpt" }, sourceEventId: "e1" });
     store.addMemory({ id: "m1", citizenId: "GPT-B", kind: "social", content: "told them the cache is behind the red barn", importance: 0.5, createdAt: "2026-10-30T00:00:00.000Z" });
-    store.addMemory({ id: "m2", citizenId: "GPT-B", kind: "social", content: "likes oak", importance: 0.5, createdAt: "2026-10-30T00:00:00.000Z" });
+    store.appendEvent({ ...evt("personal", { message: "likes oak", visibility: { class: "actor_private" } }, "GPT-B"), timestamp: "2026-10-29T00:00:00.000Z" });
+    store.addMemory({ id: "m2", citizenId: "GPT-B", kind: "social", content: "likes oak", importance: 0.5, createdAt: "2026-10-30T00:00:00.000Z" }, { sourceEventId: "personal" });
     store.removeCommunityMember("gpt", "GPT-B", AUDIT);
     expect(count(store.db, "memories")).toBe(2);
     expect(store.getMemories("GPT-B").map((m) => m.id)).toEqual(["m2"]);

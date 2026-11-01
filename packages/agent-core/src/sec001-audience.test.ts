@@ -224,9 +224,9 @@ describe("SEC-001 real store: migration of a pre-SEC-001 database", () => {
     const store = open(path);
     const live = store.listPersistentFacts("Claude-A").map((f) => f.factKey).sort();
     // the fixture drops the persisted directory, so even the world-labelled fact cannot be verified for its reader: fail closed
-    expect(live).toEqual(["note:home"]);
+    expect(live).toEqual([]); // source-free legacy notes are now quarantined too
     const quarantined = store.listQuarantinedFacts("Claude-A");
-    expect(quarantined.map((q) => q.factKey).sort()).toEqual(["event:everyone", "event:missing-event", "event:settlement-no-audience", "event:unlabeled-public"]);
+    expect(quarantined.map((q) => q.factKey).sort()).toEqual(["event:everyone", "event:missing-event", "event:settlement-no-audience", "event:unlabeled-public", "note:home"]);
     expect(quarantined.find((q) => q.factKey === "event:settlement-no-audience")?.content).toBe(SECRET); // kept for review, not live
     expect(quarantined.find((q) => q.factKey === "event:missing-event")?.reason).toMatch(/not found/);
     // old events fail closed for everyone, even with a fresh directory
@@ -240,13 +240,15 @@ describe("SEC-001 real store: migration of a pre-SEC-001 database", () => {
     open(path).close();
     const second = open(path);
     second.upsertPersistentFact({ id: "late", citizenId: "Claude-A", factKey: "event:unlabeled-public", content: "re-derived later" });
+    second.appendEvent({ id: "brand-new", type: "TaskCompleted", timestamp: new Date().toISOString(), citizenId: "Claude-A",
+      payload: { summary: "new fact", visibility: { class: "actor_private" } } });
     second.upsertPersistentFact({ id: "late2", citizenId: "Claude-A", factKey: "event:brand-new", content: "new fact" });
     second.close();
     const third = open(path);
     // fail closed: the flagged row stays hidden (and keeps its original content) until someone releases it manually
     expect(third.listPersistentFacts("Claude-A").map((f) => f.factKey)).not.toContain("event:unlabeled-public");
     expect(third.listPersistentFacts("Claude-A").map((f) => f.factKey)).toContain("event:brand-new");
-    expect(third.listQuarantinedFacts("Claude-A")).toHaveLength(4);
+    expect(third.listQuarantinedFacts("Claude-A")).toHaveLength(5);
     expect(third.listQuarantinedFacts("Claude-A").find((q) => q.factKey === "event:unlabeled-public")?.content).toBe("unlabeled fact");
   });
 

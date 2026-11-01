@@ -87,7 +87,8 @@ function urgencyFor(event: SimEvent): number {
   }
 }
 
-function summarizeEvent(event: SimEvent): string {
+/** Canonical event-derived fact text. Callers must supply the stored, authorized source event. */
+export function summarizeBulletinEvent(event: SimEvent): string {
   const actor = event.citizenId ? ` by ${event.citizenId}` : "";
   const note =
     typeof event.payload.message === "string"
@@ -146,7 +147,7 @@ export function buildCitizenBulletin(options: BulletinBuildOptions): BulletinBui
     candidates.push({
       eventId: event.id,
       type: event.type,
-      summary: summarizeEvent(event),
+      summary: summarizeBulletinEvent(event),
       urgency: urgencyFor(event),
       visibilityClass: visibility.class,
       reasonVisible: auth.reason,

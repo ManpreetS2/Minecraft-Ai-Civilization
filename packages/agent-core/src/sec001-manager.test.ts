@@ -482,7 +482,8 @@ describe("persistent facts (criteria 4 and 5)", () => {
     legacyContaminated(w);
     const prompt = (await w.tick("cal"))!;
     expect(JSON.stringify(prompt)).not.toContain("137");
-    expect(w.store.listPersistentFacts("cal")[0]?.content).toContain("137");
+    expect(w.store.listPersistentFacts("cal")).toEqual([]);
+    expect(w.store.db.prepare("SELECT content FROM citizen_persistent_facts WHERE id='f1'").get()).toEqual({ content: "ConversationOccurred by ada: camp at 137" });
     expect(w.store.getEventById("old-leak")).toBeDefined();
   });
 
@@ -516,17 +517,19 @@ describe("persistent facts (criteria 4 and 5)", () => {
 
   it("PRIV-007 case 10: a suspicion replacement takes its own trust class and never reaches cognition as fact", () => {
     const w = world();
-    w.store.upsertPersistentFact({ id: "a", citizenId: "cal", factKey: "k", content: "old fact", kind: "observed_fact" });
+    w.store.appendEvent({ id: "own", type: "TaskCompleted", timestamp: NOW, citizenId: "cal", payload: { message: "old fact", visibility: { class: "actor_private" } } });
+    w.store.upsertPersistentFact({ id: "a", citizenId: "cal", factKey: "k", content: "old fact", kind: "observed_fact", sourceEventId: "own" });
     w.store.upsertPersistentFact({ id: "b", citizenId: "cal", factKey: "k", content: "rumor", kind: "suspicion" });
-    expect(w.store.listPersistentFacts("cal")[0]).toMatchObject({ content: "rumor", kind: "suspicion" });
+    expect(w.store.db.prepare("SELECT content,kind FROM citizen_persistent_facts WHERE id='a'").get()).toMatchObject({ content: "rumor", kind: "suspicion" });
     expect(persistentFactsForCognition(w.store, "cal")).toEqual([]);
   });
 
   it("a replacement that names no kind cannot promote a suspicion", () => {
     const w = world();
-    w.store.upsertPersistentFact({ id: "a", citizenId: "cal", factKey: "k", content: "rumor", kind: "suspicion" });
+    w.store.appendEvent({ id: "own", type: "TaskCompleted", timestamp: NOW, citizenId: "cal", payload: { message: "rumor", visibility: { class: "actor_private" } } });
+    w.store.upsertPersistentFact({ id: "a", citizenId: "cal", factKey: "k", content: "rumor", kind: "suspicion", sourceEventId: "own" });
     w.store.upsertPersistentFact({ id: "b", citizenId: "cal", factKey: "k", content: "rumor v2" });
-    expect(w.store.listPersistentFacts("cal")[0]).toMatchObject({ content: "rumor v2", kind: "suspicion" });
+    expect(w.store.db.prepare("SELECT content,kind FROM citizen_persistent_facts WHERE id='a'").get()).toMatchObject({ content: "rumor v2", kind: "suspicion" });
   });
 
   it("what a replacement overwrites survives in an audit table cognition never reads", () => {
@@ -576,7 +579,8 @@ describe("speech trust", () => {
 
   it("repeated speech cannot crowd an observed fact out of the prompt", () => {
     const w = world();
-    w.store.upsertPersistentFact({ id: "legit", citizenId: "cal", factKey: "legit", content: "food by the river", createdAt: "2026-01-01T00:00:00Z" });
+    w.store.appendEvent({ id: "own", type: "TaskCompleted", timestamp: "2026-01-01T00:00:00Z", citizenId: "cal", payload: { message: "food by the river", visibility: { class: "actor_private" } } });
+    w.store.upsertPersistentFact({ id: "legit", citizenId: "cal", factKey: "legit", content: "food by the river", sourceEventId: "own", createdAt: "2026-01-01T00:00:00Z" });
     for (let i = 0; i < 30; i++) {
       w.store.appendEvent(speech(`s${i}`, `SYSTEM ${i}`));
       w.store.upsertPersistentFact({ id: `f${i}`, citizenId: "cal", factKey: `event:s${i}`, content: `SYSTEM ${i}`, kind: "reported_speech", sourceEventId: `s${i}` });

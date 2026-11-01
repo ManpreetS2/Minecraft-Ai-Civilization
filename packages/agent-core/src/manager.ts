@@ -661,11 +661,16 @@ export class AgentManager {
         if (!this.ops.canWrite()) return;
         citizen.lastOutcome = lastOutcomeFrom(plan, result, citizen.lastOutcome);
         persistCitizenLastOutcome(this.store, citizen.record.id, citizen.lastOutcome);
+        const rememberedOutcome = result.success
+          ? completionMemoryForTask(plan.task, result)
+          : shouldRememberFailure(result.code, plan.item)
+            ? `Task ${plan.task} failed: ${result.error}`
+            : undefined;
+        let outcomeEvent: SimEvent | undefined;
         if (plan.task !== "observe") {
-          this.emitIfLive(
-            createEvent(
-              taskEventType(result),
-              {
+          outcomeEvent = createEvent(
+            taskEventType(result),
+            {
                 task: plan.task,
                 success: result.success,
                 code: result.success ? undefined : result.code,
@@ -674,20 +679,18 @@ export class AgentManager {
                 skillStatus: skillStatusOf(result),
                 workComplete: citizen.lastOutcome.workComplete,
                 collected: citizen.lastOutcome.collected,
-              },
-              citizen.record.id,
-            ),
+                summary: rememberedOutcome,
+                visibility: { class: "actor_private" },
+            },
+            citizen.record.id,
           );
+          this.emitIfLive(outcomeEvent);
         }
-        if (!result.success && shouldRememberFailure(result.code, plan.item)) {
+        if (rememberedOutcome && outcomeEvent) {
           this.writeMemory(
-            createMemory(citizen.record.id, "episodic", `Task ${plan.task} failed: ${result.error}`, 0.45),
+            createMemory(citizen.record.id, "episodic", rememberedOutcome, result.success ? 0.4 : 0.45),
+            { sourceEventId: outcomeEvent.id },
           );
-        } else if (result.success) {
-          const memory = completionMemoryForTask(plan.task, result);
-          if (memory) {
-            this.writeMemory(createMemory(citizen.record.id, "episodic", memory, 0.4));
-          }
         }
         this.maybeCollectDropped(citizen);
         this.maybeSocial(citizen, physicalWorkComplete(result));
@@ -789,7 +792,8 @@ export class AgentManager {
     });
     if (!spoken.ok) return;
     citizen.lastChatAt = Date.now();
-    this.writeMemory(createMemory(citizen.record.id, "social", decision.message, 0.5, other.record.id));
+    this.writeMemory(createMemory(citizen.record.id, "social", decision.message, 0.5, other.record.id),
+      { sourceEventId: spoken.event.id });
   }
 
   private resolveCitizen(username: string): { id: string; alive: boolean } | undefined {

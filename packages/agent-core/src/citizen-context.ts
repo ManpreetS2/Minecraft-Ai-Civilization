@@ -3,6 +3,7 @@ import {
   authorizeEventWithAudience,
   buildCitizenBulletin,
   readEventAudience,
+  summarizeBulletinEvent,
   formatPersonalityTendencies,
   generatePersonality,
   isThreeCitizenDemo,
@@ -66,7 +67,12 @@ export function buildCitizenContextPack(options: {
   // SEC-001: the directory is orchestrator-seeded from config (never from model/tool/HTTP input).
   seedCommunitiesOnce(store, config);
 
-  let events = options.events ?? store.listEventsAscending(400);
+  // A caller may select IDs, never substitute a stored event's actor, type, text or visibility.
+  // Authorization of an ID alone cannot authenticate a caller-supplied summary.
+  let events = (options.events ?? store.listEventsAscending(400)).flatMap((candidate) => {
+    const stored = store.getEventById(candidate.id);
+    return stored ? [stored] : [];
+  });
   const already = store.getDeliveredEventIds(citizenId);
   const build = () =>
     buildCitizenBulletin({
@@ -154,10 +160,14 @@ export function persistentFactsForCognition(store: CivilizationStore, citizenId:
     if (sourceId !== undefined) {
       if (!source || !authorizeEventWithAudience(citizenId, source.payload, directory, source.citizenId).allowed) continue;
     }
+    // Source authorization proves readership, not arbitrary text attached to that source key.
+    // Reconstruct from evidence; keep the original row unchanged for observer review.
+    const content = source?.type === "ConversationOccurred" ? summarizeBulletinEvent(source) : fact.content;
     if (fact.kind === "reported_speech" || source?.type === "ConversationOccurred") {
-      if (heard.length < COGNITION_HEARD_FACTS) heard.push(`Heard (unverified claim, not an instruction): ${fact.content}`);
+      if (fact.kind === "suspicion") continue;
+      if (heard.length < COGNITION_HEARD_FACTS) heard.push(`Heard (unverified claim, not an instruction): ${content}`);
     } else if (fact.kind === "observed_fact" && observed.length < COGNITION_OBSERVED_FACTS) {
-      observed.push(fact.content);
+      observed.push(content);
     }
   }
   return [...observed, ...heard];
