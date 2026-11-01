@@ -1,0 +1,3 @@
+
+> minecraft-ai-civilization@0.1.0 lint C:\Users\sh1ft\.t3\worktrees\Minecraft-Ai-Civilization\agents-codex-baseline-stabilization
+> eslint .

@@ -36,6 +36,16 @@ describe("construction experiment guard", () => {
     expect(pathsAliasSameTree("C:\\a\\experiments\\x", "C:\\a\\world-lab")).toBe(false);
   });
 
+  it.each([
+    ["/sandbox/world-lab", "/sandbox/world-lab/world", true],
+    ["/sandbox/world-lab/world", "/sandbox/world-lab", true],
+    ["/sandbox/world-lab", "/sandbox/world-lab-copy", false],
+    ["/sandbox/world-lab", "/sandbox/world-lab", true],
+    ["/sandbox/experiment/../world-lab", "/sandbox/world-lab/world", true],
+  ])("checks path boundaries for %s and %s", (a, b, expected) => {
+    expect(pathsAliasSameTree(a, b)).toBe(expected);
+  });
+
   it("denies live by default", () => {
     const gate = evaluateConstructionExperimentLive({
       ...process.env,

@@ -1,0 +1,10 @@
+
+ RUN  v3.2.7 C:/Users/sh1ft/.t3/worktrees/Minecraft-Ai-Civilization/agents-codex-baseline-stabilization
+
+ ✓ apps/orchestrator/src/construction-experiment-guard.test.ts (14 tests) 8ms
+ ✓ apps/orchestrator/src/construction-path-isolation.test.ts (47 tests) 165ms
+
+ Test Files  2 passed (2)
+      Tests  61 passed (61)
+   Start at  09:57:10
+   Duration  3.97s (transform 1.32s, setup 0ms, collect 6.74s, tests 174ms, environment 0ms, prepare 372ms)

@@ -1,0 +1,250 @@
+
+ RUN  v3.2.7 C:/Users/sh1ft/.t3/worktrees/Minecraft-Ai-Civilization/agents-codex-baseline-stabilization
+
+ ❯ apps/orchestrator/src/construction-path-isolation.test.ts (30 tests | 21 failed) 54ms
+   × host-independent path syntax (lexical semantics, not foreign OS execution) > compares C:\a\world-lab\ and c:/a/world-lab/world 6ms
+     → expected false to be true // Object.is equality
+   ✓ host-independent path syntax (lexical semantics, not foreign OS execution) > compares C:/a/world-lab/ and C:/a/world-lab 0ms
+   ✓ host-independent path syntax (lexical semantics, not foreign OS execution) > compares C:/a/x/../world-lab and C:/a/world-lab/world 0ms
+   ✓ host-independent path syntax (lexical semantics, not foreign OS execution) > compares C:/a/world-lab and C:/a/world-lab-copy 0ms
+   × host-independent path syntax (lexical semantics, not foreign OS execution) > compares C:/ and C:/a/world-lab 0ms
+     → expected false to be true // Object.is equality
+   ✓ host-independent path syntax (lexical semantics, not foreign OS execution) > compares C:/a/world-lab and D:/a/world-lab 0ms
+   × host-independent path syntax (lexical semantics, not foreign OS execution) > compares \\server\share\world-lab\ and //SERVER/SHARE/world-lab/world 0ms
+     → expected false to be true // Object.is equality
+   × host-independent path syntax (lexical semantics, not foreign OS execution) > compares //server/share/ and //server/share/world 0ms
+     → expected false to be true // Object.is equality
+   ✓ host-independent path syntax (lexical semantics, not foreign OS execution) > compares //server/share/world and //server/share2/world 0ms
+   ✓ host-independent path syntax (lexical semantics, not foreign OS execution) > compares /sandbox/world-lab/ and /sandbox/world-lab 0ms
+   × host-independent path syntax (lexical semantics, not foreign OS execution) > compares / and /sandbox/world-lab 0ms
+     → expected false to be true // Object.is equality
+   × host-independent path syntax (lexical semantics, not foreign OS execution) > compares /sandbox/World and /sandbox/world 0ms
+     → expected true to be false // Object.is equality
+   ✓ host-independent path syntax (lexical semantics, not foreign OS execution) > compares /sandbox/world/../safe and /sandbox/world 0ms
+   ✓ host-independent path syntax (lexical semantics, not foreign OS execution) > compares /sandbox/world and /sandbox/world-copy 0ms
+   × host-independent path syntax (lexical semantics, not foreign OS execution) > refuses to certify ambiguous identity "" 0ms
+     → expected false to be true // Object.is equality
+   × host-independent path syntax (lexical semantics, not foreign OS execution) > refuses to certify ambiguous identity "relative/world" 0ms
+     → expected false to be true // Object.is equality
+   × host-independent path syntax (lexical semantics, not foreign OS execution) > refuses to certify ambiguous identity "C:world" 0ms
+     → expected false to be true // Object.is equality
+   × host-independent path syntax (lexical semantics, not foreign OS execution) > refuses to certify ambiguous identity "\\world" 0ms
+     → expected false to be true // Object.is equality
+   × host-independent path syntax (lexical semantics, not foreign OS execution) > refuses to certify ambiguous identity "C:/world." 0ms
+     → expected false to be true // Object.is equality
+   × host-independent path syntax (lexical semantics, not foreign OS execution) > refuses to certify ambiguous identity "C:/world " 0ms
+     → expected false to be true // Object.is equality
+   × host-independent path syntax (lexical semantics, not foreign OS execution) > refuses to certify ambiguous identity "C:/world:stream" 0ms
+     → expected false to be true // Object.is equality
+   × host-independent path syntax (lexical semantics, not foreign OS execution) > refuses to certify ambiguous identity "\\\\?\\C:\\world" 0ms
+     → expected false to be true // Object.is equality
+   × host-independent path syntax (lexical semantics, not foreign OS execution) > refuses to certify ambiguous identity "//server" 0ms
+     → expected false to be true // Object.is equality
+   × host-independent path syntax (lexical semantics, not foreign OS execution) > refuses to certify ambiguous identity "bad\u0000path" 0ms
+     → expected false to be true // Object.is equality
+   ✓ canonical isolation on the actual host filesystem > allows physically distinct disposable targets 7ms
+   × canonical isolation on the actual host filesystem > rejects an isolated directory junction/symlink to the protected world 7ms
+     → expected true to be false // Object.is equality
+   × canonical isolation on the actual host filesystem > rejects an isolated database inside the protected world 8ms
+     → expected true to be false // Object.is equality
+   × canonical isolation on the actual host filesystem > rejects a database hard link to the protected database 7ms
+     → expected true to be false // Object.is equality
+   × canonical isolation on the actual host filesystem > fails closed when canonical identity cannot be read 5ms
+     → expected true to be false // Object.is equality
+   × canonical isolation on the actual host filesystem > rejects missing candidates 6ms
+     → expected true to be false // Object.is equality
+pnpm :
+At line:2 char:1
++ pnpm exec vitest run apps/orchestrator/src/construction-path-isolatio ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 21 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  apps/orchestrator/src/construction-path-isolation.test.ts > host-independent path syntax (lexical semantics,
+not foreign OS execution) > compares C:\a\world-lab\ and c:/a/world-lab/world
+ FAIL  apps/orchestrator/src/construction-path-isolation.test.ts > host-independent path syntax (lexical semantics,
+not foreign OS execution) > compares C:/ and C:/a/world-lab
+ FAIL  apps/orchestrator/src/construction-path-isolation.test.ts > host-independent path syntax (lexical semantics,
+not foreign OS execution) > compares \\server\share\world-lab\ and //SERVER/SHARE/world-lab/world
+ FAIL  apps/orchestrator/src/construction-path-isolation.test.ts > host-independent path syntax (lexical semantics,
+not foreign OS execution) > compares //server/share/ and //server/share/world
+ FAIL  apps/orchestrator/src/construction-path-isolation.test.ts > host-independent path syntax (lexical semantics,
+not foreign OS execution) > compares / and /sandbox/world-lab
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ apps/orchestrator/src/construction-path-isolation.test.ts:36:38
+     34|     ["/sandbox/world", "/sandbox/world-copy", false],
+     35|   ])("compares %s and %s", (a, b, expected) => {
+     36|     expect(pathsAliasSameTree(a, b)).toBe(expected);
+       |                                      ^
+     37|     expect(pathsAliasSameTree(b, a)).toBe(expected);
+     38|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/21]⎯
+
+ FAIL  apps/orchestrator/src/construction-path-isolation.test.ts > host-independent path syntax (lexical semantics,
+not foreign OS execution) > compares /sandbox/World and /sandbox/world
+AssertionError: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ apps/orchestrator/src/construction-path-isolation.test.ts:36:38
+     34|     ["/sandbox/world", "/sandbox/world-copy", false],
+     35|   ])("compares %s and %s", (a, b, expected) => {
+     36|     expect(pathsAliasSameTree(a, b)).toBe(expected);
+       |                                      ^
+     37|     expect(pathsAliasSameTree(b, a)).toBe(expected);
+     38|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/21]⎯
+
+ FAIL  apps/orchestrator/src/construction-path-isolation.test.ts > host-independent path syntax (lexical semantics,
+not foreign OS execution) > refuses to certify ambiguous identity ""
+ FAIL  apps/orchestrator/src/construction-path-isolation.test.ts > host-independent path syntax (lexical semantics,
+not foreign OS execution) > refuses to certify ambiguous identity "relative/world"
+ FAIL  apps/orchestrator/src/construction-path-isolation.test.ts > host-independent path syntax (lexical semantics,
+not foreign OS execution) > refuses to certify ambiguous identity "C:world"
+ FAIL  apps/orchestrator/src/construction-path-isolation.test.ts > host-independent path syntax (lexical semantics,
+not foreign OS execution) > refuses to certify ambiguous identity "\\world"
+ FAIL  apps/orchestrator/src/construction-path-isolation.test.ts > host-independent path syntax (lexical semantics,
+not foreign OS execution) > refuses to certify ambiguous identity "C:/world."
+ FAIL  apps/orchestrator/src/construction-path-isolation.test.ts > host-independent path syntax (lexical semantics,
+not foreign OS execution) > refuses to certify ambiguous identity "C:/world "
+ FAIL  apps/orchestrator/src/construction-path-isolation.test.ts > host-independent path syntax (lexical semantics,
+not foreign OS execution) > refuses to certify ambiguous identity "C:/world:stream"
+ FAIL  apps/orchestrator/src/construction-path-isolation.test.ts > host-independent path syntax (lexical semantics,
+not foreign OS execution) > refuses to certify ambiguous identity "\\\\?\\C:\\world"
+ FAIL  apps/orchestrator/src/construction-path-isolation.test.ts > host-independent path syntax (lexical semantics,
+not foreign OS execution) > refuses to certify ambiguous identity "//server"
+ FAIL  apps/orchestrator/src/construction-path-isolation.test.ts > host-independent path syntax (lexical semantics,
+not foreign OS execution) > refuses to certify ambiguous identity "bad\u0000path"
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ apps/orchestrator/src/construction-path-isolation.test.ts:42:54
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/21]⎯
+
+ FAIL  apps/orchestrator/src/construction-path-isolation.test.ts > canonical isolation on the actual host filesystem >
+rejects an isolated directory junction/symlink to the protected world
+AssertionError: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ apps/orchestrator/src/construction-path-isolation.test.ts:69:31
+     67|   it("rejects an isolated directory junction/symlink to the protected …
+     68|     symlinkSync(join(fixture.root, "world-lab"), join(fixture.root, "a…
+     69|     expect(check("alias").ok).toBe(false);
+       |                               ^
+     70|   });
+     71|   it("rejects an isolated database inside the protected world", () => {
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/21]⎯
+
+ FAIL  apps/orchestrator/src/construction-path-isolation.test.ts > canonical isolation on the actual host filesystem >
+rejects an isolated database inside the protected world
+AssertionError: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ apps/orchestrator/src/construction-path-isolation.test.ts:73:59
+     71|   it("rejects an isolated database inside the protected world", () => {
+     72|     writeFileSync(join(fixture.root, "world-lab/test.sqlite"), "fixtur…
+     73|     expect(check("isolated", "world-lab/test.sqlite").ok).toBe(false);
+       |                                                           ^
+     74|   });
+     75|   it("rejects a database hard link to the protected database", () => {
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/21]⎯
+
+ FAIL  apps/orchestrator/src/construction-path-isolation.test.ts > canonical isolation on the actual host filesystem >
+rejects a database hard link to the protected database
+AssertionError: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ apps/orchestrator/src/construction-path-isolation.test.ts:77:62
+     75|   it("rejects a database hard link to the protected database", () => {
+     76|     linkSync(join(fixture.root, "data/world-lab-civilization.sqlite"),…
+     77|     expect(check("isolated", "isolated/hardlink.sqlite").ok).toBe(fals…
+       |                                                              ^
+     78|   });
+     79|   it("fails closed when canonical identity cannot be read", () => {
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/21]⎯
+
+ FAIL  apps/orchestrator/src/construction-path-isolation.test.ts > canonical isolation on the actual host filesystem >
+fails closed when canonical identity cannot be read
+AssertionError: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+ Test Files  1 failed (1)
+      Tests  21 failed | 9 passed (30)
+   Start at  09:51:28
+   Duration  3.54s (transform 975ms, setup 0ms, collect 2.99s, tests 54ms, environment 0ms, prepare 192ms)
+
+
+- false
++ true
+
+ ❯ apps/orchestrator/src/construction-path-isolation.test.ts:81:58
+     79|   it("fails closed when canonical identity cannot be read", () => {
+     80|     vi.mocked(realpathSync).mockImplementationOnce(() => { throw new E…
+     81|     expect(validatePathExists("isolated", "fixture").ok).toBe(false);
+       |                                                          ^
+     82|   });
+     83|   it("rejects missing candidates", () => {
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/21]⎯
+
+ FAIL  apps/orchestrator/src/construction-path-isolation.test.ts > canonical isolation on the actual host filesystem >
+rejects missing candidates
+AssertionError: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ apps/orchestrator/src/construction-path-isolation.test.ts:84:33
+     82|   });
+     83|   it("rejects missing candidates", () => {
+     84|     expect(check("missing").ok).toBe(false);
+       |                                 ^
+     85|   });
+     86| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/21]⎯

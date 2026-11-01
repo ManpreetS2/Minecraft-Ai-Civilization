@@ -2,8 +2,8 @@
  * Mission 006A — construction physical experiment guards.
  * Default: refuse live connect. Isolation paths must not alias the original World-Lab.
  */
-import { existsSync, realpathSync, statSync } from "node:fs";
-import { isAbsolute, join, normalize, sep } from "node:path";
+import { existsSync, lstatSync, realpathSync, statSync } from "node:fs";
+import { basename, dirname, isAbsolute, join, normalize, posix, win32 } from "node:path";
 import { resolveFromRoot, workspaceRoot, type Vec3 } from "@civ/shared";
 import { WORLD_LAB_CLAIMABLE_HOMES } from "@civ/agent-core";
 import { LIVE_CIVILIZATION_PORT, RED_WORLD_LAB_PORT } from "./mine-test-guard.js";
@@ -91,52 +91,141 @@ export type PathValidation =
   | { ok: false; error: string };
 
 export function resolveWorkspacePath(relOrAbs: string): string {
-  return isAbsolute(relOrAbs) ? normalize(relOrAbs) : resolveFromRoot(relOrAbs);
+  if (!relOrAbs || relOrAbs.includes("\0")) throw new Error("Empty or invalid path");
+  const windowsAbsolute = /^[A-Za-z]:[\\/]|^[\\/]{2}/.test(relOrAbs);
+  if (process.platform !== "win32" && (windowsAbsolute || relOrAbs.includes("\\"))) {
+    throw new Error("Windows path cannot be resolved on this host");
+  }
+  if (process.platform === "win32" && (/^[\\/]/.test(relOrAbs) && !windowsAbsolute || /^[A-Za-z]:(?![\\/])/.test(relOrAbs))) {
+    throw new Error("Drive-relative or root-relative path has ambiguous identity");
+  }
+  if ((windowsAbsolute || relOrAbs.startsWith("/")) && !comparablePath(relOrAbs)) {
+    throw new Error("Unsupported absolute path syntax");
+  }
+  const resolved = isAbsolute(relOrAbs) ? normalize(relOrAbs) : resolveFromRoot(relOrAbs);
+  if (!comparablePath(resolved)) throw new Error("Unsupported resolved path syntax");
+  return resolved;
 }
 
 export function validatePathExists(relOrAbs: string, label: string): PathValidation {
-  const resolved = resolveWorkspacePath(relOrAbs);
-  if (!existsSync(resolved)) {
-    return { ok: false, error: `${label} missing: ${resolved}` };
-  }
-  let real = resolved;
   try {
-    real = realpathSync(resolved);
-  } catch {
-    real = resolved;
+    const resolved = resolveWorkspacePath(relOrAbs);
+    const real = realpathSync(resolved);
+    if (!comparablePath(real)) throw new Error("Unsupported canonical path syntax");
+    return { ok: true, resolved, real };
+  } catch (error) {
+    return { ok: false, error: `${label} identity unavailable: ${error instanceof Error ? error.message : String(error)}` };
   }
-  return { ok: true, resolved, real };
+}
+
+/** Resolve a future output directory through its nearest existing ancestor.
+ * lstat distinguishes a missing component from a dangling link; canonical lookup
+ * and all errors except ENOENT must refuse rather than fall back to spelling.
+ */
+function validateOutputDirectory(path: string): PathValidation {
+  try {
+    const resolved = resolveWorkspacePath(path);
+    let ancestor = resolved;
+    const missing: string[] = [];
+    while (true) {
+      try {
+        lstatSync(ancestor);
+        break;
+      } catch (error) {
+        if (!(error instanceof Error) || !("code" in error) || error.code !== "ENOENT") throw error;
+        const parent = dirname(ancestor);
+        if (parent === ancestor) throw error;
+        missing.unshift(basename(ancestor));
+        ancestor = parent;
+      }
+    }
+    const canonical = realpathSync(ancestor);
+    if (!statSync(canonical).isDirectory()) throw new Error("Evidence ancestor must be a directory");
+    const real = join(canonical, ...missing);
+    if (!comparablePath(real)) throw new Error("Unsupported evidence path syntax");
+    return { ok: true, resolved, real };
+  } catch (error) {
+    return { ok: false, error: `Evidence identity unavailable: ${error instanceof Error ? error.message : String(error)}` };
+  }
+}
+
+/** Pure syntax handling: foreign Windows paths never depend on the host's path.sep. */
+function comparablePath(path: string): { kind: "windows" | "posix"; value: string; separator: string } | undefined {
+  if (!path || [...path].some((character) => character.charCodeAt(0) < 32)) return undefined;
+  if (/^[A-Za-z]:[\\/]|^[\\/]{2}/.test(path)) {
+    // Device namespaces, ADS, trailing dots/spaces and incomplete UNC roots can
+    // address identities that ordinary lexical normalization does not establish.
+    const slash = path.replaceAll("\\", "/");
+    if (slash.startsWith("//?/") || slash.startsWith("//./")) return undefined;
+    const drive = /^[A-Za-z]:\//.test(slash);
+    const components = (drive ? slash.slice(3) : slash.slice(2)).split("/");
+    if (!drive && (components.length < 2 || !components[0] || !components[1] || components.slice(0, 2).some((c) => c === "." || c === ".."))) return undefined;
+    if (components.some((c) => /[:<>"|?*]/.test(c) || c !== "." && c !== ".." && /[. ]$/.test(c))) return undefined;
+    return { kind: "windows", value: win32.normalize(path).replace(/[\\/]+$/, "").toLowerCase(), separator: "\\" };
+  }
+  if (!path.startsWith("/") || path.includes("\\")) return undefined;
+  return { kind: "posix", value: posix.normalize(path).replace(/\/+$/, ""), separator: "/" };
 }
 
 export function pathsAliasSameTree(a: string, b: string): boolean {
-  const na = normalize(a).toLowerCase().replaceAll("/", sep);
-  const nb = normalize(b).toLowerCase().replaceAll("/", sep);
-  return na === nb || na.startsWith(nb + sep) || nb.startsWith(na + sep);
+  const na = comparablePath(a);
+  const nb = comparablePath(b);
+  // Unknown or mixed identities cannot certify isolation. true means refuse.
+  if (!na || !nb || na.kind !== nb.kind) return true;
+  return na.value === nb.value || na.value.startsWith(nb.value + na.separator) || nb.value.startsWith(na.value + na.separator);
 }
 
 export function assertIsolatedNotOriginal(args: {
   isolatedWorldLab: string;
   isolatedSqlite: string;
 }): { ok: true } | { ok: false; error: string } {
+  const checked = checkIsolationPaths(args);
+  return checked.ok ? { ok: true } : checked;
+}
+
+function checkIsolationPaths(args: {
+  isolatedWorldLab: string;
+  isolatedSqlite: string;
+  evidenceDir?: string;
+}): { ok: true; worldLabDir: string; sqlitePath: string; evidenceDir?: string } | { ok: false; error: string } {
   const originalWl = validatePathExists(ORIGINAL_WORLD_LAB_DIR, "original world-lab");
   const originalDb = validatePathExists(ORIGINAL_WORLD_LAB_SQLITE, "original sqlite");
   if (!originalWl.ok) return originalWl;
   if (!originalDb.ok) return originalDb;
 
-  const isoWl = resolveWorkspacePath(args.isolatedWorldLab);
-  const isoDb = resolveWorkspacePath(args.isolatedSqlite);
+  const isoWl = validatePathExists(args.isolatedWorldLab, "isolated world-lab");
+  const isoDb = validatePathExists(args.isolatedSqlite, "isolated sqlite");
+  if (!isoWl.ok) return isoWl;
+  if (!isoDb.ok) return isoDb;
+  const evidence = args.evidenceDir === undefined ? undefined : validateOutputDirectory(args.evidenceDir);
+  if (evidence && !evidence.ok) return evidence;
 
-  if (pathsAliasSameTree(isoWl, originalWl.real)) {
-    return { ok: false, error: `Isolated world-lab aliases original: ${isoWl}` };
+  try {
+    for (const world of [originalWl, isoWl]) {
+      if (!statSync(world.real).isDirectory()) throw new Error("World-lab must be a directory");
+    }
+    for (const db of [originalDb, isoDb]) {
+      if (!statSync(db.real).isFile()) throw new Error("SQLite target must be a regular file");
+    }
+    for (const isolated of [isoWl, isoDb]) {
+      for (const original of [originalWl, originalDb]) {
+        if (pathsAliasSameTree(isolated.real, original.real)) {
+          return { ok: false, error: `Isolated path aliases original: ${isolated.resolved}` };
+        }
+        const a = statSync(isolated.real, { bigint: true });
+        const b = statSync(original.real, { bigint: true });
+        if (a.dev === b.dev && a.ino === b.ino) {
+          return { ok: false, error: `Isolated path shares original filesystem identity: ${isolated.resolved}` };
+        }
+      }
+    }
+    if (evidence?.ok && [originalWl, originalDb].some((original) => pathsAliasSameTree(evidence.real, original.real))) {
+      return { ok: false, error: "Evidence path aliases original" };
+    }
+  } catch (error) {
+    return { ok: false, error: `Isolation identity unavailable: ${error instanceof Error ? error.message : String(error)}` };
   }
-  if (pathsAliasSameTree(isoDb, originalDb.real)) {
-    return { ok: false, error: `Isolated sqlite aliases original: ${isoDb}` };
-  }
-  // Refuse if isolated path is inside original world-lab
-  if (pathsAliasSameTree(isoWl, join(originalWl.real, "world"))) {
-    return { ok: false, error: "Isolated path must not sit inside original world/" };
-  }
-  return { ok: true };
+  return { ok: true, worldLabDir: isoWl.real, sqlitePath: isoDb.real, evidenceDir: evidence?.real };
 }
 
 export function distance2(a: Vec3, b: Vec3): number {
@@ -198,6 +287,9 @@ export function evaluateConstructionExperimentLive(env: NodeJS.ProcessEnv = proc
 
   const paperPort = Number(env.MINECRAFT_PORT ?? ISOLATED_PAPER_PORT);
   const rconPort = Number(env.CONSTRUCTION_EXPERIMENT_RCON_PORT ?? ISOLATED_RCON_PORT);
+  if (![paperPort, rconPort].every((port) => Number.isInteger(port) && port >= 1 && port <= 65535)) {
+    return { allowed: false, error: "Paper and RCON ports must be integers from 1 to 65535" };
+  }
   if (paperPort === ORIGINAL_PAPER_PORT || paperPort === LIVE_CIVILIZATION_PORT) {
     return {
       allowed: false,
@@ -215,13 +307,9 @@ export function evaluateConstructionExperimentLive(env: NodeJS.ProcessEnv = proc
   const sqlitePath = env.DATABASE_PATH ?? ISOLATED_SQLITE_REL;
   const evidenceDir = env.CONSTRUCTION_EXPERIMENT_EVIDENCE_DIR ?? ISOLATED_EVIDENCE_REL;
 
-  const isolation = assertIsolatedNotOriginal({ isolatedWorldLab: worldLabDir, isolatedSqlite: sqlitePath });
+  const isolation = checkIsolationPaths({ isolatedWorldLab: worldLabDir, isolatedSqlite: sqlitePath, evidenceDir });
   if (!isolation.ok) return { allowed: false, error: isolation.error };
-
-  const wl = validatePathExists(worldLabDir, "isolated world-lab");
-  if (!wl.ok) return { allowed: false, error: wl.error };
-  const db = validatePathExists(sqlitePath, "isolated sqlite");
-  if (!db.ok) return { allowed: false, error: db.error };
+  if (!isolation.evidenceDir) return { allowed: false, error: "Evidence identity unavailable" };
 
   const pad = PROPOSED_CONSTRUCTION_PAD;
   const safe = padSafeFromSettlementHomes(pad);
@@ -236,9 +324,9 @@ export function evaluateConstructionExperimentLive(env: NodeJS.ProcessEnv = proc
     allowed: true,
     paperPort,
     rconPort,
-    worldLabDir: wl.resolved,
-    sqlitePath: db.resolved,
-    evidenceDir: resolveWorkspacePath(evidenceDir),
+    worldLabDir: isolation.worldLabDir,
+    sqlitePath: isolation.sqlitePath,
+    evidenceDir: isolation.evidenceDir,
     pad,
   };
 }

@@ -1,0 +1,266 @@
+
+> minecraft-ai-civilization@0.1.0 test C:\Users\sh1ft\.t3\worktrees\Minecraft-Ai-Civilization\agents-codex-baseline-stabilization
+> vitest run
+
+
+ RUN  v3.2.7 C:/Users/sh1ft/.t3/worktrees/Minecraft-Ai-Civilization/agents-codex-baseline-stabilization
+
+ ✓ packages/agent-core/src/sec001-round3.test.ts (14 tests) 1978ms
+ ✓ packages/agent-core/src/sec001-round2.test.ts (20 tests) 2065ms
+ ✓ packages/skills/src/mineflayer-fish-cycle.test.ts (15 tests) 3441ms
+   ✓ two independent mineflayer clients > times out one bot without retracting the other  1097ms
+   ✓ two independent mineflayer clients > does not claim a catch from a late particle after timeout  1223ms
+ ✓ packages/agent-core/src/sec001-migration-recovery-qa.test.ts (7 tests) 5464ms
+   ✓ Independent SEC-001 migration fault/recovery QA > fails closed when VACUUM backup encounters a real SQLite destination error; no quarantine marker or data loss  775ms
+   ✓ Independent SEC-001 migration fault/recovery QA > rolls all flag inserts back on a SQLite trigger abort mid-transaction, then retries on reopen  836ms
+   ✓ Independent SEC-001 migration fault/recovery QA > recovers idempotently after flags commit but before the completion marker is written  705ms
+   ✓ Independent SEC-001 migration fault/recovery QA > backup includes committed WAL rows even while another connection keeps the WAL open  611ms
+   ✓ Independent SEC-001 migration fault/recovery QA > aborts before flagging if the dry-run report cannot be written, retaining a usable backup  746ms
+   ✓ Independent SEC-001 migration fault/recovery QA > completes provenance backfill on reopen after the completion marker commits but backfill aborts  712ms
+   ✓ Independent SEC-001 migration fault/recovery QA > can restore a migration backup to another disposable database and reapply quarantine without losing audit content  1077ms
+ ✓ packages/agent-core/src/sec001-quarantine-durability-qa.test.ts (8 tests) 6476ms
+   ✓ Independent SEC-001 quarantine durability and provenance QA > filters quarantined facts before applying the reader retrieval limit  751ms
+   ✓ Independent SEC-001 quarantine durability and provenance QA > a shared source key is quarantined per recipient without hiding its authorized owner's fact  781ms
+   ✓ Independent SEC-001 quarantine durability and provenance QA > source_event_id makes a non-event-key fact eligible for source authorization during migration  735ms
+   ✓ Independent SEC-001 quarantine durability and provenance QA > explicit source identity overrides a misleading authorized-looking fact key  579ms
+   ✓ Independent SEC-001 quarantine durability and provenance QA > SECURITY REGRESSION: rerunning quarantine must exclude a later memory copied from already-flagged poison  710ms
+   ✓ Independent SEC-001 quarantine durability and provenance QA > SECURITY REGRESSION: a completed migration marker must not authorize subsequently imported source-linked poison  598ms
+   ✓ Independent SEC-001 quarantine durability and provenance QA > dry-run reports are read-only even when they propose additional quarantine  938ms
+   ✓ Independent SEC-001 quarantine durability and provenance QA > a newly inserted suspicion keeps its classification; the known kind defect requires replacement  1382ms
+ ✓ packages/skills/src/collect.test.ts (12 tests) 2280ms
+   ✓ collectResource inventory truthfulness > succeeds only when the expected item enters inventory  329ms
+   ✓ collectResource inventory truthfulness > fails ITEM_NOT_FOUND when the block is removed but no drop is collected  1298ms
+ ✓ packages/agent-core/src/downstream-prompt-isolation.test.ts (13 tests) 1479ms
+ ✓ packages/skills/src/eat-food.test.ts (6 tests) 1747ms
+   ✓ eatFood verifies hunger recovery > succeeds only when food is consumed and hunger rises  928ms
+   ✓ eatFood verifies hunger recovery > fails VERIFY_FAILED when consume is a no-op  816ms
+ ✓ packages/agent-core/src/ops-recovery.test.ts (29 tests) 1674ms
+   ✓ OPS-001 stuck-stop: navigation STUCK / TIMEOUT never turns into fake progress > mineBlock: a STUCK approach is returned as-is, blacklists the target, and never digs  414ms
+   ✓ OPS-001 failure recovery: executor failure paths > bot.dig throwing a non-Error value becomes a DIG_FAILED result (no throw), no event, no claim left behind  555ms
+ ✓ packages/skills/src/harvest-truth.test.ts (8 tests) 4278ms
+   ✓ harvestCropAt / harvestPlot yield truthfulness > reports verified yield only from inventory deltas  547ms
+   ✓ harvestCropAt / harvestPlot yield truthfulness > keeps cropBroken true when drops are not collected  429ms
+   ✓ harvestCropAt / harvestPlot yield truthfulness > does not count existing inventory wheat as new yield  1938ms
+   ✓ harvestCropAt / harvestPlot yield truthfulness > reports replant success after verified harvest  670ms
+   ✓ harvestCropAt / harvestPlot yield truthfulness > keeps harvest success when replant fails after crop break  671ms
+ ✓ packages/skills/src/survival-gauntlet.test.ts (9 tests) 4296ms
+   ✓ Mission 017 survival gauntlet > scenario 3 — hunger recovery requires observable evidence  1616ms
+   ✓ Mission 017 survival gauntlet > scenario 4 — farming reports zero invented yield  1992ms
+   ✓ Mission 017 survival gauntlet > scenario 7 — unreachable destination fails without false arrival  415ms
+ ✓ packages/skills/src/farm.test.ts (11 tests) 1657ms
+   ✓ workFarmPlot verified progress > treats an already-planted immature plot as idle success  1549ms
+ ✓ packages/skills/src/collect-drop-mapping.test.ts (9 tests) 4726ms
+   ✓ collectResource drop-to-possession mapping > counts coal as possession after breaking coal_ore  305ms
+   ✓ collectResource drop-to-possession mapping > does not count an unrelated oak_sapling pickup as a log  1337ms
+   ✓ collectResource drop-to-possession mapping > fails when stone is broken and nothing is picked up  1311ms
+   ✓ collectResource drop-to-possession mapping > a pre-existing coal stack is not mistaken for a new acquisition when nothing drops  1332ms
+ ✓ packages/agent-core/src/gather-possession.test.ts (6 tests) 3812ms
+   ✓ gather_wood possession vs excavation > control: a dig that drops a log is success with +1 oak_log, and physicalWorkComplete  757ms
+   ✓ gather_wood possession vs excavation > F11: no ResourceCollected when the verified path fails (nothing entered inventory)  1362ms
+   ✓ gather_wood possession vs excavation > excavation without an inventory gain is not success, workComplete, a ResourceCollected event, or a completion memory  1346ms
+pnpm : stderr | packages/agent-core/src/ops-persistence.test.ts > OPS-001 restart: crash (no close) and in-flight
+writes > writes through safeWrite after shutdown are refused and never reach disk
+At line:2 char:1
++ pnpm test *> .baseline-evidence/isolation-test-final.log; $validation ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (stderr | packag...ever reach disk:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+
+[store] skipped write after close: late-meta
+
+ ✓ packages/agent-core/src/ops-cancellation.test.ts (18 tests) 1441ms
+ ✓ packages/agent-core/src/sec001-migration-qa.test.ts (12 tests) 10140ms
+   ✓ Independent SEC-001 authentic legacy SQLite migration QA > starts without SEC schema; migrates a COPY, preserves audit rows and backs up all historical content  844ms
+   ✓ Independent SEC-001 authentic legacy SQLite migration QA > keeps authorized private/directed history; flags unauthorized, missing-source and unaudienced public facts  880ms
+   ✓ Independent SEC-001 authentic legacy SQLite migration QA > persists flags, source references, deliveries and audit contents across two reopen/migration passes  680ms
+   ✓ Independent SEC-001 authentic legacy SQLite migration QA > SECURITY REGRESSION: unverified non-event observed facts require quarantine rather than automatic trust  660ms
+   ✓ Independent SEC-001 authentic legacy SQLite migration QA > SECURITY CONTRACT GAP: provenance-free paraphrased poisoned memories must not remain model-eligible  633ms
+   ✓ Independent SEC-001 authentic legacy SQLite migration QA > SECURITY REGRESSION: same-key suspicion replacement must update trust classification  678ms
+   ✓ Independent SEC-001 authentic legacy SQLite migration QA > SECURITY CONTRACT GAP: an authorized historical source key cannot authenticate unrelated secret fact content  957ms
+   ✓ Independent SEC-001 authentic legacy SQLite migration QA > cannot shed quarantine by overwriting a flagged key with a fresh ID  1381ms
+   ✓ Independent SEC-001 authentic legacy SQLite migration QA > preserves public announcements, directed speech and explicit cross-community sharing without widening the source  844ms
+   ✓ Independent SEC-001 authentic legacy SQLite migration QA > membership removal flags community-derived facts but preserves private and directed historical knowledge  936ms
+   ✓ Independent SEC-001 authentic legacy SQLite migration QA > records authorized speech as an attributed conversation (not proof of the speaker's claim)  808ms
+   ✓ Independent SEC-001 authentic legacy SQLite migration QA > SECURITY CONTRACT GAP: a reported claim needs a trust classification distinct from an undifferentiated observed fact  836ms
+ ✓ packages/agent-core/src/sec001-manager.test.ts (37 tests) 3606ms
+   ✓ same-community announcements (criterion 2) > a citizen's own choice reaches every member of its community through the real manager path, and no one else  446ms
+   ✓ voluntary cross-community sharing (criterion 3) > a citizen may tell a rival it has met about a line it was shown; only that community receives it  319ms
+ ✓ packages/agent-core/src/ops-persistence.test.ts (18 tests) 1544ms
+ ✓ packages/agent-core/src/knowledge-provenance.test.ts (19 tests) 1307ms
+   ✓ owner policy: fail-closed provenance and per-record recovery > constructor interruption rolls back provenance DDL, flags, audit and marker; closes its handle and recovers  715ms
+ ✓ packages/agent-core/src/homes.test.ts (8 tests) 633ms
+ ✓ packages/minecraft-adapter/src/ops-body-lock.test.ts (23 tests | 2 skipped) 464ms
+ ✓ packages/agent-core/src/sec001-audience.test.ts (8 tests) 1176ms
+   ✓ SEC-001 real store: migration of a pre-SEC-001 database > creates the tables, quarantines facts whose source event has no verified audience, keeps the rest  390ms
+ ✓ packages/agent-core/src/craft-e2e-planner-loop.test.ts (1 test) 5298ms
+   ✓ CRAFT-001 planner->executor loop from an empty inventory > reaches a wooden_pickaxe in a bounded number of ticks, each tick's claim matching the real inventory  5297ms
+ ✓ packages/agent-core/src/sec001-migration-manager-qa.test.ts (5 tests) 5111ms
+   ✓ Independent migrated SQLite -> actual manager cognition QA > migrated flagged fact and exact-derived memory cannot reach manager cognition, including after restart  1262ms
+   ✓ Independent migrated SQLite -> actual manager cognition QA > SECURITY REGRESSION: unverified legacy non-event poison must not reach actual manager memory  1166ms
+   ✓ Independent migrated SQLite -> actual manager cognition QA > SECURITY CONTRACT GAP: paraphrased historical poison must not reach actual manager memory  1132ms
+   ✓ Independent migrated SQLite -> actual manager cognition QA > SECURITY REGRESSION: suspicion replacement must not inherit manager observed-fact eligibility  1061ms
+   ✓ Independent migrated SQLite -> actual manager cognition QA > correctly flagged poison is absent for the other reader and private memory ownership remains separate  488ms
+ ✓ packages/skills/src/combat.test.ts (2 tests) 986ms
+   ✓ combat live-entity narrowing > attacks the live hostile entity and reports death without calling it out of range  984ms
+ ✓ packages/skills/src/collect-inventory-delta.test.ts (8 tests) 1123ms
+   ✓ collectResource inventory-delta verification > delayed drop: an item arriving after the dig (within the poll window) is still counted  405ms
+ ✓ packages/agent-core/src/community-audit-guard.test.ts (3 tests) 241ms
+ ✓ packages/cognition/src/cloud-admission-adversarial.test.ts (24 tests) 452ms
+stderr | packages/agent-core/src/store.test.ts > CivilizationStore > safeWrite and safeRead refuse work after close
+without throwing
+[store] skipped write after close: late
+
+ ✓ packages/agent-core/src/store.test.ts (5 tests) 275ms
+ ✓ packages/agent-core/src/workstations.test.ts (5 tests) 213ms
+ ✓ packages/agent-core/src/available-homes.test.ts (6 tests) 165ms
+ ✓ packages/minecraft-adapter/src/server-commands.test.ts (16 tests) 343ms
+ ✓ packages/agent-core/src/property-safety.test.ts (7 tests) 278ms
+ ✓ packages/agent-core/src/gather-fallback.test.ts (6 tests) 956ms
+   ✓ gather_wood excavation fallback verifies the EXPECTED item > real gain: fallback dig that drops an oak_log is success, +1 oak_log, one ResourceCollected(count 1)  359ms
+ ✓ packages/agent-core/src/home-ops.test.ts (10 tests) 595ms
+ ✓ packages/psychology/src/scenarios.test.ts (9 tests) 240ms
+ ✓ packages/cognition/src/openai-usage-regression.test.ts (16 tests) 220ms
+ ✓ packages/agent-core/src/community-physical-state.test.ts (22 tests) 414ms
+ ✓ packages/agent-core/src/dispatch-integrity.test.ts (16 tests) 242ms
+ ✓ packages/skills/src/gather.test.ts (4 tests) 421ms
+   ✓ mineBlock verifies the world change > fails when the log is still present after dig  416ms
+ ✓ packages/session-isolation/src/persistence.test.ts (14 tests) 144ms
+ ✓ packages/agent-core/src/recipes.test.ts (6 tests) 164ms
+ ✓ packages/skills/src/inventory-service.test.ts (6 tests) 241ms
+ ✓ packages/cognition/src/openai-responses.test.ts (23 tests) 163ms
+ ✓ packages/skills/src/dig-abort.test.ts (11 tests) 353ms
+ ✓ packages/agent-core/src/home-discovery.test.ts (9 tests) 151ms
+ ✓ packages/agent-core/src/demo-identity.test.ts (4 tests) 204ms
+ ✓ packages/cognition/src/learning.test.ts (9 tests) 81ms
+ ✓ packages/agent-core/src/activity-choice.test.ts (15 tests) 126ms
+ ✓ packages/agent-core/src/execution-engine.test.ts (4 tests) 190ms
+ ✓ packages/agent-core/src/persistent-fact-provenance.test.ts (12 tests) 101ms
+ ✓ packages/agent-core/src/autonomy-precedence.test.ts (12 tests) 128ms
+ ✓ packages/agent-core/src/construction-production-path.test.ts (15 tests) 145ms
+ ✓ packages/agent-core/src/planner.test.ts (49 tests) 126ms
+ ✓ packages/agent-core/src/autonomous-survival-cycle.test.ts (9 tests) 118ms
+ ✓ packages/skills/src/execution-engine.test.ts (4 tests) 102ms
+ ✓ packages/skills/src/world.test.ts (4 tests) 107ms
+ ✓ packages/agent-core/src/build-structure-intention.test.ts (10 tests) 131ms
+ ✓ packages/skills/src/obtain.test.ts (5 tests) 115ms
+ ✓ packages/agent-core/src/t3-sec001-boundaries.test.ts (10 tests) 99ms
+ ✓ packages/memory/src/store.test.ts (2 tests) 66ms
+ ✓ packages/psychology/src/psychology.test.ts (9 tests) 60ms
+ ✓ packages/cognition/src/v2.test.ts (21 tests) 62ms
+ ✓ packages/session-isolation/src/guards.test.ts (9 tests) 52ms
+ ✓ apps/orchestrator/src/construction-path-isolation.test.ts (39 tests) 214ms
+ ✓ packages/agent-core/src/planner-log-items.test.ts (10 tests) 120ms
+ ✓ packages/session-isolation/src/adapters.test.ts (25 tests) 54ms
+ ✓ packages/agent-core/src/operation-tracker.test.ts (4 tests) 46ms
+ ✓ packages/skills/src/mechanics.test.ts (3 tests) 98ms
+ ✓ packages/agent-core/src/citizen-context-2v2.test.ts (27 tests) 35ms
+ ✓ packages/session-isolation/src/cancellation.test.ts (18 tests) 35ms
+ ✓ packages/session-isolation/src/isolation.test.ts (19 tests) 28ms
+ ✓ packages/agent-core/src/bootstrap-decision-cycle.test.ts (3 tests) 117ms
+ ✓ packages/cognition/src/openai-schema-regression.test.ts (40 tests) 35ms
+ ✓ packages/skills/src/fish-quota.test.ts (19 tests) 91ms
+ ✓ packages/shared/src/observer.test.ts (10 tests) 36ms
+ ✓ packages/shared/src/shared.test.ts (7 tests) 36ms
+ ✓ packages/agent-core/src/planner-food-backoff.test.ts (3 tests) 108ms
+ ✓ packages/agent-core/src/task-recovery.test.ts (9 tests) 68ms
+ ✓ packages/shared/src/event-audience.test.ts (36 tests) 30ms
+ ✓ packages/minecraft-knowledge/src/knowledge.test.ts (22 tests) 36ms
+ ✓ packages/shared/src/demo-identity.test.ts (14 tests) 27ms
+ ✓ packages/cognition/src/cloud-fallback-regression.test.ts (8 tests) 23ms
+ ✓ packages/minecraft-adapter/src/hazard-nav.test.ts (15 tests) 22ms
+ ✓ packages/cognition/src/openai-config-regression.test.ts (42 tests) 23ms
+ ✓ packages/minecraft-adapter/src/step-jump.test.ts (17 tests) 14ms
+ ✓ packages/shared/src/bulletin-2v2-contract.test.ts (9 tests) 20ms
+ ✓ packages/shared/src/directives.test.ts (10 tests) 14ms
+ ✓ packages/agent-core/src/construction-evidence.test.ts (2 tests) 13ms
+ ✓ packages/minecraft-knowledge/src/recipes-121.test.ts (12 tests) 17ms
+ ✓ packages/skills/src/bootstrap-progression.test.ts (11 tests) 51ms
+ ✓ packages/agent-core/src/goal-dispatch.test.ts (9 tests) 14ms
+ ✓ packages/minecraft-knowledge/src/build-preflight.test.ts (10 tests) 14ms
+ ✓ packages/agent-core/src/construction-mission003.test.ts (8 tests) 41ms
+ ✓ packages/minecraft-knowledge/src/construction-blueprint-rules.test.ts (11 tests) 9ms
+ ✓ packages/minecraft-adapter/src/ops-stuck-stop.test.ts (10 tests) 9ms
+ ✓ packages/minecraft-adapter/src/interaction.test.ts (4 tests) 10ms
+ ✓ packages/cognition/src/cloud-budget-regression.test.ts (9 tests) 10ms
+ ✓ packages/minecraft-knowledge/src/structures.test.ts (7 tests) 10ms
+ ✓ packages/agent-core/src/projects.test.ts (2 tests) 7ms
+ ✓ packages/minecraft-adapter/src/obstacle-detour.test.ts (3 tests) 9ms
+ ✓ packages/cognition/src/cognition.test.ts (8 tests) 9ms
+ ✓ packages/agent-core/src/dev-reset.test.ts (2 tests) 8ms
+ ✓ packages/agent-core/src/construction-mission004-audit.test.ts (7 tests) 28ms
+ ✓ packages/minecraft-adapter/src/local-escape.test.ts (6 tests) 10ms
+ ✓ packages/minecraft-knowledge/src/ores.test.ts (9 tests) 9ms
+ ✓ packages/cognition/src/inference-queue-regression.test.ts (4 tests) 8ms
+ ✓ packages/minecraft-adapter/src/movement-sync.test.ts (5 tests) 6ms
+ ✓ packages/minecraft-adapter/src/terrain-memory.test.ts (3 tests) 7ms
+ ✓ apps/orchestrator/src/world-lab-one-citizen-guard.test.ts (10 tests) 14ms
+ ✓ packages/skills/src/fish.test.ts (11 tests) 12ms
+ ✓ packages/agent-core/src/build-structure.test.ts (3 tests) 12ms
+ ✓ packages/skills/src/mine.test.ts (22 tests) 12ms
+ ✓ packages/shared/src/visibility-2v2-contract.test.ts (19 tests) 7ms
+ ✓ packages/memory/src/audience-observers.test.ts (8 tests) 8ms
+ ✓ apps/orchestrator/src/world-lab-one-citizen-sequence.test.ts (5 tests) 10ms
+ ✓ packages/minecraft-adapter/src/travel-home.test.ts (9 tests) 6ms
+ ✓ packages/minecraft-adapter/src/shared-auto-jump.test.ts (1 test) 8ms
+ ✓ apps/orchestrator/src/fish-test-guard.test.ts (6 tests) 7ms
+ ✓ packages/minecraft-adapter/src/execution-engine.test.ts (9 tests) 7ms
+ ✓ packages/skills/src/placement.test.ts (10 tests) 6ms
+ ✓ packages/agent-core/src/claims.test.ts (4 tests) 5ms
+ ✓ packages/agent-core/src/bootstrap-wood-lists.test.ts (19 tests) 8ms
+ ✓ apps/orchestrator/src/home-test-guard.test.ts (5 tests) 5ms
+ ✓ apps/orchestrator/src/mine-test-guard.test.ts (6 tests) 6ms
+ ✓ packages/memory/src/events.test.ts (3 tests) 6ms
+ ✓ packages/society/src/society.test.ts (7 tests) 6ms
+ ✓ packages/minecraft-adapter/src/connection-health.test.ts (3 tests) 6ms
+ ✓ packages/minecraft-adapter/src/return-home-nav.test.ts (6 tests) 7ms
+ ✓ packages/minecraft-adapter/src/path-recovery.test.ts (4 tests) 5ms
+ ✓ apps/orchestrator/src/two-fish-test-guard.test.ts (7 tests) 8ms
+ ✓ apps/orchestrator/src/construction-experiment-guard.test.ts (14 tests) 9ms
+ ✓ apps/orchestrator/src/farm-test-guard.test.ts (4 tests) 5ms
+ ✓ packages/memory/src/retrieval.test.ts (3 tests) 6ms
+ ✓ packages/agent-core/src/blueprint.test.ts (2 tests) 6ms
+ ✓ packages/minecraft-adapter/src/death.test.ts (1 test) 6ms
+ ✓ packages/agent-core/src/wait-inside-home.test.ts (9 tests) 8ms
+ ✓ packages/agent-core/src/inventory-view.test.ts (2 tests) 5ms
+ ✓ apps/orchestrator/src/two-probe-test-guard.test.ts (3 tests) 4ms
+ ✓ packages/agent-core/src/shelter.test.ts (1 test) 5ms
+ ✓ packages/shared/src/colony-world.test.ts (2 tests) 4ms
+ ✓ packages/memory/src/memory.test.ts (1 test) 5ms
+ ✓ packages/agent-core/src/curfew-runtime.test.ts (7 tests) 6ms
+ ✓ packages/minecraft-adapter/src/navigation.test.ts (2 tests) 5ms
+ ✓ packages/agent-core/src/failure-backoff.test.ts (2 tests) 3ms
+ ✓ packages/agent-core/src/site.test.ts (2 tests) 4ms
+ ✓ packages/shared/src/entity-target.test.ts (4 tests) 4ms
+ ✓ packages/minecraft-knowledge/src/property.test.ts (3 tests) 4ms
+ ✓ packages/skills/src/blueprint-clear-site-safety.test.ts (1 test) 3ms
+ ✓ packages/skills/src/skills.test.ts (1 test) 3ms
+ ✓ packages/minecraft-adapter/src/body-lock.test.ts (2 tests) 3ms
+ ✓ packages/skills/src/gauntlet.test.ts (4 tests) 5ms
+ ✓ packages/agent-core/src/transfer.test.ts (1 test) 3ms
+stdout | packages/skills/src/craft-e2e-empty-start.test.ts > deterministic resource capability seeds (fake Mineflayer only) > seed 17 verifies an empty-start tool and stone chain
+{"scenario":"empty-start-capability","seed":17,"mode":"offline-fixture","humanInterventions":0,"suppliedInventory":[],"finalInventory":[{"name":"oak_planks","count":3},{"name":"stick","count":2},{"name":"wooden_pickaxe","count":1},{"name":"cobblestone","count":1}],"verifiedWorldModifications":[{"name":"crafting_table","position":{"x":5,"y":64,"z":5}}],"digs":["oak_log","oak_log","oak_log","stone"],"crafts":[{"result":"oak_planks","crafts":1,"withTable":false},{"result":"stick","crafts":1,"withTable":false},{"result":"oak_planks","crafts":1,"withTable":false},{"result":"crafting_table","crafts":1,"withTable":false},{"result":"oak_planks","crafts":1,"withTable":false},{"result":"wooden_pickaxe","crafts":1,"withTable":true}],"modelDecisions":0,"skillRequests":["obtain wooden_pickaxe","collect stone"],"health":[20,20],"hunger":[20,20],"deaths":0,"unmodeled":["hostiles","server physics","provider decisions","hunger progression"]}
+
+ ✓ packages/skills/src/optional-work.test.ts (3 tests) 4ms
+ ✓ packages/agent-core/src/executor-food.test.ts (6 tests) 4ms
+ ✓ packages/minecraft-adapter/src/enter-home.test.ts (2 tests) 3ms
+ ✓ packages/skills/src/furnace.test.ts (2 tests) 2ms
+ ✓ packages/agent-core/src/construction-water.test.ts (1 test) 2ms
+stdout | packages/skills/src/craft-e2e-empty-start.test.ts > deterministic resource capability seeds (fake Mineflayer only) > seed 41 verifies an empty-start tool and stone chain
+{"scenario":"empty-start-capability","seed":41,"mode":"offline-fixture","humanInterventions":0,"suppliedInventory":[],"finalInventory":[{"name":"oak_planks","count":3},{"name":"stick","count":2},{"name":"wooden_pickaxe","count":1},{"name":"cobblestone","count":1}],"verifiedWorldModifications":[{"name":"crafting_table","position":{"x":5,"y":64,"z":5}}],"digs":["oak_log","oak_log","oak_log","stone"],"crafts":[{"result":"oak_planks","crafts":1,"withTable":false},{"result":"stick","crafts":1,"withTable":false},{"result":"oak_planks","crafts":1,"withTable":false},{"result":"crafting_table","crafts":1,"withTable":false},{"result":"oak_planks","crafts":1,"withTable":false},{"result":"wooden_pickaxe","crafts":1,"withTable":true}],"modelDecisions":0,"skillRequests":["obtain wooden_pickaxe","collect stone"],"health":[20,20],"hunger":[20,20],"deaths":0,"unmodeled":["hostiles","server physics","provider decisions","hunger progression"]}
+
+stdout | packages/skills/src/craft-e2e-empty-start.test.ts > deterministic resource capability seeds (fake Mineflayer only) > seed 99 verifies an empty-start tool and stone chain
+{"scenario":"empty-start-capability","seed":99,"mode":"offline-fixture","humanInterventions":0,"suppliedInventory":[],"finalInventory":[{"name":"oak_planks","count":3},{"name":"stick","count":2},{"name":"wooden_pickaxe","count":1},{"name":"cobblestone","count":1}],"verifiedWorldModifications":[{"name":"crafting_table","position":{"x":7,"y":64,"z":3}}],"digs":["oak_log","oak_log","oak_log","stone"],"crafts":[{"result":"oak_planks","crafts":1,"withTable":false},{"result":"stick","crafts":1,"withTable":false},{"result":"oak_planks","crafts":1,"withTable":false},{"result":"crafting_table","crafts":1,"withTable":false},{"result":"oak_planks","crafts":1,"withTable":false},{"result":"wooden_pickaxe","crafts":1,"withTable":true}],"modelDecisions":0,"skillRequests":["obtain wooden_pickaxe","collect stone"],"health":[20,20],"hunger":[20,20],"deaths":0,"unmodeled":["hostiles","server physics","provider decisions","hunger progression"]}
+
+ ✓ packages/skills/src/craft-e2e-empty-start.test.ts (9 tests) 29812ms
+   ✓ CRAFT-001 offline bootstrap from an empty inventory > staged chain: logs -> planks -> sticks -> crafting table (placed) -> wooden pickaxe, with inventory deltas at every step  3549ms
+   ✓ CRAFT-001 offline bootstrap from an empty inventory > obtainItem(wooden_pickaxe) from an empty inventory gathers, crafts, places a table, uses the table window  4939ms
+   ✓ CRAFT-001 offline bootstrap from an empty inventory > is idempotent: a second obtainItem with the pickaxe held changes nothing  4913ms
+   ✓ CRAFT-001 offline bootstrap from an empty inventory > surfaces a rejected craft instead of reporting a pickaxe  670ms
+   ✓ deterministic resource capability seeds (fake Mineflayer only) > seed 17 verifies an empty-start tool and stone chain  5273ms
+   ✓ deterministic resource capability seeds (fake Mineflayer only) > seed 41 verifies an empty-start tool and stone chain  5132ms
+   ✓ deterministic resource capability seeds (fake Mineflayer only) > seed 99 verifies an empty-start tool and stone chain  5152ms
+
+ Test Files  159 passed (159)
+      Tests  1567 passed | 2 skipped (1569)
+   Start at  09:54:41
+   Duration  37.19s (transform 15.47s, setup 0ms, collect 179.59s, tests 118.22s, environment 52ms, prepare 47.55s)

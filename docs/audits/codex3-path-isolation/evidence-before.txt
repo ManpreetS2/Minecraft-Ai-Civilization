@@ -1,0 +1,92 @@
+
+ RUN  v3.2.7 C:/Users/sh1ft/.t3/worktrees/Minecraft-Ai-Civilization/agents-codex-baseline-stabilization
+
+ ❯ apps/orchestrator/src/construction-path-isolation.test.ts (36 tests | 2 failed) 112ms
+   ✓ host-independent path syntax (lexical semantics, not foreign OS execution) > compares C:\a\world-lab\ and c:/a/world-lab/world 1ms
+   ✓ host-independent path syntax (lexical semantics, not foreign OS execution) > compares C:/a/world-lab/ and C:/a/world-lab 0ms
+   ✓ host-independent path syntax (lexical semantics, not foreign OS execution) > compares C:/a/x/../world-lab and C:/a/world-lab/world 0ms
+   ✓ host-independent path syntax (lexical semantics, not foreign OS execution) > compares C:/a/world-lab and C:/a/world-lab-copy 0ms
+   ✓ host-independent path syntax (lexical semantics, not foreign OS execution) > compares C:/ and C:/a/world-lab 0ms
+   ✓ host-independent path syntax (lexical semantics, not foreign OS execution) > compares C:/a/world-lab and D:/a/world-lab 0ms
+   ✓ host-independent path syntax (lexical semantics, not foreign OS execution) > compares \\server\share\world-lab\ and //SERVER/SHARE/world-lab/world 0ms
+   ✓ host-independent path syntax (lexical semantics, not foreign OS execution) > compares //server/share/ and //server/share/world 0ms
+   ✓ host-independent path syntax (lexical semantics, not foreign OS execution) > compares //server/share/world and //server/share2/world 0ms
+   ✓ host-independent path syntax (lexical semantics, not foreign OS execution) > compares /sandbox/world-lab/ and /sandbox/world-lab 0ms
+   ✓ host-independent path syntax (lexical semantics, not foreign OS execution) > compares / and /sandbox/world-lab 0ms
+   ✓ host-independent path syntax (lexical semantics, not foreign OS execution) > compares /sandbox/World and /sandbox/world 0ms
+   ✓ host-independent path syntax (lexical semantics, not foreign OS execution) > compares /sandbox/world/../safe and /sandbox/world 0ms
+   ✓ host-independent path syntax (lexical semantics, not foreign OS execution) > compares /sandbox/world and /sandbox/world-copy 0ms
+   ✓ host-independent path syntax (lexical semantics, not foreign OS execution) > refuses to certify ambiguous identity "" 0ms
+   ✓ host-independent path syntax (lexical semantics, not foreign OS execution) > refuses to certify ambiguous identity "relative/world" 0ms
+   ✓ host-independent path syntax (lexical semantics, not foreign OS execution) > refuses to certify ambiguous identity "C:world" 0ms
+   ✓ host-independent path syntax (lexical semantics, not foreign OS execution) > refuses to certify ambiguous identity "\\world" 0ms
+   ✓ host-independent path syntax (lexical semantics, not foreign OS execution) > refuses to certify ambiguous identity "C:/world." 0ms
+   ✓ host-independent path syntax (lexical semantics, not foreign OS execution) > refuses to certify ambiguous identity "C:/world " 0ms
+   ✓ host-independent path syntax (lexical semantics, not foreign OS execution) > refuses to certify ambiguous identity "C:/world:stream" 0ms
+   ✓ host-independent path syntax (lexical semantics, not foreign OS execution) > refuses to certify ambiguous identity "\\\\?\\C:\\world" 0ms
+   ✓ host-independent path syntax (lexical semantics, not foreign OS execution) > refuses to certify ambiguous identity "//server" 0ms
+   ✓ host-independent path syntax (lexical semantics, not foreign OS execution) > refuses to certify ambiguous identity "bad\u0000path" 0ms
+   ✓ canonical isolation on the actual host filesystem > allows physically distinct disposable targets 10ms
+   ✓ canonical isolation on the actual host filesystem > rejects an isolated directory junction/symlink to the protected world 9ms
+   ✓ canonical isolation on the actual host filesystem > rejects an isolated database inside the protected world 9ms
+   ✓ canonical isolation on the actual host filesystem > rejects a database hard link to the protected database 10ms
+   ✓ canonical isolation on the actual host filesystem > fails closed when canonical identity cannot be read 5ms
+   ✓ canonical isolation on the actual host filesystem > rejects missing candidates 7ms
+   ✓ canonical isolation on the actual host filesystem > allows a valid gate with canonical paths and a new evidence directory 10ms
+   × canonical isolation on the actual host filesystem > rejects evidence redirected through a junction into the protected world 15ms
+     → expected true to be false // Object.is equality
+   × canonical isolation on the actual host filesystem > returns a refusal for an unsupported evidence path without throwing 9ms
+     → Unsupported absolute path syntax
+   ✓ canonical isolation on the actual host filesystem > fails closed when the isolated candidate canonical lookup fails 7ms
+   ✓ canonical isolation on the actual host filesystem > rejects a directory used as SQLite target: isolated 8ms
+   ✓ canonical isolation on the actual host filesystem > rejects a directory used as SQLite target: world-lab 7ms
+pnpm :
+At line:2 char:1
++ pnpm exec vitest run apps/orchestrator/src/construction-path-isolatio ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  apps/orchestrator/src/construction-path-isolation.test.ts > canonical isolation on the actual host filesystem >
+rejects evidence redirected through a junction into the protected world
+AssertionError: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ apps/orchestrator/src/construction-path-isolation.test.ts:108:138
+    106|   it("rejects evidence redirected through a junction into the protecte…
+    107|     symlinkSync(join(fixture.root, "world-lab"), join(fixture.root, "a…
+    108|     expect(evaluateConstructionExperimentLive({ ...approvedEnv(), CONS…
+       |
+                           ^
+    109|   });
+    110|   it("returns a refusal for an unsupported evidence path without throw…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  apps/orchestrator/src/construction-path-isolation.test.ts > canonical isolation on the actual host filesystem >
+returns a refusal for an unsupported evidence path without throwing
+Error: Unsupported absolute path syntax
+ ❯ resolveWorkspacePath apps/orchestrator/src/construction-experiment-guard.ts:103:11
+    101|   }
+    102|   if ((windowsAbsolute || relOrAbs.startsWith("/")) && !comparablePath…
+    103|     throw new Error("Unsupported absolute path syntax");
+       |           ^
+    104|   }
+    105|   const resolved = isAbsolute(relOrAbs) ? normalize(relOrAbs) : resolv…
+ ❯ Module.evaluateConstructionExperimentLive apps/orchestrator/src/construction-experiment-guard.ts:288:18
+ ❯ apps/orchestrator/src/construction-path-isolation.test.ts:111:12
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 34 passed (36)
+   Start at  09:53:36
+   Duration  3.83s (transform 1.05s, setup 0ms, collect 3.10s, tests 112ms, environment 0ms, prepare 203ms)

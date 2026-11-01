@@ -1,0 +1,27 @@
+
+> minecraft-ai-civilization@0.1.0 build C:\Users\sh1ft\.t3\worktrees\Minecraft-Ai-Civilization\agents-codex-baseline-stabilization
+> pnpm -r --if-present build
+
+Scope: 12 of 13 workspace projects
+packages/session-isolation build$ tsc -p tsconfig.json
+packages/shared build$ tsc -p tsconfig.json
+packages/session-isolation build: Done
+packages/shared build: Done
+packages/memory build$ tsc -p tsconfig.json
+packages/minecraft-knowledge build$ tsc -p tsconfig.json
+packages/society build$ tsc -p tsconfig.json
+packages/minecraft-adapter build$ tsc -p tsconfig.json
+packages/society build: Done
+packages/memory build: Done
+packages/minecraft-knowledge build: Done
+packages/minecraft-adapter build: Done
+packages/psychology build$ tsc -p tsconfig.json
+packages/skills build$ tsc -p tsconfig.json
+packages/psychology build: Done
+packages/skills build: Done
+packages/cognition build$ tsc -p tsconfig.json
+packages/cognition build: Done
+packages/agent-core build$ tsc -p tsconfig.json
+packages/agent-core build: Done
+apps/orchestrator build$ tsc -p tsconfig.json
+apps/orchestrator build: Done
