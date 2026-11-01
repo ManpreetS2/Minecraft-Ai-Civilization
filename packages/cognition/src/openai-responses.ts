@@ -263,8 +263,18 @@ export function assertOpenAiConfig(config: Pick<OpenAiResponsesConfig, "apiKey" 
   if (!isAllowedOpenAiModel(config.model)) {
     throw new Error(`Unsupported OpenAI model '${config.model}' — update allowlist intentionally`);
   }
-  if (!config.baseUrl.startsWith("https://") && !config.baseUrl.includes("127.0.0.1") && !config.baseUrl.includes("localhost")) {
+  let url: URL;
+  try {
+    url = new URL(config.baseUrl);
+  } catch {
+    throw new Error("OPENAI_BASE_URL must be a valid URL");
+  }
+  const isLocal = url.hostname === "localhost" || url.hostname === "127.0.0.1" || url.hostname === "[::1]";
+  if (url.protocol !== "https:" && !(url.protocol === "http:" && isLocal)) {
     throw new Error("OPENAI_BASE_URL must be https (or localhost for offline mocks)");
+  }
+  if (url.username || url.password) {
+    throw new Error("OPENAI_BASE_URL must not contain embedded credentials");
   }
 }
 
