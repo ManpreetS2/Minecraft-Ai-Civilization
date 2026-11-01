@@ -29,7 +29,23 @@ export class CloudBudgetGate {
       /** Conservative pre-request reserve when usage is unknown. */
       reserveUsdPerRequest?: number;
     },
-  ) {}
+  ) {
+    if (!Number.isSafeInteger(limits.maxConcurrency) || limits.maxConcurrency < 1) {
+      throw new RangeError("maxConcurrency must be a positive integer");
+    }
+    if (!Number.isSafeInteger(limits.maxRequestsPerRun) || limits.maxRequestsPerRun < 0) {
+      throw new RangeError("maxRequestsPerRun must be a non-negative integer");
+    }
+    if (!Number.isFinite(limits.spendAllowanceUsd) || limits.spendAllowanceUsd < 0) {
+      throw new RangeError("spendAllowanceUsd must be finite and non-negative");
+    }
+    if (
+      limits.reserveUsdPerRequest !== undefined &&
+      (!Number.isFinite(limits.reserveUsdPerRequest) || limits.reserveUsdPerRequest < 0)
+    ) {
+      throw new RangeError("reserveUsdPerRequest must be finite and non-negative");
+    }
+  }
 
   get snapshot() {
     return {
@@ -70,9 +86,25 @@ export class CloudBudgetGate {
   }
 
   reconcile(reservationId: string, usage: CloudUsageReport | undefined, failed: boolean): number {
-    const reserved = this.reservations.get(reservationId) ?? 0;
+    // Never release an unrelated in-flight request when an unknown/settled ID is supplied.
+    const reserved = this.reservations.get(reservationId);
+    if (reserved === undefined) {
+      throw new Error("cloud reservation is unknown or already reconciled");
+    }
+    // Malformed provider token accounting must not turn spendUsd into NaN and fail open.
+    if (
+      !failed &&
+      usage &&
+      (!Number.isSafeInteger(usage.inputTokens) ||
+        usage.inputTokens < 0 ||
+        !Number.isSafeInteger(usage.outputTokens) ||
+        usage.outputTokens < 0)
+    ) {
+      this.close();
+      throw new Error("invalid cloud usage report; cloud admissions disabled");
+    }
     this.reservations.delete(reservationId);
-    this.inFlight = Math.max(0, this.inFlight - 1);
+    this.inFlight -= 1;
     let actual = 0;
     if (!failed && usage) {
       actual = estimateCloudCostUsd({
