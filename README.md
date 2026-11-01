@@ -17,8 +17,6 @@ Minecraft AI Civilization is an independent research and engineering project bui
 
 ## The first experiment: GPT vs Claude, without a scripted winner
 
-<escape> </escape>
-
 | | First technical gate | First public demonstration |
 | --- | --- | --- |
 | Citizens | **1 GPT-family + 1 Claude-family** | **2 GPT-family + 2 Claude-family** |
