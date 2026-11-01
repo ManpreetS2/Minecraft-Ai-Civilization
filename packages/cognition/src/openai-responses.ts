@@ -1,5 +1,5 @@
 import { GOALS } from "./goals.js";
-import { CloudBudgetGate } from "./cloud-budget.js";
+import { CloudBudgetGate, type CloudUsageReport } from "./cloud-budget.js";
 import { CloudDecisionLedger, type CloudDecisionRecord } from "./decision-record.js";
 import { isAllowedOpenAiModel } from "./cloud-prices.js";
 import { formatPrompt } from "./ollama.js";
@@ -20,6 +20,13 @@ export type OpenAiResponsesConfig = {
   fetchImpl?: FetchLike;
   /** Optional run/trigger label for records. */
   defaultTrigger?: string;
+};
+
+/** Set once the provider returns HTTP success; its reservation is then settled and never refunded. */
+type BilledAttempt = {
+  httpStatus: number;
+  estimatedCostUsd: number;
+  usage?: CloudUsageReport;
 };
 
 const DECISION_JSON_SCHEMA = {
@@ -88,17 +95,25 @@ export class OpenAiResponsesProvider implements CognitionProvider {
     let lastStatus: number | undefined;
     let attempt = 0;
     const maxAttempts = 1 + Math.max(0, this.config.maxRetries);
+    let billed: BilledAttempt | undefined;
 
     try {
       while (attempt < maxAttempts) {
         attempt += 1;
-        if (controller.signal.aborted || this.closed) {
-          throw new Error("OpenAI request cancelled");
-        }
         try {
-          const { decision, usage, requestId, httpStatus } = await this.invokeOnce(prompt, controller.signal);
+          if (controller.signal.aborted || this.closed) {
+            throw new Error("OpenAI request cancelled");
+          }
+          const response = await this.requestOnce(prompt, controller.signal);
+          // The provider accepted the call, so it is billable whatever its output turns out to be.
+          billed = { httpStatus: response.status, estimatedCostUsd: admission.reservedUsd };
+          const payload = await this.settleBilledResponse(admission.reservationId, response, billed);
+          const usage = billed.usage!;
+          const estimatedCostUsd = billed.estimatedCostUsd;
+          const httpStatus = billed.httpStatus;
+          const decision = this.parseDecision(payload);
+          const requestId = typeof payload.id === "string" ? payload.id : undefined;
           const latencyMs = Date.now() - startedMs;
-          const estimatedCostUsd = this.config.budget.reconcile(admission.reservationId, usage, false);
           this.ledger.push({
             id: crypto.randomUUID(),
             citizenName: prompt.citizenName,
@@ -121,8 +136,10 @@ export class OpenAiResponsesProvider implements CognitionProvider {
           lastStatus = (error as { httpStatus?: number }).httpStatus;
           const message = error instanceof Error ? error.message : String(error);
           const retryable = lastStatus === 429 || lastStatus === 500 || lastStatus === 503;
-          if (!retryable || attempt >= maxAttempts || lastStatus === 401) {
-            this.config.budget.reconcile(admission.reservationId, undefined, true);
+          if (!retryable || attempt >= maxAttempts || lastStatus === 401 || !this.config.budget.tryChargeRetry()) {
+            if (!billed) {
+              this.config.budget.reconcile(admission.reservationId, undefined, true);
+            }
             this.ledger.push({
               id: crypto.randomUUID(),
               citizenName: prompt.citizenName,
@@ -132,10 +149,13 @@ export class OpenAiResponsesProvider implements CognitionProvider {
               startedAt,
               completedAt: new Date().toISOString(),
               latencyMs: Date.now() - startedMs,
+              inputTokens: billed?.usage?.inputTokens,
+              outputTokens: billed?.usage?.outputTokens,
+              estimatedCostUsd: billed?.estimatedCostUsd,
               ok: false,
               failureReason: message,
               rejectedGoal: undefined,
-              httpStatus: lastStatus,
+              httpStatus: lastStatus ?? billed?.httpStatus,
             });
             throw error instanceof Error ? error : new Error(message);
           }
@@ -148,15 +168,7 @@ export class OpenAiResponsesProvider implements CognitionProvider {
     }
   }
 
-  private async invokeOnce(
-    prompt: CognitionPrompt,
-    signal: AbortSignal,
-  ): Promise<{
-    decision: HighLevelDecision;
-    usage: { inputTokens: number; outputTokens: number; model: string };
-    requestId?: string;
-    httpStatus: number;
-  }> {
+  private async requestOnce(prompt: CognitionPrompt, signal: AbortSignal): Promise<Response> {
     const url = `${this.config.baseUrl.replace(/\/$/, "")}/responses`;
     const body = {
       model: this.config.model,
@@ -190,6 +202,8 @@ export class OpenAiResponsesProvider implements CognitionProvider {
         authorization: `Bearer ${this.config.apiKey}`,
       },
       signal,
+      // assertOpenAiConfig only vets the configured URL; a redirect must not carry the prompt elsewhere.
+      redirect: "error",
       body: JSON.stringify(body),
     });
 
@@ -198,43 +212,38 @@ export class OpenAiResponsesProvider implements CognitionProvider {
       err.httpStatus = response.status;
       throw err;
     }
+    return response;
+  }
 
-    const payload = (await response.json()) as Record<string, unknown>;
-    assertNoSecretLeak(payload, this.config.apiKey);
-    const text = extractResponsesOutputText(payload);
-    const decision = validateDecision(extractJson(text));
-    const usageRaw = (payload.usage ?? {}) as {
-      input_tokens?: number;
-      output_tokens?: number;
-      prompt_tokens?: number;
-      completion_tokens?: number;
-    };
-    const inputTokens = usageRaw.input_tokens ?? usageRaw.prompt_tokens;
-    const outputTokens = usageRaw.output_tokens ?? usageRaw.completion_tokens;
-    if (
-      typeof inputTokens !== "number" ||
-      !Number.isSafeInteger(inputTokens) ||
-      inputTokens < 0 ||
-      typeof outputTokens !== "number" ||
-      !Number.isSafeInteger(outputTokens) ||
-      outputTokens < 0
-    ) {
+  /** Settles the reservation exactly once, before the output is interpreted. */
+  private async settleBilledResponse(
+    reservationId: string,
+    response: Response,
+    billed: BilledAttempt,
+  ): Promise<Record<string, unknown>> {
+    let payload: unknown;
+    try {
+      payload = await response.json();
+    } catch (error) {
+      this.config.budget.settleUnknownUsage(reservationId);
+      throw error;
+    }
+    const usage = readUsage(payload, this.config.model);
+    if (!usage) {
       // A successful response may still be billable when usage is absent.
-      // Refuse further calls rather than silently treating an unknown cost as zero.
-      this.config.budget.close();
+      // Keep the reserve as spend and refuse further calls rather than treating an unknown cost as zero.
+      this.config.budget.settleUnknownUsage(reservationId);
       throw new Error("OpenAI response missing or invalid token usage; cloud admissions disabled");
     }
-    const usage = {
-      model: this.config.model,
-      inputTokens,
-      outputTokens,
-    };
-    return {
-      decision,
-      usage,
-      requestId: typeof payload.id === "string" ? payload.id : undefined,
-      httpStatus: response.status,
-    };
+    billed.usage = usage;
+    billed.estimatedCostUsd = this.config.budget.reconcile(reservationId, usage, false);
+    return payload as Record<string, unknown>;
+  }
+
+  private parseDecision(payload: Record<string, unknown>): HighLevelDecision {
+    assertNoSecretLeak(payload, this.config.apiKey);
+    const text = extractResponsesOutputText(payload);
+    return validateDecision(extractJson(text));
   }
 
   private recordFailure(
@@ -297,6 +306,30 @@ export function extractResponsesOutputText(payload: Record<string, unknown>): st
     }
   }
   throw new Error("OpenAI response contained no decision text");
+}
+
+function readUsage(payload: unknown, model: string): CloudUsageReport | undefined {
+  const usageRaw = (payload as { usage?: unknown } | null)?.usage;
+  if (typeof usageRaw !== "object" || usageRaw === null) return undefined;
+  const raw = usageRaw as {
+    input_tokens?: unknown;
+    output_tokens?: unknown;
+    prompt_tokens?: unknown;
+    completion_tokens?: unknown;
+  };
+  const inputTokens = raw.input_tokens ?? raw.prompt_tokens;
+  const outputTokens = raw.output_tokens ?? raw.completion_tokens;
+  if (
+    typeof inputTokens !== "number" ||
+    !Number.isSafeInteger(inputTokens) ||
+    inputTokens < 0 ||
+    typeof outputTokens !== "number" ||
+    !Number.isSafeInteger(outputTokens) ||
+    outputTokens < 0
+  ) {
+    return undefined;
+  }
+  return { model, inputTokens, outputTokens };
 }
 
 function assertNoSecretLeak(payload: unknown, apiKey: string): void {

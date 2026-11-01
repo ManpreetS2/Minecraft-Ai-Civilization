@@ -41,9 +41,10 @@ export class CloudBudgetGate {
     }
     if (
       limits.reserveUsdPerRequest !== undefined &&
-      (!Number.isFinite(limits.reserveUsdPerRequest) || limits.reserveUsdPerRequest < 0)
+      (!Number.isFinite(limits.reserveUsdPerRequest) || limits.reserveUsdPerRequest <= 0)
     ) {
-      throw new RangeError("reserveUsdPerRequest must be finite and non-negative");
+      // A zero reserve would admit calls past a zero allowance and make unknown-cost calls free.
+      throw new RangeError("reserveUsdPerRequest must be finite and positive");
     }
   }
 
@@ -85,12 +86,16 @@ export class CloudBudgetGate {
     return { ok: true, reservationId, reservedUsd: reserve };
   }
 
-  reconcile(reservationId: string, usage: CloudUsageReport | undefined, failed: boolean): number {
-    // Never release an unrelated in-flight request when an unknown/settled ID is supplied.
-    const reserved = this.reservations.get(reservationId);
-    if (reserved === undefined) {
-      throw new Error("cloud reservation is unknown or already reconciled");
+  /** A retry is another HTTP request, so it draws on the same per-run request budget. */
+  tryChargeRetry(): boolean {
+    if (this.closed || this.requestsUsed >= this.limits.maxRequestsPerRun) {
+      return false;
     }
+    this.requestsUsed += 1;
+    return true;
+  }
+
+  reconcile(reservationId: string, usage: CloudUsageReport | undefined, failed: boolean): number {
     // Malformed provider token accounting must not turn spendUsd into NaN and fail open.
     if (
       !failed &&
@@ -100,11 +105,10 @@ export class CloudBudgetGate {
         !Number.isSafeInteger(usage.outputTokens) ||
         usage.outputTokens < 0)
     ) {
-      this.close();
+      this.settleUnknownUsage(reservationId);
       throw new Error("invalid cloud usage report; cloud admissions disabled");
     }
-    this.reservations.delete(reservationId);
-    this.inFlight -= 1;
+    const reserved = this.takeReservation(reservationId);
     let actual = 0;
     if (!failed && usage) {
       actual = estimateCloudCostUsd({
@@ -117,7 +121,27 @@ export class CloudBudgetGate {
     return actual;
   }
 
+  /**
+   * The provider accepted the call but its cost cannot be determined.
+   * The reserve stays counted as spend and no further calls are admitted.
+   */
+  settleUnknownUsage(reservationId: string): void {
+    this.takeReservation(reservationId);
+    this.close();
+  }
+
   releaseWithoutCharge(reservationId: string): void {
     this.reconcile(reservationId, undefined, true);
+  }
+
+  private takeReservation(reservationId: string): number {
+    // Never release an unrelated in-flight request when an unknown/settled ID is supplied.
+    const reserved = this.reservations.get(reservationId);
+    if (reserved === undefined) {
+      throw new Error("cloud reservation is unknown or already reconciled");
+    }
+    this.reservations.delete(reservationId);
+    this.inFlight -= 1;
+    return reserved;
   }
 }

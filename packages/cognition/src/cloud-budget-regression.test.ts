@@ -50,8 +50,8 @@ describe("CloudBudgetGate reservation integrity", () => {
     expect(budget.snapshot.closed).toBe(true);
     expect(Number.isFinite(budget.snapshot.spendUsd)).toBe(true);
     expect(budget.tryAdmit()).toMatchObject({ ok: false, reason: "cloud cognition shut down" });
-    budget.releaseWithoutCharge(reservation);
     expect(budget.snapshot.inFlight).toBe(0);
+    expect(budget.snapshot.spendUsd).toBeCloseTo(0.01);
   });
 
   it("does not interpret missing usage on a successful call as a free request", () => {
@@ -59,9 +59,44 @@ describe("CloudBudgetGate reservation integrity", () => {
     const reservation = admitted(budget.tryAdmit());
     expect(() => budget.reconcile(reservation, undefined, false)).toThrow(/invalid cloud usage/);
     expect(budget.snapshot.closed).toBe(true);
-    expect(Number.isFinite(budget.snapshot.spendUsd)).toBe(true);
-    budget.releaseWithoutCharge(reservation);
     expect(budget.snapshot.inFlight).toBe(0);
+    expect(budget.snapshot.spendUsd).toBeCloseTo(0.01);
+    // The reserve cannot be refunded after the call was treated as billable.
+    expect(() => budget.releaseWithoutCharge(reservation)).toThrow(/unknown or already reconciled/);
+    expect(budget.snapshot.spendUsd).toBeCloseTo(0.01);
+  });
+
+  it("settling unknown usage keeps other live reservations intact", () => {
+    const budget = gate();
+    const first = admitted(budget.tryAdmit());
+    const second = admitted(budget.tryAdmit());
+    budget.settleUnknownUsage(first);
+    expect(budget.snapshot).toMatchObject({ inFlight: 1, closed: true });
+    expect(budget.snapshot.spendUsd).toBeCloseTo(0.02);
+    budget.releaseWithoutCharge(second);
+    expect(budget.snapshot.inFlight).toBe(0);
+    expect(budget.snapshot.spendUsd).toBeCloseTo(0.01);
+  });
+
+  it("charges retries to the request budget and refuses them once exhausted or closed", () => {
+    const budget = new CloudBudgetGate({ maxConcurrency: 1, maxRequestsPerRun: 2, spendAllowanceUsd: 1 });
+    admitted(budget.tryAdmit());
+    expect(budget.tryChargeRetry()).toBe(true);
+    expect(budget.snapshot.requestsUsed).toBe(2);
+    expect(budget.tryChargeRetry()).toBe(false);
+    expect(budget.snapshot.requestsUsed).toBe(2);
+
+    const closed = gate();
+    closed.close();
+    expect(closed.tryChargeRetry()).toBe(false);
+  });
+
+  it("does not admit a zero-cost reservation past a zero allowance", () => {
+    expect(
+      () => new CloudBudgetGate({ maxConcurrency: 1, maxRequestsPerRun: 1, spendAllowanceUsd: 0, reserveUsdPerRequest: 0 }),
+    ).toThrow(RangeError);
+    const zero = new CloudBudgetGate({ maxConcurrency: 1, maxRequestsPerRun: 1, spendAllowanceUsd: 0 });
+    expect(zero.tryAdmit()).toMatchObject({ ok: false, reason: "cloud spend allowance exhausted" });
   });
 
   it("closes cloud admissions for negative or fractional token counts", () => {

@@ -15,6 +15,10 @@ describe("OpenAI base URL host validation", () => {
     "http://example.test/?next=127.0.0.1",
     "ftp://localhost/v1",
     "http://example.test:8080/v1",
+    "http://localhost@attacker.test/v1",
+    "http://127.0.0.1:80@attacker.test/v1",
+    "http://[::1].attacker.test/v1",
+    "http://[::ffff:8.8.8.8]/v1",
   ])("rejects nonlocal plaintext endpoints even if they contain a loopback-looking substring: %s", (url) => {
     expect(() => assertOpenAiConfig(config(url))).toThrow(/OPENAI_BASE_URL/);
   });
@@ -31,5 +35,12 @@ describe("OpenAI base URL host validation", () => {
   it("rejects malformed URLs and embedded URL credentials", () => {
     expect(() => assertOpenAiConfig(config("not a URL"))).toThrow(/OPENAI_BASE_URL/);
     expect(() => assertOpenAiConfig(config("https://name:password@api.openai.com/v1"))).toThrow(/embedded credentials/);
+    expect(() => assertOpenAiConfig(config("http://name:password@localhost:1234/v1"))).toThrow(/embedded credentials/);
+  });
+
+  it("does not echo a rejected URL's credentials in the error", () => {
+    expect(() => assertOpenAiConfig(config("http://name:s3cret@attacker.test/v1"))).toThrow(
+      expect.not.objectContaining({ message: expect.stringContaining("s3cret") }),
+    );
   });
 });
