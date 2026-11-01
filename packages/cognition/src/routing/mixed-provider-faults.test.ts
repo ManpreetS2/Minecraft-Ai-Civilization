@@ -120,3 +120,26 @@ describe("a late reply after the run was closed", () => {
     expect(citizens["gpt-b"]).toMatchObject({ requests: 0, estimatedSpendUsd: 0 });
   });
 });
+
+describe("a crash during a retry wait", () => {
+  it.each(["gpt-a", "claude-a"] as const)("%s: after restart the unresolved request stays held, the shared run keeps its totals, and the other family is unaffected", async (id) => {
+    const store = createInMemoryCitizenSessionStore();
+    let calls = 0;
+    const first = offlineRegistry({ store, assignments: patient, retryBaseDelayMs: 60_000, script: () => (calls++ === 0 ? { status: 503 } : {}) });
+    const pending = first.registry.providerFor(id).decide(prompt(NAME[id]));
+    pending.catch(() => undefined);
+    await vi.waitFor(() => expect(calls).toBe(1));
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    const persisted = first.registry.accounting();
+    // The process dies here: nothing is closed, and no further write reaches the store.
+    const restarted = offlineRegistry({ store });
+    const after = restarted.registry.accounting();
+    expect(after.experiment.requestsUsed).toBe(persisted.experiment.requestsUsed);
+    expect(after.experiment.heldUsd + after.experiment.reservedUsd).toBeGreaterThanOrEqual(persisted.experiment.heldUsd);
+    expect(after.experiment.inFlight).toBe(0);
+    expect(after.citizens[id]!.requests).toBe(1);
+    const other = id === "gpt-a" ? "claude-a" : "gpt-a";
+    await expect(restarted.registry.providerFor(other).decide(prompt(NAME[other]))).resolves.toBeDefined();
+    first.registry.providerFor(id).cancel();
+  });
+});
