@@ -35,7 +35,11 @@ export class InferenceQueue {
   private readonly waiting: Array<Waiter<unknown>> = [];
   private inFlight = 0;
 
-  constructor(private readonly maxConcurrency: number) {}
+  constructor(private readonly maxConcurrency: number) {
+    if (!Number.isSafeInteger(maxConcurrency) || maxConcurrency < 1) {
+      throw new RangeError("maxConcurrency must be a positive integer");
+    }
+  }
 
   snapshot(): QueueSnapshot {
     return { queued: this.waiting.length, inFlight: this.inFlight, maxConcurrency: this.maxConcurrency };
@@ -60,8 +64,9 @@ export class InferenceQueue {
       this.inFlight += 1;
       const started = Date.now();
       const queueWaitMs = started - next.enqueuedAt;
-      void next.job
-        .run()
+      // Capture synchronous job throws as rejections so the in-flight slot is always released.
+      void Promise.resolve()
+        .then(() => next.job.run())
         .then((value) => {
           next.resolve({
             value,

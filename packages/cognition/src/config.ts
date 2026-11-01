@@ -8,12 +8,15 @@ export type CloudCognitionConfig = {
   apiKey: string;
   model: string;
   baseUrl: string;
+  customEndpointHost: string;
   timeoutMs: number;
+  maxInputTokens: number;
   maxOutputTokens: number;
   maxConcurrency: number;
   maxRequestsPerRun: number;
   spendAllowanceUsd: number;
   maxRetries: number;
+  fallbackProvider: AppConfig["CLOUD_FALLBACK_PROVIDER"];
 };
 
 export type CognitionConfig = {
@@ -57,12 +60,15 @@ export function resolveCognitionConfig(config: AppConfig): CognitionConfig {
       apiKey: config.OPENAI_API_KEY ?? "",
       model: config.OPENAI_MODEL,
       baseUrl: config.OPENAI_BASE_URL,
+      customEndpointHost: config.OPENAI_CUSTOM_ENDPOINT_HOST,
       timeoutMs: config.CLOUD_TIMEOUT_MS,
+      maxInputTokens: config.CLOUD_MAX_INPUT_TOKENS,
       maxOutputTokens: config.CLOUD_MAX_OUTPUT_TOKENS,
       maxConcurrency: config.CLOUD_MAX_CONCURRENCY,
       maxRequestsPerRun: config.CLOUD_MAX_REQUESTS_PER_RUN,
       spendAllowanceUsd: config.CLOUD_SPEND_ALLOWANCE_USD,
       maxRetries: config.CLOUD_MAX_RETRIES,
+      fallbackProvider: config.CLOUD_FALLBACK_PROVIDER,
     },
   };
 }

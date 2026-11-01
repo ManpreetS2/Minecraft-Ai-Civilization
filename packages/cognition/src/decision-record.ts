@@ -11,7 +11,10 @@ export type CloudDecisionRecord = {
   latencyMs?: number;
   inputTokens?: number;
   outputTokens?: number;
+  /** Estimated from provider-reported usage only. */
   estimatedCostUsd?: number;
+  /** Conservative hold for attempts that reported no usage. Not confirmed billing. */
+  unverifiedHoldUsd?: number;
   ok: boolean;
   failureReason?: string;
   acceptedGoal?: string;

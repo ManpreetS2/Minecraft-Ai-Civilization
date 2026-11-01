@@ -33,13 +33,42 @@ export function isAllowedOpenAiModel(model: string): model is OpenAiAllowedModel
   return (OPENAI_ALLOWED_MODELS as readonly string[]).includes(model);
 }
 
+function priceForModel(model: string): CloudModelPrice | undefined {
+  if (!Object.hasOwn(OPENAI_MODEL_PRICES, model)) return undefined;
+  const price = OPENAI_MODEL_PRICES[model]!;
+  const valid = [price.inputPerMillionUsd, price.outputPerMillionUsd].every((rate) => Number.isFinite(rate) && rate > 0);
+  return valid ? price : undefined;
+}
+
+export function hasCloudModelPrice(model: string): boolean {
+  return priceForModel(model) !== undefined;
+}
+
+function rawCostUsd(price: CloudModelPrice, inputTokens: number, outputTokens: number): number {
+  const input = (Math.max(0, inputTokens) / 1_000_000) * price.inputPerMillionUsd;
+  const output = (Math.max(0, outputTokens) / 1_000_000) * price.outputPerMillionUsd;
+  return input + output;
+}
+
 export function estimateCloudCostUsd(params: {
   model: string;
   inputTokens: number;
   outputTokens: number;
 }): number {
-  const price = OPENAI_MODEL_PRICES[params.model] ?? OPENAI_MODEL_PRICES["gpt-4o-mini"]!;
-  const input = (Math.max(0, params.inputTokens) / 1_000_000) * price.inputPerMillionUsd;
-  const output = (Math.max(0, params.outputTokens) / 1_000_000) * price.outputPerMillionUsd;
-  return Number((input + output).toFixed(8));
+  const price = priceForModel(params.model);
+  if (!price) {
+    throw new Error(`No configured price for model '${params.model}'`);
+  }
+  return Number(rawCostUsd(price, params.inputTokens, params.outputTokens).toFixed(8));
+}
+
+/** Rounded up so it can never sit below estimateCloudCostUsd for the same counts. NaN when unpriced. */
+export function boundCloudAttemptCostUsd(params: {
+  model: string;
+  inputTokens: number;
+  outputTokens: number;
+}): number {
+  const price = priceForModel(params.model);
+  if (!price) return Number.NaN;
+  return Math.ceil(rawCostUsd(price, params.inputTokens, params.outputTokens) * 1e8) / 1e8;
 }
