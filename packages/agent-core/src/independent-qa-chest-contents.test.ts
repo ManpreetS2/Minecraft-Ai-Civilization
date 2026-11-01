@@ -64,7 +64,7 @@ describe("QA: access to observed contents follows authorization", () => {
   it("negative or fractional counts are rejected without changing what is stored", () => {
     const owner = of("citizen_atlas");
     owner.recordContainerObservation(key, { bread: 4 });
-    for (const bad of [{ bread: -1 }, { bread: 1.5 }, { bread: Number.NaN }, { "": 1 }]) {
+    for (const bad of [{ bread: -1 }, { bread: 1.5 }, { bread: Number.NaN }, { "": 1 }] as Array<Record<string, number>>) {
       expect(() => owner.recordContainerObservation(key, bad)).toThrow();
     }
     expect(owner.observedContainerContents(key)).toEqual({ bread: 4 });
@@ -101,7 +101,7 @@ describe("QA: access to observed contents follows authorization", () => {
 describe("QA: a failed withdrawal must not leave a stale positive observation", () => {
   it.fails("DEFECT: observed bread stays after a live withdrawal finds the chest empty, so the same doomed attempt repeats", async () => {
     of("citizen_atlas").recordContainerObservation(key, { bread: 4 });
-    vi.mocked(withdrawItems).mockResolvedValue(fail("CONTAINER_EMPTY", "chest holds no bread", 1, true));
+    vi.mocked(withdrawItems).mockResolvedValue(fail("VERIFY_FAILED", "chest holds no bread", 1, true));
     const actor = await ctx("citizen_atlas");
     const first = await executePlan(actor, { ...withdrawPlan, item: "bread" }, store, new EventBus());
     expect(first.success).toBe(false);
