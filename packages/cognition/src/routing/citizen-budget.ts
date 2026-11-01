@@ -52,7 +52,8 @@ export class CitizenBudgetView implements CloudBudget {
     private readonly shared: CloudBudgetGate,
     private readonly limits: CitizenBudgetLimits,
     private readonly account: CitizenAccount,
-    private readonly onChange: () => void = () => undefined,
+    /** Records the account durably, returning false if it could not. */
+    private readonly onChange: () => boolean = () => true,
   ) {
     for (const [name, value] of Object.entries(limits)) {
       if (value !== undefined && (!Number.isFinite(value) || value < 0)) {
@@ -73,18 +74,23 @@ export class CitizenBudgetView implements CloudBudget {
 
   tryAdmit(estimate: CloudAdmissionEstimate): CloudAdmissionDecision {
     const decision = this.admit(estimate);
-    if (decision.ok) {
-      this.reservations.set(decision.reservationId, {
-        remainingUsd: decision.reservedUsd,
-        attemptBoundUsd: estimate.attemptBoundUsd,
-      });
-      this.account.requests += 1;
-      this.account.reservedUsd += decision.reservedUsd;
-    } else {
+    if (!decision.ok) {
       this.account.refused += 1;
+      this.onChange();
+      return decision;
     }
-    this.onChange();
-    return decision;
+    this.reservations.set(decision.reservationId, {
+      remainingUsd: decision.reservedUsd,
+      attemptBoundUsd: estimate.attemptBoundUsd,
+    });
+    this.account.requests += 1;
+    this.account.reservedUsd += decision.reservedUsd;
+    if (this.onChange()) return decision;
+    // Nothing has been sent. A request a restart could forget must not be sent at all.
+    this.account.requests -= 1;
+    this.account.refused += 1;
+    this.reconcile(decision.reservationId, undefined, true);
+    return { ok: false, code: "closed", reason: this.shared.snapshot.closedReason ?? "cloud accounting could not be persisted" };
   }
 
   private admit(estimate: CloudAdmissionEstimate): CloudAdmissionDecision {
@@ -111,8 +117,10 @@ export class CitizenBudgetView implements CloudBudget {
     if (!this.shared.tryChargeRetry()) return false;
     this.account.requests += 1;
     this.account.retries += 1;
-    this.onChange();
-    return true;
+    if (this.onChange()) return true;
+    this.account.requests -= 1;
+    this.account.retries -= 1;
+    return false;
   }
 
   holdAttempt(reservationId: string): number {
