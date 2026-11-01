@@ -20,6 +20,8 @@ Verified private remote tips before changes:
 
 Starting workspace: clean public `main@15c13c8`, `C:/Users/sh1ft/Minecraft-Ai-Civilization`, public `origin`. Added private `windows-backup` remote and created **`agents/t3-sec001-integration-QA`** at **`C:/Users/sh1ft/Minecraft-Ai-Civilization-t3-sec001`**, from Claude's verified tip. Original Claude/Codex/Grok/Mac/Windows branches were not changed or merged. Mission 013 trees/worlds/databases were not opened or overwritten. Weekly integration was inspected, not merged.
 
+Source checkpoint: **`80fad7909d6e134adbd94714c48c30b5309a4d1c`**, pushed to this private QA branch. At final remote verification, the weekly branch had independently advanced to `a133c91a91d99e17dc032b9a3f5b187e4ba43bcd` (documentation-only, parent `17bff2d`, authored 2026-11-01T16:48:14Z). This agent did not push or merge that branch; the tested base remains Claude's pinned revision. Claude manager, original Codex QA and PR #1 still matched their initial remote SHAs. The original public checkout remained clean at `main@15c13c8`.
+
 Environment: Windows, Node **v22.17.1**, pnpm **10.13.1**. `pnpm install --frozen-lockfile` succeeded with native SQLite and unchanged manifests/lockfile. Databases were in-memory or disposable synthetic files. PR #1's file list was inspected for ownership; its queue/budget/OpenAI production files, tests and audit report are untouched. Claude's review assignment was not duplicated.
 
 ## Baseline and replay
