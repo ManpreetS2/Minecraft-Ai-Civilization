@@ -655,6 +655,7 @@ describe("Claude provider rules (scripted transport)", () => {
       maxInputTokens: 16_000,
       maxOutputTokens: 1024,
       maxRetries: 0,
+      retryBaseDelayMs: 0,
       budget,
       ...over,
     });

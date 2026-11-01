@@ -8,7 +8,7 @@ import {
 } from "./cloud-prices.js";
 import { formatPrompt } from "./ollama.js";
 import type { CognitionPrompt, CognitionProvider, HighLevelDecision } from "./schema.js";
-import { extractJson, validateDecision } from "./schema.js";
+import { extractJson, validateDecisionForLogging } from "./schema.js";
 
 export type FetchLike = typeof fetch;
 
@@ -348,7 +348,7 @@ export class OpenAiResponsesProvider implements CognitionProvider {
   private parseDecision(payload: Record<string, unknown>): HighLevelDecision {
     assertNoSecretLeak(payload, this.config.apiKey);
     const text = extractResponsesOutputText(payload);
-    return validateDecision(extractJson(text));
+    return validateDecisionForLogging(extractJson(text));
   }
 
   private recordFailure(

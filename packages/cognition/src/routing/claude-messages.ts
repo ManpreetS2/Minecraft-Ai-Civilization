@@ -5,7 +5,7 @@ import { GOALS } from "../goals.js";
 import { formatPrompt } from "../ollama.js";
 import { DECISION_SYSTEM_PROMPT } from "../openai-responses.js";
 import type { CognitionPrompt, CognitionProvider, HighLevelDecision } from "../schema.js";
-import { extractJson, validateDecision } from "../schema.js";
+import { extractJson, validateDecisionForLogging } from "../schema.js";
 
 /**
  * Claude Messages API decision provider with the same cost rules as OpenAiResponsesProvider.
@@ -28,17 +28,66 @@ export type ClaudeMessagesResponse = {
   id?: unknown;
   model?: unknown;
   stop_reason?: unknown;
+  stop_details?: unknown;
   content?: unknown;
   usage?: unknown;
 };
 
 /**
- * Sends one request with no retries of its own, so the provider can charge every attempt. A rejected call throws an
- * error carrying `status`. A live transport wraps the official SDK with `maxRetries: 0`.
+ * Sends one request with no retries of its own, so the provider can charge every attempt. Failures should throw
+ * ClaudeTransportError; any error carrying a numeric `status` and optional `retryAfterMs` is also understood.
  */
 export type ClaudeMessagesTransport = {
+  /** Set by a transport that can spend money. A registry refuses it unless paid requests were enabled. */
+  paid?: boolean;
   create(request: ClaudeMessagesRequest, options: { signal: AbortSignal }): Promise<ClaudeMessagesResponse>;
 };
+
+export type ClaudeTransportOutcome =
+  /** Nothing left this process, so nothing can have been billed. */
+  | "not_sent"
+  /** The API answered with an error status. */
+  | "http_error"
+  /** Sent, with no answer: a timeout, abort or connection failure. It may have been billed. */
+  | "no_response"
+  /** A success status whose body could not be read, so its cost is unknown. */
+  | "unreadable_success";
+
+/** Its message is safe to log: it never contains a response body, prompt text or credential. */
+export class ClaudeTransportError extends Error {
+  readonly outcome: ClaudeTransportOutcome;
+  readonly status?: number;
+  readonly retryAfterMs?: number;
+  readonly requestId?: string;
+
+  constructor(details: {
+    outcome: ClaudeTransportOutcome;
+    safeMessage: string;
+    status?: number;
+    retryAfterMs?: number;
+    requestId?: string;
+  }) {
+    super(details.safeMessage);
+    this.name = "ClaudeTransportError";
+    this.outcome = details.outcome;
+    this.status = details.status;
+    this.retryAfterMs = details.retryAfterMs;
+    this.requestId = details.requestId;
+  }
+}
+
+/** The API answered and the usage was charged, but there is no decision to use. */
+export class ClaudeResponseError extends Error {
+  constructor(
+    readonly kind: "refusal" | "max_tokens" | "unexpected_stop" | "no_text",
+    message: string,
+    /** The policy category of a refusal, when the API gave a plain one. Worth recording; it is not model text. */
+    readonly refusalCategory?: string,
+  ) {
+    super(message);
+    this.name = "ClaudeResponseError";
+  }
+}
 
 export type ClaudeEffort = "low" | "medium" | "high" | "xhigh" | "max";
 
@@ -52,6 +101,8 @@ export type ClaudeMessagesConfig = {
   /** Thinking counts toward this cap, so it must leave room for thinking as well as the JSON reply. */
   maxOutputTokens: number;
   maxRetries: number;
+  /** First wait between attempts when the API gives no retry-after. It doubles each attempt. Default 500. */
+  retryBaseDelayMs?: number;
   effort?: ClaudeEffort;
   budget: CloudBudget;
   ledger?: CloudDecisionLedger;
@@ -98,8 +149,9 @@ export const CLAUDE_DECISION_SCHEMA = {
  */
 const CLAUDE_REQUEST_FRAMING_TOKENS = 1024;
 
-/** 408 and 409 and 429 mean the request was not processed; 5xx may have been, so those attempts are held. */
+/** 408, 409 and 429 mean the request was not processed; 5xx may have been, so those attempts are held. */
 const RETRYABLE_STATUSES = new Set([408, 409, 429, 500, 502, 503, 504, 529]);
+const DEFAULT_RETRY_BASE_DELAY_MS = 500;
 
 type Settlement = {
   billedStatus?: number;
@@ -185,6 +237,7 @@ export class ClaudeMessagesProvider implements CognitionProvider {
     this.inflight.add(controller);
     const timer = setTimeout(() => controller.abort(), timeoutMs);
     const settlement: Settlement = { unverifiedHoldUsd: 0 };
+    const deadlineMs = startedMs + timeoutMs;
 
     try {
       for (let attempt = 1; ; attempt += 1) {
@@ -192,7 +245,7 @@ export class ClaudeMessagesProvider implements CognitionProvider {
         try {
           if (controller.signal.aborted || this.closed) throw new Error("Claude request cancelled");
           attemptSent = true;
-          const response = await this.config.transport.create(request, { signal: controller.signal });
+          const response = await this.sendOnce(request, controller.signal, admission.reservationId, settlement);
           settlement.billedStatus = 200;
           this.settleBilledResponse(admission.reservationId, response, settlement);
           const decision = this.parseDecision(response);
@@ -207,22 +260,55 @@ export class ClaudeMessagesProvider implements CognitionProvider {
           const message = error instanceof Error ? error.message : String(error);
           // A 4xx means the request was refused. Anything else sent may have been billed without reporting usage.
           const rejected = status !== undefined && status >= 400 && status < 500;
-          if (settlement.billedStatus === undefined && attemptSent && !rejected) {
+          const sent = attemptSent && !isNotSent(error);
+          if (settlement.billedStatus === undefined && sent && !rejected) {
             settlement.unverifiedHoldUsd += this.config.budget.holdAttempt(admission.reservationId);
           }
-          const retryable = status !== undefined && RETRYABLE_STATUSES.has(status);
-          if (!retryable || attempt >= maxAttempts || !this.config.budget.tryChargeRetry()) {
+          const waitMs = this.retryWaitMs(status, retryAfterOf(error), attempt, deadlineMs);
+          if (waitMs === undefined || attempt >= maxAttempts || !this.config.budget.tryChargeRetry()) {
             if (settlement.billedStatus === undefined) {
               this.config.budget.reconcile(admission.reservationId, undefined, true);
             }
             this.push(prompt, startedAt, startedMs, settlement, { ok: false, failureReason: message, httpStatus: status });
             throw error instanceof Error ? error : new Error(message);
           }
+          await abortableDelay(waitMs, controller.signal);
         }
       }
     } finally {
       clearTimeout(timer);
       this.inflight.delete(controller);
+    }
+  }
+
+  /** How long to wait before retrying, or undefined if this failure should not be retried. */
+  private retryWaitMs(status: number | undefined, retryAfterMs: number | undefined, attempt: number, deadlineMs: number): number | undefined {
+    if (status === undefined || !RETRYABLE_STATUSES.has(status)) return undefined;
+    // A 429 with no retry-after can be a spend cap, which keeps failing until access resumes.
+    if (status === 429 && retryAfterMs === undefined) return undefined;
+    const base = this.config.retryBaseDelayMs ?? DEFAULT_RETRY_BASE_DELAY_MS;
+    const waitMs = retryAfterMs ?? base * 2 ** (attempt - 1);
+    // Waiting past the deadline would spend the retry on a request that is then cancelled.
+    return Date.now() + waitMs >= deadlineMs ? undefined : waitMs;
+  }
+
+  /** A success whose body cannot be read is settled here, because its usage will never be known. */
+  private async sendOnce(
+    request: ClaudeMessagesRequest,
+    signal: AbortSignal,
+    reservationId: string,
+    settlement: Settlement,
+  ): Promise<ClaudeMessagesResponse> {
+    try {
+      return await this.config.transport.create(request, { signal });
+    } catch (error) {
+      if (error instanceof ClaudeTransportError && error.outcome === "unreadable_success") {
+        settlement.billedStatus = error.status ?? 200;
+        const reason = `cloud admissions closed for this run: ${error.message}, so its usage is unknown`;
+        settlement.unverifiedHoldUsd += this.config.budget.settleUnknownUsage(reservationId, reason);
+        throw new Error(reason);
+      }
+      throw error;
     }
   }
 
@@ -251,6 +337,7 @@ export class ClaudeMessagesProvider implements CognitionProvider {
     const usage = readClaudeUsage(response, this.config.model);
     if (usage === "missing") throw closeFor("had missing token usage");
     if (usage === "invalid") throw closeFor("had invalid token usage");
+    if (usage === "nonstandard") throw closeFor("was billed at a non-standard tier or speed, so the price table does not apply");
     settlement.usage = usage;
     settlement.estimatedCostUsd = this.config.budget.reconcile(reservationId, usage, false);
   }
@@ -259,17 +346,20 @@ export class ClaudeMessagesProvider implements CognitionProvider {
     if (JSON.stringify(response).includes(this.config.apiKey)) {
       throw new Error("Refusing to process Claude payload that echoes the API key");
     }
-    if (response.stop_reason === "refusal") throw new Error("Claude declined the request (stop_reason refusal)");
-    if (response.stop_reason === "max_tokens") {
-      throw new Error("Claude reply was cut off at max_tokens; raise this citizen's output limit");
+    if (response.stop_reason === "refusal") {
+      const category = refusalCategory(response.stop_details);
+      throw new ClaudeResponseError("refusal", `Claude declined the request (stop_reason refusal${category ? `, category ${category}` : ""})`, category);
     }
-    if (response.stop_reason !== "end_turn") throw new Error("Claude response had an unexpected stop_reason");
+    if (response.stop_reason === "max_tokens") {
+      throw new ClaudeResponseError("max_tokens", "Claude reply was cut off at max_tokens; raise this citizen's output limit");
+    }
+    if (response.stop_reason !== "end_turn") throw new ClaudeResponseError("unexpected_stop", "Claude response had an unexpected stop_reason");
     const text = (Array.isArray(response.content) ? response.content : []).find(
       (block): block is { type: "text"; text: string } =>
         Boolean(block) && block.type === "text" && typeof block.text === "string" && Boolean(block.text.trim()),
     );
-    if (!text) throw new Error("Claude response contained no decision text");
-    return validateDecision(extractJson(text.text));
+    if (!text) throw new ClaudeResponseError("no_text", "Claude response contained no decision text");
+    return validateDecisionForLogging(extractJson(text.text));
   }
 
   private push(
@@ -313,6 +403,34 @@ export class ClaudeMessagesProvider implements CognitionProvider {
   }
 }
 
+function isNotSent(error: unknown): boolean {
+  return error instanceof ClaudeTransportError && error.outcome === "not_sent";
+}
+
+function retryAfterOf(error: unknown): number | undefined {
+  const value = (error as { retryAfterMs?: unknown } | null)?.retryAfterMs;
+  return typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : undefined;
+}
+
+function refusalCategory(details: unknown): string | undefined {
+  const category = (details as { category?: unknown } | null)?.category;
+  return typeof category === "string" && /^[a-z_]{1,64}$/.test(category) ? category : undefined;
+}
+
+/** Resolves early on abort: the next attempt sees the abort and stops. */
+function abortableDelay(ms: number, signal: AbortSignal): Promise<void> {
+  if (ms <= 0 || signal.aborted) return Promise.resolve();
+  return new Promise((resolve) => {
+    const finish = () => {
+      clearTimeout(timer);
+      signal.removeEventListener("abort", finish);
+      resolve();
+    };
+    const timer = setTimeout(finish, ms);
+    signal.addEventListener("abort", finish, { once: true });
+  });
+}
+
 function statusOf(error: unknown): number | undefined {
   const status = (error as { status?: unknown } | null)?.status;
   return typeof status === "number" ? status : undefined;
@@ -323,7 +441,7 @@ function statusOf(error: unknown): number | undefined {
  * cache counts should be zero. If any appear, they are charged at or above their real rate: a cache write costs 1.25
  * times input, and a cache read costs less than input.
  */
-function readClaudeUsage(response: ClaudeMessagesResponse, model: string): CloudUsageReport | "missing" | "invalid" {
+function readClaudeUsage(response: ClaudeMessagesResponse, model: string): CloudUsageReport | "missing" | "invalid" | "nonstandard" {
   const usage = response.usage;
   if (usage === undefined || usage === null) return "missing";
   if (typeof usage !== "object") return "invalid";
@@ -339,5 +457,7 @@ function readClaudeUsage(response: ClaudeMessagesResponse, model: string): Cloud
   if (input === undefined || output === undefined || cacheWrite === undefined || cacheRead === undefined) {
     return "invalid";
   }
+  // These requests ask for neither, but an account setting could apply one, and the price table covers neither.
+  if ((raw.service_tier ?? "standard") !== "standard" || (raw.speed ?? "standard") !== "standard") return "nonstandard";
   return { model, inputTokens: input + Math.ceil(cacheWrite * 1.25) + cacheRead, outputTokens: output };
 }

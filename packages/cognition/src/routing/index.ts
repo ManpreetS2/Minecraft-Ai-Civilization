@@ -46,3 +46,11 @@ export {
   type LiveSmokeResult,
   type PreflightReport,
 } from "./preflight.js";
+export {
+  isClaudeApiKeyFormat,
+  PAID_RUN_APPROVAL_ENV,
+  PaidRequestGate,
+  type PaidRequestApproval,
+  type PaidRequestGateSnapshot,
+} from "./paid-request-gate.js";
+export { ClaudeResponseError, ClaudeTransportError, type ClaudeTransportOutcome } from "./claude-messages.js";

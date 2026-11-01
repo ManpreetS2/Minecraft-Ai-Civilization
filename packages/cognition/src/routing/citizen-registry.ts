@@ -142,6 +142,8 @@ export type CitizenRegistryOptions = {
   claudeTransportFor?: (assignment: CitizenAssignment, apiKey: string) => ClaudeMessagesTransport;
   /** Must be set deliberately before anything can use the real network. Default false. */
   allowPaidRequests?: boolean;
+  /** First wait between Claude attempts when the provider gives no retry-after. Tests use 0. */
+  retryBaseDelayMs?: number;
   store?: CitizenSessionStore;
   onEvidence?: (entry: DecisionEvidence) => void;
   ids?: () => string;
@@ -475,10 +477,15 @@ function buildProvider(
       fetchImpl: options.fetchImpl,
     });
   }
+  const transport = options.claudeTransportFor!(assignment, apiKey);
+  if (transport.paid && !options.allowPaidRequests) {
+    throw new Error(`citizen ${assignment.citizenId}: a paid Claude transport needs allowPaidRequests`);
+  }
   return new ClaudeMessagesProvider({
     ...shared,
     effort: assignment.effort,
-    transport: options.claudeTransportFor!(assignment, apiKey),
+    transport,
+    retryBaseDelayMs: options.retryBaseDelayMs,
   });
 }
 
