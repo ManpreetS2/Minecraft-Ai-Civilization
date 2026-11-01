@@ -1,0 +1,20 @@
+--- a/packages/agent-core/src/executor.ts
++++ b/packages/agent-core/src/executor.ts
+@@ -891,7 +891,7 @@
+     }
+     return { success: false, code: "CONTAINER_NOT_FOUND", error: "Settlement chest is gone", durationMs: 0, retryable: true };
+   }
+-  const access = assertMayUseChest(store, ctx.citizenId, chest, "communal");
++  const access = assertMayUseChest(store, ctx.citizenId, chest, "communal", ctx.bot.game?.dimension);
+   if (!access.success) return access;
+   if (ctx.citizenId && !runtime.claims.tryClaim("container", cellClaimKey(chest.x, chest.y, chest.z), ctx.citizenId, 30_000)) {
+     return { success: false, code: "CONTAINER_BUSY", error: "Chest is in use", durationMs: 0, retryable: true };
+@@ -932,7 +932,7 @@
+   if (!chest) {
+     return { success: false, code: "CONTAINER_NOT_FOUND", error: "No settlement chest", durationMs: 0, retryable: true };
+   }
+-  const access = assertMayUseChest(store, ctx.citizenId, chest, "communal");
++  const access = assertMayUseChest(store, ctx.citizenId, chest, "communal", ctx.bot.game?.dimension);
+   if (!access.success) return access;
+   const result = await withdrawItems(ctx, itemName, count, chest);
+   if (result.success) {

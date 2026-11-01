@@ -1,6 +1,7 @@
 import { fail, ok, type ActionResult, type Vec3 } from "@civ/shared";
 import type { CivilizationStore } from "./store.js";
 import { isTestFixtureChest } from "./test-fixtures.js";
+import { communityPhysicalState, physicalBlockKey } from "./community-physical-state.js";
 import type {
   CitizenHome,
   ClaimHomeRequest,
@@ -229,8 +230,26 @@ export function assertChestAccess(
   citizenId: string | undefined,
   position: Vec3,
   purpose: StorageAccess,
+  dimension?: string,
 ): ActionResult<{ position: Vec3; access: StorageAccess }> {
   const cell = floorCell(position);
+  if (store.hasCommunities()) {
+    const denied = () => fail("ACCESS_DENIED", "Storage access requires current identity and explicit scoped authorization", 0, false, { position: cell });
+    if (!citizenId || !store.getCitizen(citizenId) || !store.getCommunityDirectory().communityOf(citizenId) || isTestFixtureChest(cell)) return denied();
+    if (purpose === "communal") {
+      // Legacy callers have no dimension. Refuse rather than assuming these coordinates refer to the overworld.
+      if (typeof dimension !== "string" || !dimension.replace(/^minecraft:/, "").trim()) return denied();
+      const key = physicalBlockKey(dimension.replace(/^minecraft:/, ""), cell);
+      const permitted = communityPhysicalState(store).forCitizen(citizenId).accessibleAssets().some((a) => a.kind === "chest" && a.key === key);
+      return permitted ? ok({ position: cell, access: purpose }, 0) : denied();
+    }
+    const home = store.getCitizenHome(citizenId);
+    const designated = purpose === "personal" ? home?.personalChest : home?.householdChest;
+    if (!home || home.status !== "active" || !designated || !sameCell(designated, cell)) return denied();
+    const owner = store.personalChestOwner(cell);
+    if (owner && owner !== citizenId) return denied();
+    return ok({ position: cell, access: purpose }, 0);
+  }
   const personalOwner = store.personalChestOwner(cell);
   if (purpose === "personal") {
     if (!citizenId) return fail("ACCESS_DENIED", "Personal storage requires a citizen identity", 0, false);

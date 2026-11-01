@@ -86,7 +86,14 @@ export function assertMayUseChest(
   citizenId: string | undefined,
   position: Vec3,
   purpose: StorageAccess = "communal",
+  dimension?: string,
 ): ActionResult<{ position: Vec3; access: StorageAccess; knowledge: ChestKnowledge }> {
+  if (store.hasCommunities()) {
+    // Do not classify against the global registry before authenticating this reader: refusal is not a metadata channel.
+    const access = assertChestAccess(store, citizenId, position, purpose, dimension);
+    if (!access.success) return access;
+    return ok({ position: access.data.position, access: access.data.access, knowledge: { kind: "persisted_claim", access: purpose } }, 0);
+  }
   const knowledge = classifyChestKnowledge(store, position);
   if (knowledge.access === "test_fixture") {
     return fail(
