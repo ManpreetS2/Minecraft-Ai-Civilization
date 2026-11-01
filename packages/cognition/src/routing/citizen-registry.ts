@@ -92,6 +92,8 @@ export type CitizenSessionRecord = {
   sessionId: string;
   decisions: number;
   account: CitizenAccount;
+  /** Why cost policy closed this run, if it did. A normal shutdown is not recorded, so a restart can continue. */
+  experimentClosedReason?: string;
 };
 
 export type CitizenSessionStore = {
@@ -314,9 +316,15 @@ export class CitizenProviderRegistry {
       return { assignment, prior: prior?.runId === options.runId ? prior : undefined };
     });
 
-    // A restart must not reset spending. Work that was in flight may have been billed, so it stays as a hold.
+    // A restart must not reset spending or reopen a closure. Work that was in flight may have been billed, so it stays
+    // as a hold.
     for (const { prior } of restored) {
       if (prior) {
+        const closure: unknown = prior.experimentClosedReason;
+        if (closure !== undefined) {
+          if (typeof closure !== "string" || !closure.trim()) throw new Error("stored budget closure is malformed");
+          this.gate.close(closure);
+        }
         prior.account.unverifiedHoldUsd += prior.account.reservedUsd;
         prior.account.reservedUsd = 0;
         this.gate.restoreCommitted({
@@ -327,22 +335,38 @@ export class CitizenProviderRegistry {
       }
     }
 
+    const records: Array<() => CitizenSessionRecord> = [];
+    let closurePersisted = false;
     for (const { assignment, prior } of restored) {
       const account = prior?.account ?? emptyCitizenAccount();
       const sessionId = prior?.sessionId ?? `${options.runId}:${assignment.citizenId}:${ids()}`;
       let decisions = prior?.decisions ?? 0;
-      const persist = () =>
-        options.store?.save({
-          schemaVersion: 1,
-          runId: options.runId,
-          citizenId: assignment.citizenId,
-          citizenName: assignment.citizenName,
-          family: assignment.family,
-          model: assignment.model,
-          sessionId,
-          decisions,
-          account,
-        });
+      const record = (): CitizenSessionRecord => ({
+        schemaVersion: 1,
+        runId: options.runId,
+        citizenId: assignment.citizenId,
+        citizenName: assignment.citizenName,
+        family: assignment.family,
+        model: assignment.model,
+        sessionId,
+        decisions,
+        account,
+        experimentClosedReason: this.gate.snapshot.closedReason,
+      });
+      records.push(record);
+      const persist = () => {
+        try {
+          options.store?.save(record());
+          // The first save that sees a closure writes it to every citizen, so no single record is the only copy.
+          if (this.gate.snapshot.closedReason && !closurePersisted) {
+            for (const write of records) options.store?.save(write());
+            closurePersisted = true;
+          }
+        } catch {
+          // In-memory accounting stays correct and the work in hand can settle, but a restart could now forget spending.
+          this.gate.close("cloud admissions closed for this run: session accounting could not be persisted");
+        }
+      };
       const budget = new CitizenBudgetView(this.gate, assignment.limits ?? {}, account, persist);
       const apiKey = options.resolveSecret(assignment.credential)!;
       const session = new CitizenCognitionSession(

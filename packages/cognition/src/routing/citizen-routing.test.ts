@@ -388,6 +388,93 @@ describe("identity across membership changes, death and restart", () => {
     first.registry.closeAll();
   });
 
+  describe("a cost-safety closure survives restart in the same run", () => {
+    it.each([
+      ["missing usage", { usage: null }, /missing token usage/],
+      ["usage above the bound", { usage: { input: 5_000_000, output: 0 } }, /exceeded the admission bound/],
+    ] as Array<[string, ScriptedReply, RegExp]>)("%s", async (_name, reply, reason) => {
+      const store = createInMemoryCitizenSessionStore();
+      const first = offlineRegistry({ store, script: () => reply });
+      await first.registry.providerFor("gpt-a").decide(promptFor("gpt-a")).catch(() => undefined);
+      expect(first.registry.accounting().experiment.closedReason).toMatch(reason);
+      first.registry.closeAll();
+
+      const restarted = offlineRegistry({ store });
+      const { experiment } = restarted.registry.accounting();
+      expect(experiment.closed).toBe(true);
+      expect(experiment.closedReason).toMatch(reason);
+      for (const id of IDS) await expect(restarted.registry.providerFor(id).decide(promptFor(id))).rejects.toThrow(reason);
+      expect(restarted.openai.calls).toEqual([]);
+      expect([...restarted.claude.values()].flatMap((transport) => transport.calls)).toEqual([]);
+    });
+
+    it("every citizen's stored record carries it, so losing the record that caused it cannot reopen the run", async () => {
+      const store = createInMemoryCitizenSessionStore();
+      const first = offlineRegistry({ store, script: (c) => (c === "claude-a" ? { usage: null } : {}) });
+      await first.registry.providerFor("claude-a").decide(promptFor("claude-a")).catch(() => undefined);
+      for (const id of IDS) expect(store.load(id)!.experimentClosedReason).toMatch(/missing token usage/);
+    });
+
+    it("survives a second restart, through the JSON file store", async () => {
+      const file = tempFile();
+      const first = offlineRegistry({ store: createJsonFileCitizenSessionStore(file), script: () => ({ usage: null }) });
+      await first.registry.providerFor("gpt-a").decide(promptFor("gpt-a")).catch(() => undefined);
+      offlineRegistry({ store: createJsonFileCitizenSessionStore(file) });
+      const third = offlineRegistry({ store: createJsonFileCitizenSessionStore(file) });
+      expect(third.registry.accounting().experiment.closedReason).toMatch(/missing token usage/);
+    });
+
+    it("the explicit local fallback still answers after the restart, with no paid request", async () => {
+      const store = createInMemoryCitizenSessionStore();
+      const assignments = OFFLINE_2V2_ASSIGNMENTS.map((a) => ({ ...a, fallback: { kind: "heuristic" as const } }));
+      const first = offlineRegistry({ store, assignments, script: () => ({ usage: null }) });
+      await first.registry.providerFor("gpt-a").decide(promptFor("gpt-a"));
+      const restarted = offlineRegistry({ store, assignments });
+      await expect(restarted.registry.providerFor("gpt-a").decide(promptFor("gpt-a", [], { settlementNeeds: ["NEED_WOOD"] }))).resolves.toMatchObject({ goal: "gather_wood" });
+      expect(restarted.openai.calls).toEqual([]);
+    });
+
+    it("a store that cannot save closes the budget instead of breaking the call in hand or leaking a reservation", async () => {
+      const store = createInMemoryCitizenSessionStore();
+      const fixture = offlineRegistry({ store });
+      vi.spyOn(store, "save").mockImplementation(() => {
+        throw new Error("disk full");
+      });
+      await expect(fixture.registry.providerFor("gpt-a").decide(promptFor("gpt-a"))).resolves.toBeDefined();
+      const { experiment, citizens } = fixture.registry.accounting();
+      expect(experiment).toMatchObject({ inFlight: 0, reservedUsd: 0, closed: true });
+      expect(experiment.closedReason).toMatch(/could not be persisted/);
+      expect(citizens["gpt-a"]!.estimatedSpendUsd).toBeGreaterThan(0);
+      await expect(fixture.registry.providerFor("gpt-b").decide(promptFor("gpt-b"))).rejects.toThrow(/could not be persisted/);
+    });
+
+    it("a normal shutdown does not close the run for its next start", async () => {
+      const store = createInMemoryCitizenSessionStore();
+      const first = offlineRegistry({ store });
+      await first.registry.providerFor("gpt-a").decide(promptFor("gpt-a"));
+      first.registry.closeAll();
+      const restarted = offlineRegistry({ store });
+      expect(restarted.registry.accounting().experiment.closed).toBe(false);
+      await expect(restarted.registry.providerFor("gpt-a").decide(promptFor("gpt-a"))).resolves.toBeDefined();
+    });
+
+    it("a new run is not closed by a fault in an earlier run", async () => {
+      const store = createInMemoryCitizenSessionStore();
+      const first = offlineRegistry({ store, script: () => ({ usage: null }) });
+      await first.registry.providerFor("gpt-a").decide(promptFor("gpt-a")).catch(() => undefined);
+      const next = offlineRegistry({ store, runId: "second-run" });
+      expect(next.registry.accounting().experiment.closed).toBe(false);
+      expect(store.load("gpt-a")!.experimentClosedReason).toBeUndefined();
+    });
+
+    it("a malformed stored closure stops startup rather than reopening the run", async () => {
+      const store = createInMemoryCitizenSessionStore();
+      offlineRegistry({ store });
+      store.save({ ...store.load("gpt-a")!, experimentClosedReason: 7 as never });
+      expect(() => offlineRegistry({ store })).toThrow(/closure/);
+    });
+  });
+
   it("a new run gets new sessions and starts its accounting fresh", async () => {
     const store = createInMemoryCitizenSessionStore();
     const first = offlineRegistry({ store });
