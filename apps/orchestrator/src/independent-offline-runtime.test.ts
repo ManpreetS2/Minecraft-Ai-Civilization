@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CivilizationStore } from "@civ/agent-core";
-import { OFFLINE_2V2_ASSIGNMENTS, createInMemoryCitizenSessionStore, createScriptedOpenAiFetch, createScriptedClaudeTransport } from "@civ/cognition/routing";
+import { OFFLINE_2V2_ASSIGNMENTS, createInMemoryCitizenSessionStore } from "@civ/cognition/routing";
 import { createMineflayerCraftFixture, createSharedCraftWorld } from "@civ/skills/testing";
 import { createNavigationBackend, setNavigationBackend, type MinecraftBody, type NavigationBackend } from "@civ/minecraft-adapter";
 import { createEvent, loadConfig, ok, type BodyObservation } from "@civ/shared";
@@ -37,8 +37,6 @@ function fixture(count: 2 | 4 = 2) {
     return Reflect.apply(fx.nav[key], fx.nav, [bot, ...args]);
   } });
   setNavigationBackend(nav);
-  const openai = createScriptedOpenAiFetch(() => ({ goal: "gather_wood" }));
-  const claude = new Map<string, ReturnType<typeof createScriptedClaudeTransport>>();
   const resolveSecret = vi.fn((ref: { env: string }) => `synthetic-${ref.env}`);
   const createBody = vi.fn((options: ConstructorParameters<typeof MinecraftBody>[0]) => {
     const fx = bodies.get(options.citizenId!)!;
@@ -51,19 +49,17 @@ function fixture(count: 2 | 4 = 2) {
       observe: (): BodyObservation => ({ username: options.username, connected: true, spawned: true, health: 20, food: fx.bot.food, position: fx.bot.entity.position, inventory: fx.items, nearby: [], players: [], gameTime: 1000, isNight: false }),
     } as unknown as MinecraftBody;
   });
-  return { store, assignments, bodies, resolveSecret, createBody, openai, claude, args: {
+  return { store, assignments, bodies, resolveSecret, createBody, args: {
     config, store, assignmentsJson: JSON.stringify(assignments), sessionStore: createInMemoryCitizenSessionStore(), resolveSecret,
-    fetchImpl: openai.fetchImpl, claudeTransportFor: (assignment: { citizenId: string }) => {
-      const transport = createScriptedClaudeTransport(() => ({ goal: "craft_tools" }));
-      claude.set(assignment.citizenId, transport); return transport;
-    }, createBody,
+    script: (citizenId: string) => (citizenId.startsWith("gpt") ? { goal: "gather_wood" } : { goal: "craft_tools" }),
+     createBody,
   } };
 }
 
 describe("independent offline composition and normal manager startup", () => {
   it.each([2, 4] as const)("normal start creates %i bodies and real planning executes routed survival choices", async (count) => {
     const fx = fixture(count);
-    const { manager, registry } = createIndependentOfflineRuntime(fx.args); managers.push(manager);
+    const { manager, registry, openai, claude } = createIndependentOfflineRuntime(fx.args); managers.push(manager);
     await manager.start(undefined, { deferTicks: true });
     expect(manager.list().map((c) => c.record.id)).toEqual(fx.assignments.map((a) => a.citizenId));
     expect(fx.createBody.mock.calls.map(([o]) => o.username)).toEqual(fx.assignments.map((a) => a.citizenName));
@@ -81,12 +77,12 @@ describe("independent offline composition and normal manager startup", () => {
       const body = fx.bodies.get(a.citizenId)!;
       if (a.family === "gpt") expect(body.count("oak_log")).toBeGreaterThan(0);
       else expect(body.count("wooden_pickaxe")).toBe(1);
-      const prompts = a.family === "gpt" ? fx.openai.calls.filter((call) => call.apiKey === `synthetic-${a.credential.env}`).map((call) => call.body).join("\n") : JSON.stringify(fx.claude.get(a.citizenId)?.calls);
+      const prompts = a.family === "gpt" ? openai.calls.filter((call) => call.apiKey === `synthetic-${a.credential.env}`).map((call) => call.body).join("\n") : JSON.stringify(claude.get(a.citizenId)?.calls);
       for (const other of fx.assignments) expect(prompts.includes(`STARTUP-PRIVATE-${other.citizenId}`)).toBe(a.citizenId === other.citizenId);
     }
     for (const body of fx.bodies.values()) expect(body.bot.food).toBe(9);
-    expect(fx.openai.calls.length).toBeGreaterThan(0); expect([...fx.claude.values()].every((transport) => transport.calls.length > 0)).toBe(true);
-    expect(fx.claude.size).toBe(count / 2);
+    expect(openai.calls.length).toBeGreaterThan(0); expect([...claude.values()].every((transport) => transport.calls.length > 0)).toBe(true);
+    expect(claude.size).toBe(count / 2);
     expect(registry.evidenceLog().every((e) => e.runId === fx.store.getMeta("runId"))).toBe(true);
     expect(manager.list().every((c) => c.lastPlan?.source === "llm")).toBe(true);
   }, 30_000);
@@ -103,14 +99,13 @@ describe("independent offline composition and normal manager startup", () => {
     if (kind === "wrong-count") args = { ...args, config: { ...args.config, SIM_CITIZEN_COUNT: 4 } };
     expect(() => createIndependentOfflineRuntime(args)).toThrow();
     expect(fx.resolveSecret).not.toHaveBeenCalled(); expect(fx.createBody).not.toHaveBeenCalled();
-    expect(fx.openai.calls).toHaveLength(0); expect(fx.claude.size).toBe(0);
   });
-  it("refuses a paid Claude transport in the offline composition without sending or constructing bodies", () => {
+  it("refuses a paid Claude transport factory outright, without sending or constructing bodies", () => {
     const fx = fixture();
     const send = vi.fn(async (): Promise<never> => { throw new Error("paid transport must not send"); });
-    expect(() => createIndependentOfflineRuntime({ ...fx.args, claudeTransportFor: () => ({ paid: true, create: send }) })).toThrow(/paid|allowPaidRequests/i);
+    expect(() => createIndependentOfflineRuntime({ ...fx.args, claudeTransportFor: () => ({ paid: true, create: send }) } as never)).toThrow(/default-deny/);
     expect(send).not.toHaveBeenCalled();
     expect(fx.createBody).not.toHaveBeenCalled();
-    expect(fx.openai.calls).toHaveLength(0);
+    expect(fx.resolveSecret).not.toHaveBeenCalled();
   });
 });
