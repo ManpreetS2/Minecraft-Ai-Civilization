@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { loadConfig } from "@civ/shared";
 import { OFFLINE_2V2_ASSIGNMENTS, createJsonFileCitizenSessionStore } from "@civ/cognition/routing";
 import { OfflinePhysicalWorld } from "./testing/physical-world.js";
+import { persistCitizenHomeClaim } from "./available-homes.js";
 
 // No planner, executor or skill mocks. This suite verifies capabilities; the separate isolation
 // reproducer fails on the protected executor's legacy aggregate write and blocks overall acceptance.
@@ -92,5 +93,31 @@ describe("real manager/planner/executor physical capabilities (offline only)", {
     expect([...w.bodies.values()].reduce((n, fx) => n + fx.stats.digs.filter((b) => b === "sweet_berry_bush").length, 0)).toBe(1);
     expect(w.trace.filter((t) => t.action === "gatherFood" && t.success)).toHaveLength(1);
     expect(w.trace.filter((t) => t.action === "gatherFood" && !t.success)).toHaveLength(1);
+  });
+
+  it("does not import the prepared World-Lab house catalog into an unrelated community's fallback planning", async () => {
+    const w = world({ script: () => ({ status: 400 }) });
+    for (const fx of w.bodies.values()) fx.bot.food = 20;
+    await w.tick();
+    for (const citizen of w.citizens.values()) {
+      expect(citizen.lastPlan?.action).not.toBe("travelTowardHousing");
+      expect(citizen.lastPlan?.action).not.toBe("claimHome");
+      expect(citizen.lastPlan?.item ?? "").not.toMatch(/^home_h/);
+    }
+    expect([...w.world.blocks.values()].some((name) => name.includes("bed"))).toBe(false);
+  });
+  it("keeps an existing personal home usable as a planner target when the global catalog is withheld", async () => {
+    const w = world({ script: () => ({ status: 400 }) });
+    expect(persistCitizenHomeClaim(w.store, "gpt-a", "home_h1").success).toBe(true);
+    const home = w.store.getCitizenHome("gpt-a")!;
+    const citizen = w.citizens.get("gpt-a")!;
+    const observe = citizen.body.observe.bind(citizen.body);
+    citizen.body.observe = () => ({ ...observe(), food: 20, gameTime: 13_000, isNight: true });
+    // Context/planning assertion only: do not simulate a successful journey or sleep at a fixture-free home.
+    citizen.body.getBot = () => null;
+    await w.tick(["gpt-a"]);
+    expect(citizen.lastPlan?.action).toBe("sleep");
+    expect(citizen.lastPlan?.target).toEqual(home.bed);
+    expect(w.store.getCitizenHome("gpt-a")).toEqual(home);
   });
 });

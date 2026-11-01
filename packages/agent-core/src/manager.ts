@@ -674,7 +674,8 @@ export class AgentManager {
       knownSites: sitesKnownTo(this.store, citizen.record.id, listDiscoveredSites(this.store), scoped),
       visibleShores: visibleShoresFor(citizen.body, observation.position),
       authorizedStorage: authorizedWorkStorage(this.store, citizen.record.id),
-      availableHomes: listAvailableHomes(this.store),
+      // The prepared World-Lab catalog is not observation evidence in a new community experiment.
+      availableHomes: scoped ? [] : listAvailableHomes(this.store),
       humanDirective:
         activeDirective?.intent && activeDirective.mode !== "SUGGESTION"
           ? {
