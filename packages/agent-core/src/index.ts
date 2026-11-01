@@ -154,3 +154,6 @@ export {
 
 export { CommunityPhysicalState, communityPhysicalState, physicalBlockKey, physicalMigrationReport,
   type PhysicalSnapshot, type PhysicalAsset, type PhysicalAssetKind } from "./community-physical-state.js";
+
+export { validateExperimentPreflight, ExperimentManifestSchema, EXPERIMENT_RELEASE_BLOCKERS, type ExperimentManifest, type ExperimentPreflight } from "./experiment-preflight.js";
+export { ExperimentEvidenceJournal, type ExperimentAttempt, type ExperimentObservation } from "./experiment-evidence.js";

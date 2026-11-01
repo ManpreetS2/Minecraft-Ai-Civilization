@@ -21,7 +21,8 @@
     "@civ/skills": "workspace:*",
     "@civ/society": "workspace:*",
     "better-sqlite3": "^12.4.1",
-    "vec3": "^0.1.10"
+    "vec3": "^0.1.10",
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13"
