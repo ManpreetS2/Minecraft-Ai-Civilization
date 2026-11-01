@@ -192,7 +192,7 @@ describe("late reply is discarded when it wins the promise race (AI-001 review)"
     id: inner.id,
     allowedModels: inner.allowedModels,
     validateConfig: (c) => inner.validateConfig(c),
-    complete: (req, signal) =>
+    complete: (req, _signal) =>
       ({
         then(resolve: (r: unknown) => void) {
           void inner.complete(req, new AbortController().signal).then((reply) => {
