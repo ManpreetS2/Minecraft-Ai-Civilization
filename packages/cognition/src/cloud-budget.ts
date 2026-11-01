@@ -94,8 +94,8 @@ export class CloudBudgetGate {
     // Malformed provider token accounting must not turn spendUsd into NaN and fail open.
     if (
       !failed &&
-      usage &&
-      (!Number.isSafeInteger(usage.inputTokens) ||
+      (usage === undefined ||
+        !Number.isSafeInteger(usage.inputTokens) ||
         usage.inputTokens < 0 ||
         !Number.isSafeInteger(usage.outputTokens) ||
         usage.outputTokens < 0)
