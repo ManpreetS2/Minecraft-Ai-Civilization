@@ -1,3 +1,4 @@
+import { assertLiveRuntimeLaunchAllowed } from "@civ/agent-core";
 /**
  * Mission 006B — Stage 1 live one-block placement entrypoint.
  *
@@ -71,6 +72,7 @@ async function printReadiness(): Promise<void> {
 
 async function main(): Promise<void> {
   const args = parseArgs(process.argv.slice(2));
+  if (process.argv.includes("--live")) assertLiveRuntimeLaunchAllowed();
 
   if (args.stage !== "stage1_one_block") {
     console.error(`HARD-STOP: Mission 006B only permits stage1_one_block (got ${args.stage}).`);

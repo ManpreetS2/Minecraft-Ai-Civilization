@@ -1,3 +1,4 @@
+import { assertLiveRuntimeLaunchAllowed } from "@civ/agent-core";
 /**
  * Mission 006A — staged physical construction experiment runner.
  *
@@ -168,6 +169,7 @@ cd experiments\\construction-006a\\world-lab-isolated
 
 async function main(): Promise<void> {
   const args = parseArgs(process.argv.slice(2));
+  if (process.argv.includes("--live")) assertLiveRuntimeLaunchAllowed();
   const liveGate = evaluateConstructionExperimentLive(process.env);
 
   console.log("=== Construction staged experiment (Mission 006A) ===");

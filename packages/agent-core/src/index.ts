@@ -157,3 +157,5 @@ export { CommunityPhysicalState, communityPhysicalState, physicalBlockKey, physi
 
 export { validateExperimentPreflight, ExperimentManifestSchema, EXPERIMENT_RELEASE_BLOCKERS, type ExperimentManifest, type ExperimentPreflight } from "./experiment-preflight.js";
 export { ExperimentEvidenceJournal, type ExperimentAttempt, type ExperimentObservation } from "./experiment-evidence.js";
+
+export { assertLiveRuntimeLaunchAllowed, openOfflineRuntimeStore, RuntimeLaunchRefusedError } from "./runtime-launch-policy.js";

@@ -17,7 +17,7 @@ import { join } from "node:path";
 import { gunzipSync } from "node:zlib";
 import { loadEnv } from "./env.js";
 import { loadConfig, workspaceRoot, type Vec3 } from "@civ/shared";
-import { HOME_CLAIM_REACH_BLOCKS, TEST_FIXTURE_CHESTS, WORLD_LAB_COMMUNAL_CHEST } from "@civ/agent-core";
+import { assertLiveRuntimeLaunchAllowed, HOME_CLAIM_REACH_BLOCKS, TEST_FIXTURE_CHESTS, WORLD_LAB_COMMUNAL_CHEST } from "@civ/agent-core";
 import { LIVE_CIVILIZATION_PORT, RED_WORLD_LAB_PORT } from "./mine-test-guard.js";
 import { portOpen } from "./paper.js";
 import {
@@ -100,6 +100,7 @@ async function inspectSqliteReadonlyAsync(dbPath: string): Promise<{
   memberships: number;
   storage: { x: number; y: number; z: number } | null;
 }> {
+  assertLiveRuntimeLaunchAllowed();
   const { DatabaseSync } = await import("node:sqlite");
   const db = new DatabaseSync(dbPath, { readOnly: true });
   try {
@@ -220,6 +221,7 @@ async function dryRun(): Promise<number> {
 }
 
 async function liveConnect(maxMs: number): Promise<number> {
+  assertLiveRuntimeLaunchAllowed();
   loadEnv();
   pinWorldLabOneCitizenProcessEnv();
   const spawn = atlasSpawnFromDisk();

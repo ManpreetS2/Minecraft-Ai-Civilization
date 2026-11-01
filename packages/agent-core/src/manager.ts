@@ -11,7 +11,6 @@ import {
   EventBus,
   EventLoopMonitor,
   formatSimEvent,
-  resolveFromRoot,
   yieldEventLoop,
   type AppConfig,
   type CitizenRecord,
@@ -53,6 +52,7 @@ import { deriveSettlementInventory, type SettlementInventoryView } from "./inven
 import { SettlementRuntime } from "./settlement-runtime.js";
 import type { SettlementProject } from "./projects.js";
 import { CivilizationStore, type StoreWriteResult } from "./store.js";
+import { openOfflineRuntimeStore } from "./runtime-launch-policy.js";
 import { DirectiveBoard } from "./directives.js";
 import { applyBodyRespawn, applyTemporaryBodyDeath, applyTerminalDeath } from "./lifecycle.js";
 import { OperationTracker, type DrainResult } from "./operation-tracker.js";
@@ -130,7 +130,7 @@ export class AgentManager {
   constructor(config: AppConfig, store?: CivilizationStore, hooks?: AgentManagerHooks) {
     this.config = config;
     this.hooks = hooks ?? {};
-    this.store = store ?? new CivilizationStore(resolveFromRoot(config.DATABASE_PATH));
+    this.store = store ?? openOfflineRuntimeStore(config.DATABASE_PATH);
     this.cognition = this.hooks.cognitionRouter
       ? { name: "router-only", decide: async () => { throw new Error("A routed citizen must use its assigned provider"); } }
       : createCognition(config);

@@ -1,12 +1,15 @@
+import { pathToFileURL } from "node:url";
+import { resolve } from "node:path";
 import { loadEnv } from "./env.js";
-import { AgentManager } from "@civ/agent-core";
+import { AgentManager, assertLiveRuntimeLaunchAllowed } from "@civ/agent-core";
 import { loadConfig } from "@civ/shared";
 import { startDashboardServer } from "./http-server.js";
 import { ensurePaper } from "./paper.js";
 import { tryRcon } from "./rcon.js";
 import { enableColonyMode } from "./colony-world.js";
 
-async function main(): Promise<void> {
+export async function main(): Promise<void> {
+  assertLiveRuntimeLaunchAllowed();
   loadEnv();
   const config = loadConfig();
   const paperUp = await ensurePaper(config);
@@ -55,7 +58,7 @@ async function main(): Promise<void> {
   process.on("SIGTERM", () => void shutdown());
 }
 
-void main().catch((error: unknown) => {
+if (process.argv[1] && pathToFileURL(resolve(process.argv[1])).href === import.meta.url) void main().catch((error: unknown) => {
   console.error(error);
   process.exitCode = 1;
 });
