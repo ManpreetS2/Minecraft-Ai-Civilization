@@ -54,6 +54,16 @@ describe("CloudBudgetGate reservation integrity", () => {
     expect(budget.snapshot.inFlight).toBe(0);
   });
 
+  it("does not interpret missing usage on a successful call as a free request", () => {
+    const budget = gate();
+    const reservation = admitted(budget.tryAdmit());
+    expect(() => budget.reconcile(reservation, undefined, false)).toThrow(/invalid cloud usage/);
+    expect(budget.snapshot.closed).toBe(true);
+    expect(Number.isFinite(budget.snapshot.spendUsd)).toBe(true);
+    budget.releaseWithoutCharge(reservation);
+    expect(budget.snapshot.inFlight).toBe(0);
+  });
+
   it("closes cloud admissions for negative or fractional token counts", () => {
     for (const usage of [
       { inputTokens: -1, outputTokens: 1 },
