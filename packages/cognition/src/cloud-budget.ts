@@ -34,6 +34,19 @@ export class CloudAdmissionError extends Error {
   }
 }
 
+/** What a provider needs from a budget. A citizen-attributed view of the shared gate implements this too. */
+export type CloudBudget = Pick<
+  CloudBudgetGate,
+  | "snapshot"
+  | "close"
+  | "tryAdmit"
+  | "tryChargeRetry"
+  | "holdAttempt"
+  | "reconcile"
+  | "settleUnknownUsage"
+  | "releaseWithoutCharge"
+>;
+
 /**
  * Run-level admission control for cloud LLM calls.
  * Every attempt a request may make is reserved before the first network call, and a call is refused
@@ -84,6 +97,16 @@ export class CloudBudgetGate {
       maxRequestsPerRun: this.limits.maxRequestsPerRun,
       spendAllowanceUsd: this.limits.spendAllowanceUsd,
     };
+  }
+
+  /** Carries spending from before a restart in the same run, so restarting cannot reset the ceiling. */
+  restoreCommitted(prior: { spendUsd: number; heldUsd: number; requestsUsed: number }): void {
+    for (const value of Object.values(prior)) {
+      if (!Number.isFinite(value) || value < 0) throw new RangeError("restored budget values must be finite and non-negative");
+    }
+    this.spendUsd += prior.spendUsd;
+    this.heldUsd += prior.heldUsd;
+    this.requestsUsed += prior.requestsUsed;
   }
 
   /** Without a reason this is a normal shutdown; with one it records why cost safety closed the gate. */
