@@ -1,5 +1,5 @@
 import { GOALS } from "./goals.js";
-import { CloudAdmissionError, CloudBudgetGate, type CloudUsageReport } from "./cloud-budget.js";
+import { CloudAdmissionError, type CloudBudget, type CloudUsageReport } from "./cloud-budget.js";
 import { CloudDecisionLedger, type CloudDecisionRecord } from "./decision-record.js";
 import {
   boundCloudAttemptCostUsd,
@@ -23,7 +23,7 @@ export type OpenAiResponsesConfig = {
   maxInputTokens?: number;
   maxOutputTokens: number;
   maxRetries: number;
-  budget: CloudBudgetGate;
+  budget: CloudBudget;
   ledger?: CloudDecisionLedger;
   fetchImpl?: FetchLike;
   /** Optional run/trigger label for records. */
@@ -49,6 +49,9 @@ type RequestSettlement = {
   estimatedCostUsd?: number;
   unverifiedHoldUsd: number;
 };
+
+export const DECISION_SYSTEM_PROMPT =
+  "You are a high-level advisor for one Minecraft citizen. Choose exactly one allowlisted survival goal. Reply with structured JSON only. Do not include chain-of-thought, tools, code, shell commands, or Minecraft slash commands.";
 
 /**
  * Strict Structured Outputs requires every property in `required`, so an optional field is a required
@@ -117,12 +120,17 @@ export class OpenAiResponsesProvider implements CognitionProvider {
     );
   }
 
-  close(): void {
-    this.closed = true;
-    this.config.budget.close();
+  /** Aborts this provider's requests only. It stays usable. */
+  cancelInFlight(): void {
     for (const controller of this.inflight) {
       controller.abort();
     }
+  }
+
+  close(): void {
+    this.closed = true;
+    this.config.budget.close();
+    this.cancelInFlight();
     this.inflight.clear();
   }
 
@@ -266,8 +274,7 @@ export class OpenAiResponsesProvider implements CognitionProvider {
       input: [
         {
           role: "system",
-          content:
-            "You are a high-level advisor for one Minecraft citizen. Choose exactly one allowlisted survival goal. Reply with structured JSON only. Do not include chain-of-thought, tools, code, shell commands, or Minecraft slash commands.",
+          content: DECISION_SYSTEM_PROMPT,
         },
         {
           role: "user",

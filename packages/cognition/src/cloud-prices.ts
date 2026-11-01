@@ -29,13 +29,31 @@ export const OPENAI_MODEL_PRICES: Record<string, CloudModelPrice> = {
   "gpt-4.1": { inputPerMillionUsd: 2.0, outputPerMillionUsd: 8.0 },
 };
 
+/**
+ * Explicit allowlist of models a Claude citizen may be assigned, with first-party list prices as of 2026-10-06. Unlike
+ * the OpenAI table above, these were not checked against an invoice. Update both tables intentionally.
+ */
+export const CLAUDE_ALLOWED_MODELS = ["claude-opus-5-5", "claude-sonnet-5-5", "claude-haiku-5-5"] as const;
+
+export const CLAUDE_MODEL_PRICES: Record<string, CloudModelPrice> = {
+  "claude-opus-5-5": { inputPerMillionUsd: 4, outputPerMillionUsd: 20 },
+  "claude-sonnet-5-5": { inputPerMillionUsd: 2, outputPerMillionUsd: 10 },
+  // This rate applies up to 100K input tokens, which is above any citizen's input limit.
+  "claude-haiku-5-5": { inputPerMillionUsd: 0.1, outputPerMillionUsd: 0.5 },
+};
+
+export function isAllowedClaudeModel(model: string): boolean {
+  return (CLAUDE_ALLOWED_MODELS as readonly string[]).includes(model);
+}
+
 export function isAllowedOpenAiModel(model: string): model is OpenAiAllowedModel {
   return (OPENAI_ALLOWED_MODELS as readonly string[]).includes(model);
 }
 
 function priceForModel(model: string): CloudModelPrice | undefined {
-  if (!Object.hasOwn(OPENAI_MODEL_PRICES, model)) return undefined;
-  const price = OPENAI_MODEL_PRICES[model]!;
+  const table = [OPENAI_MODEL_PRICES, CLAUDE_MODEL_PRICES].find((prices) => Object.hasOwn(prices, model));
+  if (!table) return undefined;
+  const price = table[model]!;
   const valid = [price.inputPerMillionUsd, price.outputPerMillionUsd].every((rate) => Number.isFinite(rate) && rate > 0);
   return valid ? price : undefined;
 }
