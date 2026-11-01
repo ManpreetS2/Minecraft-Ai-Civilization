@@ -30,7 +30,10 @@ const settlement = (): SettlementState => ({
   needs: [],
 });
 
-describe("CRAFT-001 planner->executor loop from an empty inventory", () => {
+/** Explicit budget: these drive the real gather/craft/place loop and the slowest case takes ~5s on a quiet box. */
+const E2E_TIMEOUT_MS = 30_000;
+
+describe("CRAFT-001 planner->executor loop from an empty inventory", { timeout: E2E_TIMEOUT_MS }, () => {
   afterEach(() => setNavigationBackend(createNavigationBackend("pathfinder")));
 
   it("reaches a wooden_pickaxe in a bounded number of ticks, each tick's claim matching the real inventory", async () => {
