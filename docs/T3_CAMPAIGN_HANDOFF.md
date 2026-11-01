@@ -1,3 +1,9 @@
+# Current campaign handoff
+
+Read [T3_CAMPAIGN_RESUME.md](T3_CAMPAIGN_RESUME.md) for the current unified source, exact test evidence, file ownership, blockers and next action. The initial reconciliation report below is retained as historical evidence; its failures, provider availability and security review statements have since changed.
+
+---
+
 # T3 offline campaign ? reconciliation checkpoint
 
 ## Source authority and safety
