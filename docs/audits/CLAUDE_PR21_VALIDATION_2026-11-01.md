@@ -9,14 +9,14 @@ Reviewed: `agents/t3-independent-manager-integration` at `5d0268f67a97dc5cd3901e
 | Check | PR #21 `5d0268f` | This branch | New failures |
 | --- | --- | --- | --- |
 | T3's restart reproducer | **fails** | passes | none |
-| `pnpm test` | 1757 passed, 2 skipped | 1832 passed, 2 skipped | none |
+| `pnpm test` | 1757 passed, 2 skipped | 1835 passed, 2 skipped | none |
 | `pnpm test:security`, new command | n/a | 341 passed | none |
 | `packages/cognition` | 291 passed | 324 passed | none |
 | Workspace typecheck | 0 errors | 0 errors | none |
 | `pnpm lint` | 0 errors | 0 errors | none |
 | `pnpm build` | pass | pass | none |
 
-Deliberately breaking 28 properties across this work was caught by the tests every time, after strengthening the tests that first let 3 through: 14 Campaign D properties, 6 restart properties, and 8 manager properties.
+The tests caught every one of 35 properties deliberately broken across this work: 14 Campaign D, 13 restart and durability, and 8 manager.
 
 ## T3's five manager repairs
 
@@ -34,11 +34,14 @@ Reviewed by reading the diff and running T3's tests with my attacks. All five ar
 | --- | --- | --- | --- |
 | R1 | **High** | A same-run restart reopened a budget closed by unknown or over-bound usage. **My defect, reported by T3** | `7a32605`, #17 |
 | R2 | Medium | A failed session save could break accounting mid-call | `7a32605`, #17 |
+| R3 | **High** | A request was still sent when its reservation could not be saved, so a crash would forget it. My first fix for R2 encoded this. **Reported by T3** | #17 |
 | D1 | Medium | A decision overtaken by a new threat, critical injury or solved hunger was still acted on. `isDecisionStale` existed but only unused code called it | `manager.ts`, this branch |
 | D2 | Medium | In single-provider mode, a reply arriving after death still steered the respawned body. Routed mode was already protected | `manager.ts`, this branch |
 | S8 | Low | A withdrawn bulletin line shifted the model's line numbers, also fixed in #19 | `manager.ts`, this branch |
 
 **R1 details:** the closure reason is now stored in every citizen's record and restored on start. A normal shutdown is not recorded, so a run can continue after one, and an earlier run's fault does not carry into a new run. If the closure itself cannot be saved, it is lost on restart, and nothing can prevent that.
+
+**R3 details:** an admission or retry that cannot be saved is now refused before sending. A save failing after a call was made cannot undo the call, so the call settles, its charge stays in memory, and the budget closes. If the process then crashes before a later save succeeds, that charge is lost. This is the remaining limit of a file-backed record.
 
 `manager.ts` changes here are **proposals for T3**, who owns that file. I did not edit T3's worktree.
 

@@ -130,22 +130,6 @@ describe("live smoke interface, driven offline", () => {
 });
 
 describe("failure injection in session persistence", () => {
-  it("a failing store closes the budget instead of breaking the call in hand or leaking a reservation", async () => {
-    const store = createInMemoryCitizenSessionStore();
-    const fixture = offlineRegistry({ store });
-    const save = vi.spyOn(store, "save").mockImplementation(() => {
-      throw new Error("disk full");
-    });
-    await expect(fixture.registry.providerFor("gpt-a").decide(prompt("GPT-A"))).resolves.toBeDefined();
-    const { experiment, citizens } = fixture.registry.accounting();
-    expect(experiment).toMatchObject({ inFlight: 0, reservedUsd: 0, closed: true });
-    expect(experiment.closedReason).toMatch(/could not be persisted/);
-    expect(citizens["gpt-a"]!.estimatedSpendUsd).toBeGreaterThan(0);
-    await expect(fixture.registry.providerFor("gpt-b").decide(prompt("GPT-B"))).rejects.toThrow(/could not be persisted/);
-    expect(fixture.openai.calls).toHaveLength(1);
-    save.mockRestore();
-  });
-
   it("a corrupt session file stops startup rather than resetting spending", () => {
     const dir = mkdtempSync(join(tmpdir(), "citizen-preflight-"));
     dirs.push(dir);
