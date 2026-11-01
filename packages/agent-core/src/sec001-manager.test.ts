@@ -88,7 +88,7 @@ class World {
     for (const id of ROSTER) {
       this.store.upsertCitizen({ id, name: id, minecraftUsername: id, createdAt: NOW, status: "online" });
     }
-    if (communities !== null) applyCommunityConfig(this.store, config);
+    if (communities !== null) applyCommunityConfig(this.store, config, "2026-01-01T00:00:00.000Z");
     this.manager = new AgentManager(config, this.store);
     const registry = (this.manager as unknown as { citizens: Map<string, unknown> }).citizens;
     for (const id of ROSTER) {

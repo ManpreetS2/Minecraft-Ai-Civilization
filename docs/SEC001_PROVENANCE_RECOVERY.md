@@ -34,12 +34,16 @@ const result = store.knowledge.review(
   {
     actor: "orchestrator-review",
     reason: "Verify original acquisition against stored evidence",
-    authorizationId: operatorReleaseAuthorizationReference,
+    grant, // from signKnowledgeRelease in separate operator tooling
   },
 );
 ```
 
-The authorization reference must refer to an actual operator release decision, never invented or supplied by model output. Authorization/prose alone cannot release a record. Code independently verifies that the stored source existed by acquisition, its original audience/actor entitlement, exact content derivation and current access. Community evidence needs audited original membership; joining today cannot retroactively authorize an older acquisition.
+The grant is an HMAC over one exact citizen, record, source and authorization reference, signed with `KNOWLEDGE_RELEASE_KEY` (at least 32 characters). Keep that key in the operator's environment, never in SQLite, config files or prompts. Without it every release is refused. An authorization reference releases at most one record, once. Refusals are audited and change no flags.
+
+**Trust boundary:** the grant proves possession of the key, not a person's identity; `operatorId` is what the key holder wrote. Code running inside this process could read the key, so it is trusted by definition. Nothing in the simulation may call `review` or import `signKnowledgeRelease`, and a test enforces this. Whoever can write SQLite directly can also forge proof rows; hashes detect accidental or partial changes, not that attacker.
+
+A grant is not sufficient by itself. Code independently verifies that the stored source existed by acquisition, the reader was in its audience when it happened and at acquisition, exact content derivation and current access. Joining a community today cannot authorize anything said before the citizen joined or while it was away.
 
 Success releases only that original record's flag and adds proof/audit metadata. Content, timestamps, ownership and original metadata stay unchanged. Another record's key quarantine cannot be blanket-released. Failure preserves quarantine and audits rejection/evidence references. Read observer outcomes with `store.knowledge.listAudit()`; do not register recovery as a citizen/model tool.
 

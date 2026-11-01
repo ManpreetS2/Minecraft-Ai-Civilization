@@ -32,6 +32,7 @@ type ContextStore = Pick<
   | "upsertPersistentFact"
   | "getCommunityDirectory"
   | "getEventById"
+  | "knowledge"
 >;
 type Fact = Parameters<CivilizationStore["upsertPersistentFact"]>[0];
 type State = {
@@ -67,6 +68,8 @@ function fixture(events: SimEvent[], state = newState()) {
         { id: "claude", memberIds: ["Claude-A", "Claude-B"] },
       ]),
     getEventById: (id: string) => events.find((event) => event.id === id),
+    // This fake has no membership history; real-store timing is covered by sec001-independent-review.test.ts.
+    knowledge: { wasInAudienceAtEvent: () => true } as unknown as CivilizationStore["knowledge"],
     getCitizen(id) {
       return state.records.get(id);
     },

@@ -66,7 +66,7 @@ const evt = (id: string, payload: Record<string, unknown>, citizenId = "GPT-A", 
 function seed(path = dbPath()): CivilizationStore {
   const store = open(path);
   for (const id of READERS) store.upsertCitizen(record(id));
-  applyCommunityConfig(store, config);
+  applyCommunityConfig(store, config, "2026-01-01T00:00:00.000Z");
   return store;
 }
 const gptSecret = (id = "gpt-secret", msg = "gpt hidden cache at x=137") =>

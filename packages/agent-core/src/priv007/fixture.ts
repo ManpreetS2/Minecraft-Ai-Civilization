@@ -30,7 +30,7 @@ export function makeStore(
       createdAt: at,
       status: "online",
     });
-  applyCommunityConfig(store, communities);
+  applyCommunityConfig(store, communities, "2026-01-01T00:00:00.000Z");
   return store;
 }
 export function event(

@@ -79,7 +79,7 @@ function legacyDb(): string {
   const path = dbPath();
   const store = open(path);
   for (const id of READERS) store.upsertCitizen(record(id));
-  applyCommunityConfig(store, config);
+  applyCommunityConfig(store, config, "2026-01-01T00:00:00.000Z");
   store.appendEvent(evt("private-claude-a", { message: "claude-a private", visibility: { class: "actor_private" } }, "Claude-A"));
   store.appendEvent(evt("gpt-secret", withAudience({ message: SECRET }, "settlement_public", { scope: "community", communityId: "gpt" })));
   store.appendEvent(evt("unlabeled", { message: "old broadcast", visibility: { class: "world_public" } }));
@@ -230,7 +230,7 @@ describe("removeCommunityMember flags in place", () => {
   function setup(path: string) {
     const store = open(path);
     for (const id of READERS) store.upsertCitizen(record(id));
-    applyCommunityConfig(store, config);
+    applyCommunityConfig(store, config, "2026-01-01T00:00:00.000Z");
     store.appendEvent(evt("gpt-plan", withAudience({ message: SECRET }, "settlement_public", { scope: "community", communityId: "gpt" })));
     buildCitizenContextPack({ store, config, citizenId: "GPT-B" }); // GPT-B stores the urgent fact with its audience
     store.appendEvent(evt("personal", { message: "my own note", visibility: { class: "actor_private" } }, "GPT-B", "TaskCompleted"));
@@ -273,7 +273,7 @@ describe("round 3 review fixes (F1, F2, memories, config revocation, required di
   it("F1: a re-written fact with the same (citizen, key) and a NEW id stays quarantined (row survives, content untouched)", () => {
     const store = open(dbPath());
     for (const id of READERS) store.upsertCitizen(record(id));
-    applyCommunityConfig(store, config);
+    applyCommunityConfig(store, config, "2026-01-01T00:00:00.000Z");
     store.appendEvent(evt("gpt-news", withAudience({ message: "gpt news" }, "settlement_public", { scope: "community", communityId: "gpt" })));
     store.upsertPersistentFact({
       id: "fact-1", citizenId: "GPT-B", factKey: "event:gpt-news", content: "gpt news " + SECRET,
@@ -326,7 +326,7 @@ describe("round 3 review fixes (F1, F2, memories, config revocation, required di
   it("memories: membership removal flags memories quoting the facts it flagged", () => {
     const store = open(dbPath());
     for (const id of READERS) store.upsertCitizen(record(id));
-    applyCommunityConfig(store, config);
+    applyCommunityConfig(store, config, "2026-01-01T00:00:00.000Z");
     store.upsertPersistentFact({ id: "f", citizenId: "GPT-B", factKey: "event:e1", content: "the cache is behind the red barn", audience: { scope: "community", communityId: "gpt" }, sourceEventId: "e1" });
     store.addMemory({ id: "m1", citizenId: "GPT-B", kind: "social", content: "told them the cache is behind the red barn", importance: 0.5, createdAt: "2026-10-30T00:00:00.000Z" });
     store.appendEvent({ ...evt("personal", { message: "likes oak", visibility: { class: "actor_private" } }, "GPT-B"), timestamp: "2026-10-29T00:00:00.000Z" });
@@ -339,7 +339,7 @@ describe("round 3 review fixes (F1, F2, memories, config revocation, required di
   it("COMMUNITIES_JSON: dropping a member revokes membership through the audited removal path and flags their community facts", () => {
     const store = open(dbPath());
     for (const id of READERS) store.upsertCitizen(record(id));
-    applyCommunityConfig(store, config);
+    applyCommunityConfig(store, config, "2026-01-01T00:00:00.000Z");
     store.upsertPersistentFact({ id: "f", citizenId: "GPT-B", factKey: "event:e1", content: "gpt-only knowledge", audience: { scope: "community", communityId: "gpt" }, sourceEventId: "e1" });
     const smaller = { COMMUNITIES_JSON: JSON.stringify([{ id: "gpt", memberIds: ["GPT-A"] }, { id: "claude", memberIds: ["Claude-A", "Claude-B"] }]) };
     const result = applyCommunityConfig(store, smaller);

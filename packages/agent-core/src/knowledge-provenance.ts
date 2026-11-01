@@ -11,6 +11,11 @@ import {
   type CommunityDirectory,
   type SimEvent,
 } from "@civ/shared";
+import {
+  KNOWLEDGE_RELEASE_KEY_ENV,
+  refuseKnowledgeRelease,
+  type KnowledgeReleaseGrant,
+} from "./knowledge-release-grant.js";
 
 export type KnowledgeKind = "fact" | "memory";
 type Row = {
@@ -44,7 +49,7 @@ export type KnowledgeMigrationReport = {
 export type KnowledgeReviewAuthority = {
   actor: "orchestrator-review";
   reason: string;
-  authorizationId: string;
+  grant: KnowledgeReleaseGrant;
 };
 const KEY = "sec001_knowledge_provenance_v2";
 const hash = (value: unknown) => createHash("sha256").update(JSON.stringify(value)).digest("hex");
@@ -151,19 +156,37 @@ export class KnowledgeProvenance {
   }
 
   private originalDirectory(at: string): CommunityDirectory {
-    const members = new Map<string, Set<string>>();
+    const communities = new Set<string>();
+    const owner = new Map<string, string>();
     const actions = this.db
       .prepare(
-        "SELECT action, community_id, citizen_id FROM community_audit WHERE at <= ? ORDER BY seq",
+        "SELECT action, community_id, citizen_id FROM community_audit WHERE at <= ? ORDER BY at, seq",
       )
       .all(at) as Array<{ action: string; community_id: string; citizen_id: string | null }>;
     for (const action of actions) {
-      const set = members.get(action.community_id) ?? new Set<string>();
-      members.set(action.community_id, set);
-      if (action.citizen_id && action.action === "add_member") set.add(action.citizen_id);
-      if (action.citizen_id && action.action === "remove_member") set.delete(action.citizen_id);
+      communities.add(action.community_id);
+      if (!action.citizen_id) continue;
+      if (action.action === "add_member") owner.set(action.citizen_id, action.community_id);
+      // A removal only ends the membership it names, so an out-of-order history can never yield two communities.
+      if (action.action === "remove_member" && owner.get(action.citizen_id) === action.community_id)
+        owner.delete(action.citizen_id);
     }
-    return createCommunityDirectory([...members].map(([id, ids]) => ({ id, memberIds: [...ids] })));
+    return createCommunityDirectory(
+      [...communities].map((id) => ({
+        id,
+        memberIds: [...owner].filter(([, community]) => community === id).map(([citizen]) => citizen),
+      })),
+    );
+  }
+
+  /**
+   * A community audience covers who belonged when the event happened. Joining later, or rejoining after an absence,
+   * grants no access to what was said without the reader. Other classes name their readers on the event itself.
+   */
+  wasInAudienceAtEvent(citizenId: string, event: SimEvent): boolean {
+    const audience = readEventAudience(event.payload);
+    if (audience?.scope !== "community") return true;
+    return this.originalDirectory(event.timestamp).communityOf(citizenId) === audience.communityId;
   }
 
   private evidence(
@@ -186,7 +209,9 @@ export class KnowledgeProvenance {
       return undefined;
     const directory = this.originalDirectory(at);
     if (
-      !authorizeEventWithAudience(row.citizen_id, event.payload, directory, event.citizenId).allowed
+      !authorizeEventWithAudience(row.citizen_id, event.payload, directory, event.citizenId)
+        .allowed ||
+      !this.wasInAudienceAtEvent(row.citizen_id, event)
     )
       return undefined;
     // A key, label or prose justification does not prove derivation. Only reproducible source text qualifies.
@@ -236,6 +261,7 @@ export class KnowledgeProvenance {
       return Boolean(
         event &&
         hash(event) === proof.source_digest &&
+        this.wasInAudienceAtEvent(row.citizen_id, event) &&
         authorizeEventWithAudience(
           row.citizen_id,
           event.payload,
@@ -423,7 +449,11 @@ export class KnowledgeProvenance {
     })();
   }
 
-  /** Single-record observer recovery. Free-text authority alone can never supply evidence. */
+  /**
+   * Single-record observer recovery. Needs both an authenticated operator grant for this exact record and source, and
+   * independently verified evidence. Neither alone releases anything. Refusals are audited and change no flags, so a
+   * mistaken review cannot quarantine a healthy record. Reachable only from operator code; never expose it as a tool.
+   */
   review(
     kind: KnowledgeKind,
     id: string,
@@ -431,58 +461,81 @@ export class KnowledgeProvenance {
     authority: KnowledgeReviewAuthority,
   ): { ok: boolean; reason: string } {
     if (kind !== "fact" && kind !== "memory") throw new Error("unknown knowledge record kind");
-    if (
-      authority?.actor !== "orchestrator-review" ||
-      !authority.reason?.trim() ||
-      !authority.authorizationId?.trim()
-    )
-      throw new Error("explicit orchestrator review authorization required");
-    return this.db.transaction(() => {
-      const row = this.row(kind, id);
-      if (!row) return { ok: false, reason: "record not found" };
-      const proof = this.evidence(kind, row, sourceId, "historical");
-      const source = this.source.getEventById(sourceId);
-      const current =
-        source &&
-        authorizeEventWithAudience(
-          row.citizen_id,
-          source.payload,
-          this.source.getCommunityDirectory(),
-          source.citizenId,
-        ).allowed;
-      const keyConflict =
-        kind === "fact" &&
-        this.db
-          .prepare(
-            `SELECT 1 FROM citizen_persistent_fact_flags
+    // IMMEDIATE takes the write lock before reading, so no concurrent writer can change what was checked.
+    return this.db
+      .transaction(() => {
+        const row = this.row(kind, id);
+        const citizenId = row?.citizen_id ?? "unknown";
+        const grant = authority?.grant;
+        const reference =
+          typeof grant?.authorizationId === "string" ? grant.authorizationId.slice(0, 200) : undefined;
+        const refuse = (reason: string) => {
+          this.audit(
+            { kind, id, citizenId, reason, evidenceRefs: [sourceId] },
+            "refused",
+            typeof authority?.actor === "string" ? authority.actor.slice(0, 80) : "unknown",
+            reference,
+          );
+          return { ok: false, reason };
+        };
+        if (authority?.actor !== "orchestrator-review" || !authority.reason?.trim())
+          return refuse("explicit orchestrator review authorization required");
+        if (!row) return refuse("record not found");
+        const refusal = refuseKnowledgeRelease(
+          grant,
+          { kind, recordId: id, citizenId, sourceEventId: sourceId },
+          process.env[KNOWLEDGE_RELEASE_KEY_ENV],
+        );
+        if (refusal) return refuse(refusal);
+        const replayed = this.db
+          .prepare("SELECT 1 FROM knowledge_review_audit WHERE outcome='released' AND release_authorization=?")
+          .get(grant.authorizationId);
+        if (replayed) return refuse("release authorization was already used");
+        const proof = this.evidence(kind, row, sourceId, "historical");
+        const source = this.source.getEventById(sourceId);
+        const current =
+          source &&
+          authorizeEventWithAudience(
+            row.citizen_id,
+            source.payload,
+            this.source.getCommunityDirectory(),
+            source.citizenId,
+          ).allowed;
+        const keyConflict =
+          kind === "fact" &&
+          this.db
+            .prepare(
+              `SELECT 1 FROM citizen_persistent_fact_flags
         WHERE citizen_id=? AND fact_key=? AND fact_id<>? AND released_at IS NULL`,
-          )
-          .get(row.citizen_id, row.fact_key, row.id);
-      const decision: Decision = {
-        kind,
-        id,
-        citizenId: row.citizen_id,
-        evidence: proof,
-        evidenceRefs: [sourceId],
-        reason: `${authority.reason}: ${proof && current && !keyConflict ? "original evidence verified" : "original evidence/authorization not established or another record's key quarantine remains"}`,
-      };
-      if (!proof || !current || keyConflict) {
-        this.flag(decision);
-        this.audit(decision, "rejected", authority.actor, authority.authorizationId);
-        return { ok: false, reason: decision.reason };
-      }
-      if (kind === "fact")
-        this.db
-          .prepare("UPDATE citizen_persistent_fact_flags SET released_at=? WHERE fact_id=?")
-          .run(new Date().toISOString(), row.id);
-      else
-        this.db
-          .prepare("UPDATE citizen_memory_flags SET released_at=? WHERE memory_id=?")
-          .run(new Date().toISOString(), row.id);
-      this.stamp(decision);
-      this.audit(decision, "released", authority.actor, authority.authorizationId);
-      return { ok: true, reason: decision.reason };
-    })();
+            )
+            .get(row.citizen_id, row.fact_key, row.id);
+        const verified = proof && current && !keyConflict;
+        const decision: Decision = {
+          kind,
+          id,
+          citizenId: row.citizen_id,
+          evidence: proof,
+          evidenceRefs: [sourceId],
+          reason: `${authority.reason}: ${verified ? "original evidence verified" : "original evidence/authorization not established or another record's key quarantine remains"} (operator ${grant.operatorId})`,
+        };
+        if (!verified) {
+          if (!this.isEligible(kind, id)) this.flag(decision);
+          this.audit(decision, "rejected", authority.actor, grant.authorizationId);
+          return { ok: false, reason: decision.reason };
+        }
+        if (kind === "fact")
+          this.db
+            .prepare("UPDATE citizen_persistent_fact_flags SET released_at=? WHERE fact_id=?")
+            .run(new Date().toISOString(), row.id);
+        else
+          this.db
+            .prepare("UPDATE citizen_memory_flags SET released_at=? WHERE memory_id=?")
+            .run(new Date().toISOString(), row.id);
+        this.stamp(decision);
+        this.audit(decision, "released", authority.actor, grant.authorizationId);
+        return { ok: true, reason: decision.reason };
+      })
+      .immediate();
   }
 
   listAudit(): Array<Record<string, unknown>> {

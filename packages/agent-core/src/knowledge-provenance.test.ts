@@ -2,9 +2,10 @@ import Database from "better-sqlite3";
 import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { MemoryRecord, SimEvent } from "@civ/shared";
 import { CivilizationStore } from "./store.js";
+import { KNOWLEDGE_RELEASE_KEY_ENV, signKnowledgeRelease } from "./knowledge-release-grant.js";
 import { KnowledgeProvenance } from "./knowledge-provenance.js";
 
 const stores: CivilizationStore[] = [];
@@ -21,6 +22,7 @@ const path = () => {
 };
 afterEach(() => {
   vi.restoreAllMocks();
+  vi.unstubAllEnvs();
   vi.useRealTimers();
   for (const s of stores.splice(0)) s.close();
   for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true });
@@ -44,11 +46,26 @@ const memory = (
   importance: 1,
   createdAt: "2026-02-01T00:00:00.000Z",
 });
-const authority = {
+const RELEASE_KEY = "synthetic-release-key-for-offline-tests-only";
+let grantSeq = 0;
+const authorityFor = (kind: "memory" | "fact", recordId: string, sourceEventId: string, citizenId = "alice") => ({
   actor: "orchestrator-review" as const,
-  authorizationId: "owner-policy-2026-11-01/test-review",
   reason: "verify original source",
-};
+  grant: signKnowledgeRelease(
+    {
+      authorizationId: `owner-policy-2026-11-01/test-review-${(grantSeq += 1)}`,
+      operatorId: "synthetic-operator",
+      kind,
+      recordId,
+      citizenId,
+      sourceEventId,
+    },
+    RELEASE_KEY,
+  ),
+});
+beforeEach(() => {
+  vi.stubEnv(KNOWLEDGE_RELEASE_KEY_ENV, RELEASE_KEY);
+});
 
 describe("owner policy: fail-closed provenance and per-record recovery", () => {
   it("quarantines unknown notes and personal-sounding memories without rewriting originals", () => {
@@ -108,7 +125,7 @@ describe("owner policy: fail-closed provenance and per-record recovery", () => {
     });
     expect(s.getMemories("alice")).toEqual([]);
     expect(s.listPersistentFacts("alice")).toEqual([]);
-    expect(s.knowledge.review("memory", "paraphrase", "own", authority).ok).toBe(false);
+    expect(s.knowledge.review("memory", "paraphrase", "own", authorityFor("memory", "paraphrase", "own")).ok).toBe(false);
   });
 
   it("recovers only a proven record and records authorization, citizen, outcome and evidence", () => {
@@ -118,6 +135,7 @@ describe("owner policy: fail-closed provenance and per-record recovery", () => {
     s.addMemory(memory("proven"));
     s.addMemory(memory("unknown", "alice", "untraceable paraphrase"));
     const original = s.db.prepare("SELECT * FROM memories ORDER BY id").all();
+    const authority = authorityFor("memory", "proven", "own");
     expect(s.knowledge.review("memory", "proven", "own", authority).ok).toBe(true);
     expect(s.getMemories("alice").map((m) => m.id)).toEqual(["proven"]);
     expect(s.db.prepare("SELECT * FROM memories ORDER BY id").all()).toEqual(original);
@@ -126,7 +144,7 @@ describe("owner policy: fail-closed provenance and per-record recovery", () => {
       record_id: "proven",
       citizen_id: "alice",
       outcome: "released",
-      release_authorization: authority.authorizationId,
+      release_authorization: authority.grant.authorizationId,
     });
     expect(String(s.knowledge.listAudit().at(-1)?.evidence_refs)).toContain("own");
     const audit = s.knowledge.listAudit();
@@ -140,20 +158,22 @@ describe("owner policy: fail-closed provenance and per-record recovery", () => {
     const s = open();
     s.appendEvent(source());
     s.addMemory(memory("m", "bob"));
-    expect(s.knowledge.review("memory", "m", "own", authority).ok).toBe(false);
-    expect(s.knowledge.review("memory", "m", "invented", authority).ok).toBe(false);
-    expect(() =>
-      s.knowledge.review("memory", "m", "own", { ...authority, authorizationId: "" }),
-    ).toThrow(/authorization/);
-    expect(s.getMemories("bob")).toEqual([]);
+    expect(s.knowledge.review("memory", "m", "own", authorityFor("memory", "m", "own", "bob")).ok).toBe(false);
     expect(s.knowledge.listAudit().at(-1)?.outcome).toBe("rejected");
+    expect(s.knowledge.review("memory", "m", "invented", authorityFor("memory", "m", "invented", "bob")).ok).toBe(false);
+    expect(s.knowledge.listAudit().at(-1)?.outcome).toBe("rejected");
+    const proseOnly = authorityFor("memory", "m", "own", "bob");
+    proseOnly.grant.authorizationId = "";
+    expect(s.knowledge.review("memory", "m", "own", proseOnly)).toMatchObject({ ok: false, reason: expect.stringMatching(/grant/) });
+    expect(s.getMemories("bob")).toEqual([]);
+    expect(s.knowledge.listAudit().at(-1)?.outcome).toBe("refused");
   });
 
   it("cannot recover from an event that happened after the original memory", () => {
     const s = open();
     s.appendEvent({ ...source(), timestamp: "2026-03-01T00:00:00.000Z" });
     s.addMemory(memory());
-    expect(s.knowledge.review("memory", "memory", "own", authority).ok).toBe(false);
+    expect(s.knowledge.review("memory", "memory", "own", authorityFor("memory", "memory", "own")).ok).toBe(false);
     expect(s.getMemories("alice")).toEqual([]);
   });
 
@@ -165,7 +185,7 @@ describe("owner policy: fail-closed provenance and per-record recovery", () => {
     expect(s.getMemories("alice")).toEqual([]);
     s.knowledge.apply(s.knowledge.dryRun());
     expect(s.listFlaggedMemoryIds()).toContain("memory");
-    expect(s.knowledge.review("memory", "memory", "own", authority).ok).toBe(false);
+    expect(s.knowledge.review("memory", "memory", "own", authorityFor("memory", "memory", "own")).ok).toBe(false);
     const other = open();
     other.appendEvent(source());
     other.addMemory(memory(), { sourceEventId: "own" });
@@ -265,10 +285,27 @@ describe("owner policy: fail-closed provenance and per-record recovery", () => {
     });
     s.addMemory(memory(), { sourceEventId: "own" }); // February, before admission
     expect(s.getMemories("alice")).toEqual([]);
-    expect(s.knowledge.review("memory", "memory", "own", authority).ok).toBe(false);
+    expect(s.knowledge.review("memory", "memory", "own", authorityFor("memory", "memory", "own")).ok).toBe(false);
+    // Independent review: acquiring it after joining does not help, because alice was not in the audience in January.
+    s.addMemory(
+      { ...memory("after-join"), createdAt: "2026-04-01T00:00:00.000Z" },
+      { sourceEventId: "own" },
+    );
+    expect(s.getMemories("alice")).toEqual([]);
+    s.appendEvent({
+      ...source("said-while-member"),
+      timestamp: "2026-03-15T00:00:00.000Z",
+      payload: {
+        message: "I observed a river",
+        visibility: {
+          class: "settlement_public",
+          audience: { scope: "community", communityId: "north" },
+        },
+      },
+    });
     s.addMemory(
       { ...memory("later"), createdAt: "2026-04-01T00:00:00.000Z" },
-      { sourceEventId: "own" },
+      { sourceEventId: "said-while-member" },
     );
     expect(s.getMemories("alice").map((m) => m.id)).toEqual(["later"]);
     s.removeCommunityMember("north", "alice", audit);
@@ -299,7 +336,7 @@ describe("owner policy: fail-closed provenance and per-record recovery", () => {
       content: "I observed a river",
     });
     const original = s.db.prepare("SELECT * FROM citizen_persistent_facts WHERE id='note'").get();
-    expect(s.knowledge.review("fact", "note", "own", authority).ok).toBe(true);
+    expect(s.knowledge.review("fact", "note", "own", authorityFor("fact", "note", "own")).ok).toBe(true);
     expect(s.listPersistentFacts("alice")[0]?.sourceEventId).toBe("own");
     expect(s.db.prepare("SELECT * FROM citizen_persistent_facts WHERE id='note'").get()).toEqual(
       original,
@@ -408,7 +445,7 @@ describe("owner policy: fail-closed provenance and per-record recovery", () => {
         "INSERT INTO citizen_persistent_fact_flags(fact_id,citizen_id,fact_key,reason,source,flagged_at) VALUES(?,?,?,?,?,?)",
       )
       .run("other-original", "alice", "same-key", "unresolved original", "test", "2026-01-01");
-    expect(s.knowledge.review("fact", "new", "own", authority).ok).toBe(false);
+    expect(s.knowledge.review("fact", "new", "own", authorityFor("fact", "new", "own")).ok).toBe(false);
     expect(
       s.db
         .prepare(
