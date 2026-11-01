@@ -212,8 +212,10 @@ export class OpenAiResponsesProvider implements CognitionProvider {
     const inputTokens = usageRaw.input_tokens ?? usageRaw.prompt_tokens;
     const outputTokens = usageRaw.output_tokens ?? usageRaw.completion_tokens;
     if (
+      typeof inputTokens !== "number" ||
       !Number.isSafeInteger(inputTokens) ||
       inputTokens < 0 ||
+      typeof outputTokens !== "number" ||
       !Number.isSafeInteger(outputTokens) ||
       outputTokens < 0
     ) {
