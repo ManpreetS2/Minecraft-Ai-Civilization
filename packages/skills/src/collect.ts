@@ -163,11 +163,39 @@ function blockMissing(ctx: SkillContext, position: Vec3, expected: string): bool
   return !after || after.name === "air" || after.name === "cave_air" || after.name !== expected;
 }
 
-function countMatching(ctx: SkillContext, names: string[]): number {
+/**
+ * Block name -> inventory item(s) that prove possession. Breaking `coal_ore` yields `coal`,
+ * `stone` yields `cobblestone`, etc. Everything else (logs, cobblestone, wheat) is the item itself.
+ */
+const BLOCK_DROP_ITEMS: Record<string, string[]> = {
+  stone: ["cobblestone"],
+  deepslate: ["cobbled_deepslate"],
+  coal_ore: ["coal"],
+  deepslate_coal_ore: ["coal"],
+  iron_ore: ["raw_iron"],
+  deepslate_iron_ore: ["raw_iron"],
+  copper_ore: ["raw_copper"],
+  deepslate_copper_ore: ["raw_copper"],
+  gold_ore: ["raw_gold"],
+  deepslate_gold_ore: ["raw_gold"],
+};
+
+function expectedDropItems(names: string[]): Set<string> {
   const knowledge = minecraftKnowledge();
-  const set = new Set(names.map((name) => knowledge.normalizeItemName(name) || name));
+  const out = new Set<string>();
+  for (const name of names) {
+    const normalized = knowledge.normalizeItemName(name) || name;
+    out.add(normalized);
+    // Keep the original behaviour for the block names callers already pass ("stone" also accepts cobblestone).
+    for (const drop of BLOCK_DROP_ITEMS[normalized] ?? BLOCK_DROP_ITEMS[name] ?? []) out.add(drop);
+  }
+  return out;
+}
+
+function countMatching(ctx: SkillContext, names: string[]): number {
+  const set = expectedDropItems(names);
   return ctx.bot.inventory
     .items()
-    .filter((item) => set.has(item.name) || names.some((name) => item.name.includes(name.replace(/_log$/, ""))))
+    .filter((item) => set.has(item.name))
     .reduce((sum, item) => sum + item.count, 0);
 }
