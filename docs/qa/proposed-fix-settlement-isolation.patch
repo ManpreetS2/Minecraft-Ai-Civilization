@@ -1,0 +1,13 @@
+diff --git a/packages/agent-core/src/executor.ts b/packages/agent-core/src/executor.ts
+index db91705..9fc829b 100644
+--- a/packages/agent-core/src/executor.ts
++++ b/packages/agent-core/src/executor.ts
+@@ -476,7 +476,7 @@ export async function executePlan(
+ 
+   // Only sync settlement resources when food was newly acquired or other actions succeeded.
+   if (result.success && ctx.citizenId && foodMeta?.acquired !== false) {
+-    if (store.isOpen()) {
++    if (store.isOpen() && !store.hasCommunities()) {
+       store.safeWrite("updateSettlementFromInventory", () => updateSettlementFromInventory(ctx, store));
+     }
+   }
