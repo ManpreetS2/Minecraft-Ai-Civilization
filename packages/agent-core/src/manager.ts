@@ -534,7 +534,9 @@ export class AgentManager {
           lastLlmMs = Date.now() - started;
           if (!this.ops.canWrite()) return;
           citizen.pendingLlm = decision;
-          citizen.pendingBulletinEventIds = contextPack.acknowledge();
+          contextPack.acknowledge();
+          // Keep the list as shown: the model's line numbers refer to it, even if a line was withdrawn meanwhile.
+          citizen.pendingBulletinEventIds = contextPack.bulletin.deliveredEventIds;
           this.writeLlmCall({
             citizenId: citizen.record.id,
             latencyMs: lastLlmMs,
