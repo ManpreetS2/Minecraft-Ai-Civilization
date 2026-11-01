@@ -1,5 +1,8 @@
 # Cross-Computer Handoff — Mission 007
 
+> **HISTORICAL October 2026 Windows Mission 007 backup instructions; do not use as the current laptop-sync checklist.** The active multi-agent synchronization handoff is [GitHub Issue #2](https://github.com/ManpreetS2/Minecraft-Ai-Civilization-windows-backup/issues/2) with recent verified Claude/Codex/Grok branch tips; see [Development workflow](DEVELOPMENT_WORKFLOW.md). Mission 013 may contain unpublished Windows-only changes outside Git; preserve them before any integration. The snapshots below remain useful for reconstructing the October 27 Windows backup, not for current SEC-001 rollout.
+
+
 ## Snapshot
 
 | Field | Value |
