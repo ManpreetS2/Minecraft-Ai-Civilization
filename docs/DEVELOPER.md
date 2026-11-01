@@ -1,5 +1,8 @@
 # Local developer notes
 
+> **Legacy developer setup:** These instructions document earlier local Paper/single-settlement workflows, not a ready-to-run 2v2 GPT/Claude demonstration. The first-demo contract and validation gates are in [project.md](../project.md). Treat any version, citizen-count or world-configuration defaults below as historical until they are separately validated; do not start a live server, modify a world or enable paid providers from an offline tutorial.
+
+
 ## Connect
 
 Use **`127.0.0.1:25565`**. On this machine `localhost` has produced a network-unreachable error.
