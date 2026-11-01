@@ -137,3 +137,30 @@ This is not a billing guarantee, and none of it has been checked against a real 
 - **`AgentManager` never calls the provider's `close()`.** This predates the PR and was left alone because `manager.ts` is out of scope.
 - **Loopback mocks still receive the key.** Any local process listening on the configured port would get it.
 - **SEC-001 interaction is still untested.** `manager.ts` and `executor.ts` remain unchanged.
+
+## Strict schema follow-up
+
+The owner's PR #4 review found that `DECISION_JSON_SCHEMA` declared `targetCitizenId` in `properties` but not `required`, which the OpenAI Structured Outputs guide does not allow under `strict: true`.
+
+- **Wire format:** `targetCitizenId` is now a required `["string", "null"]` property.
+- **Internal type:** `HighLevelDecision.targetCitizenId` stays optional. `normalizeDecisionInput` already dropped null, so a null target becomes an omitted field and normalization needed no change.
+- **Second mismatch:** `reason` also used `minLength` and `maxLength`, which are absent from the guide's supported string keywords. They are removed. `validateDecision` still truncates at 280 characters and rejects empty reasons, and a schema `description` states the limit to the model.
+- **Base:** `a133c91` is merged in without conflicts. It only changes docs and comments in `.env.example`.
+
+| Check | Result on this commit | New failures compared with base |
+| --- | --- | --- |
+| `openai-schema-regression.test.ts` | 31 passed | none |
+| `packages/cognition` | 195 passed, three consecutive runs | none |
+| `@civ/cognition` and `@civ/shared` typecheck | pass | none |
+| Workspace typecheck | fail, 10 errors, identical to `17bff2d` | none |
+| `pnpm lint` | fail, 15 errors, identical to `17bff2d` | none |
+| `pnpm test` tests | 1 failed, 1195 passed, 2 skipped | none |
+| `pnpm test` files | 1 failed, 137 passed | none |
+
+The baseline logs are from `17bff2d`. They were not rerun on `a133c91` because it changes no code. The one test failure is still `blueprint.test.ts`.
+
+Seven schema and normalization properties were broken one at a time, including the original defect. The schema tests caught all seven.
+
+These tests check the request shape against the documented rules, using mocks. They do not show that OpenAI accepts the schema, because no real request was made.
+
+The owner checked the local price table against current standard text-token rates and it matched, which narrows the price risk above. Invoices and service tiers remain unverified. The owner also reports that the configured GPT-4o and GPT-4.1 models are listed for shutdown on January 14, 2027, so a newer-model and price-table update is needed as a separate task.

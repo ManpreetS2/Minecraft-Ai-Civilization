@@ -37,7 +37,9 @@ No Cognition V2, no second planner, no tool/function calling to the model.
 - Endpoint: `POST /v1/responses`
 - `store: false`
 - `max_output_tokens` from config
-- `text.format` = strict `json_schema` for `{ goal, priority, reason, targetCitizenId? }`
+- `text.format` = strict `json_schema` for `{ goal, priority, reason, targetCitizenId }`
+- Strict mode requires every property, so `targetCitizenId` is a required `string | null` on the wire. `validateDecision` turns null into an omitted optional field on `HighLevelDecision`.
+- `reason` length limits are enforced by `validateDecision`, not the schema. Offline tests check the schema shape only; no real request has confirmed the provider accepts it.
 - `goal` enum = cognition `GOALS`
 - System prompt forbids chain-of-thought, code, shell, Minecraft commands
 - No `tools` parameter

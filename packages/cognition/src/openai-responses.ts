@@ -46,15 +46,20 @@ type RequestSettlement = {
   unverifiedHoldUsd: number;
 };
 
+/**
+ * Strict Structured Outputs requires every property in `required`, so an optional field is a required
+ * nullable one here. normalizeDecisionInput turns null back into an omitted targetCitizenId.
+ * The `reason` length limits are enforced by validateDecision because strict schemas do not list them.
+ */
 const DECISION_JSON_SCHEMA = {
   type: "object",
   additionalProperties: false,
-  required: ["goal", "priority", "reason"],
+  required: ["goal", "priority", "reason", "targetCitizenId"],
   properties: {
     goal: { type: "string", enum: [...GOALS] },
     priority: { type: "number", minimum: 0, maximum: 1 },
-    reason: { type: "string", minLength: 1, maxLength: 280 },
-    targetCitizenId: { type: "string" },
+    reason: { type: "string", description: "One short sentence, at most 280 characters." },
+    targetCitizenId: { type: ["string", "null"], description: "Citizen this goal targets, or null if none." },
   },
 } as const;
 
