@@ -50,6 +50,7 @@ import { catalogHomeById, evaluateClaimHomeAction } from "./available-homes.js";
 import { travelTowardHousingResult } from "./home-discovery.js";
 import { rememberDiscoveredSite, visibleShoresFromWorld } from "./discovered-sites.js";
 import { skipProtectedPropertyCell, assertMayUseChest } from "./property-safety.js";
+import { communityConstruction } from "./community-construction.js";
 import { communityPhysicalState } from "./community-physical-state.js";
 import { decisionKind, physicalWorkComplete, skillStatusOf } from "./task-recovery.js";
 
@@ -156,8 +157,17 @@ export async function executePlan(
   plan: PlannedTask,
   store: CivilizationStore,
   events: EventBus,
-  runtime = new SettlementRuntime(),
+  baseRuntime = new SettlementRuntime(),
 ): Promise<ActionResult> {
+  // Community mode: project state and reservations live in a per-community runtime bound to the authenticated caller.
+  let runtime = baseRuntime;
+  if (store.hasCommunities()) {
+    const communityId = ctx.citizenId ? store.getCommunityDirectory().communityOf(ctx.citizenId) : undefined;
+    if (!communityId) {
+      return { success: false, code: "ACCESS_DENIED", error: "Construction requires authenticated community membership", durationMs: 0, retryable: false };
+    }
+    runtime = baseRuntime.forCommunity(communityId, store);
+  }
   // Shared boundary: model-originated plans must stay on the cognition allowlist.
   // Reflex / planner / human-directive plans are not rewritten here.
   const gated = plan.source === "llm" ? enforceModelOriginatedPlan(plan) : plan;
@@ -332,8 +342,16 @@ export async function executePlan(
         runtime,
         persist: (project) => {
           if (!store.isOpen()) return { ok: false, reason: "store_closed" };
-          // The settlement row is community-global; a citizen's project/site must not be published into it.
-          if (store.hasCommunities()) return { ok: true };
+          // The shared settlement row is never written in community mode; the community's own row is.
+          if (store.hasCommunities()) {
+            try {
+              return communityConstruction(store).forCitizen(ctx.citizenId).save(project)
+                ? { ok: true }
+                : { ok: false, reason: "error" };
+            } catch {
+              return { ok: false, reason: "error" };
+            }
+          }
           const write = store.safeWrite("saveSettlement:structureProject", () => {
             const settlement = store.getSettlement();
             settlement.projectJson = JSON.stringify(project);
@@ -504,7 +522,7 @@ async function ensureAndBuild(
   runtime: SettlementRuntime,
 ): Promise<ActionResult> {
   const settlement = store.getSettlement();
-  if (settlement.shelterComplete && runtime.project?.status === "COMPLETED") {
+  if ((store.hasCommunities() || settlement.shelterComplete) && runtime.project?.status === "COMPLETED") {
     return seekSafety(ctx, store);
   }
   if (!runtime.project || runtime.project.status === "FAILED") {
