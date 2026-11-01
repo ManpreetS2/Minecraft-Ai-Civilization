@@ -176,7 +176,9 @@ describe("SEC-001 explicit cross-community share", () => {
 
   it("refuses an unknown receiver, an unknown actor, an empty message and a missing source id", () => {
     expect(createCommunityShareEvent({ ...base, actingCitizenId: "GPT-A", toCommunityId: "ghost" }).ok).toBe(false);
-    expect(createCommunityShareEvent({ ...base, actingCitizenId: "stranger" }).ok).toBe(false);
+    const stranger = createCommunityShareEvent({ ...base, actingCitizenId: "stranger" });
+    expect(stranger.ok).toBe(false);
+    if (!stranger.ok) expect(stranger.reason).toMatch(/acting citizen unknown/);
     expect(createCommunityShareEvent({ ...base, actingCitizenId: "GPT-A", message: "  " }).ok).toBe(false);
     expect(createCommunityShareEvent({ ...base, actingCitizenId: "GPT-A", sourceEventId: undefined } as never).ok).toBe(false);
   });
