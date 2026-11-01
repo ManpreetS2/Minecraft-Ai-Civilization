@@ -180,3 +180,41 @@ describe.each(providerCases())("cancellation & timeout ($id)", ({ id, make }) =>
     expect(t.snapshot().turn).toBe(0);
   });
 });
+
+describe("late reply is discarded when it wins the promise race (AI-001 review)", () => {
+  /**
+   * Deterministic microtask ordering: the adapter returns a thenable whose `then` fulfils the reply FIRST and aborts
+   * the caller's signal immediately AFTER, in the same synchronous step. Promise.race therefore settles with the
+   * (valid) reply, not the abort rejection; only the explicit `scope.cause()` check after the race can reject it.
+   * Without that check this would commit history, a turn and usage for a call the caller already cancelled.
+   */
+  const lateAdapter = (inner: ProviderAdapter, controller: AbortController): ProviderAdapter => ({
+    id: inner.id,
+    allowedModels: inner.allowedModels,
+    validateConfig: (c) => inner.validateConfig(c),
+    complete: (req, signal) =>
+      ({
+        then(resolve: (r: unknown) => void) {
+          void inner.complete(req, new AbortController().signal).then((reply) => {
+            resolve(reply); // reply wins the race...
+            controller.abort("caller"); // ...and the abort lands in the same step
+          });
+        },
+      }) as unknown as Promise<Awaited<ReturnType<ProviderAdapter["complete"]>>>,
+  });
+
+  it.each(providerCases())("($id) a valid reply that settles before the abort is handled is still discarded: CANCELLED, nothing committed", async ({ id, make }) => {
+    const controller = new AbortController();
+    const h = makeRegistry({ adapters: [lateAdapter(make({ script: () => ({ text: "too late", usage: { inputTokens: 5, outputTokens: 5 } }) }), controller)] });
+    const s = h.registry.open(cfg({ provider: id }));
+    const before = s.snapshot();
+    const result = await settle(s.send({ content: "hi", signal: controller.signal }));
+    expect(errorCode(result)).toBe("CANCELLED");
+    const after = s.snapshot();
+    expect(after.history).toEqual(before.history);
+    expect(after.turn).toBe(0);
+    expect(after.usageTotal).toEqual(before.usageTotal);
+    expect(after.requestsUsed).toBe(1); // the adapter was invoked, so it still counts
+    expect(s.state).toBe("idle");
+  });
+});

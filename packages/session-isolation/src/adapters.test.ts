@@ -2,8 +2,9 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { claudeFromWire, claudeToWire } from "./mock-claude-adapter.js";
-import { gptFromWire, gptToWire } from "./mock-gpt-adapter.js";
+import { claudeFromWire, claudeToWire, createMockClaudeAdapter } from "./mock-claude-adapter.js";
+import { sha256Hex } from "./snapshot.js";
+import { createMockGptAdapter, gptFromWire, gptToWire } from "./mock-gpt-adapter.js";
 import { createJsonFileSessionStore } from "./store-file.js";
 import { isSessionError, redact, SessionError } from "./errors.js";
 import { cfg, createFakeClock, createIdFactory, errorCode, keyRef, makeRegistry, providerCases, settle } from "./test-helpers.js";
@@ -199,6 +200,38 @@ describe("AT-27 provider wire-shape mocks", () => {
     expect(raw.content[0]?.type).toBe("text");
     expect(claudeFromWire(raw)).toEqual({ text: "hello", usage: { inputTokens: 3, outputTokens: 5 }, providerRequestId: "msg_abc", finishReason: "stop" });
     expect(claudeFromWire({ ...raw, stop_reason: "max_tokens" }).finishReason).toBe("length");
+  });
+
+  it("Claude: the adapter's actual complete() output is Messages-shaped (msg_ id from the request id, text, usage, stop_reason mapping)", async () => {
+    const adapter = createMockClaudeAdapter({ script: () => ({ text: "claude says hi", usage: { inputTokens: 21, outputTokens: 8 }, finishReason: "length" }) });
+    const out = await adapter.complete(request, new AbortController().signal);
+    expect(out).toEqual({
+      text: "claude says hi",
+      usage: { inputTokens: 21, outputTokens: 8 },
+      providerRequestId: `msg_${sha256Hex("req_1").slice(0, 16)}`,
+      finishReason: "length", // stop_reason "max_tokens" mapped back
+    });
+    expect(out.providerRequestId).toMatch(/^msg_[0-9a-f]{16}$/);
+    // The request the adapter actually received maps to a Messages request: system top-level, never a message.
+    const wire = claudeToWire(adapter.calls[0] as ProviderRequest);
+    expect(wire.system).toBe("SYS");
+    expect(wire.messages.some((m) => (m as { role: string }).role === "system")).toBe(false);
+    expect(wire.max_tokens).toBe(7);
+    // A normal end_turn reply maps to "stop" and gets a different id for a different request id.
+    const stop = await createMockClaudeAdapter({ script: () => ({ text: "ok" }) }).complete({ ...request, requestId: "req_2" }, new AbortController().signal);
+    expect(stop.finishReason).toBe("stop");
+    expect(stop.providerRequestId).toBe(`msg_${sha256Hex("req_2").slice(0, 16)}`);
+    expect(stop.providerRequestId).not.toBe(out.providerRequestId);
+  });
+
+  it("GPT: the adapter's actual complete() output is Responses-shaped (resp_ id, text, usage, status mapping)", async () => {
+    const adapter = createMockGptAdapter({ script: () => ({ text: "gpt says hi", usage: { inputTokens: 21, outputTokens: 8 }, finishReason: "length" }) });
+    const out = await adapter.complete(request, new AbortController().signal);
+    expect(out.text).toBe("gpt says hi");
+    expect(out.usage).toEqual({ inputTokens: 21, outputTokens: 8 });
+    expect(out.finishReason).toBe("length");
+    expect(out.providerRequestId).toMatch(/^resp_[0-9a-f]{16}$/);
+    expect(gptToWire(adapter.calls[0] as ProviderRequest).instructions).toBe("SYS");
   });
 
   it("round-trips a scripted reply through each wire shape, including finishReason and usage", async () => {
