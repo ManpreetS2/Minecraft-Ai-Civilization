@@ -76,6 +76,9 @@ describe("Mission 012 — work roles and government not auto-assigned", () => {
 describe("Mission 012 — delivery isolation and context packs", () => {
   it("multiple citizens retain isolated delivery state from shared history", () => {
     const store = tempDb();
+    // SEC-001: broadcast events need a verified audience; one colony community holds all three citizens.
+    store.upsertCommunity("colony");
+    for (const id of ["citizen_atlas", "citizen_maya", "citizen_theo"]) store.addCommunityMember("colony", id);
     const config = demoCfg();
     const events: SimEvent[] = [
       {
@@ -84,7 +87,7 @@ describe("Mission 012 — delivery isolation and context packs", () => {
         timestamp: "2026-10-27T12:00:00.000Z",
         payload: withEventVisibility(
           { announcement: "Seek food and shelter.", message: "Seek food and shelter." },
-          { class: "world_public" },
+          { class: "world_public", audience: { scope: "world" } },
         ),
       },
       {
@@ -157,7 +160,7 @@ describe("Mission 012 — delivery isolation and context packs", () => {
     // Late visibility: promote observer-only to public for Theo without losing it.
     const late: SimEvent = {
       ...events[4]!,
-      payload: withEventVisibility({ summary: "observer debug only" }, { class: "world_public" }),
+      payload: withEventVisibility({ summary: "observer debug only" }, { class: "world_public", audience: { scope: "world" } }),
     };
     const latePack = buildCitizenContextPack({
       store,
