@@ -17,6 +17,7 @@ import { findBlockCandidates } from "./observe.js";
 import { collectItem } from "./gather.js";
 import { inventorySpace, canFitDrop } from "./inventory.js";
 import { expectedDropItems } from "./drop-mapping.js";
+import { digUnlessAborted } from "./dig-abort.js";
 import { lookAtPosition } from "./look.js";
 import { equipForBlock } from "./tools.js";
 
@@ -125,7 +126,13 @@ export async function collectResource(
           });
         }
         try {
-          await ctx.bot.dig(current, true);
+          if ((await digUnlessAborted(ctx, current)) === "aborted") {
+            return fail("INTERRUPTED", "collectResource interrupted during dig", Date.now() - started, true, {
+              collected: countMatching(ctx, names) - before,
+              inventoryPreserved: true,
+              workComplete: false,
+            });
+          }
         } catch (error) {
           ctx.body.unreachable.mark(best.position, 20_000);
           skipped.add(key);

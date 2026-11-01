@@ -34,6 +34,7 @@ import { classifyStaleTarget } from "./gather.js";
 import { canFitDrop, inventorySpace, snapshotInventory } from "./inventory.js";
 import { depositItems } from "./inventory.js";
 import { pickupDroppedItem, countItem } from "./inventory-service.js";
+import { digUnlessAborted } from "./dig-abort.js";
 import { lookAtPosition } from "./look.js";
 import { obtainItem } from "./obtain.js";
 import { cancelledThisCitizen, optionalWorkInterrupted } from "./optional-work.js";
@@ -599,7 +600,14 @@ export async function mineKnownOre(
     if (!current || current.name !== block.name) continue;
     await lookAtPosition(ctx, target.position);
     try {
-      await ctx.bot.dig(current, true);
+      if ((await digUnlessAborted(ctx, current)) === "aborted") {
+        return cancelledThisCitizen({
+          durationMs: Date.now() - started,
+          inventory: snapshotInventory(ctx).counts,
+          extra: { mined, hiddenIgnored, quotaProgress: `${mined.length}/${bounds.amount}` },
+          error: "Mining task cancelled during dig",
+        });
+      }
     } catch (error) {
       ctx.body.unreachable.mark(target.position, 20_000);
       return fail("DIG_FAILED", error instanceof Error ? error.message : String(error), Date.now() - started, true);

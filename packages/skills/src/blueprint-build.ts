@@ -35,6 +35,7 @@ import { moveTo } from "./movement.js";
 import { openDoor } from "./doors.js";
 import { equipForBlock } from "./tools.js";
 import { placeBlock } from "./world.js";
+import { digUnlessAborted } from "./dig-abort.js";
 import { lookAtPosition } from "./look.js";
 import type { PlacementIntent } from "./placement.js";
 
@@ -294,7 +295,9 @@ async function clearCell(ctx: SkillContext, pos: Vec3): Promise<ActionResult> {
   }
   await lookAtPosition(ctx, pos);
   try {
-    await ctx.bot.dig(block, true);
+    if ((await digUnlessAborted(ctx, block)) === "aborted") {
+      return fail("CANCELLED", "Site clearing cancelled during dig", Date.now() - started, false, { workComplete: false });
+    }
   } catch (error) {
     return fail("DIG_FAILED", error instanceof Error ? error.message : String(error), Date.now() - started, true);
   }
@@ -395,6 +398,10 @@ export async function advanceBlueprintBuild(
     }
     if (session.stage === "SITE_CLEARING") {
       const cleared = await clearSite(ctx, session);
+      if (!cleared.success && cleared.code === "CANCELLED") {
+        // a cancel is not an unsuitable site: leave the session IN_PROGRESS at SITE_CLEARING so the build resumes
+        return fail("INTERRUPTED", "Build interrupted; progress is persisted", Date.now() - started, true, { session });
+      }
       if (!cleared.success) {
         session.status = "BLOCKED";
         session.failures = ["SITE_UNSUITABLE"];

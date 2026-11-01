@@ -32,19 +32,22 @@ export class DirectiveBoard {
     return this.store.listDirectives(limit).map(asRuntime);
   }
 
+  /** All open (ACTIVE / PENDING) directives, selected by status in the store: not subject to the 40-row display window. */
+  private open(): RuntimeDirective[] {
+    return this.store.listDirectivesByStatus(["ACTIVE", "PENDING"]).map(asRuntime);
+  }
+
   activeFor(citizenId: string): RuntimeDirective | undefined {
-    return this.list().find(
+    return this.open().find(
       (directive) =>
-        (directive.status === "ACTIVE" || directive.status === "PENDING") &&
         directive.mode !== "SUGGESTION" &&
         directive.targetIds.includes(citizenId),
     );
   }
 
   suggestionsFor(citizenId: string): RuntimeDirective[] {
-    return this.list().filter(
+    return this.open().filter(
       (directive) =>
-        (directive.status === "ACTIVE" || directive.status === "PENDING") &&
         directive.mode === "SUGGESTION" &&
         directive.targetIds.includes(citizenId),
     );
@@ -133,8 +136,7 @@ export class DirectiveBoard {
 
   cancelForCitizen(citizenId: string, reason = "cancelled"): RuntimeDirective[] {
     const cancelled: RuntimeDirective[] = [];
-    for (const directive of this.list()) {
-      if (directive.status !== "ACTIVE" && directive.status !== "PENDING") continue;
+    for (const directive of this.open()) {
       if (!directive.targetIds.includes(citizenId)) continue;
       directive.outcomes[citizenId] = "CANCELLED";
       const remaining = Object.values(directive.outcomes);

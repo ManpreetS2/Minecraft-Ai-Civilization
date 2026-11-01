@@ -120,11 +120,16 @@ export class ClaimBoard {
     return this.claims.get(claimId(kind, key))?.ownerId;
   }
 
-  release(kind: string, key: string, ownerId?: string): boolean {
+  /**
+   * The owner argument is required: a claim can only be released by the citizen that holds it (use releaseOwner to
+   * drop all of one citizen's claims). `undefined` is accepted only so callers can pass an optional `ctx.citizenId`
+   * straight through; it matches no claim (claims always have an owner), so it can never free someone else's claim.
+   */
+  release(kind: string, key: string, ownerId: string | undefined): boolean {
     const id = claimId(kind, key);
     const existing = this.claims.get(id);
     if (!existing) return false;
-    if (ownerId && existing.ownerId !== ownerId) return false;
+    if (ownerId === undefined || existing.ownerId !== ownerId) return false;
     this.claims.delete(id);
     return true;
   }

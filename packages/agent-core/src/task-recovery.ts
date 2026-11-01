@@ -1,5 +1,5 @@
 import { classifySkill, type SkillStatus } from "@civ/skills";
-import { fail, ok, type ActionResult, type ErrorCode } from "@civ/shared";
+import { fail, ok, type ActionResult } from "@civ/shared";
 import { isTestControlIdentity } from "./available-homes.js";
 import type { LastOutcome, PlannedTask } from "./planner.js";
 import type { CivilizationStore } from "./store.js";
@@ -142,6 +142,20 @@ export function shouldBackoffToObserve(last: LastOutcome | undefined): boolean {
   return last.streak >= RETRYABLE_FAILURE_LIMIT;
 }
 
+/** Codes that say "this attempt was stopped, not that the task failed": they must not move the failure streak either way. */
+const STREAK_NEUTRAL_CODES = new Set(["CANCELLED", "INTERRUPTED", "CURFEW_STOP", "NOT_SLEEP_TIME"]);
+
+function safeStreak(previous: LastOutcome | undefined, task: string): number {
+  if (previous?.task !== task) return 0;
+  return typeof previous.streak === "number" && Number.isFinite(previous.streak) && previous.streak >= 0 ? previous.streak : 0;
+}
+
+function nextStreak(plan: PlannedTask, complete: boolean, code: string | undefined, previous: LastOutcome | undefined): number {
+  if (complete) return 0;
+  const prior = safeStreak(previous, plan.task);
+  return code !== undefined && STREAK_NEUTRAL_CODES.has(code) ? prior : prior + 1;
+}
+
 export function lastOutcomeFrom(plan: PlannedTask, result: ActionResult, previous?: LastOutcome): LastOutcome {
   const complete = physicalWorkComplete(result);
   const details = result.success ? undefined : result.details;
@@ -160,7 +174,7 @@ export function lastOutcomeFrom(plan: PlannedTask, result: ActionResult, previou
     item,
     nextTask: typeof details?.nextTask === "string" ? details.nextTask : undefined,
     nextAction: typeof details?.nextAction === "string" ? details.nextAction : undefined,
-    streak: complete ? 0 : previous?.task === plan.task ? previous.streak + 1 : 1,
+    streak: nextStreak(plan, complete, code, previous),
     retryable: complete ? undefined : result.success ? false : result.retryable,
     workComplete: complete,
     skillStatus: classified,
@@ -179,7 +193,8 @@ export function loadCitizenLastOutcome(store: CivilizationStore, citizenId: stri
   try {
     const parsed = JSON.parse(raw) as LastOutcome;
     if (!parsed || typeof parsed.task !== "string" || typeof parsed.action !== "string") return undefined;
-    return parsed;
+    // older / damaged records may lack a usable streak: treat it as 0 rather than letting NaN poison the count
+    return { ...parsed, streak: typeof parsed.streak === "number" && Number.isFinite(parsed.streak) && parsed.streak >= 0 ? parsed.streak : 0 };
   } catch {
     return undefined;
   }
