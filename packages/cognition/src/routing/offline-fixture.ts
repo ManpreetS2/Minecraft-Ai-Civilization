@@ -57,7 +57,13 @@ export function createScriptedOpenAiFetch(script: (apiKey: string, body: Record<
     const reply = script(apiKey, JSON.parse(body) as Record<string, unknown>);
     if (reply.hang) await abortable(init?.signal);
     if (reply.after) await reply.after;
-    if (reply.status) return new Response("{}", { status: reply.status });
+    if (reply.status) {
+      // A real 429 names its cause, and a rate limit usually carries retry-after, so the fixture does too.
+      const body = reply.status === 429 ? { error: { type: "requests", code: "rate_limit_exceeded" } } : {};
+      const headers: Record<string, string> =
+        reply.retryAfterMs === undefined ? {} : { "retry-after": String(reply.retryAfterMs / 1000) };
+      return new Response(JSON.stringify(body), { status: reply.status, headers });
+    }
     const usage = reply.usage === undefined ? DEFAULT_USAGE : reply.usage;
     return new Response(
       JSON.stringify({

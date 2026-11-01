@@ -6,6 +6,7 @@ import { OpenAiResponsesProvider, assertOpenAiConfig } from "./openai-responses.
 const MODEL = "gpt-4o-mini";
 const decision = JSON.stringify({ goal: "rest", priority: 0.1, reason: "x" });
 const json = (status: number, body: unknown) => new Response(JSON.stringify(body), { status });
+const RATE_LIMITED = { error: { type: "requests", code: "rate_limit_exceeded" } };
 
 const basePrompt = {
   citizenName: "A",
@@ -42,6 +43,7 @@ function build(
     maxInputTokens: over.maxInputTokens ?? 1_000_000,
     maxOutputTokens: 128,
     maxRetries: over.maxRetries ?? 0,
+    retryBaseDelayMs: 0,
     budget,
     fetchImpl: fetchImpl as typeof fetch,
   });
@@ -179,7 +181,7 @@ describe("cloud spend admission (mock-only)", () => {
     const usage = { input_tokens: 10, output_tokens: 5 };
     const fetchImpl = vi
       .fn<() => Promise<Response>>()
-      .mockResolvedValueOnce(json(429, {}))
+      .mockResolvedValueOnce(json(429, RATE_LIMITED))
       .mockResolvedValueOnce(json(200, { output_text: decision, usage }));
     const { budget, provider } = build(fetchImpl, { maxRetries: 1 });
     await provider.decide(basePrompt);
@@ -220,7 +222,7 @@ describe("cloud spend admission (mock-only)", () => {
           case 0:
             return json(500, {});
           case 1:
-            return json(429, {});
+            return json(429, RATE_LIMITED);
           case 2:
             return json(200, { output_text: "not-json", usage: { input_tokens: 5_000, output_tokens: 128 } });
           default:

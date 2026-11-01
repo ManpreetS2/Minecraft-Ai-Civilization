@@ -23,6 +23,12 @@ export type OpenAiResponsesConfig = {
   maxInputTokens?: number;
   maxOutputTokens: number;
   maxRetries: number;
+  /** First wait between attempts when the API gives no Retry-After. It doubles each attempt. Default 500. */
+  retryBaseDelayMs?: number;
+  /** Longest backoff wait when the API gives no Retry-After. Default 8000. */
+  retryMaxDelayMs?: number;
+  /** Source of jitter in [0, 1). Tests inject a constant. */
+  random?: () => number;
   budget: CloudBudget;
   ledger?: CloudDecisionLedger;
   fetchImpl?: FetchLike;
@@ -34,6 +40,21 @@ export const DEFAULT_CLOUD_MAX_INPUT_TOKENS = 16_000;
 
 const OFFICIAL_OPENAI_HOST = "api.openai.com";
 
+/** 408 and 409 are transient per the official SDKs; 429 is retried only for rate limits, see isRetryable429. */
+const RETRYABLE_STATUSES = new Set([408, 409, 429, 500, 502, 503, 504]);
+const DEFAULT_RETRY_BASE_DELAY_MS = 500;
+const DEFAULT_RETRY_MAX_DELAY_MS = 8000;
+const MAX_ERROR_BODY_BYTES = 8192;
+
+/**
+ * 429 codes OpenAI documents as rate limiting. OpenAI states that retrying billing, spend or quota errors will not
+ * restore access, and those can share status 429 (and error.type insufficient_quota), so anything else is not retried.
+ */
+const RETRYABLE_429_CODES = new Set(["rate_limit_exceeded", "rate_limit_error", "slow_down", "requests", "tokens"]);
+
+/** Service tier that bills at the standard rates the price table models. */
+const STANDARD_SERVICE_TIER = "default";
+
 /**
  * Allowance for message framing the provider adds around the serialized request.
  * The input bound assumes byte-level tokenizers, which emit at most one token per UTF-8 byte.
@@ -41,6 +62,13 @@ const OFFICIAL_OPENAI_HOST = "api.openai.com";
  * the resulting bound closes the budget.
  */
 const REQUEST_FRAMING_TOKENS = 64;
+
+type OpenAiHttpError = Error & {
+  httpStatus?: number;
+  retryAfterMs?: number;
+  apiCode?: string;
+  apiType?: string;
+};
 
 type RequestSettlement = {
   /** Set once the provider returns HTTP success; the reservation is then settled and never refunded. */
@@ -174,6 +202,7 @@ export class OpenAiResponsesProvider implements CognitionProvider {
     const controller = new AbortController();
     this.inflight.add(controller);
     const timer = setTimeout(() => controller.abort(), timeoutMs);
+    const deadlineMs = startedMs + timeoutMs;
 
     let lastStatus: number | undefined;
     let attempt = 0;
@@ -221,17 +250,22 @@ export class OpenAiResponsesProvider implements CognitionProvider {
           return decision;
         } catch (error) {
           lastStatus = (error as { httpStatus?: number }).httpStatus;
-          const message = error instanceof Error ? error.message : String(error);
+          let message = error instanceof Error ? error.message : String(error);
           // Only a 4xx is a provider rejection. A timeout or 5xx may have been billed without reporting usage.
           const rejected = lastStatus !== undefined && lastStatus >= 400 && lastStatus < 500;
           if (settlement.billedStatus === undefined && attemptSent && !rejected) {
             settlement.unverifiedHoldUsd += this.config.budget.holdAttempt(admission.reservationId);
           }
-          const retryable = lastStatus === 429 || lastStatus === 500 || lastStatus === 503;
+          const waitMs = this.retryWaitMs(error as OpenAiHttpError, attempt, deadlineMs);
+          // Check cancellation first so a retry that will never be sent is not charged to the request budget.
+          const cancelledDuringRetryableFailure =
+            isRetryableFailure(error as OpenAiHttpError) && (controller.signal.aborted || this.closed);
+          if (cancelledDuringRetryableFailure) message = "OpenAI request cancelled";
           if (
-            !retryable ||
+            waitMs === undefined ||
             attempt >= maxAttempts ||
-            lastStatus === 401 ||
+            controller.signal.aborted ||
+            this.closed ||
             !this.config.budget.tryChargeRetry()
           ) {
             if (settlement.billedStatus === undefined) {
@@ -255,8 +289,11 @@ export class OpenAiResponsesProvider implements CognitionProvider {
               rejectedGoal: undefined,
               httpStatus: lastStatus ?? settlement.billedStatus,
             });
+            // A retryable failure that landed after a timeout or shutdown is reported as the cancellation it became.
+            if (cancelledDuringRetryableFailure) throw new Error(message);
             throw error instanceof Error ? error : new Error(message);
           }
+          await abortableDelay(waitMs, controller.signal);
         }
       }
       throw new Error("OpenAI retry exhaustion");
@@ -266,10 +303,29 @@ export class OpenAiResponsesProvider implements CognitionProvider {
     }
   }
 
+  /** How long to wait before retrying, or undefined if this failure must not be retried. */
+  private retryWaitMs(error: OpenAiHttpError, attempt: number, deadlineMs: number): number | undefined {
+    if (!isRetryableFailure(error)) return undefined;
+    const base = this.config.retryBaseDelayMs ?? DEFAULT_RETRY_BASE_DELAY_MS;
+    const max = this.config.retryMaxDelayMs ?? DEFAULT_RETRY_MAX_DELAY_MS;
+    const random = this.config.random ?? Math.random;
+    const jitter = Math.min(Math.max(random(), 0), 1);
+    // Retry-After is a minimum, so jitter only adds to it. Backoff uses equal jitter: half fixed, half random.
+    const backoff = Math.min(base * 2 ** (attempt - 1), max);
+    const waitMs =
+      error.retryAfterMs !== undefined
+        ? error.retryAfterMs + jitter * Math.min(base, 1000)
+        : backoff / 2 + (jitter * backoff) / 2;
+    // Waiting past the deadline would spend the retry on a request that is then cancelled.
+    return Date.now() + waitMs >= deadlineMs ? undefined : waitMs;
+  }
+
   private buildRequestBody(prompt: CognitionPrompt): string {
     return JSON.stringify({
       model: this.config.model,
       store: false,
+      // Without this, a project default of flex or priority could change the price of a request the bound assumed.
+      service_tier: STANDARD_SERVICE_TIER,
       max_output_tokens: this.config.maxOutputTokens,
       input: [
         {
@@ -307,8 +363,14 @@ export class OpenAiResponsesProvider implements CognitionProvider {
     });
 
     if (!response.ok) {
-      const err = new Error(`OpenAI HTTP ${response.status}`) as Error & { httpStatus?: number };
+      const { code, type } = await readApiErrorCode(response);
+      // Only vetted tokens reach the message: an error body can echo prompt text or model output.
+      const suffix = code ?? type;
+      const err = new Error(`OpenAI HTTP ${response.status}${suffix ? ` (${suffix})` : ""}`) as OpenAiHttpError;
       err.httpStatus = response.status;
+      err.retryAfterMs = parseRetryAfterMs(response.headers);
+      err.apiCode = code;
+      err.apiType = type;
       throw err;
     }
     return response;
@@ -332,6 +394,11 @@ export class OpenAiResponsesProvider implements CognitionProvider {
       payload = await response.json();
     } catch {
       throw closeForUnknownUsage("response body was unreadable, so usage is unknown");
+    }
+    const tier = (payload as { service_tier?: unknown } | null)?.service_tier;
+    if (tier !== undefined && tier !== null && tier !== STANDARD_SERVICE_TIER) {
+      // Flex bills below and priority above the modeled rate, so the cost of this call cannot be bounded.
+      throw closeForUnknownUsage(`response used non-standard service tier '${safeToken(tier) ?? "unrecognized"}'`);
     }
     const usage = readUsage(payload, this.config.model);
     if (usage === "missing") {
@@ -496,4 +563,69 @@ function assertNoSecretLeak(payload: unknown, apiKey: string): void {
   if (apiKey && blob.includes(apiKey)) {
     throw new Error("Refusing to process OpenAI payload that echoes the API key");
   }
+}
+
+function isRetryableFailure(error: OpenAiHttpError): boolean {
+  const status = error.httpStatus;
+  if (status === undefined || !RETRYABLE_STATUSES.has(status)) return false;
+  return status !== 429 || isRetryable429(error);
+}
+
+function isRetryable429(error: OpenAiHttpError): boolean {
+  if (error.apiCode !== undefined) return RETRYABLE_429_CODES.has(error.apiCode);
+  return error.apiType !== undefined && RETRYABLE_429_CODES.has(error.apiType);
+}
+
+function safeToken(value: unknown): string | undefined {
+  return typeof value === "string" && /^[A-Za-z0-9_.-]{1,64}$/.test(value) ? value : undefined;
+}
+
+/** Reads at most a few KB of an error body and keeps only error.code and error.type, if they are plain tokens. */
+async function readApiErrorCode(response: Response): Promise<{ code?: string; type?: string }> {
+  try {
+    const reader = response.body?.getReader();
+    if (!reader) return {};
+    const chunks: Uint8Array[] = [];
+    let total = 0;
+    while (total < MAX_ERROR_BODY_BYTES) {
+      const { done, value } = await reader.read();
+      if (done || !value) break;
+      chunks.push(value);
+      total += value.byteLength;
+    }
+    await reader.cancel().catch(() => undefined);
+    const text = new TextDecoder().decode(Buffer.concat(chunks));
+    const error = (JSON.parse(text) as { error?: { code?: unknown; type?: unknown } } | null)?.error;
+    return { code: safeToken(error?.code), type: safeToken(error?.type) };
+  } catch {
+    return {};
+  }
+}
+
+/** Retry-After is delay-seconds or an HTTP date. Anything else, including negatives, is ignored. */
+export function parseRetryAfterMs(headers: Headers | undefined): number | undefined {
+  const raw = headers?.get("retry-after")?.trim();
+  if (!raw) return undefined;
+  if (/^\d+(\.\d+)?$/.test(raw)) {
+    const seconds = Number(raw);
+    return Number.isFinite(seconds) ? seconds * 1000 : undefined;
+  }
+  // Date.parse accepts plenty of non-dates ("-5" is a year), so require the weekday that every HTTP-date form starts with.
+  if (!/^(Mon|Tue|Wed|Thu|Fri|Sat|Sun)[a-z]*[, ]/.test(raw)) return undefined;
+  const date = Date.parse(raw);
+  return Number.isFinite(date) ? Math.max(0, date - Date.now()) : undefined;
+}
+
+/** Resolves early on abort: the next attempt sees the abort and stops. */
+function abortableDelay(ms: number, signal: AbortSignal): Promise<void> {
+  if (ms <= 0 || signal.aborted) return Promise.resolve();
+  return new Promise((resolve) => {
+    const finish = () => {
+      clearTimeout(timer);
+      signal.removeEventListener("abort", finish);
+      resolve();
+    };
+    const timer = setTimeout(finish, ms);
+    signal.addEventListener("abort", finish, { once: true });
+  });
 }
