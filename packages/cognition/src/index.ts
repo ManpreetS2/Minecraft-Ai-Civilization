@@ -101,6 +101,7 @@ export {
   type CognitionDecision,
   type CognitionPrompt,
   type CognitionProvider,
+  type CommunicationIntent,
   type HighLevelDecision,
 } from "./schema.js";
 export { GOALS, GOAL_ALIASES, GOAL_SET, type Goal } from "./goals.js";

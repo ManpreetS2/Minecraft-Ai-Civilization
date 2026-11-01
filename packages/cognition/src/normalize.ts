@@ -12,7 +12,10 @@ const PRIORITY_ALIASES: Record<string, number> = {
 
 export function normalizeGoal(raw: unknown): Goal | undefined {
   if (typeof raw !== "string") return undefined;
-  const key = raw.trim().toLowerCase().replaceAll(/[\s-]+/g, "_");
+  const key = raw
+    .trim()
+    .toLowerCase()
+    .replaceAll(/[\s-]+/g, "_");
   if (!key) return undefined;
   if (GOAL_SET.has(key)) return key as Goal;
   const compact = key.replaceAll("_", "");
@@ -52,6 +55,21 @@ export function normalizeDecisionInput(input: unknown): unknown {
   const source = unwrapDecision(input as Record<string, unknown>);
   rejectPrivilegedFields(source);
   const next: Record<string, unknown> = { ...source };
+  // Strict cloud output represents optional intent fields as required nullable fields.
+  // Preserve content validation and runtime-only sender/audience attribution downstream.
+  if (source.communication === null) {
+    delete next.communication;
+  } else if (
+    source.communication &&
+    typeof source.communication === "object" &&
+    !Array.isArray(source.communication)
+  ) {
+    const communication = { ...(source.communication as Record<string, unknown>) };
+    for (const field of ["toCitizen", "bulletinLine"]) {
+      if (communication[field] === null) delete communication[field];
+    }
+    next.communication = communication;
+  }
   const goal = normalizeGoal(source.goal);
   if (goal) next.goal = goal;
   const priority = firstFiniteNumber(source, ["priority", "urgency", "score"]);

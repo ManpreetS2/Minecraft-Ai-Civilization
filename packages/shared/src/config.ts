@@ -9,6 +9,8 @@ const envSchema = z.object({
   DASHBOARD_HOST: z.string().default("127.0.0.1"),
   DASHBOARD_PORT: z.coerce.number().int().default(3000),
   DATABASE_PATH: z.string().default("./data/civilization.sqlite"),
+  /** SEC-001: orchestrator-owned community directory seed, JSON: [{"id":"gpt","name":"GPT","memberIds":["a","b"]}]. Never read from LLM/tool/HTTP input. */
+  COMMUNITIES_JSON: z.string().optional(),
   SIM_CITIZEN_COUNT: z.coerce.number().int().default(5),
   SIM_TICK_MS: z.coerce.number().int().default(1500),
   SIM_RUN_ID: z.string().optional(),

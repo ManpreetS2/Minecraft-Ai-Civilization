@@ -1,7 +1,11 @@
 import { GOALS } from "./goals.js";
 import { CloudAdmissionError, CloudBudgetGate, type CloudUsageReport } from "./cloud-budget.js";
 import { CloudDecisionLedger, type CloudDecisionRecord } from "./decision-record.js";
-import { boundCloudAttemptCostUsd, hasCloudModelPrice, isAllowedOpenAiModel } from "./cloud-prices.js";
+import {
+  boundCloudAttemptCostUsd,
+  hasCloudModelPrice,
+  isAllowedOpenAiModel,
+} from "./cloud-prices.js";
 import { formatPrompt } from "./ollama.js";
 import type { CognitionPrompt, CognitionProvider, HighLevelDecision } from "./schema.js";
 import { extractJson, validateDecision } from "./schema.js";
@@ -48,18 +52,32 @@ type RequestSettlement = {
 
 /**
  * Strict Structured Outputs requires every property in `required`, so an optional field is a required
- * nullable one here. normalizeDecisionInput turns null back into an omitted targetCitizenId.
+ * nullable one here. normalizeDecisionInput omits null targets and communication fields.
  * The `reason` length limits are enforced by validateDecision because strict schemas do not list them.
  */
 const DECISION_JSON_SCHEMA = {
   type: "object",
   additionalProperties: false,
-  required: ["goal", "priority", "reason", "targetCitizenId"],
+  required: ["goal", "priority", "reason", "targetCitizenId", "communication"],
   properties: {
     goal: { type: "string", enum: [...GOALS] },
     priority: { type: "number", minimum: 0, maximum: 1 },
     reason: { type: "string", description: "One short sentence, at most 280 characters." },
-    targetCitizenId: { type: ["string", "null"], description: "Citizen this goal targets, or null if none." },
+    targetCitizenId: {
+      type: ["string", "null"],
+      description: "Citizen this goal targets, or null if none.",
+    },
+    communication: {
+      type: ["object", "null"],
+      additionalProperties: false,
+      required: ["kind", "message", "toCitizen", "bulletinLine"],
+      properties: {
+        kind: { type: "string", enum: ["say", "announce_to_community", "share_bulletin_line"] },
+        message: { type: "string", description: "Voluntary speech, at most 200 characters." },
+        toCitizen: { type: ["string", "null"] },
+        bulletinLine: { type: ["integer", "null"], minimum: 1 },
+      },
+    },
   },
 } as const;
 
@@ -92,7 +110,11 @@ export class OpenAiResponsesProvider implements CognitionProvider {
   permitsLocalFallback(error: unknown): boolean {
     if (this.closed) return false;
     if (this.config.budget.snapshot.closedReason) return true;
-    return error instanceof CloudAdmissionError && error.code !== "concurrency" && error.code !== "closed";
+    return (
+      error instanceof CloudAdmissionError &&
+      error.code !== "concurrency" &&
+      error.code !== "closed"
+    );
   }
 
   close(): void {
@@ -104,7 +126,10 @@ export class OpenAiResponsesProvider implements CognitionProvider {
     this.inflight.clear();
   }
 
-  async decide(prompt: CognitionPrompt, timeoutMs = this.config.timeoutMs): Promise<HighLevelDecision> {
+  async decide(
+    prompt: CognitionPrompt,
+    timeoutMs = this.config.timeoutMs,
+  ): Promise<HighLevelDecision> {
     if (this.closed) {
       throw new Error("OpenAI cognition provider is shut down");
     }
@@ -158,7 +183,11 @@ export class OpenAiResponsesProvider implements CognitionProvider {
           const response = await this.requestOnce(requestBody, controller.signal);
           // The provider accepted the call, so it is billable whatever its output turns out to be.
           settlement.billedStatus = response.status;
-          const payload = await this.settleBilledResponse(admission.reservationId, response, settlement);
+          const payload = await this.settleBilledResponse(
+            admission.reservationId,
+            response,
+            settlement,
+          );
           const usage = settlement.usage!;
           const decision = this.parseDecision(payload);
           const requestId = typeof payload.id === "string" ? payload.id : undefined;
@@ -191,7 +220,12 @@ export class OpenAiResponsesProvider implements CognitionProvider {
             settlement.unverifiedHoldUsd += this.config.budget.holdAttempt(admission.reservationId);
           }
           const retryable = lastStatus === 429 || lastStatus === 500 || lastStatus === 503;
-          if (!retryable || attempt >= maxAttempts || lastStatus === 401 || !this.config.budget.tryChargeRetry()) {
+          if (
+            !retryable ||
+            attempt >= maxAttempts ||
+            lastStatus === 401 ||
+            !this.config.budget.tryChargeRetry()
+          ) {
             if (settlement.billedStatus === undefined) {
               this.config.budget.reconcile(admission.reservationId, undefined, true);
             }
@@ -375,7 +409,9 @@ export function assertOpenAiConfig(
   // The API key goes to this host, so it must be named twice on purpose: once here and once in the URL.
   const customHost = config.customEndpointHost?.trim();
   if (!customHost) {
-    throw new Error("OPENAI_BASE_URL points at a non-OpenAI host; set OPENAI_CUSTOM_ENDPOINT_HOST to allow it");
+    throw new Error(
+      "OPENAI_BASE_URL points at a non-OpenAI host; set OPENAI_CUSTOM_ENDPOINT_HOST to allow it",
+    );
   }
   if (customHost.toLowerCase() !== url.host) {
     throw new Error("OPENAI_BASE_URL host does not match OPENAI_CUSTOM_ENDPOINT_HOST");
@@ -410,7 +446,12 @@ export function extractResponsesOutputText(payload: Record<string, unknown>): st
     const row = item as { type?: string; content?: Array<{ type?: string; text?: string }> };
     if (row.type !== "message" || !Array.isArray(row.content)) continue;
     for (const part of row.content) {
-      if (part && (part.type === "output_text" || part.type === "text") && typeof part.text === "string" && part.text.trim()) {
+      if (
+        part &&
+        (part.type === "output_text" || part.type === "text") &&
+        typeof part.text === "string" &&
+        part.text.trim()
+      ) {
         return part.text;
       }
     }

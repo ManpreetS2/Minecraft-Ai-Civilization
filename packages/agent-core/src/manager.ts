@@ -21,7 +21,16 @@ import {
   type SimEvent,
   type Vec3,
 } from "@civ/shared";
-import { buildCitizenContextPack, ensureCitizenPersonality } from "./citizen-context.js";
+import { buildCitizenContextPack, ensureCitizenPersonality, persistentFactsForCognition } from "./citizen-context.js";
+import {
+  COMMUNICATION_GUIDE,
+  hearersOf,
+  performCommunicationIntent,
+  scopeSettlementForCitizen,
+  sitesKnownTo,
+  speakNearby,
+} from "./community-comms.js";
+import { seedCommunitiesOnce } from "./community-config.js";
 import { minecraftKnowledge } from "@civ/minecraft-knowledge";
 import { Vec3 as Vec3Class } from "vec3";
 import { authorizedWorkStorage } from "./activity-choice.js";
@@ -63,6 +72,8 @@ type RuntimeCitizen = {
   lastPlan?: PlannedTask;
   lastOutcome?: LastOutcome;
   pendingLlm?: HighLevelDecision;
+  /** The bulletin shown in the prompt that produced pendingLlm: all a share_bulletin_line can refer to. */
+  pendingBulletinEventIds?: readonly string[];
 };
 
 type PerformanceSnapshot = {
@@ -227,6 +238,7 @@ export class AgentManager {
     }
     this.running = true;
     this.loop.start();
+    seedCommunitiesOnce(this.store, this.config);
     this.runId = crypto.randomUUID();
     this.store.setMeta("runId", this.runId);
     this.store.setMeta("humanDirectives", String(this.config.HUMAN_DIRECTIVES_ENABLED));
@@ -239,7 +251,7 @@ export class AgentManager {
         permadeath: this.config.SIM_PERMADEATH_ENABLED,
         humanDirectives: this.config.HUMAN_DIRECTIVES_ENABLED,
         demoProfile: this.config.DEMO_PROFILE,
-        visibility: { class: "world_public" },
+        visibility: { class: "world_public", audience: { scope: "world" } },
       }),
     );
 
@@ -410,11 +422,16 @@ export class AgentManager {
 
   private async tickCitizen(
     citizen: RuntimeCitizen,
-    settlement: SettlementState,
-    assignedNeeds: SettlementNeed[],
-    workRole?: WorkRole,
+    sharedSettlement: SettlementState,
+    sharedNeeds: SettlementNeed[],
+    sharedWorkRole?: WorkRole,
   ): Promise<void> {
     if (!this.ops.canAcceptWork()) return;
+    // SEC-001: with communities configured, the shared settlement row and work split derived from it stay out of this tick.
+    seedCommunitiesOnce(this.store, this.config);
+    const { scoped, settlement } = scopeSettlementForCitizen(this.store, citizen.record.id, sharedSettlement);
+    const assignedNeeds = scoped ? [] : sharedNeeds;
+    const workRole = scoped ? undefined : sharedWorkRole;
     if (citizen.body.isDeceased() || (this.config.SIM_PERMADEATH_ENABLED && citizen.record.status === "dead")) {
       citizen.record.status = "dead";
       return;
@@ -455,13 +472,25 @@ export class AgentManager {
     const suggestions = this.directives.suggestionsFor(citizen.record.id);
     const llmDecision: HighLevelDecision | undefined = citizen.pendingLlm;
     citizen.pendingLlm = undefined;
+    if (llmDecision?.communication) {
+      performCommunicationIntent({
+        store: this.store,
+        speakerId: citizen.record.id,
+        body: citizen.body,
+        resolve: (username) => this.resolveCitizen(username),
+        intent: llmDecision.communication,
+        bulletinEventIds: citizen.pendingBulletinEventIds ?? [],
+        emit: (event) => this.emitIfLive(event),
+      });
+    }
     const now = Date.now();
     const llmDue =
       this.config.LLM_ENABLED &&
       llmInFlight === 0 &&
       now - citizen.lastLlmAt > this.config.LLM_COOLDOWN_MS &&
       !(activeDirective && activeDirective.mode !== "SUGGESTION") &&
-      (assignedNeeds.length > 1 || (observation.food ?? 20) < 12 || Boolean(observation.nearby.find((e) => e.hostile)));
+      // Scoped citizens have no shared needs list, so that list can't be what keeps them thinking.
+      (scoped || assignedNeeds.length > 1 || (observation.food ?? 20) < 12 || Boolean(observation.nearby.find((e) => e.hostile)));
 
     if (llmDue && this.ops.canAcceptWork()) {
       citizen.lastLlmAt = now;
@@ -481,10 +510,7 @@ export class AgentManager {
         config: this.config,
         citizenId: citizen.record.id,
       });
-      const persistentFacts = this.store
-        .listPersistentFacts(citizen.record.id, 5)
-        .filter((f) => f.kind === "observed_fact")
-        .map((f) => f.content);
+      const persistentFacts = persistentFactsForCognition(this.store, citizen.record.id);
       const decisionWork = this.cognition
         .decide({
           citizenName: citizen.record.name,
@@ -501,11 +527,13 @@ export class AgentManager {
           nearbyCitizens: observation.players.map((p) => p.username),
           gameFacts,
           ...contextPack.promptExtras,
+          ...(scoped ? { communicationGuide: COMMUNICATION_GUIDE } : {}),
         })
         .then((decision) => {
           lastLlmMs = Date.now() - started;
           if (!this.ops.canWrite()) return;
           citizen.pendingLlm = decision;
+          citizen.pendingBulletinEventIds = contextPack.bulletin.deliveredEventIds;
           this.writeLlmCall({
             citizenId: citizen.record.id,
             latencyMs: lastLlmMs,
@@ -553,12 +581,13 @@ export class AgentManager {
       workRole,
       llmGoal: llmDecision?.goal,
       llmReason: llmDecision?.reason,
-      projectStatus: this.runtime.project?.status,
+      projectStatus: scoped ? undefined : this.runtime.project?.status,
       constructionProject: (() => {
         const project = this.runtime.project;
         if (!project || project.type !== "STRUCTURE_BUILD") return undefined;
         const owner = (project as { ownerCitizenId?: string }).ownerCitizenId;
         if (owner && owner !== citizen.record.id) return undefined;
+        if (scoped && !owner) return undefined;
         return project;
       })(),
       lastOutcome: citizen.lastOutcome,
@@ -572,7 +601,7 @@ export class AgentManager {
             personalChest: claimedHome.personalChest,
           }
         : undefined,
-      knownSites: listDiscoveredSites(this.store),
+      knownSites: sitesKnownTo(this.store, citizen.record.id, listDiscoveredSites(this.store), scoped),
       visibleShores: visibleShoresFor(citizen.body, observation.position),
       authorizedStorage: authorizedWorkStorage(this.store, citizen.record.id),
       availableHomes: listAvailableHomes(this.store),
@@ -632,11 +661,16 @@ export class AgentManager {
         if (!this.ops.canWrite()) return;
         citizen.lastOutcome = lastOutcomeFrom(plan, result, citizen.lastOutcome);
         persistCitizenLastOutcome(this.store, citizen.record.id, citizen.lastOutcome);
+        const rememberedOutcome = result.success
+          ? completionMemoryForTask(plan.task, result)
+          : shouldRememberFailure(result.code, plan.item)
+            ? `Task ${plan.task} failed: ${result.error}`
+            : undefined;
+        let outcomeEvent: SimEvent | undefined;
         if (plan.task !== "observe") {
-          this.emitIfLive(
-            createEvent(
-              taskEventType(result),
-              {
+          outcomeEvent = createEvent(
+            taskEventType(result),
+            {
                 task: plan.task,
                 success: result.success,
                 code: result.success ? undefined : result.code,
@@ -645,20 +679,18 @@ export class AgentManager {
                 skillStatus: skillStatusOf(result),
                 workComplete: citizen.lastOutcome.workComplete,
                 collected: citizen.lastOutcome.collected,
-              },
-              citizen.record.id,
-            ),
+                summary: rememberedOutcome,
+                visibility: { class: "actor_private" },
+            },
+            citizen.record.id,
           );
+          this.emitIfLive(outcomeEvent);
         }
-        if (!result.success && shouldRememberFailure(result.code, plan.item)) {
+        if (rememberedOutcome && outcomeEvent) {
           this.writeMemory(
-            createMemory(citizen.record.id, "episodic", `Task ${plan.task} failed: ${result.error}`, 0.45),
+            createMemory(citizen.record.id, "episodic", rememberedOutcome, result.success ? 0.4 : 0.45),
+            { sourceEventId: outcomeEvent.id },
           );
-        } else if (result.success) {
-          const memory = completionMemoryForTask(plan.task, result);
-          if (memory) {
-            this.writeMemory(createMemory(citizen.record.id, "episodic", memory, 0.4));
-          }
         }
         this.maybeCollectDropped(citizen);
         this.maybeSocial(citizen, physicalWorkComplete(result));
@@ -749,12 +781,24 @@ export class AgentManager {
     }
 
     if (!decision.shouldSpeak || !decision.message) return;
+    // SEC-001: never server-wide chat. Only citizens within hearing get this; if it can't be sent, nothing was said.
+    const spoken = speakNearby({
+      speakerId: citizen.record.id,
+      body: citizen.body,
+      hearers: hearersOf(citizen.record.id, citizen.body, (username) => this.resolveCitizen(username)),
+      message: decision.message,
+      emit: (event) => this.emitIfLive(event),
+      detail: { other: other.record.name, cause },
+    });
+    if (!spoken.ok) return;
     citizen.lastChatAt = Date.now();
-    void citizen.body.chat(decision.message);
-    this.emitIfLive(
-      createEvent("ConversationOccurred", { message: decision.message, other: other.record.name, cause }, citizen.record.id),
-    );
-    this.writeMemory(createMemory(citizen.record.id, "social", decision.message, 0.5, other.record.id));
+    this.writeMemory(createMemory(citizen.record.id, "social", decision.message, 0.5, other.record.id),
+      { sourceEventId: spoken.event.id });
+  }
+
+  private resolveCitizen(username: string): { id: string; alive: boolean } | undefined {
+    const citizen = this.get(username);
+    return citizen ? { id: citizen.record.id, alive: !citizen.body.isDeceased() } : undefined;
   }
 
   private chooseJointWorker(citizen: RuntimeCitizen): RuntimeCitizen | undefined {

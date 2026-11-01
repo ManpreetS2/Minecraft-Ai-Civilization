@@ -61,6 +61,7 @@ export function formatPrompt(prompt: CognitionPrompt): string {
     prompt.bulletin ?? "",
     `Relevant memories: ${prompt.memories.slice(0, 5).join(" | ") || "none"}`,
     prompt.gameFacts?.length ? `Relevant Minecraft facts:\n- ${prompt.gameFacts.slice(0, 8).join("\n- ")}` : "",
+    prompt.communicationGuide ?? "",
     "Choose the single most useful high-level goal.",
   ]
     .filter(Boolean)

@@ -13,7 +13,13 @@ import {
   withEventVisibility,
 } from "./event-visibility.js";
 import { buildCitizenBulletin, estimateTokens } from "./bulletin.js";
+import { createCommunityDirectory } from "./event-audience.js";
 import type { SimEvent } from "./events.js";
+
+// SEC-001: bulletins need a directory; world audiences reach only readers the directory knows.
+const DEMO_DIRECTORY = createCommunityDirectory([
+  { id: "demo", memberIds: ["citizen_atlas", "citizen_maya", "citizen_theo", "citizen_sage", "citizen_nova"] },
+]);
 import { DEFAULT_CITIZENS } from "./types.js";
 
 function demoConfig(overrides: Record<string, string> = {}) {
@@ -133,7 +139,7 @@ describe("Mission 012 — visibility and bulletin", () => {
         "HumanDirectiveIssued",
         withEventVisibility(
           { announcement: "Night falls in one hour — seek shelter.", message: "Night falls in one hour — seek shelter." },
-          { class: "world_public" },
+          { class: "world_public", audience: { scope: "world" } },
         ),
       ),
       evt(
@@ -175,18 +181,21 @@ describe("Mission 012 — visibility and bulletin", () => {
       readerCitizenId: "citizen_atlas",
       events,
       alreadyDeliveredIds: new Set(),
+      directory: DEMO_DIRECTORY,
       targetTokens: 200,
     });
     const maya = buildCitizenBulletin({
       readerCitizenId: "citizen_maya",
       events,
       alreadyDeliveredIds: new Set(),
+      directory: DEMO_DIRECTORY,
       targetTokens: 200,
     });
     const theo = buildCitizenBulletin({
       readerCitizenId: "citizen_theo",
       events,
       alreadyDeliveredIds: new Set(),
+      directory: DEMO_DIRECTORY,
       targetTokens: 200,
     });
 
@@ -206,20 +215,22 @@ describe("Mission 012 — visibility and bulletin", () => {
 
   it("bulletin ordering and deduplication are deterministic; tokens measured", () => {
     const events: SimEvent[] = [
-      evt("b2", "SettlementNeedDetected", withEventVisibility({ summary: "need food", dedupeKey: "food" }, { class: "settlement_public" }), undefined, "2026-10-27T12:00:02.000Z"),
-      evt("b1", "SettlementNeedDetected", withEventVisibility({ summary: "need food again", dedupeKey: "food" }, { class: "settlement_public" }), undefined, "2026-10-27T12:00:01.000Z"),
-      evt("b3", "CitizenInjured", withEventVisibility({ summary: "Maya hurt" }, { class: "world_public" }), "citizen_maya", "2026-10-27T12:00:03.000Z"),
+      evt("b2", "SettlementNeedDetected", withEventVisibility({ summary: "need food", dedupeKey: "food" }, { class: "world_public", audience: { scope: "world" } }), undefined, "2026-10-27T12:00:02.000Z"),
+      evt("b1", "SettlementNeedDetected", withEventVisibility({ summary: "need food again", dedupeKey: "food" }, { class: "world_public", audience: { scope: "world" } }), undefined, "2026-10-27T12:00:01.000Z"),
+      evt("b3", "CitizenInjured", withEventVisibility({ summary: "Maya hurt" }, { class: "world_public", audience: { scope: "world" } }), "citizen_maya", "2026-10-27T12:00:03.000Z"),
     ];
     const first = buildCitizenBulletin({
       readerCitizenId: "citizen_theo",
       events,
       alreadyDeliveredIds: new Set(),
+      directory: DEMO_DIRECTORY,
       targetTokens: 200,
     });
     const second = buildCitizenBulletin({
       readerCitizenId: "citizen_theo",
       events,
       alreadyDeliveredIds: new Set(),
+      directory: DEMO_DIRECTORY,
       targetTokens: 200,
     });
     expect(first.text).toEqual(second.text);
@@ -241,17 +252,19 @@ describe("Mission 012 — visibility and bulletin", () => {
       readerCitizenId: "citizen_atlas",
       events: [publicEvt],
       alreadyDeliveredIds: new Set(),
+      directory: DEMO_DIRECTORY,
     });
     expect(first.lines).toHaveLength(0);
 
     const revealed: SimEvent = {
       ...publicEvt,
-      payload: withEventVisibility({ announcement: "All clear" }, { class: "world_public" }),
+      payload: withEventVisibility({ announcement: "All clear" }, { class: "world_public", audience: { scope: "world" } }),
     };
     const second = buildCitizenBulletin({
       readerCitizenId: "citizen_atlas",
       events: [revealed],
       alreadyDeliveredIds: new Set(first.deliveredEventIds),
+      directory: DEMO_DIRECTORY,
     });
     expect(second.lines.some((l) => l.eventId === "late-public")).toBe(true);
 
@@ -259,6 +272,7 @@ describe("Mission 012 — visibility and bulletin", () => {
       readerCitizenId: "citizen_atlas",
       events: [revealed],
       alreadyDeliveredIds: new Set(second.deliveredEventIds),
+      directory: DEMO_DIRECTORY,
     });
     expect(third.lines.some((l) => l.eventId === "late-public")).toBe(false);
   });
@@ -276,7 +290,7 @@ describe("Mission 012 — visibility and bulletin", () => {
       evt(
         `u${i}`,
         "CitizenDied",
-        withEventVisibility({ summary: `death ${i} ${"x".repeat(40)}` }, { class: "world_public" }),
+        withEventVisibility({ summary: `death ${i} ${"x".repeat(40)}` }, { class: "world_public", audience: { scope: "world" } }),
         "citizen_maya",
         `2026-10-27T12:00:${String(i).padStart(2, "0")}.000Z`,
       ),
@@ -285,6 +299,7 @@ describe("Mission 012 — visibility and bulletin", () => {
       readerCitizenId: "citizen_theo",
       events,
       alreadyDeliveredIds: new Set(),
+      directory: DEMO_DIRECTORY,
       targetTokens: 80,
       maxLines: 3,
     });

@@ -13,6 +13,7 @@ import {
   type WorldSnapshot,
 } from "@civ/memory";
 import { randomId } from "@civ/memory";
+import type { CommunityDirectory } from "@civ/shared";
 import { associationFromRow } from "./associations.js";
 import { activityFromRow } from "./activity.js";
 import { DeterministicAppraisal, type AppraisalProvider } from "./appraisal.js";
@@ -34,6 +35,11 @@ import type {
 } from "./types.js";
 
 export type CitizenMindOptions = {
+  /**
+   * SEC-001: REQUIRED provider of the current community directory (called on every ingest so membership changes
+   * apply immediately). Broadcast events are only learned second-hand by readers inside their verified audience.
+   */
+  directory: () => CommunityDirectory;
   clock?: Clock;
   id?: IdFactory;
   embeddings?: EmbeddingProvider;
@@ -60,12 +66,14 @@ export type CitizenCognitiveSnapshot = {
 export class CitizenMind {
   readonly store: CognitiveStore;
   private readonly clock: Clock;
+  private readonly directory: () => CommunityDirectory;
   private readonly id: IdFactory;
   private readonly appraisal: AppraisalProvider;
   private readonly embeddings: EmbeddingQueue;
 
-  constructor(store: CognitiveStore, options: CitizenMindOptions = {}) {
+  constructor(store: CognitiveStore, options: CitizenMindOptions) {
     this.store = store;
+    this.directory = options.directory;
     this.clock = options.clock ?? systemClock();
     this.id = options.id ?? randomId;
     this.appraisal = options.appraisal ?? new DeterministicAppraisal();
@@ -87,6 +95,7 @@ export class CitizenMind {
       clock: this.clock,
       id: this.id,
       appraisal: this.appraisal,
+      directory: this.directory(),
     });
     for (const memory of result.memoriesCreated) {
       if (memory.importance >= 0.35) {

@@ -55,12 +55,18 @@ describe("OPS-001 restart: world state round trip", () => {
   it("memories, relationships, events, delivered-event ids, persistent facts and meta all survive a reopen", () => {
     const path = dbPath("rt");
     const a = new CivilizationStore(path);
-    a.addMemory({ id: "m1", citizenId: "citizen_atlas", kind: "episodic", content: "found a cave", importance: 0.9, createdAt: "2026-10-31T10:00:00.000Z", relatedCitizenId: "citizen_maya" });
-    a.addMemory({ id: "m2", citizenId: "citizen_atlas", kind: "recent", content: "ate bread", importance: 0.2, createdAt: "2026-10-31T10:05:00.000Z" });
+    const cave = createEvent("TaskCompleted", { message: "found a cave", summary: "cave at 10,12,3", visibility: { class: "actor_private" } }, "citizen_atlas");
+    cave.timestamp = "2026-10-31T09:00:00.000Z";
+    const meal = createEvent("TaskCompleted", { message: "ate bread", visibility: { class: "actor_private" } }, "citizen_atlas");
+    meal.timestamp = "2026-10-31T09:05:00.000Z";
+    a.appendEvent(cave);
+    a.appendEvent(meal);
+    a.addMemory({ id: "m1", citizenId: "citizen_atlas", kind: "episodic", content: "found a cave", importance: 0.9, createdAt: "2026-10-31T10:00:00.000Z", relatedCitizenId: "citizen_maya" }, { sourceEventId: cave.id });
+    a.addMemory({ id: "m2", citizenId: "citizen_atlas", kind: "recent", content: "ate bread", importance: 0.2, createdAt: "2026-10-31T10:05:00.000Z" }, { sourceEventId: meal.id });
     a.saveRelationship({ citizenId: "citizen_atlas", otherId: "citizen_maya", trust: 0.7, affection: 0.4, respect: 0.6, resentment: 0.1, familiarity: 0.5 });
     a.appendEvent(createEvent("ResourceCollected", { item: "oak_log", count: 2 }, "citizen_atlas"));
     a.markEventsDelivered("citizen_atlas", ["evt-1", "evt-2"]);
-    a.upsertPersistentFact({ id: "f1", citizenId: "citizen_atlas", factKey: "cave", content: "cave at 10,12,3" });
+    a.upsertPersistentFact({ id: "f1", citizenId: "citizen_atlas", factKey: "cave", content: "cave at 10,12,3", sourceEventId: cave.id });
     a.setMeta("runId", "run-xyz");
     a.close();
 
@@ -69,8 +75,8 @@ describe("OPS-001 restart: world state round trip", () => {
     expect(b.getMemories("citizen_atlas")[0]?.relatedCitizenId).toBe("citizen_maya");
     expect(b.getMemories("citizen_maya")).toEqual([]);
     expect(b.getRelationship("citizen_atlas", "citizen_maya")).toMatchObject({ trust: 0.7, respect: 0.6 });
-    expect(b.recentEvents(10)).toHaveLength(1);
-    expect(b.recentEvents(10)[0]?.payload).toEqual({ item: "oak_log", count: 2 });
+    expect(b.recentEvents(10)).toHaveLength(3);
+    expect(b.recentEvents(10).find((event) => event.type === "ResourceCollected")?.payload).toEqual({ item: "oak_log", count: 2 });
     expect([...b.getDeliveredEventIds("citizen_atlas")].sort()).toEqual(["evt-1", "evt-2"]);
     expect(b.getDeliveredEventIds("citizen_maya").size).toBe(0);
     expect(b.listPersistentFacts("citizen_atlas")[0]?.content).toBe("cave at 10,12,3");

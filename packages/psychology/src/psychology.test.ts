@@ -1,5 +1,6 @@
+import { createCommunityDirectory } from "@civ/shared";
 import { describe, expect, it } from "vitest";
-import { CognitiveStore, createIdFactory, mutableClock, taskOutcomeEvent, type WorldSnapshot } from "@civ/memory";
+import { CognitiveStore, createIdFactory, mutableClock, taskOutcomeEvent, tryAdaptSimEvent, type WorldSnapshot } from "@civ/memory";
 import { CitizenMind } from "./mind.js";
 import { recordHabit } from "./habits.js";
 import { applyPsychDeltas, defaultPsych } from "./psych.js";
@@ -49,6 +50,7 @@ describe("cognition context and reflection", () => {
   it("builds a limited context instead of full history", () => {
     const store = new CognitiveStore(":memory:");
     const runtime = new CitizenMind(store, {
+      directory: () => createCommunityDirectory([]),
       clock: mutableClock(),
       id: createIdFactory("ctx"),
     });
@@ -93,5 +95,57 @@ describe("cognition context and reflection", () => {
       socialBeliefs: [],
     });
     expect(prepared.summary).toMatch(/close_citizen_death/);
+  });
+});
+
+describe("SEC-001 ingestion passes the community directory to observersForEvent", () => {
+  const dir = createCommunityDirectory([
+    { id: "gpt", memberIds: ["GPT-A", "GPT-B"] },
+    { id: "claude", memberIds: ["Claude-A", "Claude-B"] },
+  ]);
+  const here = { x: 0, y: 64, z: 0 };
+  const snapshot: WorldSnapshot = {
+    nearbyRadius: 32,
+    citizens: ["GPT-A", "GPT-B", "Claude-A", "Claude-B"].map((id) => ({ id, name: id, position: here })),
+  };
+  function run(visibility: Record<string, unknown> | undefined) {
+    const store = new CognitiveStore(":memory:");
+    const mind = new CitizenMind(store, { directory: () => dir, clock: mutableClock(), id: createIdFactory("sec") });
+    const event = tryAdaptSimEvent({
+      id: "e-1",
+      type: "ConversationOccurred",
+      timestamp: "2026-10-31T00:00:00.000Z",
+      citizenId: "GPT-A",
+      payload: { speakerId: "GPT-A", listenerIds: ["GPT-B"], text: "hello", location: here, ...(visibility ? { visibility } : {}) },
+    })!;
+    const result = mind.ingest(event, snapshot);
+    return result.memoriesCreated.map((m) => m.citizenId).sort();
+  }
+  it("a community broadcast is remembered only inside its community", () => {
+    expect(run({ class: "settlement_public", audience: { scope: "community", communityId: "gpt" } })).toEqual(["GPT-A", "GPT-B"]);
+  });
+  it("a broadcast with no audience is remembered by direct participants only", () => {
+    expect(run({ class: "world_public" })).toEqual(["GPT-A", "GPT-B"]);
+  });
+  it("a non-broadcast event keeps its nearby witnesses (nothing is dropped)", () => {
+    expect(run(undefined)).toEqual(["Claude-A", "Claude-B", "GPT-A", "GPT-B"]);
+  });
+  it("the directory provider is consulted on every ingest (membership changes apply immediately)", () => {
+    const store = new CognitiveStore(":memory:");
+    let current = createCommunityDirectory([{ id: "gpt", memberIds: ["GPT-A", "GPT-B"] }, { id: "claude", memberIds: ["Claude-A", "Claude-B"] }]);
+    const mind = new CitizenMind(store, { directory: () => current, clock: mutableClock(), id: createIdFactory("sec2") });
+    const mk = (id: string) =>
+      tryAdaptSimEvent({
+        id,
+        type: "ConversationOccurred",
+        timestamp: "2026-10-31T00:00:00.000Z",
+        citizenId: "GPT-A",
+        payload: { speakerId: "GPT-A", listenerIds: [], text: "t", location: here, visibility: { class: "settlement_public", audience: { scope: "community", communityId: "gpt" } } },
+      })!;
+    const before = mind.ingest(mk("a"), snapshot).memoriesCreated.map((m) => m.citizenId).sort();
+    current = createCommunityDirectory([{ id: "gpt", memberIds: ["GPT-A"] }, { id: "claude", memberIds: ["Claude-A", "Claude-B", "GPT-B"] }]);
+    const after = mind.ingest(mk("b"), snapshot).memoriesCreated.map((m) => m.citizenId).sort();
+    expect(before).toEqual(["GPT-A", "GPT-B"]);
+    expect(after).toEqual(["GPT-A"]);
   });
 });

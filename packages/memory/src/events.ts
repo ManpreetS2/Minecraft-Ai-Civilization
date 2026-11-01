@@ -1,4 +1,12 @@
-import { distance, type SimEvent, type Vec3 } from "@civ/shared";
+import {
+  distance,
+  isReaderInAudience,
+  readEventAudience,
+  readEventVisibility,
+  type CommunityDirectory,
+  type SimEvent,
+  type Vec3,
+} from "@civ/shared";
 import { asNumber, asString, asStringArray } from "./json.js";
 import { randomId } from "./clock.js";
 import type {
@@ -266,6 +274,18 @@ export function promiseAgreementEvent(args: EventFactoryBase & {
  * Does not invent runtime events.
  */
 export function tryAdaptSimEvent(event: SimEvent): ObjectiveWorldEvent | null {
+  const adapted = adaptSimEvent(event);
+  if (!adapted) return null;
+  // SEC-001: carry the (unverified) audience label through so observersForEvent can check it against a directory.
+  const audience = readEventAudience(event.payload);
+  const visibilityClass = readEventVisibility(event.payload).class;
+  return {
+    ...adapted,
+    facts: { ...adapted.facts, visibilityClass, ...(audience ? { audience } : {}) },
+  };
+}
+
+function adaptSimEvent(event: SimEvent): ObjectiveWorldEvent | null {
   const payload = event.payload ?? {};
   const timestamp = event.timestamp;
   const citizenId = event.citizenId;
@@ -380,7 +400,18 @@ export type ObserverRole = {
  * Who actually has a basis to remember this event.
  * Distant citizens are omitted unless later told (HEARD).
  */
-export function observersForEvent(event: ObjectiveWorldEvent, snapshot: WorldSnapshot): ObserverRole[] {
+export function observersForEvent(
+  event: ObjectiveWorldEvent,
+  snapshot: WorldSnapshot,
+  /**
+   * SEC-001: REQUIRED. Broadcast events (facts.visibilityClass world_public / settlement_public) may only be
+   * learned second-hand (WITNESSED / HEARD / RECORD) by readers inside their verified audience (facts.audience);
+   * a missing or unknown audience means nobody. Everything else (physical observations, directed, private,
+   * unclassified) is not audience-gated, so legitimate nearby witnesses are kept. DIRECT observers (actor, target,
+   * listed participants) lived the event and are never gated.
+   */
+  directory: CommunityDirectory,
+): ObserverRole[] {
   const radius = snapshot.nearbyRadius ?? DEFAULT_NEARBY_RADIUS;
   const found = new Map<string, ObserverRole>();
 
@@ -412,7 +443,13 @@ export function observersForEvent(event: ObjectiveWorldEvent, snapshot: WorldSna
   const recordReaders = asStringArray(event.facts.recordReaders);
   for (const id of recordReaders) add(id, "RECORD");
 
-  return [...found.values()];
+  const roles = [...found.values()];
+  const klass = asString(event.facts.visibilityClass);
+  if (klass !== "world_public" && klass !== "settlement_public") return roles;
+  const audience = readEventAudience({ visibility: { audience: event.facts.audience } });
+  return roles.filter(
+    (role) => role.source === "DIRECT" || isReaderInAudience(role.citizenId, audience, directory).allowed,
+  );
 }
 
 export function isNearby(a: SnapshotCitizen, b: Vec3, radius = DEFAULT_NEARBY_RADIUS): boolean {

@@ -1,8 +1,14 @@
 import Database from "better-sqlite3";
-import { mkdirSync } from "node:fs";
+import { existsSync, mkdirSync, statSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import {
   DEFAULT_CITIZENS,
+  authorizeEventWithAudience,
+  createCommunityDirectory,
+  readEventAudience,
+  summarizeBulletinEvent,
+  type EventAudience,
+  type CommunityDirectory,
   type CitizenRecord,
   type ConstructionState,
   type MemoryRecord,
@@ -14,6 +20,45 @@ import {
   type HumanDirective,
 } from "@civ/shared";
 import type { CitizenHome, HomeMembership, HomeRecord } from "./home-types.js";
+import { KnowledgeProvenance } from "./knowledge-provenance.js";
+
+/** True for the existing row of an upsert when it is quarantined: a flagged fact is never overwritten, only released manually. */
+// A flag covers the fact row it was raised on AND any row for the same (citizen, key): a re-written fact with a
+// fresh id must not shed the quarantine.
+const FLAGGED_FACT_SQL = `EXISTS (SELECT 1 FROM citizen_persistent_fact_flags g WHERE g.released_at IS NULL AND (g.fact_id = citizen_persistent_facts.id OR (g.citizen_id = citizen_persistent_facts.citizen_id AND g.fact_key = citizen_persistent_facts.fact_key)))`;
+const FACT_FLAG_MIGRATION_KEY = "sec001_fact_flags_v1";
+
+/** SEC-001: result of re-checking legacy facts / deliveries against their source events (never contains fact content). */
+export type LegacyFactMigrationReport = {
+  generatedAt: string;
+  communitiesKnown: number;
+  facts: {
+    examined: number;
+    kept: number;
+    alreadyFlagged: number;
+    toFlag: Array<{ factId: string; citizenId: string; factKey: string; sourceEventId?: string; reason: string }>;
+  };
+  deliveries: {
+    examined: number;
+    unauthorized: Array<{ citizenId: string; eventId: string; reason: string }>;
+  };
+  /** Memories whose text contains a to-be-flagged fact's text (best-effort second-order taint; ids only). */
+  memories: {
+    toFlag: Array<{ memoryId: string; citizenId: string; viaFactId: string }>;
+  };
+};
+
+/**
+ * SEC-001: every community / membership write must carry this audit context. The only legitimate actor is the
+ * orchestrator's own configuration path (community-config.ts); nothing derived from LLM, tool or HTTP input may
+ * construct one. The literal type plus the runtime check make an accidental pass-through fail loudly.
+ */
+export type CommunityAudit = { actor: "orchestrator-config"; reason: string };
+function assertCommunityAudit(audit: CommunityAudit): void {
+  if (!audit || audit.actor !== "orchestrator-config" || typeof audit.reason !== "string" || !audit.reason.trim()) {
+    throw new Error("community writes require an orchestrator-config audit context");
+  }
+}
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -177,14 +222,24 @@ function parseDirectiveRow(json: string): HumanDirective | undefined {
 export class CivilizationStore {
   readonly db: Database.Database;
   private open = true;
+  private readonly filePath: string;
+  readonly knowledge: KnowledgeProvenance;
 
   constructor(filePath: string) {
+    this.filePath = filePath;
     mkdirSync(dirname(resolve(filePath)), { recursive: true });
     this.db = new Database(filePath);
-    this.db.pragma("journal_mode = WAL");
-    this.db.exec(SCHEMA);
-    this.migrate();
-    this.seed();
+    this.knowledge = new KnowledgeProvenance(this.db, this);
+    try {
+      this.db.pragma("journal_mode = WAL");
+      this.db.exec(SCHEMA);
+      this.migrate();
+      this.seed();
+    } catch (error) {
+      this.open = false;
+      this.db.close();
+      throw error;
+    }
   }
 
   isOpen(): boolean {
@@ -265,7 +320,428 @@ export class CivilizationStore {
         UNIQUE(citizen_id, fact_key)
       );
     `);
+    this.migrateCommunities();
     this.migrateHomes();
+    this.knowledge.initialize(this.filePath);
+  }
+
+  /**
+   * SEC-001: persisted community directory + non-destructive quarantine FLAGS for facts derived from unverified
+   * audiences. Events carry their audience inside payload.visibility.audience, so no events-table change is needed;
+   * every event written before this migration has no audience and therefore reaches nobody.
+   *
+   * HARD RULE (owner policy): no historical row is ever deleted or moved. A fact is quarantined by a row in
+   * citizen_persistent_fact_flags that points at it; the fact row itself, with its content, stays exactly where it is
+   * and is excluded at read time (listPersistentFacts). Flags are released manually only.
+   */
+  private migrateCommunities(): void {
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS citizen_persistent_fact_revisions (
+        seq INTEGER PRIMARY KEY AUTOINCREMENT,
+        fact_id TEXT NOT NULL,
+        citizen_id TEXT NOT NULL,
+        fact_key TEXT NOT NULL,
+        content TEXT NOT NULL,
+        kind TEXT NOT NULL,
+        audience TEXT,
+        source_event_id TEXT,
+        replaced_at TEXT NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS communities (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        created_at TEXT NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS community_members (
+        citizen_id TEXT PRIMARY KEY,
+        community_id TEXT NOT NULL REFERENCES communities(id),
+        joined_at TEXT NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS community_audit (
+        seq INTEGER PRIMARY KEY AUTOINCREMENT,
+        at TEXT NOT NULL,
+        action TEXT NOT NULL,
+        community_id TEXT NOT NULL,
+        citizen_id TEXT,
+        actor TEXT NOT NULL,
+        reason TEXT NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS citizen_persistent_fact_flags (
+        fact_id TEXT PRIMARY KEY,
+        citizen_id TEXT NOT NULL,
+        fact_key TEXT NOT NULL,
+        reason TEXT NOT NULL,
+        source TEXT NOT NULL,
+        flagged_at TEXT NOT NULL,
+        released_at TEXT
+      );
+      CREATE TABLE IF NOT EXISTS citizen_memory_flags (
+        memory_id TEXT PRIMARY KEY,
+        citizen_id TEXT NOT NULL,
+        via_fact_id TEXT,
+        reason TEXT NOT NULL,
+        flagged_at TEXT NOT NULL,
+        released_at TEXT
+      );
+      CREATE TABLE IF NOT EXISTS citizen_event_delivery_flags (
+        citizen_id TEXT NOT NULL,
+        event_id TEXT NOT NULL,
+        reason TEXT NOT NULL,
+        flagged_at TEXT NOT NULL,
+        PRIMARY KEY (citizen_id, event_id)
+      );
+    `);
+    // Persistent facts record which audience authorized them and which event they came from (idempotent).
+    const factCols = new Set(
+      (this.db.prepare(`PRAGMA table_info(citizen_persistent_facts)`).all() as Array<{ name: string }>).map((c) => c.name),
+    );
+    if (!factCols.has("audience")) this.db.exec(`ALTER TABLE citizen_persistent_facts ADD COLUMN audience TEXT`);
+    if (!factCols.has("source_event_id")) this.db.exec(`ALTER TABLE citizen_persistent_facts ADD COLUMN source_event_id TEXT`);
+    if (this.db.prepare(`SELECT value FROM sim_meta WHERE key = ?`).get(FACT_FLAG_MIGRATION_KEY)) {
+      this.backfillFactProvenance();
+      return;
+    }
+    const factRows = (this.db.prepare(`SELECT COUNT(*) AS n FROM citizen_persistent_facts`).get() as { n: number }).n;
+    const deliveryRows = (this.db.prepare(`SELECT COUNT(*) AS n FROM citizen_event_delivery`).get() as { n: number }).n;
+    const now = new Date().toISOString();
+    if (factRows === 0 && deliveryRows === 0) {
+      // Nothing historical to protect or check (fresh database).
+      this.db.prepare(`INSERT OR REPLACE INTO sim_meta (key, value) VALUES (?, ?)`).run(FACT_FLAG_MIGRATION_KEY, `${now} fresh`);
+      return;
+    }
+    // 1. back up the database file BEFORE touching anything (throws, and aborts the open, if it cannot).
+    const backupPath = this.backupBeforeLegacyMigration(now);
+    // 2. dry run: re-check every fact and delivery against its source event (read-only).
+    const report = this.dryRunLegacyFactMigration();
+    if (backupPath) {
+      writeFileSync(`${backupPath}.dry-run-report.json`, JSON.stringify(report, null, 2));
+    }
+    // 3. apply flags (inserts into the flag tables only; no fact, event or delivery row is changed or removed).
+    const applied = this.applyLegacyFactMigration(report, now);
+    this.db
+      .prepare(`INSERT OR REPLACE INTO sim_meta (key, value) VALUES (?, ?)`)
+      .run(FACT_FLAG_MIGRATION_KEY, `${now} backup=${backupPath ?? "none"} flaggedFacts=${applied.factsFlagged} flaggedDeliveries=${applied.deliveriesFlagged}`);
+    this.backfillFactProvenance();
+  }
+
+  /**
+   * Consistent snapshot of the database file (VACUUM INTO includes WAL content). Returns the backup path, or
+   * undefined for an in-memory database. Throws if the snapshot cannot be written or does not verify.
+   */
+  private backupBeforeLegacyMigration(at: string): string | undefined {
+    if (!this.filePath || this.filePath === ":memory:" || this.filePath.startsWith("file::memory:")) return undefined;
+    const stamp = at.replace(/[:.]/g, "-");
+    let backupPath = `${resolve(this.filePath)}.pre-sec001-${stamp}.bak`;
+    for (let i = 1; existsSync(backupPath); i += 1) backupPath = `${resolve(this.filePath)}.pre-sec001-${stamp}-${i}.bak`;
+    try {
+      this.db.exec(`VACUUM INTO '${backupPath.replace(/'/g, "''")}'`);
+      if (!existsSync(backupPath) || statSync(backupPath).size === 0) throw new Error("backup file missing or empty");
+      const copy = new Database(backupPath, { readonly: true });
+      try {
+        const live = (this.db.prepare(`SELECT COUNT(*) AS n FROM citizen_persistent_facts`).get() as { n: number }).n;
+        const saved = (copy.prepare(`SELECT COUNT(*) AS n FROM citizen_persistent_facts`).get() as { n: number }).n;
+        if (live !== saved) throw new Error(`backup fact count ${saved} != live ${live}`);
+      } finally {
+        copy.close();
+      }
+    } catch (error) {
+      throw new Error(`SEC-001 legacy fact migration aborted: cannot back up the database first (${error instanceof Error ? error.message : String(error)})`);
+    }
+    return backupPath;
+  }
+
+  /**
+   * READ-ONLY. Re-checks every event-derived fact and every delivery record against its SOURCE event and the
+   * persisted community directory. Facts that are not event-derived (note:*, etc.) are never examined. An actor_private
+   * fact survives when its reader is the actor; a community-labelled fact survives only for an actual member.
+   */
+  dryRunLegacyFactMigration(at = new Date().toISOString()): LegacyFactMigrationReport {
+    const directory = this.getCommunityDirectory();
+    const report: LegacyFactMigrationReport = {
+      generatedAt: at,
+      communitiesKnown: (this.db.prepare(`SELECT COUNT(*) AS n FROM communities`).get() as { n: number }).n,
+      facts: { examined: 0, kept: 0, alreadyFlagged: 0, toFlag: [] },
+      deliveries: { examined: 0, unauthorized: [] },
+      memories: { toFlag: [] },
+    };
+    const flagged = new Set(
+      (this.db.prepare(`SELECT fact_id FROM citizen_persistent_fact_flags WHERE released_at IS NULL`).all() as Array<{ fact_id: string }>).map((r) => r.fact_id),
+    );
+    const facts = this.db
+      .prepare(`SELECT id, citizen_id, fact_key, source_event_id FROM citizen_persistent_facts WHERE fact_key LIKE 'event:%' OR source_event_id IS NOT NULL ORDER BY id`)
+      .all() as Array<{ id: string; citizen_id: string; fact_key: string; source_event_id: string | null }>;
+    for (const fact of facts) {
+      report.facts.examined += 1;
+      if (flagged.has(fact.id)) {
+        report.facts.alreadyFlagged += 1;
+        continue;
+      }
+      const eventId = fact.source_event_id ?? fact.fact_key.slice("event:".length);
+      const event = this.getEventById(eventId);
+      if (!event) {
+        report.facts.toFlag.push({ factId: fact.id, citizenId: fact.citizen_id, factKey: fact.fact_key, sourceEventId: eventId, reason: "source event not found" });
+        continue;
+      }
+      const decision = authorizeEventWithAudience(fact.citizen_id, event.payload, directory, event.citizenId);
+      if (decision.allowed) report.facts.kept += 1;
+      else report.facts.toFlag.push({ factId: fact.id, citizenId: fact.citizen_id, factKey: fact.fact_key, sourceEventId: eventId, reason: `source event not authorized for reader: ${decision.reason}` });
+    }
+    const deliveries = this.db
+      .prepare(`SELECT citizen_id, event_id FROM citizen_event_delivery ORDER BY citizen_id, event_id`)
+      .all() as Array<{ citizen_id: string; event_id: string }>;
+    for (const d of deliveries) {
+      report.deliveries.examined += 1;
+      const event = this.getEventById(d.event_id);
+      if (!event) {
+        report.deliveries.unauthorized.push({ citizenId: d.citizen_id, eventId: d.event_id, reason: "source event not found" });
+        continue;
+      }
+      const decision = authorizeEventWithAudience(d.citizen_id, event.payload, directory, event.citizenId);
+      if (!decision.allowed) report.deliveries.unauthorized.push({ citizenId: d.citizen_id, eventId: d.event_id, reason: decision.reason });
+    }
+    // Include active flags so a later import cannot escape a repeated quarantine scan.
+    const existingFlags = this.db.prepare(
+      "SELECT fact_id AS factId, citizen_id AS citizenId FROM citizen_persistent_fact_flags WHERE released_at IS NULL",
+    ).all() as Array<{ factId: string; citizenId: string }>;
+    report.memories.toFlag = this.findTaintedMemories([
+      ...existingFlags,
+      ...report.facts.toFlag.map((f) => ({ factId: f.factId, citizenId: f.citizenId })),
+    ]);
+    return report;
+  }
+
+  /**
+   * Best-effort second-order quarantine: memories carry no provenance, so a memory is treated as tainted when its
+   * text contains a flagged fact's text (or is wholly contained in it). Paraphrases cannot be traced. READ-ONLY.
+   */
+  private findTaintedMemories(facts: Array<{ factId: string; citizenId: string }>): Array<{ memoryId: string; citizenId: string; viaFactId: string }> {
+    const out: Array<{ memoryId: string; citizenId: string; viaFactId: string }> = [];
+    const seen = new Set<string>();
+    const getFact = this.db.prepare(`SELECT content FROM citizen_persistent_facts WHERE id = ?`);
+    const memories = this.db.prepare(
+      `SELECT id, content FROM memories WHERE citizen_id = ? AND id NOT IN (SELECT memory_id FROM citizen_memory_flags WHERE released_at IS NULL)`,
+    );
+    for (const fact of facts) {
+      const row = getFact.get(fact.factId) as { content: string } | undefined;
+      const needle = row?.content.trim().toLowerCase() ?? "";
+      if (needle.length < 12) continue; // too short to match without false positives
+      for (const memory of memories.all(fact.citizenId) as Array<{ id: string; content: string }>) {
+        if (seen.has(memory.id)) continue;
+        if (this.knowledge.isEligible("memory", memory.id)) continue;
+        const text = memory.content.toLowerCase();
+        if (text.includes(needle) || (text.length >= 20 && needle.includes(text))) {
+          seen.add(memory.id);
+          out.push({ memoryId: memory.id, citizenId: fact.citizenId, viaFactId: fact.factId });
+        }
+      }
+    }
+    return out;
+  }
+
+  private flagMemories(items: Array<{ memoryId: string; citizenId: string; viaFactId: string }>, reason: string, at: string): number {
+    const insert = this.db.prepare(
+      `INSERT OR IGNORE INTO citizen_memory_flags (memory_id, citizen_id, via_fact_id, reason, flagged_at) VALUES (?, ?, ?, ?, ?)`,
+    );
+    let n = 0;
+    for (const m of items) n += insert.run(m.memoryId, m.citizenId, m.viaFactId, reason, at).changes;
+    return n;
+  }
+
+  listFlaggedMemoryIds(citizenId?: string): string[] {
+    const rows = (citizenId
+      ? this.db.prepare(`SELECT memory_id FROM citizen_memory_flags WHERE released_at IS NULL AND citizen_id = ? ORDER BY memory_id`).all(citizenId)
+      : this.db.prepare(`SELECT memory_id FROM citizen_memory_flags WHERE released_at IS NULL ORDER BY memory_id`).all()) as Array<{ memory_id: string }>;
+    return rows.map((r) => r.memory_id);
+  }
+
+  /**
+   * Apply a dry-run report by INSERTING flag rows. Never updates or deletes a fact, event or delivery row. A fact
+   * that was already flagged (or flagged and manually released) keeps its existing flag row.
+   */
+  applyLegacyFactMigration(report: LegacyFactMigrationReport, at = new Date().toISOString()): { factsFlagged: number; deliveriesFlagged: number } {
+    const flagFact = this.db.prepare(
+      `INSERT OR IGNORE INTO citizen_persistent_fact_flags (fact_id, citizen_id, fact_key, reason, source, flagged_at) VALUES (?, ?, ?, ?, 'legacy-migration', ?)`,
+    );
+    const flagDelivery = this.db.prepare(
+      `INSERT OR IGNORE INTO citizen_event_delivery_flags (citizen_id, event_id, reason, flagged_at) VALUES (?, ?, ?, ?)`,
+    );
+    let factsFlagged = 0;
+    let deliveriesFlagged = 0;
+    this.db.transaction(() => {
+      for (const f of report.facts.toFlag) factsFlagged += flagFact.run(f.factId, f.citizenId, f.factKey, f.reason, at).changes;
+      for (const d of report.deliveries.unauthorized) deliveriesFlagged += flagDelivery.run(d.citizenId, d.eventId, d.reason, at).changes;
+      this.flagMemories(report.memories.toFlag, "text derived from a quarantined fact", at);
+    })();
+    return { factsFlagged, deliveriesFlagged };
+  }
+
+  /**
+   * Fill source_event_id (provenance) for event-derived facts written before the column existed. The AUDIENCE stamp is
+   * only written when the fact is not flagged AND its source event authorizes this fact's reader today, so a stamp
+   * never vouches for a fact the migration refused. Idempotent.
+   */
+  private backfillFactProvenance(): void {
+    const rows = this.db
+      .prepare(`SELECT id, citizen_id, fact_key FROM citizen_persistent_facts WHERE source_event_id IS NULL AND fact_key LIKE 'event:%'`)
+      .all() as Array<{ id: string; citizen_id: string; fact_key: string }>;
+    if (rows.length === 0) return;
+    const directory = this.getCommunityDirectory();
+    const flagged = new Set(
+      (this.db.prepare(`SELECT fact_id FROM citizen_persistent_fact_flags WHERE released_at IS NULL`).all() as Array<{ fact_id: string }>).map((r) => r.fact_id),
+    );
+    const update = this.db.prepare(`UPDATE citizen_persistent_facts SET source_event_id = ?, audience = ? WHERE id = ?`);
+    this.db.transaction(() => {
+      for (const row of rows) {
+        const eventId = row.fact_key.slice("event:".length);
+        const event = this.getEventById(eventId);
+        let stamp: string | null = null;
+        if (event && !flagged.has(row.id) && authorizeEventWithAudience(row.citizen_id, event.payload, directory, event.citizenId).allowed) {
+          const audience = readEventAudience(event.payload);
+          stamp = audience ? JSON.stringify(audience) : null;
+        }
+        update.run(eventId, stamp, row.id);
+      }
+    })();
+  }
+
+  private auditCommunity(audit: CommunityAudit, action: string, communityId: string, citizenId: string | null, at: string): void {
+    this.db
+      .prepare(`INSERT INTO community_audit (at, action, community_id, citizen_id, actor, reason) VALUES (?, ?, ?, ?, ?, ?)`)
+      .run(at, action, communityId, citizenId, audit.actor, audit.reason);
+  }
+
+  /** Create (or rename) a community. Orchestrator-config path only (see CommunityAudit). */
+  upsertCommunity(id: string, name: string, audit: CommunityAudit, at = new Date().toISOString()): void {
+    assertCommunityAudit(audit);
+    if (!id.trim() || id !== id.trim()) throw new Error("community id must be a non-empty trimmed string");
+    this.db.transaction(() => {
+      this.db
+        .prepare(
+          `INSERT INTO communities (id, name, created_at) VALUES (?, ?, ?)
+           ON CONFLICT(id) DO UPDATE SET name = excluded.name`,
+        )
+        .run(id, name, at);
+      this.auditCommunity(audit, "upsert_community", id, null, at);
+    })();
+  }
+
+  /**
+   * A citizen belongs to at most one community (PRIMARY KEY on citizen_id). Re-adding to another community throws.
+   * Orchestrator-config path only (see CommunityAudit). Returns true when a row was added.
+   */
+  addCommunityMember(communityId: string, citizenId: string, audit: CommunityAudit, at = new Date().toISOString()): boolean {
+    assertCommunityAudit(audit);
+    const existing = this.db
+      .prepare(`SELECT community_id FROM community_members WHERE citizen_id = ?`)
+      .get(citizenId) as { community_id: string } | undefined;
+    if (existing && existing.community_id !== communityId) {
+      throw new Error(`citizen ${citizenId} already belongs to community ${existing.community_id}`);
+    }
+    if (existing) return false;
+    if (!this.db.prepare(`SELECT 1 FROM communities WHERE id = ?`).get(communityId)) {
+      throw new Error(`unknown community ${communityId}`);
+    }
+    this.db.transaction(() => {
+      this.db
+        .prepare(`INSERT INTO community_members (citizen_id, community_id, joined_at) VALUES (?, ?, ?)`)
+        .run(citizenId, communityId, at);
+      this.auditCommunity(audit, "add_member", communityId, citizenId, at);
+    })();
+    return true;
+  }
+
+  /**
+   * Audited removal. Facts the citizen stored on the strength of that community's audience are FLAGGED in place
+   * (excluded from reads, content and row untouched, never moved or deleted), because the authorization that
+   * justified them is gone. Orchestrator-config path only (see CommunityAudit).
+   * Returns false when the citizen was not a member.
+   */
+  removeCommunityMember(communityId: string, citizenId: string, audit: CommunityAudit, at = new Date().toISOString()): boolean {
+    assertCommunityAudit(audit);
+    const row = this.db
+      .prepare(`SELECT community_id FROM community_members WHERE citizen_id = ? AND community_id = ?`)
+      .get(citizenId, communityId);
+    if (!row) return false;
+    this.db.transaction(() => {
+      this.db.prepare(`DELETE FROM community_members WHERE citizen_id = ? AND community_id = ?`).run(citizenId, communityId);
+      const facts = this.db
+        .prepare(`SELECT id, citizen_id, fact_key, audience FROM citizen_persistent_facts WHERE citizen_id = ? AND audience IS NOT NULL`)
+        .all(citizenId) as Array<{ id: string; citizen_id: string; fact_key: string; audience: string }>;
+      const flag = this.db.prepare(
+        `INSERT OR IGNORE INTO citizen_persistent_fact_flags (fact_id, citizen_id, fact_key, reason, source, flagged_at)
+         VALUES (?, ?, ?, ?, 'membership-removal', ?)`,
+      );
+      const flaggedNow: Array<{ factId: string; citizenId: string }> = [];
+      for (const fact of facts) {
+        let audienceCommunity: string | undefined;
+        try {
+          const parsed = JSON.parse(fact.audience) as { scope?: string; communityId?: string };
+          if (parsed.scope === "community") audienceCommunity = parsed.communityId;
+        } catch {
+          audienceCommunity = communityId; // unreadable audience: treat as revoked (fail closed)
+        }
+        if (audienceCommunity !== communityId) continue;
+        flag.run(fact.id, fact.citizen_id, fact.fact_key, `membership of ${communityId} removed`, at);
+        flaggedNow.push({ factId: fact.id, citizenId: fact.citizen_id });
+      }
+      this.flagMemories(this.findTaintedMemories(flaggedNow), `derived from a fact flagged when ${communityId} membership was removed`, at);
+      this.auditCommunity(audit, "remove_member", communityId, citizenId, at);
+    })();
+    return true;
+  }
+
+  listCommunityAudit(): Array<{ seq: number; at: string; action: string; communityId: string; citizenId?: string; actor: string; reason: string }> {
+    const rows = this.db.prepare(`SELECT * FROM community_audit ORDER BY seq ASC`).all() as Array<{
+      seq: number; at: string; action: string; community_id: string; citizen_id: string | null; actor: string; reason: string;
+    }>;
+    return rows.map((r) => ({ seq: r.seq, at: r.at, action: r.action, communityId: r.community_id, citizenId: r.citizen_id ?? undefined, actor: r.actor, reason: r.reason }));
+  }
+
+  /** True when the most recent audited action for this (community, citizen) pair is an explicit removal. */
+  wasMemberRemoved(communityId: string, citizenId: string): boolean {
+    const row = this.db
+      .prepare(`SELECT action FROM community_audit WHERE community_id = ? AND citizen_id = ? AND action IN ('add_member','remove_member') ORDER BY seq DESC LIMIT 1`)
+      .get(communityId, citizenId) as { action: string } | undefined;
+    return row?.action === "remove_member";
+  }
+
+  /** Fresh directory snapshot from the persisted tables (survives restart; never cached across calls). */
+  /** True once any community exists: the world is then multi-community and shared settlement state is off limits. */
+  hasCommunities(): boolean {
+    return (this.db.prepare(`SELECT COUNT(*) AS n FROM communities`).get() as { n: number }).n > 0;
+  }
+
+  getCommunityDirectory(): CommunityDirectory {
+    const communities = this.db.prepare(`SELECT id FROM communities ORDER BY id`).all() as Array<{ id: string }>;
+    const members = this.db
+      .prepare(`SELECT citizen_id, community_id FROM community_members ORDER BY citizen_id`)
+      .all() as Array<{ citizen_id: string; community_id: string }>;
+    return createCommunityDirectory(
+      communities.map((c) => ({
+        id: c.id,
+        memberIds: members.filter((m) => m.community_id === c.id).map((m) => m.citizen_id),
+      })),
+    );
+  }
+
+  /** Facts currently flagged (still stored in citizen_persistent_facts, excluded from reads). Oldest flag first by id. */
+  listQuarantinedFacts(citizenId?: string): Array<{ id: string; citizenId: string; factKey: string; content: string; reason: string; source: string }> {
+    const sql = `SELECT f.id AS id, f.citizen_id AS citizen_id, f.fact_key AS fact_key, f.content AS content, g.reason AS reason, g.source AS source
+      FROM citizen_persistent_fact_flags g JOIN citizen_persistent_facts f ON f.id = g.fact_id
+      WHERE g.released_at IS NULL ${citizenId ? "AND f.citizen_id = ?" : ""} ORDER BY f.id`;
+    const rows = (citizenId ? this.db.prepare(sql).all(citizenId) : this.db.prepare(sql).all()) as Array<{
+      id: string; citizen_id: string; fact_key: string; content: string; reason: string; source: string;
+    }>;
+    return rows.map((r) => ({ id: r.id, citizenId: r.citizen_id, factKey: r.fact_key, content: r.content, reason: r.reason, source: r.source }));
+  }
+
+  listFlaggedDeliveries(citizenId?: string): Array<{ citizenId: string; eventId: string; reason: string }> {
+    const rows = (
+      citizenId
+        ? this.db.prepare(`SELECT * FROM citizen_event_delivery_flags WHERE citizen_id = ? ORDER BY event_id`).all(citizenId)
+        : this.db.prepare(`SELECT * FROM citizen_event_delivery_flags ORDER BY citizen_id, event_id`).all()
+    ) as Array<{ citizen_id: string; event_id: string; reason: string }>;
+    return rows.map((r) => ({ citizenId: r.citizen_id, eventId: r.event_id, reason: r.reason }));
   }
 
   private migrateHomes(): void {
@@ -513,53 +989,148 @@ export class CivilizationStore {
     citizenId: string;
     factKey: string;
     content: string;
-    kind?: "observed_fact" | "suspicion";
+    /** reported_speech: the speech happened; what it claims has not been verified. */
+    kind?: "observed_fact" | "suspicion" | "reported_speech";
     createdAt?: string;
+    /** SEC-001: the verified audience that authorized this fact (omit for private/non-broadcast facts). */
+    audience?: EventAudience;
+    /** SEC-001: the event this fact was derived from. */
+    sourceEventId?: string;
   }): void {
-    this.db
-      .prepare(
-        `INSERT INTO citizen_persistent_facts (id, citizen_id, fact_key, content, kind, created_at)
-         VALUES (@id, @citizenId, @factKey, @content, @kind, @createdAt)
-         ON CONFLICT(citizen_id, fact_key) DO UPDATE SET content = excluded.content`,
-      )
-      .run({
-        id: fact.id,
-        citizenId: fact.citizenId,
-        factKey: fact.factKey,
-        content: fact.content,
-        kind: fact.kind ?? "observed_fact",
-        createdAt: fact.createdAt ?? new Date().toISOString(),
-      });
+    this.db.transaction(() => {
+      const priorFact = this.db
+        .prepare("SELECT id FROM citizen_persistent_facts WHERE citizen_id=? AND fact_key=?")
+        .get(fact.citizenId, fact.factKey);
+      this.recordFactRevision(fact);
+      this.db
+        .prepare(
+          `INSERT INTO citizen_persistent_facts (id, citizen_id, fact_key, content, kind, created_at, audience, source_event_id)
+         VALUES (@id, @citizenId, @factKey, @content, @kind, @createdAt, @audience, @sourceEventId)
+         ON CONFLICT(citizen_id, fact_key) DO UPDATE SET
+           content = CASE WHEN ${FLAGGED_FACT_SQL} THEN content ELSE excluded.content END,
+           kind = CASE WHEN ${FLAGGED_FACT_SQL} THEN kind ELSE COALESCE(@explicitKind, kind) END,
+           audience = CASE WHEN ${FLAGGED_FACT_SQL} THEN audience ELSE excluded.audience END,
+           source_event_id = CASE WHEN ${FLAGGED_FACT_SQL} THEN source_event_id ELSE excluded.source_event_id END`,
+        )
+        .run({
+          audience: fact.audience ? JSON.stringify(fact.audience) : null,
+          sourceEventId: fact.sourceEventId ?? null,
+          id: fact.id,
+          citizenId: fact.citizenId,
+          factKey: fact.factKey,
+          content: fact.content,
+          kind: fact.kind ?? "observed_fact",
+          // A replacement takes its own trust class. One that names no kind keeps the old class, so it can't be promoted.
+          explicitKind: fact.kind ?? null,
+          createdAt: fact.createdAt ?? new Date().toISOString(),
+        });
+      const stored = this.db
+        .prepare("SELECT id FROM citizen_persistent_facts WHERE citizen_id=? AND fact_key=?")
+        .get(fact.citizenId, fact.factKey) as { id: string };
+      this.knowledge.recordWrite(
+        "fact",
+        stored.id,
+        fact.sourceEventId ??
+          (fact.factKey.startsWith("event:") ? fact.factKey.slice(6) : undefined),
+        Boolean(priorFact),
+      );
+    })();
   }
 
-  listPersistentFacts(citizenId: string, limit = 20): Array<{
+  /** SEC-001 audit: what a same-key replacement is about to overwrite is copied out first, never lost. */
+  private recordFactRevision(fact: { citizenId: string; factKey: string; content: string; kind?: string }): void {
+    const prior = this.db
+      .prepare(`SELECT id, content, kind, audience, source_event_id FROM citizen_persistent_facts WHERE citizen_id = ? AND fact_key = ?`)
+      .get(fact.citizenId, fact.factKey) as
+      | { id: string; content: string; kind: string; audience: string | null; source_event_id: string | null }
+      | undefined;
+    if (!prior || (prior.content === fact.content && prior.kind === (fact.kind ?? prior.kind))) return;
+    this.db
+      .prepare(
+        `INSERT INTO citizen_persistent_fact_revisions (fact_id, citizen_id, fact_key, content, kind, audience, source_event_id, replaced_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(prior.id, fact.citizenId, fact.factKey, prior.content, prior.kind, prior.audience, prior.source_event_id, new Date().toISOString());
+  }
+
+  /** Observer audit: prior versions of a fact, oldest first. Never read by cognition. */
+  listPersistentFactRevisions(citizenId: string, factKey: string): Array<{ factId: string; content: string; kind: string; replacedAt: string }> {
+    return (
+      this.db
+        .prepare(`SELECT fact_id, content, kind, replaced_at FROM citizen_persistent_fact_revisions WHERE citizen_id = ? AND fact_key = ? ORDER BY seq`)
+        .all(citizenId, factKey) as Array<{ fact_id: string; content: string; kind: string; replaced_at: string }>
+    ).map((row) => ({ factId: row.fact_id, content: row.content, kind: row.kind, replacedAt: row.replaced_at }));
+  }
+
+  listPersistentFacts(
+    citizenId: string,
+    limit = 20,
+  ): Array<{
     id: string;
     citizenId: string;
     factKey: string;
     content: string;
     kind: string;
     createdAt: string;
+    audience?: EventAudience;
+    sourceEventId?: string;
   }> {
-    const rows = this.db
-      .prepare(
-        `SELECT * FROM citizen_persistent_facts WHERE citizen_id = ? ORDER BY created_at DESC LIMIT ?`,
-      )
-      .all(citizenId, limit) as Array<{
-      id: string;
-      citizen_id: string;
-      fact_key: string;
-      content: string;
-      kind: string;
-      created_at: string;
-    }>;
-    return rows.map((row) => ({
-      id: row.id,
-      citizenId: row.citizen_id,
-      factKey: row.fact_key,
-      content: row.content,
-      kind: row.kind,
-      createdAt: row.created_at,
-    }));
+    return this.knowledge.withSnapshot(() => {
+      if (limit <= 0) return [];
+      const candidates = this.db
+        .prepare(
+          // SEC-001: flagged (quarantined) facts stay in the table but are excluded from every read. This is the single
+          // chokepoint for facts that reach a prompt (manager.ts:485 and anything else).
+          `SELECT * FROM citizen_persistent_facts
+         WHERE citizen_id = ? AND NOT ${FLAGGED_FACT_SQL}
+         ORDER BY created_at DESC`,
+        )
+        .iterate(citizenId) as Iterable<{
+        id: string;
+        citizen_id: string;
+        fact_key: string;
+        content: string;
+        kind: string;
+        created_at: string;
+        audience: string | null;
+        source_event_id: string | null;
+      }>;
+      const rows: Array<{
+        id: string;
+        citizen_id: string;
+        fact_key: string;
+        content: string;
+        kind: string;
+        created_at: string;
+        audience: string | null;
+        source_event_id: string | null;
+      }> = [];
+      for (const row of candidates) {
+        if (!this.knowledge.isEligible("fact", row.id)) continue;
+        rows.push(row);
+        if (rows.length >= limit) break;
+      }
+      return rows.map((row) => {
+        let audience: EventAudience | undefined;
+        if (row.audience) {
+          try {
+            audience = readEventAudience({ visibility: { audience: JSON.parse(row.audience) } });
+          } catch {
+            audience = undefined;
+          }
+        }
+        return {
+          id: row.id,
+          citizenId: row.citizen_id,
+          factKey: row.fact_key,
+          content: row.content,
+          kind: row.kind,
+          createdAt: row.created_at,
+          audience,
+          sourceEventId: this.knowledge.sourceFor("fact", row.id)?.id,
+        };
+      });
+    });
   }
 
   /** Observer audit: all events newest-first (no citizen visibility filter). */
@@ -567,9 +1138,29 @@ export class CivilizationStore {
     return this.recentEvents(limit);
   }
 
+  /** One stored event by id (the trusted source for sharing and write-time audience re-checks). */
+  getEventById(id: string): SimEvent | undefined {
+    const row = this.db.prepare(`SELECT * FROM events WHERE id = ?`).get(id) as EventRow | undefined;
+    if (!row) return undefined;
+    try {
+      return {
+        id: row.id,
+        type: row.type as SimEvent["type"],
+        timestamp: row.timestamp,
+        citizenId: row.citizen_id ?? undefined,
+        payload: JSON.parse(row.payload) as Record<string, unknown>,
+      };
+    } catch {
+      return undefined;
+    }
+  }
+
+  /** The NEWEST `limit` events, returned oldest-first (so a long history never hides the latest events). */
   listEventsAscending(limit = 500): SimEvent[] {
     const rows = this.db
-      .prepare(`SELECT * FROM events ORDER BY timestamp ASC, id ASC LIMIT ?`)
+      .prepare(
+        `SELECT * FROM (SELECT * FROM events ORDER BY timestamp DESC, id DESC LIMIT ?) ORDER BY timestamp ASC, id ASC`,
+      )
       .all(limit) as EventRow[];
     return rows.map((row) => ({
       id: row.id,
@@ -601,38 +1192,60 @@ export class CivilizationStore {
     }));
   }
 
-  addMemory(memory: MemoryRecord): void {
-    this.db
-      .prepare(
-        `INSERT INTO memories (id, citizen_id, kind, content, importance, created_at, related_citizen_id)
+  addMemory(memory: MemoryRecord, provenance?: { sourceEventId: string }): void {
+    this.db.transaction(() => {
+      this.db
+        .prepare(
+          `INSERT INTO memories (id, citizen_id, kind, content, importance, created_at, related_citizen_id)
          VALUES (@id, @citizenId, @kind, @content, @importance, @createdAt, @relatedCitizenId)`,
-      )
-      .run({
-        id: memory.id,
-        citizenId: memory.citizenId,
-        kind: memory.kind,
-        content: memory.content,
-        importance: memory.importance,
-        createdAt: memory.createdAt,
-        relatedCitizenId: memory.relatedCitizenId ?? null,
-      });
+        )
+        .run({
+          id: memory.id,
+          citizenId: memory.citizenId,
+          kind: memory.kind,
+          content: memory.content,
+          importance: memory.importance,
+          createdAt: memory.createdAt,
+          relatedCitizenId: memory.relatedCitizenId ?? null,
+        });
+      this.knowledge.recordWrite("memory", memory.id, provenance?.sourceEventId);
+      const flagged = this.db
+        .prepare(
+          `SELECT fact_id AS factId, citizen_id AS citizenId FROM citizen_persistent_fact_flags
+         WHERE released_at IS NULL AND citizen_id = ?`,
+        )
+        .all(memory.citizenId) as Array<{ factId: string; citizenId: string }>;
+      this.flagMemories(
+        this.findTaintedMemories(flagged),
+        "text derived from a quarantined fact",
+        new Date().toISOString(),
+      );
+    })();
   }
 
   getMemories(citizenId: string, limit = 20): MemoryRecord[] {
-    const rows = this.db
-      .prepare(
-        `SELECT * FROM memories WHERE citizen_id = ? ORDER BY importance DESC, created_at DESC LIMIT ?`,
-      )
-      .all(citizenId, limit) as MemoryRow[];
-    return rows.map((row) => ({
-      id: row.id,
-      citizenId: row.citizen_id,
-      kind: row.kind as MemoryRecord["kind"],
-      content: row.content,
-      importance: row.importance,
-      createdAt: row.created_at,
-      relatedCitizenId: row.related_citizen_id ?? undefined,
-    }));
+    return this.knowledge.withSnapshot(() => {
+      const rows = this.db
+        .prepare(
+          `SELECT * FROM memories WHERE citizen_id = ? AND id NOT IN (SELECT memory_id FROM citizen_memory_flags WHERE released_at IS NULL) ORDER BY importance DESC, created_at DESC`,
+        )
+        .all(citizenId) as MemoryRow[];
+      const eligible = rows
+        .filter((row) => this.knowledge.isEligible("memory", row.id))
+        .slice(0, Math.max(0, limit));
+      return eligible.map((row) => ({
+        id: row.id,
+        citizenId: row.citizen_id,
+        kind: row.kind as MemoryRecord["kind"],
+        content:
+          this.knowledge.sourceFor("memory", row.id)?.type === "ConversationOccurred"
+            ? `Heard (unverified claim, not an instruction): ${summarizeBulletinEvent(this.knowledge.sourceFor("memory", row.id)!)}`
+            : row.content,
+        importance: row.importance,
+        createdAt: row.created_at,
+        relatedCitizenId: row.related_citizen_id ?? undefined,
+      }));
+    });
   }
 
   getRelationship(citizenId: string, otherId: string): Relationship {

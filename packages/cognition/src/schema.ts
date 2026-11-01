@@ -4,11 +4,32 @@ import { normalizeDecisionInput } from "./normalize.js";
 
 export { GOALS, type Goal };
 
+const spokenMessage = z.string().trim().min(1).max(200);
+
+/**
+ * SEC-001: what a citizen may choose to say. Only content and a target NAME are model-supplied. The sender, the
+ * community and the source event id are resolved by the runtime; any such field a model adds is stripped here.
+ */
+export const CommunicationIntentSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("say"), message: spokenMessage, toCitizen: z.string().min(1).max(64).optional() }),
+  z.object({ kind: z.literal("announce_to_community"), message: spokenMessage }),
+  z.object({
+    kind: z.literal("share_bulletin_line"),
+    bulletinLine: z.number().int().min(1).max(64),
+    toCitizen: z.string().min(1).max(64),
+    message: spokenMessage,
+  }),
+]);
+
+export type CommunicationIntent = z.infer<typeof CommunicationIntentSchema>;
+
 export const DecisionSchema = z.object({
   goal: z.enum(GOALS),
   priority: z.number().min(0).max(1),
   reason: z.string().min(1).max(280),
   targetCitizenId: z.string().optional(),
+  /** Optional and voluntary. A malformed intent is dropped; it never invalidates the goal decision. */
+  communication: CommunicationIntentSchema.optional().catch(undefined),
 });
 
 export type HighLevelDecision = z.infer<typeof DecisionSchema>;
@@ -41,6 +62,8 @@ export type CognitionPrompt = {
   bulletin?: string;
   /** Shared demo survival objective when three-citizen profile is active. */
   sharedObjective?: string;
+  /** SEC-001: neutral description of the optional communication field (community mode only). */
+  communicationGuide?: string;
 };
 
 export type CognitionProvider = {

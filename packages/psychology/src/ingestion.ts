@@ -11,6 +11,7 @@ import {
   type StoredMemory,
   type WorldSnapshot,
 } from "@civ/memory";
+import type { CommunityDirectory } from "@civ/shared";
 import { parseJson } from "./json.js";
 import { activityFromRow, activityToRow, normalizeActivity, recordActivityAttempt } from "./activity.js";
 import { applyAssociationProposal, associationFromRow, associationToRow } from "./associations.js";
@@ -35,6 +36,8 @@ export function ingestObjectiveEvent(
     clock: Clock;
     id: IdFactory;
     appraisal?: AppraisalProvider;
+    /** SEC-001: required; broadcast events are only learned second-hand by readers inside their verified audience. */
+    directory: CommunityDirectory;
   },
 ): IngestResult {
   const appraisal = opts.appraisal ?? new DeterministicAppraisal();
@@ -51,7 +54,7 @@ export function ingestObjectiveEvent(
     store.upsertIdentity(citizen.id, citizen.name, at);
   }
 
-  const observers = observersForEvent(event, snapshot);
+  const observers = observersForEvent(event, snapshot, opts.directory);
   const observerIds = new Set(observers.map((o) => o.citizenId));
   const skippedDistant = snapshot.citizens
     .map((c) => c.id)
