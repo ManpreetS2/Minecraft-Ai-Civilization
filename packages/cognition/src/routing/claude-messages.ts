@@ -265,14 +265,19 @@ export class ClaudeMessagesProvider implements CognitionProvider {
             settlement.unverifiedHoldUsd += this.config.budget.holdAttempt(admission.reservationId);
           }
           const waitMs = this.retryWaitMs(status, retryAfterOf(error), attempt, deadlineMs);
-          if (waitMs === undefined || attempt >= maxAttempts || !this.config.budget.tryChargeRetry()) {
+          const giveUp = (reason: string, thrown: Error): never => {
             if (settlement.billedStatus === undefined) {
               this.config.budget.reconcile(admission.reservationId, undefined, true);
             }
-            this.push(prompt, startedAt, startedMs, settlement, { ok: false, failureReason: message, httpStatus: status });
-            throw error instanceof Error ? error : new Error(message);
-          }
-          await abortableDelay(waitMs, controller.signal);
+            this.push(prompt, startedAt, startedMs, settlement, { ok: false, failureReason: reason, httpStatus: status });
+            throw thrown;
+          };
+          const asError = error instanceof Error ? error : new Error(message);
+          if (waitMs === undefined || attempt >= maxAttempts) giveUp(message, asError);
+          await abortableDelay(waitMs!, controller.signal);
+          // The retry is charged only once it is about to go out, so a cancellation during the wait costs nothing.
+          if (controller.signal.aborted || this.closed) giveUp("Claude request cancelled", new Error("Claude request cancelled"));
+          if (!this.config.budget.tryChargeRetry()) giveUp(message, asError);
         }
       }
     } finally {

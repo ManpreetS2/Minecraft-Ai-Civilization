@@ -261,13 +261,7 @@ export class OpenAiResponsesProvider implements CognitionProvider {
           const cancelledDuringRetryableFailure =
             isRetryableFailure(error as OpenAiHttpError) && (controller.signal.aborted || this.closed);
           if (cancelledDuringRetryableFailure) message = "OpenAI request cancelled";
-          if (
-            waitMs === undefined ||
-            attempt >= maxAttempts ||
-            controller.signal.aborted ||
-            this.closed ||
-            !this.config.budget.tryChargeRetry()
-          ) {
+          const giveUp = (reason: string, thrown: unknown): never => {
             if (settlement.billedStatus === undefined) {
               this.config.budget.reconcile(admission.reservationId, undefined, true);
             }
@@ -285,15 +279,20 @@ export class OpenAiResponsesProvider implements CognitionProvider {
               estimatedCostUsd: settlement.estimatedCostUsd,
               unverifiedHoldUsd: settlement.unverifiedHoldUsd || undefined,
               ok: false,
-              failureReason: message,
+              failureReason: reason,
               rejectedGoal: undefined,
               httpStatus: lastStatus ?? settlement.billedStatus,
             });
             // A retryable failure that landed after a timeout or shutdown is reported as the cancellation it became.
-            if (cancelledDuringRetryableFailure) throw new Error(message);
-            throw error instanceof Error ? error : new Error(message);
+            throw thrown instanceof Error && !cancelledDuringRetryableFailure ? thrown : new Error(reason);
+          };
+          if (waitMs === undefined || attempt >= maxAttempts || controller.signal.aborted || this.closed) {
+            giveUp(message, error);
           }
-          await abortableDelay(waitMs, controller.signal);
+          await abortableDelay(waitMs!, controller.signal);
+          // The retry is charged only once it is about to go out, so a cancellation during the wait costs nothing.
+          if (controller.signal.aborted || this.closed) giveUp("OpenAI request cancelled", new Error("OpenAI request cancelled"));
+          if (!this.config.budget.tryChargeRetry()) giveUp(message, error);
         }
       }
       throw new Error("OpenAI retry exhaustion");
