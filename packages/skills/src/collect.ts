@@ -16,6 +16,7 @@ import type { SkillContext } from "./context.js";
 import { findBlockCandidates } from "./observe.js";
 import { collectItem } from "./gather.js";
 import { inventorySpace, canFitDrop } from "./inventory.js";
+import { expectedDropItems } from "./drop-mapping.js";
 import { lookAtPosition } from "./look.js";
 import { equipForBlock } from "./tools.js";
 
@@ -25,6 +26,7 @@ export async function collectResource(
   amount = 1,
   maxDistance = 48,
   prefer?: Vec3,
+  opts: { dropWaitMs?: number } = {},
 ): Promise<ActionResult<{ name: string; collected: number; position: Vec3 }>> {
   const started = Date.now();
   const knowledge = minecraftKnowledge();
@@ -45,6 +47,7 @@ export async function collectResource(
     if (!canFitDrop(ctx, names) && inventorySpace(ctx) <= 0) {
       return fail("INVENTORY_FULL", "Inventory is full; store items before mining more", Date.now() - started, true);
     }
+    const countAtIterationStart = countMatching(ctx, names);
     const candidates = [
       ...(prefer ? [{ name: names[0] ?? "block", position: prefer }] : []),
       ...findBlockCandidates(ctx, names, maxDistance),
@@ -138,6 +141,8 @@ export async function collectResource(
     lastPos = best.position;
     lastName = block.name;
     await collectItem(ctx, undefined, 8);
+    // Drops can land a few ticks after the dig: poll the real inventory delta (bounded) before judging possession.
+    await waitForInventoryGain(ctx, () => countMatching(ctx, names), countAtIterationStart, opts.dropWaitMs ?? DROP_WAIT_MS);
     if (mined >= Math.max(1, amount)) break;
   }
 
@@ -163,33 +168,21 @@ function blockMissing(ctx: SkillContext, position: Vec3, expected: string): bool
   return !after || after.name === "air" || after.name === "cave_air" || after.name !== expected;
 }
 
-/**
- * Block name -> inventory item(s) that prove possession. Breaking `coal_ore` yields `coal`,
- * `stone` yields `cobblestone`, etc. Everything else (logs, cobblestone, wheat) is the item itself.
- */
-const BLOCK_DROP_ITEMS: Record<string, string[]> = {
-  stone: ["cobblestone"],
-  deepslate: ["cobbled_deepslate"],
-  coal_ore: ["coal"],
-  deepslate_coal_ore: ["coal"],
-  iron_ore: ["raw_iron"],
-  deepslate_iron_ore: ["raw_iron"],
-  copper_ore: ["raw_copper"],
-  deepslate_copper_ore: ["raw_copper"],
-  gold_ore: ["raw_gold"],
-  deepslate_gold_ore: ["raw_gold"],
-};
+const DROP_WAIT_MS = 1_200;
+const DROP_POLL_MS = 40;
 
-function expectedDropItems(names: string[]): Set<string> {
-  const knowledge = minecraftKnowledge();
-  const out = new Set<string>();
-  for (const name of names) {
-    const normalized = knowledge.normalizeItemName(name) || name;
-    out.add(normalized);
-    // Keep the original behaviour for the block names callers already pass ("stone" also accepts cobblestone).
-    for (const drop of BLOCK_DROP_ITEMS[normalized] ?? BLOCK_DROP_ITEMS[name] ?? []) out.add(drop);
+async function waitForInventoryGain(
+  ctx: SkillContext,
+  current: () => number,
+  baseline: number,
+  timeoutMs: number,
+): Promise<boolean> {
+  const deadline = Date.now() + Math.max(0, timeoutMs);
+  while (current() <= baseline) {
+    if (ctx.signal?.aborted || Date.now() >= deadline) return false;
+    await new Promise((resolve) => setTimeout(resolve, DROP_POLL_MS));
   }
-  return out;
+  return true;
 }
 
 function countMatching(ctx: SkillContext, names: string[]): number {

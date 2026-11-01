@@ -74,11 +74,22 @@ describe("collectResource drop-to-possession mapping", () => {
     expect(count(ctx, "oak_log")).toBe(0); // ...but it is not the requested resource
     expect(r.success).toBe(false);
   });
-  it("does not count a stick pickup as a log", async () => {
+  // The pre-fix matcher accepted any item whose name merely CONTAINED the block stem ("oak" in "oak_planks",
+  // "stone" in "stone_button"); these two pickups would have been success there, so they pin the new exact matching.
+  it("does not count oak_planks (name contains 'oak') as an oak_log", async () => {
     setNavigationBackend(nav());
-    const ctx = ctxFor("oak_log", "stick", "wooden_axe");
-    const r = await collectResource(ctx, ["oak_log", "birch_log"], 1, 48);
+    const ctx = ctxFor("oak_log", "oak_planks", "wooden_axe");
+    const r = await collectResource(ctx, ["oak_log", "birch_log"], 1, 48, undefined, { dropWaitMs: 0 });
+    expect(count(ctx, "oak_planks")).toBe(1);
     expect(count(ctx, "oak_log")).toBe(0);
+    expect(r.success).toBe(false);
+  });
+  it("does not count stone_button (name contains 'stone') as stone/cobblestone", async () => {
+    setNavigationBackend(nav());
+    const ctx = ctxFor("stone", "stone_button");
+    const r = await collectResource(ctx, ["stone", "cobblestone", "deepslate"], 1, 48, undefined, { dropWaitMs: 0 });
+    expect(count(ctx, "stone_button")).toBe(1);
+    expect(count(ctx, "cobblestone")).toBe(0);
     expect(r.success).toBe(false);
   });
   it("fails when stone is broken and nothing is picked up", async () => {
