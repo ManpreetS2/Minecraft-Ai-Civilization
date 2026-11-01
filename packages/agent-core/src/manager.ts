@@ -1,5 +1,5 @@
 import { MinecraftBody, activePathCount, lastPathDurationMs, pathMetrics } from "@civ/minecraft-adapter";
-import { createCognition, type CognitionProvider, type HighLevelDecision } from "@civ/cognition";
+import { createCognition, type CognitionProvider, type CognitionPrompt, type HighLevelDecision } from "@civ/cognition";
 import { createMemory, retrieveRelevant } from "@civ/memory";
 import { applySocialEvent, sameWorkFamily, SocialDirector } from "@civ/society";
 import {
@@ -60,7 +60,7 @@ import type { DirectiveMode, HumanDirective } from "./directive-parse.js";
 
 /** One provider per citizen. Structural, so a registry from @civ/cognition/routing satisfies it directly. */
 export type CitizenCognitionRouter = {
-  providerFor(citizenId: string): CognitionProvider & { cancel(): void };
+  providerFor(citizenId: string): CognitionProvider & { cancel(): void; suspend?(reason: string): void; resume?(): void };
   closeAll(): void;
 };
 
@@ -131,7 +131,9 @@ export class AgentManager {
     this.config = config;
     this.hooks = hooks ?? {};
     this.store = store ?? new CivilizationStore(resolveFromRoot(config.DATABASE_PATH));
-    this.cognition = createCognition(config);
+    this.cognition = this.hooks.cognitionRouter
+      ? { name: "router-only", decide: async () => { throw new Error("A routed citizen must use its assigned provider"); } }
+      : createCognition(config);
     this.snapshot = emptySnapshot();
     this.directives = new DirectiveBoard(
       this.store,
@@ -147,6 +149,8 @@ export class AgentManager {
       if (event.type === "CitizenDied") this.handleDeathEvent(event);
       if (event.type === "CitizenBodyDied") this.handleBodyDied(event);
       if (event.type === "CitizenRespawned") this.handleRespawned(event);
+      if (event.type === "CitizenDisconnected" || event.type === "CitizenKicked") this.cancelCognition(event.citizenId ?? "", event.type);
+      if (event.type === "CitizenSpawned") this.resumeCognition(event.citizenId ?? "");
       if (event.type === "ItemTransferred" || event.type === "ItemDropped") this.notePendingDrop(event);
     });
   }
@@ -505,8 +509,6 @@ export class AgentManager {
 
     if (llmDue && this.ops.canAcceptWork()) {
       citizen.lastLlmAt = now;
-      llmInFlight += 1;
-      citizen.llmBusy = true;
       const started = Date.now();
       const memories = retrieveRelevant(this.store.getMemories(citizen.record.id), assignedNeeds.join(" "), 5);
       const gameFacts = minecraftKnowledge().getRelevantRules({
@@ -525,24 +527,28 @@ export class AgentManager {
       });
       const persistentFacts = persistentFactsForCognition(this.store, citizen.record.id);
       const cognition = this.cognitionFor(citizen.record.id);
-      const decisionWork = cognition
-        .decide({
-          citizenName: citizen.record.name,
-          health: observation.health,
-          hunger: observation.food,
-          occupation: citizen.record.occupation,
-          inventory: observation.inventory.map((i) => `${i.name} x${i.count}`),
-          settlementNeeds: settlement.needs,
-          memories: [
-            ...suggestions.map((item) => `Human suggestion: ${item.rawText}`),
-            ...memories.map((m) => m.content),
-            ...persistentFacts,
-          ],
-          nearbyCitizens: observation.players.map((p) => p.username),
-          gameFacts,
-          ...contextPack.promptExtras,
-          ...(scoped ? { communicationGuide: COMMUNICATION_GUIDE } : {}),
-        })
+      const prompt: CognitionPrompt = {
+        citizenName: citizen.record.name,
+        health: observation.health,
+        hunger: observation.food,
+        occupation: citizen.record.occupation,
+        inventory: observation.inventory.map((i) => `${i.name} x${i.count}`),
+        settlementNeeds: settlement.needs,
+        memories: [
+          ...suggestions.map((item) => `Human suggestion: ${item.rawText}`),
+          ...memories.map((m) => m.content),
+          ...persistentFacts,
+        ],
+        nearbyCitizens: observation.players.map((p) => p.username),
+        gameFacts,
+        ...contextPack.promptExtras,
+        ...(scoped ? { communicationGuide: COMMUNICATION_GUIDE } : {}),
+      };
+      llmInFlight += 1;
+      citizen.llmBusy = true;
+      // Catch synchronous adapter failures as well as rejected provider promises.
+      const decisionWork = Promise.resolve()
+        .then(() => cognition.decide(prompt))
         .then((decision) => {
           lastLlmMs = Date.now() - started;
           if (!this.ops.canWrite()) return;
@@ -859,6 +865,7 @@ export class AgentManager {
       return;
     }
     const citizen = this.citizens.get(event.citizenId ?? "");
+    if (citizen) this.cancelCognition(citizen.record.id);
     applyTerminalDeath({ event, store: this.store, runtime: this.runtime, citizen });
     if (citizen) this.directives.cancelForCitizen(citizen.record.id, "terminal_death");
   }
@@ -875,14 +882,26 @@ export class AgentManager {
   }
 
   /** Whatever this citizen was deciding no longer applies. Any late reply is discarded by its session. */
-  private cancelCognition(citizenId: string): void {
+  private cancelCognition(citizenId: string, suspendedFor?: string): void {
+    const citizen = this.citizens.get(citizenId);
+    if (!citizen) return;
+    citizen.pendingLlm = undefined;
+    citizen.pendingBulletinEventIds = undefined;
     const router = this.hooks.cognitionRouter;
     if (!router) return;
     try {
-      router.providerFor(citizenId).cancel();
+      const provider = router.providerFor(citizenId);
+      if (suspendedFor && provider.suspend) provider.suspend(suspendedFor);
+      else provider.cancel();
     } catch {
       // An unassigned citizen has nothing in flight.
     }
+  }
+
+  private resumeCognition(citizenId: string): void {
+    if (!this.citizens.has(citizenId)) return;
+    try { this.hooks.cognitionRouter?.providerFor(citizenId).resume?.(); }
+    catch { /* Unassigned citizens remain unable to think. */ }
   }
 
   private handleBodyDied(event: SimEvent): void {
@@ -898,6 +917,7 @@ export class AgentManager {
     const citizen = this.citizens.get(event.citizenId ?? "");
     if (!citizen) return;
     applyBodyRespawn(citizen);
+    this.resumeCognition(citizen.record.id);
     this.writeCitizen(citizen.record);
   }
 
@@ -912,6 +932,7 @@ export class AgentManager {
           const citizen = this.citizens.get(id);
           if (!citizen) continue;
           cancelCitizenWork(citizen);
+          this.cancelCognition(citizen.record.id);
           citizen.body.stopPathfinding();
           citizen.busy = false;
           this.runtime.releaseCitizen(id);

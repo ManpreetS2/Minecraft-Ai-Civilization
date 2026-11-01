@@ -1,4 +1,4 @@
-export { AgentManager, type AgentManagerHooks, type DashboardSnapshot } from "./manager.js";
+export { AgentManager, type AgentManagerHooks, type CitizenCognitionRouter, type DashboardSnapshot } from "./manager.js";
 export { CivilizationStore, computeNeeds, type StoreReadResult, type StoreWriteResult } from "./store.js";
 export {
   buildCitizenContextPack,

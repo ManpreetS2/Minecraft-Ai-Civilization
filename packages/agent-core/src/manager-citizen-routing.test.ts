@@ -1,5 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { offlineRegistry, OFFLINE_2V2_ASSIGNMENTS, type ScriptedReply } from "@civ/cognition/routing";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { offlineRegistry, OFFLINE_2V2_ASSIGNMENTS, createInMemoryCitizenSessionStore, type CitizenAssignment, type CitizenSessionStore, type ScriptedReply } from "@civ/cognition/routing";
 import type { MinecraftBody } from "@civ/minecraft-adapter";
 import { createEvent, loadConfig, ok, type BodyObservation } from "@civ/shared";
 import { applyCommunityConfig } from "./community-config.js";
@@ -24,12 +27,17 @@ const IDS = OFFLINE_2V2_ASSIGNMENTS.map((a) => a.citizenId);
 const SEEDED = "2026-01-01T00:00:00.000Z";
 
 class RoutedWorld {
-  readonly store = new CivilizationStore(":memory:");
+  readonly store: CivilizationStore;
   readonly fixture: ReturnType<typeof offlineRegistry>;
   readonly manager: AgentManager;
   readonly citizens = new Map<string, ReturnType<AgentManager["list"]>[number]>();
 
-  constructor(script: (citizen: string) => ScriptedReply = () => ({}), extraCitizens: string[] = []) {
+  constructor(script: (citizen: string) => ScriptedReply = () => ({}), extraCitizens: string[] = [],
+    options: { assignments?: readonly CitizenAssignment[]; databasePath?: string; sessionStore?: CitizenSessionStore } = {}) {
+    this.store = new CivilizationStore(options.databasePath ?? ":memory:");
+    const assignments = options.assignments ?? OFFLINE_2V2_ASSIGNMENTS;
+    const assigned = new Set(assignments.map((a) => a.citizenId));
+    const communities = COMMUNITIES.map((c) => ({ ...c, memberIds: c.memberIds.filter((id) => assigned.has(id)) }));
     const config = loadConfig({
       DEMO_PROFILE: "none",
       LLM_PROVIDER: "none",
@@ -38,14 +46,14 @@ class RoutedWorld {
       LLM_COOLDOWN_MS: "1",
       DEMO_BULLETIN_TARGET_TOKENS: "400",
       HUMAN_DIRECTIVES_ENABLED: "false",
-      COMMUNITIES_JSON: JSON.stringify(COMMUNITIES),
+      COMMUNITIES_JSON: JSON.stringify(communities),
     });
-    const roster = [...OFFLINE_2V2_ASSIGNMENTS.map((a) => [a.citizenId, a.citizenName] as const), ...extraCitizens.map((id) => [id, id] as const)];
+    const roster = [...assignments.map((a) => [a.citizenId, a.citizenName] as const), ...extraCitizens.map((id) => [id, id] as const)];
     for (const [id, name] of roster) {
-      this.store.upsertCitizen({ id, name, minecraftUsername: name, createdAt: SEEDED, status: "online" });
+      if (!this.store.getCitizen(id)) this.store.upsertCitizen({ id, name, minecraftUsername: name, createdAt: SEEDED, status: "online" });
     }
     applyCommunityConfig(this.store, config);
-    this.fixture = offlineRegistry({ script });
+    this.fixture = offlineRegistry({ script, assignments, store: options.sessionStore });
     this.manager = new AgentManager(config, this.store, { cognitionRouter: this.fixture.registry });
     const registry = (this.manager as unknown as { citizens: Map<string, unknown> }).citizens;
     for (const [id, name] of roster) {
@@ -91,6 +99,7 @@ class RoutedWorld {
 }
 
 const worlds: RoutedWorld[] = [];
+const tempDirs: string[] = [];
 const world = (...args: ConstructorParameters<typeof RoutedWorld>) => {
   const value = new RoutedWorld(...args);
   worlds.push(value);
@@ -106,7 +115,11 @@ beforeEach(() => {
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
-  for (const value of worlds.splice(0)) if (value.store.isOpen()) value.store.close();
+  for (const value of worlds.splice(0)) {
+    value.fixture.registry.closeAll();
+    if (value.store.isOpen()) value.store.close();
+  }
+  for (const dir of tempDirs.splice(0)) rmSync(dir, { recursive: true, force: true });
   expect(networkGuard).not.toHaveBeenCalled();
 });
 
@@ -235,5 +248,101 @@ describe("AgentManager routes each citizen to its own session", () => {
     const manager = new AgentManager(config, store);
     expect(manager["cognitionFor"]("anyone").name).toBe("heuristic");
     store.close();
+  });
+});
+
+describe("T3 routing lifecycle regressions", () => {
+  it("does not initialize an unused global paid provider when a citizen router is supplied", () => {
+    const w = world();
+    const config = loadConfig({ DEMO_PROFILE: "none", LLM_PROVIDER: "openai", LLM_ENABLED: "true", CLOUD_LLM_ENABLED: "true", OPENAI_API_KEY: "" });
+    expect(() => new AgentManager(config, w.store, { cognitionRouter: w.fixture.registry })).not.toThrow();
+  });
+
+  it("death discards a decision that was already queued before the body died", async () => {
+    const w = world(); await w.tick("gpt-a");
+    expect(w.citizens.get("gpt-a")!.pendingLlm).toBeDefined();
+    w.manager["handleBodyDied"](createEvent("CitizenBodyDied", {}, "gpt-a"));
+    expect(w.citizens.get("gpt-a")!.pendingLlm).toBeUndefined();
+    expect(w.citizens.get("gpt-a")!.pendingBulletinEventIds).toBeUndefined();
+  });
+
+  it("suspends disconnected sessions and resumes the same identity on spawn", async () => {
+    const w = world(); const session = w.fixture.registry.providerFor("gpt-a");
+    const identity = session.sessionId;
+    await w.tick("gpt-a");
+    w.manager.events.emit(createEvent("CitizenDisconnected", {}, "gpt-a"));
+    expect(w.citizens.get("gpt-a")!.pendingLlm).toBeUndefined();
+    const prompt = { citizenName: "GPT-A", inventory: [], settlementNeeds: [], memories: [], nearbyCitizens: [] };
+    await expect(session.decide(prompt)).rejects.toMatchObject({ code: "SUSPENDED" });
+    await w.tick("claude-b"); expect(w.citizens.get("claude-b")!.pendingLlm).toBeDefined();
+    w.manager.events.emit(createEvent("CitizenSpawned", {}, "gpt-a"));
+    expect(w.fixture.registry.providerFor("gpt-a").sessionId).toBe(identity);
+    w.citizens.get("gpt-a")!.lastLlmAt = 0; await w.tick("gpt-a");
+    expect(w.citizens.get("gpt-a")!.pendingLlm).toBeDefined();
+  });
+
+  it("does not strand inference slots when preparing context throws", async () => {
+    const w = world(); vi.spyOn(w.store, "getMemories").mockImplementationOnce(() => { throw new Error("synthetic context failure"); });
+    await expect(w.tickOnly("gpt-a")).rejects.toThrow("synthetic context failure");
+    expect(w.citizens.get("gpt-a")!.llmBusy).not.toBe(true);
+    w.citizens.get("gpt-a")!.lastLlmAt = 0; await w.tick("gpt-a");
+    expect(w.citizens.get("gpt-a")!.pendingLlm).toBeDefined();
+  });
+
+  it("recovers that citizen's inference slot after a synchronous provider throw", async () => {
+    const w = world(); const session = w.fixture.registry.providerFor("gpt-a");
+    vi.spyOn(session, "decide").mockImplementationOnce(() => { throw new Error("synchronous provider failure"); });
+    await expect(w.tick("gpt-a")).resolves.toBeUndefined();
+    expect(w.citizens.get("gpt-a")!.llmBusy).toBe(false);
+    w.citizens.get("gpt-a")!.lastLlmAt = 0; await w.tick("gpt-a");
+    expect(w.citizens.get("gpt-a")!.pendingLlm).toBeDefined();
+    await w.tick("claude-b"); expect(w.citizens.get("claude-b")!.pendingLlm).toBeDefined();
+  });
+});
+
+describe("T3 1v1 and restart routing acceptance (body/planner mocked)", () => {
+  it("runs exactly one GPT and one Claude session in separate communities", async () => {
+    const assignments = OFFLINE_2V2_ASSIGNMENTS.filter((a) => a.citizenId === "gpt-a" || a.citizenId === "claude-b");
+    const w = world((id) => ({ goal: id === "gpt-a" ? "gather_wood" : "explore" }), [], { assignments });
+    expect(w.manager.list()).toHaveLength(2);
+    await Promise.all(assignments.map((a) => w.tickOnly(a.citizenId)));
+    await vi.waitFor(() => expect(w.manager.pendingOps()).toBe(0));
+    expect(w.citizens.get("gpt-a")!.pendingLlm?.goal).toBe("gather_wood");
+    expect(w.citizens.get("claude-b")!.pendingLlm?.goal).toBe("explore");
+    expect(w.store.getCommunityDirectory().communityOf("gpt-a")).not.toBe(w.store.getCommunityDirectory().communityOf("claude-b"));
+    expect(w.fixture.registry.accounting().experiment.requestsUsed).toBe(2);
+  });
+
+  it("restores private history, model session identity and attributed usage after SQLite restart", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "t3-routed-manager-")); tempDirs.push(dir);
+    const databasePath = join(dir, "fixture.sqlite"); const sessionStore = createInMemoryCitizenSessionStore();
+    const w = world(undefined, [], { databasePath, sessionStore });
+    const e = createEvent("TaskCompleted", { summary: "PRIVATE-ROUTE-A", visibility: { class: "actor_private" } }, "gpt-a");
+    w.store.appendEvent(e); w.store.addMemory({ id: "private-route-a", citizenId: "gpt-a", kind: "episodic", content: "PRIVATE-ROUTE-A", importance: 1, createdAt: new Date().toISOString() }, { sourceEventId: e.id });
+    await w.tick("gpt-a");
+    const identity = w.fixture.registry.providerFor("gpt-a").sessionId;
+    const spent = w.fixture.registry.accounting().citizens["gpt-a"]!.estimatedSpendUsd;
+    await w.manager.stop();
+    const resumed = world(undefined, [], { databasePath, sessionStore });
+    expect(resumed.fixture.registry.providerFor("gpt-a").sessionId).toBe(identity);
+    expect(resumed.fixture.registry.accounting().citizens["gpt-a"]!.estimatedSpendUsd).toBe(spent);
+    resumed.citizens.get("gpt-a")!.lastLlmAt = 0;
+    await resumed.tick("gpt-a"); await resumed.tick("claude-a");
+    expect(resumed.sent("gpt-a")).toContain("PRIVATE-ROUTE-A");
+    expect(resumed.sent("claude-a")).not.toContain("PRIVATE-ROUTE-A");
+    expect(resumed.fixture.registry.accounting().citizens["gpt-a"]!.requests).toBe(2);
+  });
+
+  it("affiliation changes preserve the underlying family/session and legitimate personal experience", async () => {
+    const w = world(); await w.tick("gpt-a");
+    const session = w.fixture.registry.providerFor("gpt-a");
+    const e = createEvent("TaskCompleted", { summary: "own experience survives", visibility: { class: "actor_private" } }, "gpt-a");
+    w.store.appendEvent(e); w.store.addMemory({ id: "own-experience", citizenId: "gpt-a", kind: "episodic", content: "own experience survives", importance: 1, createdAt: new Date().toISOString() }, { sourceEventId: e.id });
+    const audit = { actor: "orchestrator-config" as const, reason: "offline voluntary affiliation transition" };
+    w.store.removeCommunityMember("north", "gpt-a", audit); w.store.addCommunityMember("south", "gpt-a", audit);
+    w.citizens.get("gpt-a")!.lastLlmAt = 0; await w.tick("gpt-a");
+    expect(w.fixture.registry.providerFor("gpt-a")).toBe(session);
+    expect(session.family).toBe("gpt");
+    expect(w.store.getMemories("gpt-a").map((m) => m.content)).toContain("own experience survives");
   });
 });
