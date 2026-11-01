@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { OFFLINE_2V2_ASSIGNMENTS, offlineRegistry, type ScriptedReply } from "./offline-fixture.js";
+import { OFFLINE_2V2_ASSIGNMENTS, offlineRegistry } from "./offline-fixture.js";
 import { createInMemoryCitizenSessionStore } from "./citizen-registry.js";
 import type { CognitionPrompt } from "../schema.js";
 
