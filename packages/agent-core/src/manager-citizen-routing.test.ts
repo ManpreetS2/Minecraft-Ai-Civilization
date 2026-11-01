@@ -139,6 +139,8 @@ describe("AgentManager routes each citizen to its own session", () => {
     expect(w.fixture.registry.accounting().citizens["gpt-a"]!.requests).toBe(1);
     release();
     await vi.waitFor(() => expect(w.manager.pendingOps()).toBe(0));
+    // The second tick saw the pending decision and did not try again, rather than being refused as busy.
+    expect(w.skips()).toEqual([]);
   });
 
   it("a real private observation reaches only its owner's session, through the store's gated reads", async () => {
