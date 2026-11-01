@@ -1,8 +1,9 @@
 import Database from "better-sqlite3";
-import { mkdirSync } from "node:fs";
+import { existsSync, mkdirSync, statSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import {
   DEFAULT_CITIZENS,
+  authorizeEventWithAudience,
   createCommunityDirectory,
   readEventAudience,
   type EventAudience,
@@ -19,7 +20,25 @@ import {
 } from "@civ/shared";
 import type { CitizenHome, HomeMembership, HomeRecord } from "./home-types.js";
 
-const EVENT_AUDIENCE_MIGRATION_KEY = "sec001_event_audience_v1";
+/** True for the existing row of an upsert when it is quarantined: a flagged fact is never overwritten, only released manually. */
+const FLAGGED_FACT_SQL = `EXISTS (SELECT 1 FROM citizen_persistent_fact_flags g WHERE g.fact_id = citizen_persistent_facts.id AND g.released_at IS NULL)`;
+const FACT_FLAG_MIGRATION_KEY = "sec001_fact_flags_v1";
+
+/** SEC-001: result of re-checking legacy facts / deliveries against their source events (never contains fact content). */
+export type LegacyFactMigrationReport = {
+  generatedAt: string;
+  communitiesKnown: number;
+  facts: {
+    examined: number;
+    kept: number;
+    alreadyFlagged: number;
+    toFlag: Array<{ factId: string; citizenId: string; factKey: string; sourceEventId?: string; reason: string }>;
+  };
+  deliveries: {
+    examined: number;
+    unauthorized: Array<{ citizenId: string; eventId: string; reason: string }>;
+  };
+};
 
 /**
  * SEC-001: every community / membership write must carry this audit context. The only legitimate actor is the
@@ -186,8 +205,10 @@ export type StoreReadResult<T> =
 export class CivilizationStore {
   readonly db: Database.Database;
   private open = true;
+  private readonly filePath: string;
 
   constructor(filePath: string) {
+    this.filePath = filePath;
     mkdirSync(dirname(resolve(filePath)), { recursive: true });
     this.db = new Database(filePath);
     this.db.pragma("journal_mode = WAL");
@@ -279,9 +300,13 @@ export class CivilizationStore {
   }
 
   /**
-   * SEC-001: persisted community directory + one-time quarantine of facts derived from unaudited events.
-   * Events carry their audience inside payload.visibility.audience, so no events-table change is needed;
+   * SEC-001: persisted community directory + non-destructive quarantine FLAGS for facts derived from unverified
+   * audiences. Events carry their audience inside payload.visibility.audience, so no events-table change is needed;
    * every event written before this migration has no audience and therefore reaches nobody.
+   *
+   * HARD RULE (owner policy): no historical row is ever deleted or moved. A fact is quarantined by a row in
+   * citizen_persistent_fact_flags that points at it; the fact row itself, with its content, stays exactly where it is
+   * and is excluded at read time (listPersistentFacts). Flags are released manually only.
    */
   private migrateCommunities(): void {
     this.db.exec(`
@@ -304,15 +329,21 @@ export class CivilizationStore {
         actor TEXT NOT NULL,
         reason TEXT NOT NULL
       );
-      CREATE TABLE IF NOT EXISTS citizen_persistent_facts_quarantine (
-        id TEXT PRIMARY KEY,
+      CREATE TABLE IF NOT EXISTS citizen_persistent_fact_flags (
+        fact_id TEXT PRIMARY KEY,
         citizen_id TEXT NOT NULL,
         fact_key TEXT NOT NULL,
-        content TEXT NOT NULL,
-        kind TEXT NOT NULL,
-        created_at TEXT NOT NULL,
-        quarantined_at TEXT NOT NULL,
-        reason TEXT NOT NULL
+        reason TEXT NOT NULL,
+        source TEXT NOT NULL,
+        flagged_at TEXT NOT NULL,
+        released_at TEXT
+      );
+      CREATE TABLE IF NOT EXISTS citizen_event_delivery_flags (
+        citizen_id TEXT NOT NULL,
+        event_id TEXT NOT NULL,
+        reason TEXT NOT NULL,
+        flagged_at TEXT NOT NULL,
+        PRIMARY KEY (citizen_id, event_id)
       );
     `);
     // Persistent facts record which audience authorized them and which event they came from (idempotent).
@@ -321,56 +352,128 @@ export class CivilizationStore {
     );
     if (!factCols.has("audience")) this.db.exec(`ALTER TABLE citizen_persistent_facts ADD COLUMN audience TEXT`);
     if (!factCols.has("source_event_id")) this.db.exec(`ALTER TABLE citizen_persistent_facts ADD COLUMN source_event_id TEXT`);
-    const done = this.db.prepare(`SELECT value FROM sim_meta WHERE key = ?`).get(EVENT_AUDIENCE_MIGRATION_KEY);
-    if (done) {
+    if (this.db.prepare(`SELECT value FROM sim_meta WHERE key = ?`).get(FACT_FLAG_MIGRATION_KEY)) {
       this.backfillFactProvenance();
       return;
     }
+    const factRows = (this.db.prepare(`SELECT COUNT(*) AS n FROM citizen_persistent_facts`).get() as { n: number }).n;
+    const deliveryRows = (this.db.prepare(`SELECT COUNT(*) AS n FROM citizen_event_delivery`).get() as { n: number }).n;
     const now = new Date().toISOString();
-    const facts = this.db
-      .prepare(`SELECT * FROM citizen_persistent_facts WHERE fact_key LIKE 'event:%'`)
-      .all() as Array<{
-      id: string;
-      citizen_id: string;
-      fact_key: string;
-      content: string;
-      kind: string;
-      created_at: string;
-    }>;
-    const getEvent = this.db.prepare(`SELECT payload FROM events WHERE id = ?`);
-    const quarantine = this.db.prepare(
-      `INSERT OR IGNORE INTO citizen_persistent_facts_quarantine
-         (id, citizen_id, fact_key, content, kind, created_at, quarantined_at, reason)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    );
-    const remove = this.db.prepare(`DELETE FROM citizen_persistent_facts WHERE id = ?`);
-    this.db.transaction(() => {
-      for (const fact of facts) {
-        const row = getEvent.get(fact.fact_key.slice("event:".length)) as { payload: string } | undefined;
-        let audience: unknown;
-        try {
-          audience = row ? readEventAudience(JSON.parse(row.payload) as Record<string, unknown>) : undefined;
-        } catch {
-          audience = undefined;
-        }
-        if (audience) continue; // labeled after the fact: keep
-        quarantine.run(
-          fact.id,
-          fact.citizen_id,
-          fact.fact_key,
-          fact.content,
-          fact.kind,
-          fact.created_at,
-          now,
-          row ? "source event has no verified audience" : "source event not found",
-        );
-        remove.run(fact.id);
-      }
-      this.db
-        .prepare(`INSERT OR REPLACE INTO sim_meta (key, value) VALUES (?, ?)`)
-        .run(EVENT_AUDIENCE_MIGRATION_KEY, now);
-    })();
+    if (factRows === 0 && deliveryRows === 0) {
+      // Nothing historical to protect or check (fresh database).
+      this.db.prepare(`INSERT OR REPLACE INTO sim_meta (key, value) VALUES (?, ?)`).run(FACT_FLAG_MIGRATION_KEY, `${now} fresh`);
+      return;
+    }
+    // 1. back up the database file BEFORE touching anything (throws, and aborts the open, if it cannot).
+    const backupPath = this.backupBeforeLegacyMigration(now);
+    // 2. dry run: re-check every fact and delivery against its source event (read-only).
+    const report = this.dryRunLegacyFactMigration();
+    if (backupPath) {
+      writeFileSync(`${backupPath}.dry-run-report.json`, JSON.stringify(report, null, 2));
+    }
+    // 3. apply flags (inserts into the flag tables only; no fact, event or delivery row is changed or removed).
+    const applied = this.applyLegacyFactMigration(report, now);
+    this.db
+      .prepare(`INSERT OR REPLACE INTO sim_meta (key, value) VALUES (?, ?)`)
+      .run(FACT_FLAG_MIGRATION_KEY, `${now} backup=${backupPath ?? "none"} flaggedFacts=${applied.factsFlagged} flaggedDeliveries=${applied.deliveriesFlagged}`);
     this.backfillFactProvenance();
+  }
+
+  /**
+   * Consistent snapshot of the database file (VACUUM INTO includes WAL content). Returns the backup path, or
+   * undefined for an in-memory database. Throws if the snapshot cannot be written or does not verify.
+   */
+  private backupBeforeLegacyMigration(at: string): string | undefined {
+    if (!this.filePath || this.filePath === ":memory:" || this.filePath.startsWith("file::memory:")) return undefined;
+    const stamp = at.replace(/[:.]/g, "-");
+    let backupPath = `${resolve(this.filePath)}.pre-sec001-${stamp}.bak`;
+    for (let i = 1; existsSync(backupPath); i += 1) backupPath = `${resolve(this.filePath)}.pre-sec001-${stamp}-${i}.bak`;
+    try {
+      this.db.exec(`VACUUM INTO '${backupPath.replace(/'/g, "''")}'`);
+      if (!existsSync(backupPath) || statSync(backupPath).size === 0) throw new Error("backup file missing or empty");
+      const copy = new Database(backupPath, { readonly: true });
+      try {
+        const live = (this.db.prepare(`SELECT COUNT(*) AS n FROM citizen_persistent_facts`).get() as { n: number }).n;
+        const saved = (copy.prepare(`SELECT COUNT(*) AS n FROM citizen_persistent_facts`).get() as { n: number }).n;
+        if (live !== saved) throw new Error(`backup fact count ${saved} != live ${live}`);
+      } finally {
+        copy.close();
+      }
+    } catch (error) {
+      throw new Error(`SEC-001 legacy fact migration aborted: cannot back up the database first (${error instanceof Error ? error.message : String(error)})`);
+    }
+    return backupPath;
+  }
+
+  /**
+   * READ-ONLY. Re-checks every event-derived fact and every delivery record against its SOURCE event and the
+   * persisted community directory. Facts that are not event-derived (note:*, etc.) are never examined. An actor_private
+   * fact survives when its reader is the actor; a community-labelled fact survives only for an actual member.
+   */
+  dryRunLegacyFactMigration(at = new Date().toISOString()): LegacyFactMigrationReport {
+    const directory = this.getCommunityDirectory();
+    const report: LegacyFactMigrationReport = {
+      generatedAt: at,
+      communitiesKnown: (this.db.prepare(`SELECT COUNT(*) AS n FROM communities`).get() as { n: number }).n,
+      facts: { examined: 0, kept: 0, alreadyFlagged: 0, toFlag: [] },
+      deliveries: { examined: 0, unauthorized: [] },
+    };
+    const flagged = new Set(
+      (this.db.prepare(`SELECT fact_id FROM citizen_persistent_fact_flags WHERE released_at IS NULL`).all() as Array<{ fact_id: string }>).map((r) => r.fact_id),
+    );
+    const facts = this.db
+      .prepare(`SELECT id, citizen_id, fact_key, source_event_id FROM citizen_persistent_facts WHERE fact_key LIKE 'event:%' OR source_event_id IS NOT NULL ORDER BY id`)
+      .all() as Array<{ id: string; citizen_id: string; fact_key: string; source_event_id: string | null }>;
+    for (const fact of facts) {
+      report.facts.examined += 1;
+      if (flagged.has(fact.id)) {
+        report.facts.alreadyFlagged += 1;
+        continue;
+      }
+      const eventId = fact.source_event_id ?? fact.fact_key.slice("event:".length);
+      const event = this.getEventById(eventId);
+      if (!event) {
+        report.facts.toFlag.push({ factId: fact.id, citizenId: fact.citizen_id, factKey: fact.fact_key, sourceEventId: eventId, reason: "source event not found" });
+        continue;
+      }
+      const decision = authorizeEventWithAudience(fact.citizen_id, event.payload, directory, event.citizenId);
+      if (decision.allowed) report.facts.kept += 1;
+      else report.facts.toFlag.push({ factId: fact.id, citizenId: fact.citizen_id, factKey: fact.fact_key, sourceEventId: eventId, reason: `source event not authorized for reader: ${decision.reason}` });
+    }
+    const deliveries = this.db
+      .prepare(`SELECT citizen_id, event_id FROM citizen_event_delivery ORDER BY citizen_id, event_id`)
+      .all() as Array<{ citizen_id: string; event_id: string }>;
+    for (const d of deliveries) {
+      report.deliveries.examined += 1;
+      const event = this.getEventById(d.event_id);
+      if (!event) {
+        report.deliveries.unauthorized.push({ citizenId: d.citizen_id, eventId: d.event_id, reason: "source event not found" });
+        continue;
+      }
+      const decision = authorizeEventWithAudience(d.citizen_id, event.payload, directory, event.citizenId);
+      if (!decision.allowed) report.deliveries.unauthorized.push({ citizenId: d.citizen_id, eventId: d.event_id, reason: decision.reason });
+    }
+    return report;
+  }
+
+  /**
+   * Apply a dry-run report by INSERTING flag rows. Never updates or deletes a fact, event or delivery row. A fact
+   * that was already flagged (or flagged and manually released) keeps its existing flag row.
+   */
+  applyLegacyFactMigration(report: LegacyFactMigrationReport, at = new Date().toISOString()): { factsFlagged: number; deliveriesFlagged: number } {
+    const flagFact = this.db.prepare(
+      `INSERT OR IGNORE INTO citizen_persistent_fact_flags (fact_id, citizen_id, fact_key, reason, source, flagged_at) VALUES (?, ?, ?, ?, 'legacy-migration', ?)`,
+    );
+    const flagDelivery = this.db.prepare(
+      `INSERT OR IGNORE INTO citizen_event_delivery_flags (citizen_id, event_id, reason, flagged_at) VALUES (?, ?, ?, ?)`,
+    );
+    let factsFlagged = 0;
+    let deliveriesFlagged = 0;
+    this.db.transaction(() => {
+      for (const f of report.facts.toFlag) factsFlagged += flagFact.run(f.factId, f.citizenId, f.factKey, f.reason, at).changes;
+      for (const d of report.deliveries.unauthorized) deliveriesFlagged += flagDelivery.run(d.citizenId, d.eventId, d.reason, at).changes;
+    })();
+    return { factsFlagged, deliveriesFlagged };
   }
 
   /** Fill source_event_id / audience for event-derived facts written before those columns existed. Idempotent. */
@@ -437,9 +540,10 @@ export class CivilizationStore {
   }
 
   /**
-   * Audited removal. Facts the citizen stored on the strength of that community's audience are moved to the
-   * quarantine table (not deleted), because the authorization that justified them is gone.
-   * Orchestrator-config path only (see CommunityAudit). Returns false when the citizen was not a member.
+   * Audited removal. Facts the citizen stored on the strength of that community's audience are FLAGGED in place
+   * (excluded from reads, content and row untouched, never moved or deleted), because the authorization that
+   * justified them is gone. Orchestrator-config path only (see CommunityAudit).
+   * Returns false when the citizen was not a member.
    */
   removeCommunityMember(communityId: string, citizenId: string, audit: CommunityAudit, at = new Date().toISOString()): boolean {
     assertCommunityAudit(audit);
@@ -450,8 +554,12 @@ export class CivilizationStore {
     this.db.transaction(() => {
       this.db.prepare(`DELETE FROM community_members WHERE citizen_id = ? AND community_id = ?`).run(citizenId, communityId);
       const facts = this.db
-        .prepare(`SELECT * FROM citizen_persistent_facts WHERE citizen_id = ? AND audience IS NOT NULL`)
-        .all(citizenId) as Array<{ id: string; citizen_id: string; fact_key: string; content: string; kind: string; created_at: string; audience: string }>;
+        .prepare(`SELECT id, citizen_id, fact_key, audience FROM citizen_persistent_facts WHERE citizen_id = ? AND audience IS NOT NULL`)
+        .all(citizenId) as Array<{ id: string; citizen_id: string; fact_key: string; audience: string }>;
+      const flag = this.db.prepare(
+        `INSERT OR IGNORE INTO citizen_persistent_fact_flags (fact_id, citizen_id, fact_key, reason, source, flagged_at)
+         VALUES (?, ?, ?, ?, 'membership-removal', ?)`,
+      );
       for (const fact of facts) {
         let audienceCommunity: string | undefined;
         try {
@@ -461,14 +569,7 @@ export class CivilizationStore {
           audienceCommunity = communityId; // unreadable audience: treat as revoked (fail closed)
         }
         if (audienceCommunity !== communityId) continue;
-        this.db
-          .prepare(
-            `INSERT OR IGNORE INTO citizen_persistent_facts_quarantine
-               (id, citizen_id, fact_key, content, kind, created_at, quarantined_at, reason)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-          )
-          .run(fact.id, fact.citizen_id, fact.fact_key, fact.content, fact.kind, fact.created_at, at, `membership of ${communityId} removed`);
-        this.db.prepare(`DELETE FROM citizen_persistent_facts WHERE id = ?`).run(fact.id);
+        flag.run(fact.id, fact.citizen_id, fact.fact_key, `membership of ${communityId} removed`, at);
       }
       this.auditCommunity(audit, "remove_member", communityId, citizenId, at);
     })();
@@ -504,13 +605,24 @@ export class CivilizationStore {
     );
   }
 
-  listQuarantinedFacts(citizenId?: string): Array<{ id: string; citizenId: string; factKey: string; content: string; reason: string }> {
+  /** Facts currently flagged (still stored in citizen_persistent_facts, excluded from reads). Oldest flag first by id. */
+  listQuarantinedFacts(citizenId?: string): Array<{ id: string; citizenId: string; factKey: string; content: string; reason: string; source: string }> {
+    const sql = `SELECT f.id AS id, f.citizen_id AS citizen_id, f.fact_key AS fact_key, f.content AS content, g.reason AS reason, g.source AS source
+      FROM citizen_persistent_fact_flags g JOIN citizen_persistent_facts f ON f.id = g.fact_id
+      WHERE g.released_at IS NULL ${citizenId ? "AND f.citizen_id = ?" : ""} ORDER BY f.id`;
+    const rows = (citizenId ? this.db.prepare(sql).all(citizenId) : this.db.prepare(sql).all()) as Array<{
+      id: string; citizen_id: string; fact_key: string; content: string; reason: string; source: string;
+    }>;
+    return rows.map((r) => ({ id: r.id, citizenId: r.citizen_id, factKey: r.fact_key, content: r.content, reason: r.reason, source: r.source }));
+  }
+
+  listFlaggedDeliveries(citizenId?: string): Array<{ citizenId: string; eventId: string; reason: string }> {
     const rows = (
       citizenId
-        ? this.db.prepare(`SELECT * FROM citizen_persistent_facts_quarantine WHERE citizen_id = ? ORDER BY id`).all(citizenId)
-        : this.db.prepare(`SELECT * FROM citizen_persistent_facts_quarantine ORDER BY id`).all()
-    ) as Array<{ id: string; citizen_id: string; fact_key: string; content: string; reason: string }>;
-    return rows.map((r) => ({ id: r.id, citizenId: r.citizen_id, factKey: r.fact_key, content: r.content, reason: r.reason }));
+        ? this.db.prepare(`SELECT * FROM citizen_event_delivery_flags WHERE citizen_id = ? ORDER BY event_id`).all(citizenId)
+        : this.db.prepare(`SELECT * FROM citizen_event_delivery_flags ORDER BY citizen_id, event_id`).all()
+    ) as Array<{ citizen_id: string; event_id: string; reason: string }>;
+    return rows.map((r) => ({ citizenId: r.citizen_id, eventId: r.event_id, reason: r.reason }));
   }
 
   private migrateHomes(): void {
@@ -757,7 +869,9 @@ export class CivilizationStore {
         `INSERT INTO citizen_persistent_facts (id, citizen_id, fact_key, content, kind, created_at, audience, source_event_id)
          VALUES (@id, @citizenId, @factKey, @content, @kind, @createdAt, @audience, @sourceEventId)
          ON CONFLICT(citizen_id, fact_key) DO UPDATE SET
-           content = excluded.content, audience = excluded.audience, source_event_id = excluded.source_event_id`,
+           content = CASE WHEN ${FLAGGED_FACT_SQL} THEN content ELSE excluded.content END,
+           audience = CASE WHEN ${FLAGGED_FACT_SQL} THEN audience ELSE excluded.audience END,
+           source_event_id = CASE WHEN ${FLAGGED_FACT_SQL} THEN source_event_id ELSE excluded.source_event_id END`,
       )
       .run({
         audience: fact.audience ? JSON.stringify(fact.audience) : null,
@@ -783,10 +897,10 @@ export class CivilizationStore {
   }> {
     const rows = this.db
       .prepare(
-        // SEC-001: quarantined facts are excluded at read time as well (defense in depth: a row present in both
-        // tables, e.g. after an interrupted move, must never reach a prompt). Quarantine rows are never deleted.
+        // SEC-001: flagged (quarantined) facts stay in the table but are excluded from every read. This is the single
+        // chokepoint for facts that reach a prompt (manager.ts:485 and anything else).
         `SELECT * FROM citizen_persistent_facts
-         WHERE citizen_id = ? AND id NOT IN (SELECT id FROM citizen_persistent_facts_quarantine)
+         WHERE citizen_id = ? AND id NOT IN (SELECT fact_id FROM citizen_persistent_fact_flags WHERE released_at IS NULL)
          ORDER BY created_at DESC LIMIT ?`,
       )
       .all(citizenId, limit) as Array<{

@@ -322,16 +322,16 @@ describe("(a) quarantined facts never reach a context pack or prompt, before or 
     expect(promptSurface(third, "GPT-B")).not.toContain(needle);
     expect(third.listQuarantinedFacts("GPT-B")).toHaveLength(1);
   });
-  it("a row that exists in BOTH tables (interrupted move) is still excluded at read time", () => {
+  it("a flag row alone is enough to hide a fact: the fact row stays in place and is excluded at read time", () => {
     const path = dbPath();
     const store = seed(path);
     store.upsertPersistentFact({ id: "dup", citizenId: "GPT-A", factKey: "note:dup", content: needle });
     store.close();
     const raw = new Database(path);
     raw.prepare(
-      `INSERT INTO citizen_persistent_facts_quarantine (id, citizen_id, fact_key, content, kind, created_at, quarantined_at, reason)
-       VALUES ('dup','GPT-A','note:dup',?, 'observed_fact','t','t','test')`,
-    ).run(needle);
+      `INSERT INTO citizen_persistent_fact_flags (fact_id, citizen_id, fact_key, reason, source, flagged_at) VALUES ('dup','GPT-A','note:dup','test','test','t')`,
+    ).run();
+    expect((raw.prepare(`SELECT COUNT(*) AS n FROM citizen_persistent_facts WHERE id = 'dup'`).get() as { n: number }).n).toBe(1);
     raw.close();
     const again = open(path);
     expect(again.listPersistentFacts("GPT-A", 100)).toEqual([]);
@@ -345,7 +345,7 @@ describe("(a) quarantined facts never reach a context pack or prompt, before or 
     s.upsertPersistentFact({ id: "lf", citizenId: "Claude-A", factKey: "event:legacy-unlabeled", content: needle });
     s.close();
     const raw = new Database(path);
-    raw.prepare(`DELETE FROM sim_meta WHERE key = 'sec001_event_audience_v1'`).run();
+    raw.prepare(`DELETE FROM sim_meta WHERE key = 'sec001_fact_flags_v1'`).run();
     raw.close();
     const migrated = open(path);
     expect(migrated.listQuarantinedFacts("Claude-A").map((q) => q.content)).toContain(needle);

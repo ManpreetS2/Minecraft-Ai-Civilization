@@ -211,10 +211,10 @@ describe("SEC-001 real store: migration of a pre-SEC-001 database", () => {
     // make it look like a database from before the migration ever ran
     const raw = new Database(path);
     raw.exec(
-      `DROP TABLE community_members; DROP TABLE communities; DROP TABLE citizen_persistent_facts_quarantine; DROP TABLE community_audit;
+      `DROP TABLE community_members; DROP TABLE communities; DROP TABLE citizen_persistent_fact_flags; DROP TABLE citizen_event_delivery_flags; DROP TABLE community_audit;
        ALTER TABLE citizen_persistent_facts DROP COLUMN audience; ALTER TABLE citizen_persistent_facts DROP COLUMN source_event_id;`,
     );
-    raw.prepare(`DELETE FROM sim_meta WHERE key = 'sec001_event_audience_v1'`).run();
+    raw.prepare(`DELETE FROM sim_meta WHERE key = 'sec001_fact_flags_v1'`).run();
     raw.close();
     return { path };
   }
@@ -223,9 +223,10 @@ describe("SEC-001 real store: migration of a pre-SEC-001 database", () => {
     const { path } = legacyDb();
     const store = open(path);
     const live = store.listPersistentFacts("Claude-A").map((f) => f.factKey).sort();
-    expect(live).toEqual(["event:everyone", "note:home"]);
+    // the fixture drops the persisted directory, so even the world-labelled fact cannot be verified for its reader: fail closed
+    expect(live).toEqual(["note:home"]);
     const quarantined = store.listQuarantinedFacts("Claude-A");
-    expect(quarantined.map((q) => q.factKey).sort()).toEqual(["event:missing-event", "event:settlement-no-audience", "event:unlabeled-public"]);
+    expect(quarantined.map((q) => q.factKey).sort()).toEqual(["event:everyone", "event:missing-event", "event:settlement-no-audience", "event:unlabeled-public"]);
     expect(quarantined.find((q) => q.factKey === "event:settlement-no-audience")?.content).toBe(SECRET); // kept for review, not live
     expect(quarantined.find((q) => q.factKey === "event:missing-event")?.reason).toMatch(/not found/);
     // old events fail closed for everyone, even with a fresh directory
@@ -234,15 +235,19 @@ describe("SEC-001 real store: migration of a pre-SEC-001 database", () => {
     expect(store.getCommunityDirectory().membersOf("claude")).toEqual(["Claude-A", "Claude-B"]);
   });
 
-  it("runs once: reopening neither re-quarantines new facts nor loses quarantined ones", () => {
+  it("runs once: reopening neither re-flags new facts nor loses flagged ones, and a flagged fact is never overwritten", () => {
     const { path } = legacyDb();
     open(path).close();
     const second = open(path);
     second.upsertPersistentFact({ id: "late", citizenId: "Claude-A", factKey: "event:unlabeled-public", content: "re-derived later" });
+    second.upsertPersistentFact({ id: "late2", citizenId: "Claude-A", factKey: "event:brand-new", content: "new fact" });
     second.close();
     const third = open(path);
-    expect(third.listPersistentFacts("Claude-A").map((f) => f.factKey)).toContain("event:unlabeled-public");
-    expect(third.listQuarantinedFacts("Claude-A")).toHaveLength(3);
+    // fail closed: the flagged row stays hidden (and keeps its original content) until someone releases it manually
+    expect(third.listPersistentFacts("Claude-A").map((f) => f.factKey)).not.toContain("event:unlabeled-public");
+    expect(third.listPersistentFacts("Claude-A").map((f) => f.factKey)).toContain("event:brand-new");
+    expect(third.listQuarantinedFacts("Claude-A")).toHaveLength(4);
+    expect(third.listQuarantinedFacts("Claude-A").find((q) => q.factKey === "event:unlabeled-public")?.content).toBe("unlabeled fact");
   });
 
   it("a fresh database is migrated without quarantining anything", () => {
