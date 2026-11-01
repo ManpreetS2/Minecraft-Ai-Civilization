@@ -1,0 +1,19 @@
+﻿# Manager-driven physical capability replay
+
+Base: draft #26, d11fe0a30e95ccf2ea82b1c8dcda958064b1ad77. Child: agents/t3-manager-physical-acceptance.
+
+The previous routed-manager tests replaced the physical planner and supplied bodies without bots. This package adds a shared simulated block/drop world and invokes the real manager tick, planner, executor, skill functions, model-family registry and SQLite. Provider responses remain scripted; navigation and Minecraft protocol/physics remain simulated. The harness attaches known disposable bodies at the existing manager tick boundary; it does not exercise live startup/body connection.
+
+Two and four bodies start with empty inventories at equivalent natural tree/bush sites. Real skill dig/pickup produces two berries each, real eatFood consumes one and verifies food 7 -> 9. The next model-choice tick dispatches GPT fixture gather_wood and Claude fixture craft_tools through the real planner/executor, obtaining carried logs versus a wooden pickaxe and a placed crafting table. These choices are test inputs, not evidence of model autonomy or a programmed production advantage. No human intervention or supplied material occurs during the scenario.
+
+Additional tests cover native SQLite close/reopen with file-backed provider session records, private history in the correct prompts, provider failure isolation, and simultaneous competition for one observed bush. The latter yields exactly one dig, one two-berry drop and one successful acquisition. Existing deterministic tool/stone seed tests remain intact. Hunger progression, hostiles, night/shelter survival, real providers and Paper compatibility are not modeled.
+
+## Blocking isolation regression
+
+Run `pnpm exec tsx scripts/repro-manager-executor-isolation.ts` separately. Its intact acceptance assertion FAILS: after two independently acquired berry drops, protected executor.ts writes global settlement_first.food from 0 to 2. The exact production path is manager tick -> executePlan -> updateSettlementFromInventory -> store.getSettlement/saveSettlement. Planner-scoped reads do not repair executor writes. No replacement planner, proxy store, test assertion suppression or executor edit hides the failure. The positive capability suite is not overall community acceptance.
+
+The existing review-only docs/patches/executor-community-boundary.patch remains unapplied. Its broad fail-closed gate prevents unsafe execution but also blocks survival capability; a complete repair requires reviewed community-aware executor/helpers integration and Mission 013 conflict analysis, not merely changing the SQLite schema or redirecting personal inventory into a communal pool. Do not automatically publish private carried inventory to teammates (O4 remains pending).
+
+Verification: five physical manager capability tests and nine existing empty-start craft tests pass (14 focused). Workspace typecheck and lint pass after replacing an ES2023-only findLast use with the current ES2022-compatible reverse/find. Frozen offline install passes. Full test/build results are recorded at the checkpoint below. All temporary files are OS-created disposable fixtures. API cost incurred: $0. Overall readiness: NOT READY; live Gate A: not executed in this campaign.
+
+Final checkpoint: full workspace 1906 passed / 0 failed / 2 skipped (172 files); typecheck, lint and build pass. One earlier full replay failed the architecture scan because a test helper constructed community configuration outside a .test.ts file. Configuration is now explicitly supplied by the test/script; the security scan and assertions are unchanged, and its focused replay passes. The separate executor isolation reproducer remains failing and is a release blocker, not part of the green capability count. Evidence: artifacts/campaign/manager-physical-*-final.log and manager-executor-isolation-red.log.

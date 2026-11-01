@@ -85,9 +85,22 @@ export function buildPrismarineRecipe(source: EnumRecipe): PrismarineRecipe {
 
 type Cell = string; // block name
 type FixtureItem = { name: string; type: number; count: number; slot: number; metadata: null };
-type DroppedItem = { id: number; name: string; position: Vec3; item: { name: string; count: number } };
+export type DroppedItem = { id: number; name: string; position: Vec3; item: { name: string; count: number } };
+
+export type SharedCraftWorld = {
+  blocks: Map<string, Cell>;
+  dropped: DroppedItem[];
+  entities: Record<string, unknown>;
+  nextEntityId: number;
+};
+
+export function createSharedCraftWorld(): SharedCraftWorld {
+  return { blocks: new Map(), dropped: [], entities: {}, nextEntityId: 100 };
+}
 
 export type CraftFixtureOptions = {
+  sharedWorld?: SharedCraftWorld;
+  start?: { x: number; y: number; z: number };
   /** Starting inventory; the CRAFT-001 scenario passes nothing (empty). */
   inventory?: Array<{ name: string; count: number }>;
   /** Trees as `{x, z, height, log}` trunks standing on the ground (ground top is y=63, feet at y=64). */
@@ -108,7 +121,8 @@ export function createMineflayerCraftFixture(options: CraftFixtureOptions = {}) 
   const data = knowledge.data;
   const recipesTable = (data.recipes ?? {}) as Record<string, EnumRecipe[]>;
 
-  const world = new Map<string, Cell>();
+  const shared = options.sharedWorld ?? createSharedCraftWorld();
+  const world = shared.blocks;
   const key = (x: number, y: number, z: number) => `${Math.floor(x)},${Math.floor(y)},${Math.floor(z)}`;
   const blockNameAt = (x: number, y: number, z: number): string => {
     const found = world.get(key(x, y, z));
@@ -184,6 +198,7 @@ export function createMineflayerCraftFixture(options: CraftFixtureOptions = {}) 
     const position = new Vec3(Math.floor(x), Math.floor(y), Math.floor(z));
     return {
       name,
+      metadata: name === "sweet_berry_bush" ? 3 : 0,
       type: meta?.id ?? 0,
       position,
       boundingBox: meta?.boundingBox ?? (name === "air" ? "empty" : "block"),
@@ -197,20 +212,21 @@ export function createMineflayerCraftFixture(options: CraftFixtureOptions = {}) 
     };
   }
 
-  const dropped: DroppedItem[] = [];
-  let nextEntityId = 100;
+  const dropped = shared.dropped;
   const dropFor = (blockName: string): string | undefined => {
     if (blockName === "stone") return "cobblestone";
+    // These fixture bushes are mature (age 3), with a deterministic legal minimum drop.
+    if (blockName === "sweet_berry_bush") return "sweet_berries";
     if (blockName.endsWith("_log") || blockName === "cobblestone") return blockName;
     return undefined;
   };
 
   const windowStub = { type: "minecraft:crafting", id: 1 } as { type: string; id: number };
   const bot = {
-    entity: { position: new Vec3(0.5, FEET_Y, 0.5), eyeHeight: 1.62, onGround: true },
+    entity: { position: new Vec3(options.start?.x ?? 0.5, options.start?.y ?? FEET_Y, options.start?.z ?? 0.5), eyeHeight: 1.62, onGround: true },
     heldItem: null as FixtureItem | null,
     currentWindow: null as typeof windowStub | null,
-    entities: {} as Record<string, unknown>,
+    entities: shared.entities,
     time: { timeOfDay: 1000 },
     health: 20,
     food: 20,
@@ -267,6 +283,12 @@ export function createMineflayerCraftFixture(options: CraftFixtureOptions = {}) 
     async equip(item: FixtureItem) {
       bot.heldItem = item;
     },
+    async consume() {
+      const item = bot.heldItem;
+      const value = item ? knowledge.foodValue(item.name) : undefined;
+      if (!item || !value || bot.food >= 20 || !removeItem(item.type, 1)) throw new Error("cannot consume");
+      bot.food = Math.min(20, bot.food + value);
+    },
     async unequip() {
       bot.heldItem = null;
     },
@@ -296,12 +318,13 @@ export function createMineflayerCraftFixture(options: CraftFixtureOptions = {}) 
         // the drop falls to the ground: find the first solid cell below
         let y = block.position.y;
         while (blockNameAt(block.position.x, y - 1, block.position.z) === "air") y -= 1;
-        const entityId = nextEntityId++;
+        const entityId = shared.nextEntityId++;
+        const dropCount = name === "sweet_berry_bush" ? 2 : 1;
         const entry: DroppedItem = {
           id: entityId,
           name: "item",
           position: new Vec3(block.position.x + 0.5, y + 0.25, block.position.z + 0.5),
-          item: { name: drop, count: 1 },
+          item: { name: drop, count: dropCount },
         };
         dropped.push(entry);
         bot.entities[String(entityId)] = {
@@ -310,7 +333,7 @@ export function createMineflayerCraftFixture(options: CraftFixtureOptions = {}) 
           type: "other",
           objectType: "Item",
           position: entry.position,
-          getDroppedItem: () => ({ name: drop, count: 1 }),
+          getDroppedItem: () => ({ name: drop, count: dropCount }),
         };
       }
     },
