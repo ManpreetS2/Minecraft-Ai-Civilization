@@ -66,6 +66,8 @@ export function buildCitizenContextPack(options: {
     readerCitizenId: citizenId,
     events,
     alreadyDeliveredIds: already,
+    // SEC-001: always verify broadcast audiences against the persisted directory (unlabeled events reach nobody).
+    directory: store.getCommunityDirectory(),
     targetTokens: config.DEMO_BULLETIN_TARGET_TOKENS,
   });
 

@@ -10,6 +10,7 @@ export * from "./directives.js";
 export * from "./error-copy.js";
 export * from "./event-loop.js";
 export * from "./event-visibility.js";
+export * from "./event-audience.js";
 export * from "./events.js";
 export * from "./format-event.js";
 export * from "./friendly-names.js";

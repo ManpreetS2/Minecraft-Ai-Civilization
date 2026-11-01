@@ -24,6 +24,8 @@ export type EventVisibility = {
   scopeNote?: string;
   /** Evidence / observation reference IDs when available. */
   evidenceRefs?: string[];
+  /** SEC-001: verified audience for broadcast classes (see event-audience.ts). Never trusted unchecked. */
+  audience?: { scope: "world" } | { scope: "community"; communityId: string };
 };
 
 export function readEventVisibility(payload: Record<string, unknown> | undefined): EventVisibility {
@@ -85,8 +87,11 @@ export function authorizeEventForCitizen(
     case "unknown":
       return { visible: false, reason: `visibility=${visibility.class}` };
     case "world_public":
-    case "settlement_public":
       return { visible: true, reason: visibility.class };
+    case "settlement_public":
+      // SEC-001: a settlement/community scope can only be verified against a CommunityDirectory
+      // (authorizeEventWithAudience in event-audience.ts). Without one this class reaches nobody.
+      return { visible: false, reason: "settlement_public requires a verified community audience" };
     case "actor_private": {
       const owner = visibility.audienceIds?.[0] ?? visibility.speakerId ?? actorCitizenId;
       if (owner && owner === readerCitizenId) {

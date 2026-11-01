@@ -1,4 +1,11 @@
-import { distance, type SimEvent, type Vec3 } from "@civ/shared";
+import {
+  distance,
+  isReaderInAudience,
+  readEventAudience,
+  type CommunityDirectory,
+  type SimEvent,
+  type Vec3,
+} from "@civ/shared";
 import { asNumber, asString, asStringArray } from "./json.js";
 import { randomId } from "./clock.js";
 import type {
@@ -266,6 +273,14 @@ export function promiseAgreementEvent(args: EventFactoryBase & {
  * Does not invent runtime events.
  */
 export function tryAdaptSimEvent(event: SimEvent): ObjectiveWorldEvent | null {
+  const adapted = adaptSimEvent(event);
+  if (!adapted) return null;
+  // SEC-001: carry the (unverified) audience label through so observersForEvent can check it against a directory.
+  const audience = readEventAudience(event.payload);
+  return audience ? { ...adapted, facts: { ...adapted.facts, audience } } : adapted;
+}
+
+function adaptSimEvent(event: SimEvent): ObjectiveWorldEvent | null {
   const payload = event.payload ?? {};
   const timestamp = event.timestamp;
   const citizenId = event.citizenId;
@@ -380,7 +395,16 @@ export type ObserverRole = {
  * Who actually has a basis to remember this event.
  * Distant citizens are omitted unless later told (HEARD).
  */
-export function observersForEvent(event: ObjectiveWorldEvent, snapshot: WorldSnapshot): ObserverRole[] {
+export function observersForEvent(
+  event: ObjectiveWorldEvent,
+  snapshot: WorldSnapshot,
+  /**
+   * SEC-001: when a directory is given, anyone who learns of the event second-hand (WITNESSED / HEARD / RECORD)
+   * must be inside its verified audience (facts.audience); a missing or unknown audience means nobody.
+   * DIRECT observers (actor, target, listed participants) lived the event and are not audience-gated.
+   */
+  options: { directory?: CommunityDirectory } = {},
+): ObserverRole[] {
   const radius = snapshot.nearbyRadius ?? DEFAULT_NEARBY_RADIUS;
   const found = new Map<string, ObserverRole>();
 
@@ -412,7 +436,13 @@ export function observersForEvent(event: ObjectiveWorldEvent, snapshot: WorldSna
   const recordReaders = asStringArray(event.facts.recordReaders);
   for (const id of recordReaders) add(id, "RECORD");
 
-  return [...found.values()];
+  const roles = [...found.values()];
+  const directory = options.directory;
+  if (!directory) return roles;
+  const audience = readEventAudience({ visibility: { audience: event.facts.audience } });
+  return roles.filter(
+    (role) => role.source === "DIRECT" || isReaderInAudience(role.citizenId, audience, directory).allowed,
+  );
 }
 
 export function isNearby(a: SnapshotCitizen, b: Vec3, radius = DEFAULT_NEARBY_RADIUS): boolean {

@@ -206,8 +206,8 @@ describe("Mission 012 — visibility and bulletin", () => {
 
   it("bulletin ordering and deduplication are deterministic; tokens measured", () => {
     const events: SimEvent[] = [
-      evt("b2", "SettlementNeedDetected", withEventVisibility({ summary: "need food", dedupeKey: "food" }, { class: "settlement_public" }), undefined, "2026-10-27T12:00:02.000Z"),
-      evt("b1", "SettlementNeedDetected", withEventVisibility({ summary: "need food again", dedupeKey: "food" }, { class: "settlement_public" }), undefined, "2026-10-27T12:00:01.000Z"),
+      evt("b2", "SettlementNeedDetected", withEventVisibility({ summary: "need food", dedupeKey: "food" }, { class: "world_public" }), undefined, "2026-10-27T12:00:02.000Z"),
+      evt("b1", "SettlementNeedDetected", withEventVisibility({ summary: "need food again", dedupeKey: "food" }, { class: "world_public" }), undefined, "2026-10-27T12:00:01.000Z"),
       evt("b3", "CitizenInjured", withEventVisibility({ summary: "Maya hurt" }, { class: "world_public" }), "citizen_maya", "2026-10-27T12:00:03.000Z"),
     ];
     const first = buildCitizenBulletin({

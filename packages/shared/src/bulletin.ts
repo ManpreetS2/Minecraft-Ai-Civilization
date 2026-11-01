@@ -1,4 +1,5 @@
 import type { SimEvent } from "./events.js";
+import { authorizeEventWithAudience, type CommunityDirectory } from "./event-audience.js";
 import {
   authorizeEventForCitizen,
   readEventVisibility,
@@ -38,6 +39,12 @@ export type BulletinBuildOptions = {
   alreadyDeliveredIds: ReadonlySet<string>;
   targetTokens?: number;
   maxLines?: number;
+  /**
+   * SEC-001: when given, broadcast events must carry a verified audience (world or a community in this
+   * directory) or they reach nobody. The production path (buildCitizenContextPack) always passes it.
+   * Without it only the legacy visibility-class rule applies, and settlement_public fails closed.
+   */
+  directory?: CommunityDirectory;
 };
 
 const DEFAULT_TARGET_TOKENS = 200;
@@ -47,6 +54,10 @@ const DEFAULT_MAX_LINES = 12;
 export function estimateTokens(text: string): number {
   if (!text) return 0;
   return Math.max(1, Math.ceil(text.length / 4));
+}
+
+function toDecision(verdict: { allowed: boolean; reason: string }): VisibilityDecision {
+  return verdict.allowed ? { visible: true, reason: verdict.reason } : { visible: false, reason: verdict.reason };
 }
 
 function urgencyFor(event: SimEvent): number {
@@ -120,11 +131,11 @@ export function buildCitizenBulletin(options: BulletinBuildOptions): BulletinBui
       continue;
     }
     const visibility = readEventVisibility(event.payload);
-    const auth: VisibilityDecision = authorizeEventForCitizen(
-      options.readerCitizenId,
-      visibility,
-      event.citizenId,
-    );
+    const auth: VisibilityDecision = options.directory
+      ? toDecision(
+          authorizeEventWithAudience(options.readerCitizenId, event.payload, options.directory, event.citizenId),
+        )
+      : authorizeEventForCitizen(options.readerCitizenId, visibility, event.citizenId);
     if (!auth.visible) {
       excluded.push({ eventId: event.id, reason: auth.reason });
       continue;

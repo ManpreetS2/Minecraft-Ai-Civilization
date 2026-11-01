@@ -3,6 +3,9 @@ import { mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import {
   DEFAULT_CITIZENS,
+  createCommunityDirectory,
+  readEventAudience,
+  type CommunityDirectory,
   type CitizenRecord,
   type ConstructionState,
   type MemoryRecord,
@@ -14,6 +17,8 @@ import {
   type HumanDirective,
 } from "@civ/shared";
 import type { CitizenHome, HomeMembership, HomeRecord } from "./home-types.js";
+
+const EVENT_AUDIENCE_MIGRATION_KEY = "sec001_event_audience_v1";
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -256,7 +261,131 @@ export class CivilizationStore {
         UNIQUE(citizen_id, fact_key)
       );
     `);
+    this.migrateCommunities();
     this.migrateHomes();
+  }
+
+  /**
+   * SEC-001: persisted community directory + one-time quarantine of facts derived from unaudited events.
+   * Events carry their audience inside payload.visibility.audience, so no events-table change is needed;
+   * every event written before this migration has no audience and therefore reaches nobody.
+   */
+  private migrateCommunities(): void {
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS communities (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        created_at TEXT NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS community_members (
+        citizen_id TEXT PRIMARY KEY,
+        community_id TEXT NOT NULL REFERENCES communities(id),
+        joined_at TEXT NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS citizen_persistent_facts_quarantine (
+        id TEXT PRIMARY KEY,
+        citizen_id TEXT NOT NULL,
+        fact_key TEXT NOT NULL,
+        content TEXT NOT NULL,
+        kind TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        quarantined_at TEXT NOT NULL,
+        reason TEXT NOT NULL
+      );
+    `);
+    const done = this.db.prepare(`SELECT value FROM sim_meta WHERE key = ?`).get(EVENT_AUDIENCE_MIGRATION_KEY);
+    if (done) return;
+    const now = new Date().toISOString();
+    const facts = this.db
+      .prepare(`SELECT * FROM citizen_persistent_facts WHERE fact_key LIKE 'event:%'`)
+      .all() as Array<{
+      id: string;
+      citizen_id: string;
+      fact_key: string;
+      content: string;
+      kind: string;
+      created_at: string;
+    }>;
+    const getEvent = this.db.prepare(`SELECT payload FROM events WHERE id = ?`);
+    const quarantine = this.db.prepare(
+      `INSERT OR IGNORE INTO citizen_persistent_facts_quarantine
+         (id, citizen_id, fact_key, content, kind, created_at, quarantined_at, reason)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    );
+    const remove = this.db.prepare(`DELETE FROM citizen_persistent_facts WHERE id = ?`);
+    this.db.transaction(() => {
+      for (const fact of facts) {
+        const row = getEvent.get(fact.fact_key.slice("event:".length)) as { payload: string } | undefined;
+        let audience: unknown;
+        try {
+          audience = row ? readEventAudience(JSON.parse(row.payload) as Record<string, unknown>) : undefined;
+        } catch {
+          audience = undefined;
+        }
+        if (audience) continue; // labeled after the fact: keep
+        quarantine.run(
+          fact.id,
+          fact.citizen_id,
+          fact.fact_key,
+          fact.content,
+          fact.kind,
+          fact.created_at,
+          now,
+          row ? "source event has no verified audience" : "source event not found",
+        );
+        remove.run(fact.id);
+      }
+      this.db
+        .prepare(`INSERT OR REPLACE INTO sim_meta (key, value) VALUES (?, ?)`)
+        .run(EVENT_AUDIENCE_MIGRATION_KEY, now);
+    })();
+  }
+
+  /** Create (or rename) a community. */
+  upsertCommunity(id: string, name = id, at = new Date().toISOString()): void {
+    if (!id.trim() || id !== id.trim()) throw new Error("community id must be a non-empty trimmed string");
+    this.db
+      .prepare(
+        `INSERT INTO communities (id, name, created_at) VALUES (?, ?, ?)
+         ON CONFLICT(id) DO UPDATE SET name = excluded.name`,
+      )
+      .run(id, name, at);
+  }
+
+  /** A citizen belongs to at most one community (PRIMARY KEY on citizen_id). Re-adding to another community throws. */
+  addCommunityMember(communityId: string, citizenId: string, at = new Date().toISOString()): void {
+    const existing = this.db
+      .prepare(`SELECT community_id FROM community_members WHERE citizen_id = ?`)
+      .get(citizenId) as { community_id: string } | undefined;
+    if (existing && existing.community_id !== communityId) {
+      throw new Error(`citizen ${citizenId} already belongs to community ${existing.community_id}`);
+    }
+    this.db
+      .prepare(`INSERT OR IGNORE INTO community_members (citizen_id, community_id, joined_at) VALUES (?, ?, ?)`)
+      .run(citizenId, communityId, at);
+  }
+
+  /** Fresh directory snapshot from the persisted tables (survives restart; never cached across calls). */
+  getCommunityDirectory(): CommunityDirectory {
+    const communities = this.db.prepare(`SELECT id FROM communities ORDER BY id`).all() as Array<{ id: string }>;
+    const members = this.db
+      .prepare(`SELECT citizen_id, community_id FROM community_members ORDER BY citizen_id`)
+      .all() as Array<{ citizen_id: string; community_id: string }>;
+    return createCommunityDirectory(
+      communities.map((c) => ({
+        id: c.id,
+        memberIds: members.filter((m) => m.community_id === c.id).map((m) => m.citizen_id),
+      })),
+    );
+  }
+
+  listQuarantinedFacts(citizenId?: string): Array<{ id: string; citizenId: string; factKey: string; content: string; reason: string }> {
+    const rows = (
+      citizenId
+        ? this.db.prepare(`SELECT * FROM citizen_persistent_facts_quarantine WHERE citizen_id = ? ORDER BY id`).all(citizenId)
+        : this.db.prepare(`SELECT * FROM citizen_persistent_facts_quarantine ORDER BY id`).all()
+    ) as Array<{ id: string; citizen_id: string; fact_key: string; content: string; reason: string }>;
+    return rows.map((r) => ({ id: r.id, citizenId: r.citizen_id, factKey: r.fact_key, content: r.content, reason: r.reason }));
   }
 
   private migrateHomes(): void {
