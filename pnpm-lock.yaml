@@ -40,6 +40,9 @@ importers:
       '@civ/agent-core':
         specifier: workspace:*
         version: link:../../packages/agent-core
+      '@civ/cognition':
+        specifier: workspace:*
+        version: link:../../packages/cognition
       '@civ/minecraft-adapter':
         specifier: workspace:*
         version: link:../../packages/minecraft-adapter

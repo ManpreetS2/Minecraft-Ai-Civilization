@@ -32,6 +32,7 @@
   },
   "dependencies": {
     "@civ/agent-core": "workspace:*",
+    "@civ/cognition": "workspace:*",
     "@civ/minecraft-adapter": "workspace:*",
     "@civ/minecraft-knowledge": "workspace:*",
     "@civ/shared": "workspace:*",

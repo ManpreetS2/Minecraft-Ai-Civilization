@@ -1,4 +1,4 @@
-import { MinecraftBody, activePathCount, lastPathDurationMs, pathMetrics } from "@civ/minecraft-adapter";
+import { MinecraftBody, VALID_USERNAME, activePathCount, lastPathDurationMs, pathMetrics } from "@civ/minecraft-adapter";
 import { createCognition, isDecisionStale, type CognitionProvider, type CognitionPrompt, type DecisionAssumptions, type HighLevelDecision } from "@civ/cognition";
 import { createMemory, retrieveRelevant } from "@civ/memory";
 import { applySocialEvent, sameWorkFamily, SocialDirector } from "@civ/society";
@@ -70,6 +70,10 @@ export type AgentManagerHooks = {
   drainTimeoutMs?: number;
   /** When set, every citizen decides through its own provider and the shared provider is never used. */
   cognitionRouter?: CitizenCognitionRouter;
+  /** Trusted operator roster, never model/tool input. Names are Minecraft usernames. */
+  roster?: readonly { id: string; name: string }[];
+  /** Dependency injection for offline bodies; normal runtime uses MinecraftBody. */
+  createBody?: (options: ConstructorParameters<typeof MinecraftBody>[0]) => MinecraftBody;
 };
 
 type RuntimeCitizen = {
@@ -147,6 +151,17 @@ export class AgentManager {
   constructor(config: AppConfig, store?: CivilizationStore, hooks?: AgentManagerHooks) {
     this.config = config;
     this.hooks = hooks ?? {};
+    if (this.hooks.roster) {
+      const ids = new Set<string>();
+      const names = new Set<string>();
+      if (!this.hooks.roster.length || this.config.DEMO_PROFILE !== "none") throw new Error("Explicit roster requires nonempty identities and demo profile none");
+      for (const identity of this.hooks.roster) {
+        if (!identity.id.trim() || ids.has(identity.id) || !VALID_USERNAME.test(identity.name) || names.has(identity.name.toLowerCase()) || isMechanicsProbeUsername(identity.name) || isMechanicsProbeUsername(identity.id)) throw new Error("Invalid or duplicate roster identity/username");
+        ids.add(identity.id); names.add(identity.name.toLowerCase());
+      }
+      // Caller mutation cannot silently replace an identity after validation.
+      this.hooks = { ...this.hooks, roster: this.hooks.roster.map((identity) => ({ ...identity })) };
+    }
     this.store = store ?? openOfflineRuntimeStore(config.DATABASE_PATH);
     this.cognition = this.hooks.cognitionRouter
       ? { name: "router-only", decide: async () => { throw new Error("A routed citizen must use its assigned provider"); } }
@@ -249,11 +264,17 @@ export class AgentManager {
    * WORLD-LAB launcher can inspect spawn (pond vs house) before Atlas acts.
    * Default remains: connect then tick immediately.
    */
-  async start(count = this.config.SIM_CITIZEN_COUNT, options?: { deferTicks?: boolean }): Promise<void> {
+  async start(count = this.hooks.roster?.length ?? this.config.SIM_CITIZEN_COUNT, options?: { deferTicks?: boolean }): Promise<void> {
     if (this.ops.isShuttingDown || this.ops.isClosed) {
       throw new Error("Cannot start AgentManager while shutting down or after stop");
     }
     if (this.running) return;
+    if (this.hooks.roster && count !== this.hooks.roster.length) throw new Error("Explicit roster count must match all assigned identities");
+    if (this.config.SIM_RUN_ID !== undefined && !this.config.SIM_RUN_ID.trim()) throw new Error("Experiment run ID must not be empty");
+    for (const identity of this.hooks.roster ?? []) {
+      const persisted = this.store.getCitizen(identity.id);
+      if (persisted && persisted.minecraftUsername !== identity.name) throw new Error("Roster identity conflicts with persisted Minecraft username");
+    }
     if (isThreeCitizenDemo(this.config)) {
       const demo = validateThreeCitizenDemo(this.config);
       if (!demo.ok) {
@@ -270,11 +291,11 @@ export class AgentManager {
     this.running = true;
     this.loop.start();
     seedCommunitiesOnce(this.store, this.config);
-    this.runId = crypto.randomUUID();
+    this.runId = this.config.SIM_RUN_ID ?? crypto.randomUUID();
     this.store.setMeta("runId", this.runId);
     this.store.setMeta("humanDirectives", String(this.config.HUMAN_DIRECTIVES_ENABLED));
     this.store.setMeta("permadeath", String(this.config.SIM_PERMADEATH_ENABLED));
-    const wanted = DEFAULT_CITIZENS.slice(0, count).filter((identity) => !isMechanicsProbeUsername(identity.name));
+    const wanted = (this.hooks.roster ?? DEFAULT_CITIZENS).slice(0, count).filter((identity) => !isMechanicsProbeUsername(identity.name));
     this.emitIfLive(
       createEvent("SimulationStarted", {
         citizens: wanted.map((c) => c.name),
@@ -306,9 +327,11 @@ export class AgentManager {
           record.reason = restored.reason;
         }
       }
+      // A newly configured identity must exist before personality initialization can persist its seed.
+      if (!this.store.getCitizen(identity.id)) this.writeCitizen(record);
       ensureCitizenPersonality(this.store, identity.id, this.config.DEMO_PERSONALITY_SEED);
       const withPersonality = this.store.getCitizen(identity.id) ?? record;
-      const body = new MinecraftBody({
+      const bodyOptions: ConstructorParameters<typeof MinecraftBody>[0] = {
         username: identity.name,
         config: this.config,
         events: this.events,
@@ -316,7 +339,8 @@ export class AgentManager {
         reconnect: withPersonality.status !== "dead",
         allowRespawn: !this.config.SIM_PERMADEATH_ENABLED,
         eventLoopLag: () => this.loop.lagMs,
-      });
+      };
+      const body = this.hooks.createBody ? this.hooks.createBody(bodyOptions) : new MinecraftBody(bodyOptions);
       // Guarantee an `error` listener so transport faults stay observable without crashing Node.
       body.on("error", (error) => {
         console.warn(`[body] ${identity.name} error: ${error.message}`);
