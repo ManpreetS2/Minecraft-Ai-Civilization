@@ -625,7 +625,7 @@ async function gatherByTask(ctx: SkillContext, task: string, runtime: Settlement
     const before = inventoryCounts(ctx);
     const collected = await collectResource(ctx, ["stone", "cobblestone", "deepslate"], 1, 48);
     if (collected.success) {
-      emitResourceCollected(ctx, before, collected.data.position);
+      emitResourceCollected(ctx, before, collected.data.position, expectedItemNames(["stone", "cobblestone", "deepslate"]));
       return collected;
     }
     if (!mayFallBackToExcavation(collected.code)) return collected;
@@ -635,7 +635,7 @@ async function gatherByTask(ctx: SkillContext, task: string, runtime: Settlement
   const before = inventoryCounts(ctx);
   const collected = await collectResource(ctx, [...LOG_BLOCK_NAMES], 1, 48);
   if (collected.success) {
-    emitResourceCollected(ctx, before, collected.data.position);
+    emitResourceCollected(ctx, before, collected.data.position, expectedItemNames(LOG_BLOCK_NAMES));
     return collected;
   }
   if (!mayFallBackToExcavation(collected.code)) return collected;
@@ -659,22 +659,45 @@ function inventoryCounts(ctx: SkillContext): Map<string, number> {
 }
 
 /**
- * Emits one ResourceCollected per item whose inventory count really increased since `before`.
+ * Inventory item names that prove possession of a block family. A stone block drops cobblestone, deepslate drops
+ * cobbled_deepslate; logs are themselves. Anything else that lands in inventory (a sapling, a stick) is NOT the
+ * requested resource and must not turn an excavation into a success.
+ */
+function expectedItemNames(blockNames: readonly string[]): Set<string> {
+  const out = new Set<string>();
+  for (const name of blockNames) {
+    out.add(name);
+    if (name === "stone") out.add("cobblestone");
+    if (name === "deepslate") out.add("cobbled_deepslate");
+  }
+  return out;
+}
+
+function countExpected(counts: Map<string, number>, expected: Set<string>): number {
+  let total = 0;
+  for (const [name, n] of counts) if (expected.has(name)) total += n;
+  return total;
+}
+
+/**
+ * Emits one ResourceCollected per EXPECTED item whose inventory count really increased since `before`.
  * `count` is the observed inventory delta (never the number of blocks dug), `item`/`name` is the item that
  * entered inventory (a stone block yields cobblestone, so this is the drop, not the block).
- * Emits nothing when the inventory did not grow.
+ * Emits nothing when the expected items did not grow.
  */
-function emitResourceCollected(ctx: SkillContext, before: Map<string, number>, position: Vec3 | undefined): void {
+function emitResourceCollected(
+  ctx: SkillContext,
+  before: Map<string, number>,
+  position: Vec3 | undefined,
+  expected: Set<string>,
+): void {
   if (!ctx.events) return;
   for (const [name, after] of inventoryCounts(ctx)) {
+    if (!expected.has(name)) continue;
     const delta = after - (before.get(name) ?? 0);
     if (delta <= 0) continue;
     ctx.events.emit(createEvent("ResourceCollected", { name, item: name, count: delta, position }, ctx.citizenId));
   }
-}
-
-function totalInventoryItems(ctx: SkillContext): number {
-  return ctx.bot.inventory.items().reduce((sum, item) => sum + item.count, 0);
 }
 
 async function mineClaimed(
@@ -700,20 +723,20 @@ async function mineClaimedTarget(
   position: Vec3,
 ): Promise<ActionResult> {
   const key = cellClaimKey(position.x, position.y, position.z);
-  if (ctx.citizenId && !runtime.claims.tryClaim(kind, key, ctx.citizenId, 60_000)) {
-    ctx.body.unreachable.mark(position, 8_000);
-    return mineBlock(ctx, names, 48);
-  }
-  const itemsBefore = totalInventoryItems(ctx);
+  // A contended claim still digs (the block is reachable), but possession is verified exactly like the claimed path.
+  const contended = Boolean(ctx.citizenId && !runtime.claims.tryClaim(kind, key, ctx.citizenId, 60_000));
+  if (contended) ctx.body.unreachable.mark(position, 8_000);
+  const expected = expectedItemNames(names);
   const countsBefore = inventoryCounts(ctx);
   const mined = await mineBlock(ctx, names, 48);
-  runtime.claims.release(kind, key, ctx.citizenId);
+  if (!contended) runtime.claims.release(kind, key, ctx.citizenId);
   if (!mined.success) return mined;
   await collectItem(ctx, undefined, 8);
-  const gained = totalInventoryItems(ctx) - itemsBefore;
+  const gained = countExpected(inventoryCounts(ctx), expected) - countExpected(countsBefore, expected);
   if (gained <= 0) {
-    // Excavation is not possession: do not emit ResourceCollected or report workComplete.
-    return fail("ITEM_NOT_FOUND", `Excavated ${mined.data.name} but no item entered inventory`, 0, true, {
+    // Excavation is not possession: no gain of the EXPECTED item (an unrelated pickup does not count) means no
+    // ResourceCollected event, no workComplete, no success.
+    return fail("ITEM_NOT_FOUND", `Excavated ${mined.data.name} but no ${[...expected].join("/")} entered inventory`, 0, true, {
       excavated: true,
       resourceAcquired: false,
       collected: 0,
@@ -721,7 +744,7 @@ async function mineClaimedTarget(
       position: mined.data.position,
     });
   }
-  emitResourceCollected(ctx, countsBefore, mined.data.position);
+  emitResourceCollected(ctx, countsBefore, mined.data.position, expected);
   return ok({ name: mined.data.name, position: mined.data.position, collected: gained }, mined.durationMs);
 }
 
