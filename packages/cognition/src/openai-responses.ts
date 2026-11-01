@@ -31,6 +31,17 @@ const DECISION_JSON_SCHEMA = {
     priority: { type: "number", minimum: 0, maximum: 1 },
     reason: { type: "string", minLength: 1, maxLength: 280 },
     targetCitizenId: { type: "string" },
+    communication: {
+      type: "object",
+      additionalProperties: false,
+      required: ["kind", "message"],
+      properties: {
+        kind: { type: "string", enum: ["say", "announce_to_community", "share_bulletin_line"] },
+        message: { type: "string", minLength: 1, maxLength: 200 },
+        toCitizen: { type: "string" },
+        bulletinLine: { type: "integer", minimum: 1 },
+      },
+    },
   },
 } as const;
 

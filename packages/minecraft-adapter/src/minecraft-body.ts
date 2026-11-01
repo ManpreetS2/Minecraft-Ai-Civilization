@@ -26,6 +26,9 @@ import { TargetBlacklist } from "./path-recovery.js";
 import { deriveConnectionHealth, emptyTelemetry, keepalivePolicy, armShutdownClient, type ConnectionTelemetry } from "./connection-health.js";
 import { installModernMovement } from "./movement-sync.js";
 import { loadPathfinder } from "./pathing.js";
+import { declaredRootCommands, sanitizeWhisperText, VALID_USERNAME, WHISPER_COMMAND } from "./server-commands.js";
+
+type DeclaredCommandSource = { _client?: { on(event: string, listener: (packet: unknown) => void): void } };
 
 const activeBodies = new Map<string, MinecraftBody>();
 
@@ -66,6 +69,7 @@ export class MinecraftBody extends EventEmitter {
   readonly unreachable = new TargetBlacklist();
   private deceased = false;
   private bot: Bot | null = null;
+  private declaredCommands: ReadonlySet<string> | undefined;
   private shuttingDown = false;
   private reconnectAttempt = 0;
   private reconnectTimer: ReturnType<typeof setTimeout> | undefined;
@@ -388,7 +392,9 @@ export class MinecraftBody extends EventEmitter {
           { x: pos.x, y: pos.y, z: pos.z },
         );
       }
-      if (!info.distance || info.distance <= maxDistance) {
+      // SEC-001: bot.players is the server-wide tab list. A player with no loaded entity has no known distance and is
+      // not "nearby": counting them would reveal every online citizen and let distant citizens "hear" nearby speech.
+      if (info.distance !== undefined && info.distance <= maxDistance) {
         result.push(info);
       }
     }
@@ -464,11 +470,42 @@ export class MinecraftBody extends EventEmitter {
     }
   }
 
+  /** SEC-001: true only when THIS server told THIS player it may run /tell. */
+  canWhisper(): boolean {
+    return this.declaredCommands?.has(WHISPER_COMMAND) === true;
+  }
+
+  /**
+   * SEC-001: directed speech over /tell (bot.whisper), one message per recipient; never server-wide chat. Fails closed
+   * when the server's declared command tree does not include the command. The server sends no delivery receipt to
+   * Mineflayer here, so `sent` means transmitted, not proven received.
+   */
+  whisperTo(usernames: readonly string[], message: string): ActionResult<{ sent: string[] }> {
+    const started = Date.now();
+    try {
+      const bot = this.requireBot();
+      if (!this.canWhisper()) {
+        return fail("COMMAND_UNAVAILABLE", `server has not declared /${WHISPER_COMMAND} for ${this.username}`, Date.now() - started);
+      }
+      const text = sanitizeWhisperText(message);
+      if (!text) return fail("EMPTY_MESSAGE", "nothing to say", Date.now() - started);
+      const sent = usernames.filter((name) => VALID_USERNAME.test(name));
+      for (const name of sent) bot.whisper(name, text);
+      return ok({ sent }, Date.now() - started);
+    } catch (error) {
+      return fail("NOT_CONNECTED", error instanceof Error ? error.message : String(error), Date.now() - started);
+    }
+  }
+
   lastKickReason(): string | undefined {
     return this.lastKick;
   }
 
   private bindBot(bot: Bot): void {
+    this.declaredCommands = undefined;
+    (bot as unknown as DeclaredCommandSource)._client?.on("declare_commands", (packet: unknown) => {
+      this.declaredCommands = declaredRootCommands(packet);
+    });
     bot.on("login", () => {
       this.emit("connected");
       this.events?.emit(createEvent("CitizenConnected", { username: this.username }, this.citizenId));

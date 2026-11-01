@@ -316,6 +316,17 @@ export class CivilizationStore {
    */
   private migrateCommunities(): void {
     this.db.exec(`
+      CREATE TABLE IF NOT EXISTS citizen_persistent_fact_revisions (
+        seq INTEGER PRIMARY KEY AUTOINCREMENT,
+        fact_id TEXT NOT NULL,
+        citizen_id TEXT NOT NULL,
+        fact_key TEXT NOT NULL,
+        content TEXT NOT NULL,
+        kind TEXT NOT NULL,
+        audience TEXT,
+        source_event_id TEXT,
+        replaced_at TEXT NOT NULL
+      );
       CREATE TABLE IF NOT EXISTS communities (
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
@@ -667,6 +678,11 @@ export class CivilizationStore {
   }
 
   /** Fresh directory snapshot from the persisted tables (survives restart; never cached across calls). */
+  /** True once any community exists: the world is then multi-community and shared settlement state is off limits. */
+  hasCommunities(): boolean {
+    return (this.db.prepare(`SELECT COUNT(*) AS n FROM communities`).get() as { n: number }).n > 0;
+  }
+
   getCommunityDirectory(): CommunityDirectory {
     const communities = this.db.prepare(`SELECT id FROM communities ORDER BY id`).all() as Array<{ id: string }>;
     const members = this.db
@@ -932,19 +948,22 @@ export class CivilizationStore {
     citizenId: string;
     factKey: string;
     content: string;
-    kind?: "observed_fact" | "suspicion";
+    /** reported_speech: the speech happened; what it claims has not been verified. */
+    kind?: "observed_fact" | "suspicion" | "reported_speech";
     createdAt?: string;
     /** SEC-001: the verified audience that authorized this fact (omit for private/non-broadcast facts). */
     audience?: EventAudience;
     /** SEC-001: the event this fact was derived from. */
     sourceEventId?: string;
   }): void {
+    this.recordFactRevision(fact);
     this.db
       .prepare(
         `INSERT INTO citizen_persistent_facts (id, citizen_id, fact_key, content, kind, created_at, audience, source_event_id)
          VALUES (@id, @citizenId, @factKey, @content, @kind, @createdAt, @audience, @sourceEventId)
          ON CONFLICT(citizen_id, fact_key) DO UPDATE SET
            content = CASE WHEN ${FLAGGED_FACT_SQL} THEN content ELSE excluded.content END,
+           kind = CASE WHEN ${FLAGGED_FACT_SQL} THEN kind ELSE COALESCE(@explicitKind, kind) END,
            audience = CASE WHEN ${FLAGGED_FACT_SQL} THEN audience ELSE excluded.audience END,
            source_event_id = CASE WHEN ${FLAGGED_FACT_SQL} THEN source_event_id ELSE excluded.source_event_id END`,
       )
@@ -956,8 +975,35 @@ export class CivilizationStore {
         factKey: fact.factKey,
         content: fact.content,
         kind: fact.kind ?? "observed_fact",
+        // A replacement takes its own trust class. One that names no kind keeps the old class, so it can't be promoted.
+        explicitKind: fact.kind ?? null,
         createdAt: fact.createdAt ?? new Date().toISOString(),
       });
+  }
+
+  /** SEC-001 audit: what a same-key replacement is about to overwrite is copied out first, never lost. */
+  private recordFactRevision(fact: { citizenId: string; factKey: string; content: string; kind?: string }): void {
+    const prior = this.db
+      .prepare(`SELECT id, content, kind, audience, source_event_id FROM citizen_persistent_facts WHERE citizen_id = ? AND fact_key = ?`)
+      .get(fact.citizenId, fact.factKey) as
+      | { id: string; content: string; kind: string; audience: string | null; source_event_id: string | null }
+      | undefined;
+    if (!prior || (prior.content === fact.content && prior.kind === (fact.kind ?? prior.kind))) return;
+    this.db
+      .prepare(
+        `INSERT INTO citizen_persistent_fact_revisions (fact_id, citizen_id, fact_key, content, kind, audience, source_event_id, replaced_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(prior.id, fact.citizenId, fact.factKey, prior.content, prior.kind, prior.audience, prior.source_event_id, new Date().toISOString());
+  }
+
+  /** Observer audit: prior versions of a fact, oldest first. Never read by cognition. */
+  listPersistentFactRevisions(citizenId: string, factKey: string): Array<{ factId: string; content: string; kind: string; replacedAt: string }> {
+    return (
+      this.db
+        .prepare(`SELECT fact_id, content, kind, replaced_at FROM citizen_persistent_fact_revisions WHERE citizen_id = ? AND fact_key = ? ORDER BY seq`)
+        .all(citizenId, factKey) as Array<{ fact_id: string; content: string; kind: string; replaced_at: string }>
+    ).map((row) => ({ factId: row.fact_id, content: row.content, kind: row.kind, replacedAt: row.replaced_at }));
   }
 
   listPersistentFacts(citizenId: string, limit = 20): Array<{

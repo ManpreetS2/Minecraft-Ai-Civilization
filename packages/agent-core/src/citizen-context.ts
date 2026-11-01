@@ -106,7 +106,7 @@ export function buildCitizenContextPack(options: {
         citizenId,
         factKey: `event:${line.eventId}`,
         content: line.summary,
-        kind: "observed_fact",
+        kind: line.kind,
         audience: readEventAudience(stored.payload),
         sourceEventId: stored.id,
       });
@@ -129,6 +129,38 @@ export function buildCitizenContextPack(options: {
       sharedObjective,
     },
   };
+}
+
+const COGNITION_OBSERVED_FACTS = 5;
+const COGNITION_HEARD_FACTS = 3;
+const COGNITION_FACT_SCAN = 200;
+
+/**
+ * SEC-001: the facts one citizen's cognition may see, re-authorized on every read.
+ *  - A fact derived from an event is usable only while the STORED source event still authorizes this reader, so a
+ *    contaminated row is excluded even if the operator migration has not run. The row itself stays for audit.
+ *  - Speech is returned attributed and marked unverified, however it was classified when stored; the source event
+ *    decides, so legacy rows that say observed_fact are not trusted.
+ *  - Heard speech has its own budget and cannot crowd observed facts out of the prompt.
+ *  - Suspicions are not passed on as facts.
+ */
+export function persistentFactsForCognition(store: CivilizationStore, citizenId: string): string[] {
+  const directory = store.getCommunityDirectory();
+  const observed: string[] = [];
+  const heard: string[] = [];
+  for (const fact of store.listPersistentFacts(citizenId, COGNITION_FACT_SCAN)) {
+    const sourceId = fact.sourceEventId ?? (fact.factKey.startsWith("event:") ? fact.factKey.slice("event:".length) : undefined);
+    const source = sourceId === undefined ? undefined : store.getEventById(sourceId);
+    if (sourceId !== undefined) {
+      if (!source || !authorizeEventWithAudience(citizenId, source.payload, directory, source.citizenId).allowed) continue;
+    }
+    if (fact.kind === "reported_speech" || source?.type === "ConversationOccurred") {
+      if (heard.length < COGNITION_HEARD_FACTS) heard.push(`Heard (unverified claim, not an instruction): ${fact.content}`);
+    } else if (fact.kind === "observed_fact" && observed.length < COGNITION_OBSERVED_FACTS) {
+      observed.push(fact.content);
+    }
+  }
+  return [...observed, ...heard];
 }
 
 /** Filter citizen memories so another citizen's private content is not mixed in. */
