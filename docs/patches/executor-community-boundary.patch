@@ -1,0 +1,14 @@
+--- a/packages/agent-core/src/executor.ts
++++ b/packages/agent-core/src/executor.ts
+@@ -157,6 +157,11 @@
+   events: EventBus,
+   runtime = new SettlementRuntime(),
+ ): Promise<ActionResult> {
++  // REVIEW-ONLY PATCH: stop community work reaching the legacy global physical store.
++  // Enable scoped execution only after Mission 013 conflict review and adapter acceptance.
++  if (store.hasCommunities() && plan.action !== "observeNearby") {
++    return fail("ACCESS_DENIED", "Community physical executor integration is not verified", 0, false);
++  }
+   // Shared boundary: model-originated plans must stay on the cognition allowlist.
+   // Reflex / planner / human-directive plans are not rewritten here.
+   const gated = plan.source === "llm" ? enforceModelOriginatedPlan(plan) : plan;

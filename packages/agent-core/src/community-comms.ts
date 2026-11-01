@@ -3,6 +3,7 @@ import { createEvent, type ActionResult, type PlayerInfo, type SettlementState, 
 import { announceToOwnCommunity, shareEventWithCommunity } from "./community-share.js";
 import type { DiscoveredSite } from "./discovered-sites.js";
 import type { CivilizationStore } from "./store.js";
+import { communityPhysicalState } from "./community-physical-state.js";
 
 /**
  * SEC-001 part B: every way a citizen's words leave its head at runtime.
@@ -147,8 +148,8 @@ export type SettlementScope = { scoped: boolean; settlement: SettlementState };
 
 /**
  * The store holds one settlement row, written by every citizen's actions. Once communities exist that row belongs to no
- * one community: it mixes both groups' stocks and locations, so reading it would be an omniscient shortcut. Until
- * per-community state exists a citizen gets a neutral view and works from what its own body observes. Without
+ * one community: it mixes both groups' stocks and locations, so reading it would be an omniscient shortcut. Per-community observations are read through the authenticated physical-state facade;
+ * unaffiliated citizens get a neutral view. Without
  * communities the world really has one settlement and nothing changes.
  */
 export function scopeSettlementForCitizen(
@@ -157,7 +158,11 @@ export function scopeSettlementForCitizen(
   settlement: SettlementState,
 ): SettlementScope {
   if (!store.hasCommunities()) return { scoped: false, settlement };
-  const id = store.getCommunityDirectory().communityOf(citizenId) ?? "no_community";
+  const communityId = store.getCommunityDirectory().communityOf(citizenId);
+  if (communityId && store.getCitizen(citizenId)) {
+    return { scoped: true, settlement: communityPhysicalState(store).forCitizen(citizenId).read().state };
+  }
+  const id = "no_community";
   return {
     scoped: true,
     settlement: {

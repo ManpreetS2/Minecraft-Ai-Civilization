@@ -151,3 +151,6 @@ export {
   type SettlementProject,
   type ProjectStatus,
 } from "./projects.js";
+
+export { CommunityPhysicalState, communityPhysicalState, physicalBlockKey, physicalMigrationReport,
+  type PhysicalSnapshot, type PhysicalAsset, type PhysicalAssetKind } from "./community-physical-state.js";
