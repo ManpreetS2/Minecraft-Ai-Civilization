@@ -52,6 +52,7 @@ function provider(fetchImpl: typeof fetch, over: Partial<ConstructorParameters<t
     timeoutMs: 5_000,
     maxOutputTokens: 128,
     maxRetries: 1,
+    retryBaseDelayMs: 0,
     budget,
     fetchImpl,
     ...over,
@@ -128,7 +129,7 @@ describe("Mission 011 — OpenAI Responses cloud provider (mocked)", () => {
   });
 
   it("7. HTTP 429 retries then fails", async () => {
-    const fetchImpl = vi.fn(async () => jsonResponse(429, { error: "rate" }));
+    const fetchImpl = vi.fn(async () => jsonResponse(429, { error: { type: "requests", code: "rate_limit_exceeded" } }));
     const p = provider(fetchImpl as unknown as typeof fetch, { maxRetries: 1 });
     await expect(p.decide(prompt)).rejects.toThrow(/429/);
     expect(fetchImpl).toHaveBeenCalledTimes(2);

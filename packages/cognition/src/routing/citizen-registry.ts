@@ -142,7 +142,7 @@ export type CitizenRegistryOptions = {
   claudeTransportFor?: (assignment: CitizenAssignment, apiKey: string) => ClaudeMessagesTransport;
   /** Must be set deliberately before anything can use the real network. Default false. */
   allowPaidRequests?: boolean;
-  /** First wait between Claude attempts when the provider gives no retry-after. Tests use 0. */
+  /** First wait between attempts when the provider gives no retry-after. Tests use 0. */
   retryBaseDelayMs?: number;
   store?: CitizenSessionStore;
   onEvidence?: (entry: DecisionEvidence) => void;
@@ -475,6 +475,7 @@ function buildProvider(
       ...shared,
       baseUrl: "https://api.openai.com/v1",
       fetchImpl: options.fetchImpl,
+      retryBaseDelayMs: options.retryBaseDelayMs,
     });
   }
   const transport = options.claudeTransportFor!(assignment, apiKey);

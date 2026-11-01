@@ -90,6 +90,7 @@ function billingProvider(fetchImpl: unknown, over: { maxRetries?: number; timeou
     timeoutMs: over.timeoutMs ?? 1000,
     maxOutputTokens: 128,
     maxRetries: over.maxRetries ?? 0,
+    retryBaseDelayMs: 0,
     budget,
     fetchImpl: fetchImpl as typeof fetch,
   });
@@ -97,6 +98,7 @@ function billingProvider(fetchImpl: unknown, over: { maxRetries?: number; timeou
 }
 
 const json = (status: number, body: unknown) => new Response(JSON.stringify(body), { status });
+const RATE_LIMITED = { error: { type: "requests", code: "rate_limit_exceeded" } };
 
 describe("OpenAI Responses billing settlement (mock-only)", () => {
   const usage = { input_tokens: 200, output_tokens: 10 };
@@ -141,7 +143,7 @@ describe("OpenAI Responses billing settlement (mock-only)", () => {
   it("releases the slot when a timeout lands between retry attempts", async () => {
     const fetchImpl = vi.fn(async () => {
       await new Promise((resolve) => setTimeout(resolve, 40));
-      return json(429, {});
+      return json(429, RATE_LIMITED);
     });
     const { budget, provider } = billingProvider(fetchImpl, { maxRetries: 1, timeoutMs: 10 });
     await expect(provider.decide(prompt)).rejects.toThrow(/cancelled/);
