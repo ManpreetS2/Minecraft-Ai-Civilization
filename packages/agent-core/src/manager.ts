@@ -1,5 +1,5 @@
 import { MinecraftBody, activePathCount, lastPathDurationMs, pathMetrics } from "@civ/minecraft-adapter";
-import { createCognition, type CognitionProvider, type CognitionPrompt, type HighLevelDecision } from "@civ/cognition";
+import { createCognition, isDecisionStale, type CognitionProvider, type CognitionPrompt, type DecisionAssumptions, type HighLevelDecision } from "@civ/cognition";
 import { createMemory, retrieveRelevant } from "@civ/memory";
 import { applySocialEvent, sameWorkFamily, SocialDirector } from "@civ/society";
 import {
@@ -10,9 +10,11 @@ import {
   validateThreeCitizenDemo,
   EventBus,
   EventLoopMonitor,
+  FOOD_ITEM_NAMES,
   formatSimEvent,
   yieldEventLoop,
   type AppConfig,
+  type BodyObservation,
   type CitizenRecord,
   type PresentedEvent,
   type SettlementNeed,
@@ -78,6 +80,10 @@ type RuntimeCitizen = {
   lastLlmAt: number;
   /** A decision of this citizen's own is pending. Used only with a cognitionRouter. */
   llmBusy?: boolean;
+  /** Bumped when a pending decision stops applying, so one that arrives later is discarded. */
+  llmEpoch?: number;
+  /** What the pending decision was based on. */
+  pendingLlmAssumptions?: DecisionAssumptions;
   lastChatAt: number;
   lastPlan?: PlannedTask;
   lastOutcome?: LastOutcome;
@@ -101,6 +107,17 @@ type PerformanceSnapshot = {
 let llmInFlight = 0;
 let lastLlmMs = 0;
 let lastTaskMs = 0;
+
+function decisionAssumptions(observation: BodyObservation): DecisionAssumptions {
+  return {
+    version: 1,
+    createdAtMs: Date.now(),
+    hunger: observation.food,
+    health: observation.health,
+    hasFoodInInventory: observation.inventory.some((item) => FOOD_ITEM_NAMES.has(item.name) && item.count > 0),
+    nearbyHostile: observation.nearby.some((entity) => entity.hostile && (entity.distance ?? 0) < 12),
+  };
+}
 
 export class AgentManager {
   readonly events = new EventBus(400);
@@ -485,8 +502,7 @@ export class AgentManager {
 
     const activeDirective = this.directives.activeFor(citizen.record.id);
     const suggestions = this.directives.suggestionsFor(citizen.record.id);
-    const llmDecision: HighLevelDecision | undefined = citizen.pendingLlm;
-    citizen.pendingLlm = undefined;
+    const llmDecision = this.takeCurrentDecision(citizen, observation);
     if (llmDecision?.communication) {
       performCommunicationIntent({
         store: this.store,
@@ -546,13 +562,20 @@ export class AgentManager {
       };
       llmInFlight += 1;
       citizen.llmBusy = true;
+      const epoch = citizen.llmEpoch ?? 0;
+      const assumptions = decisionAssumptions(observation);
       // Catch synchronous adapter failures as well as rejected provider promises.
       const decisionWork = Promise.resolve()
         .then(() => cognition.decide(prompt))
         .then((decision) => {
           lastLlmMs = Date.now() - started;
           if (!this.ops.canWrite()) return;
+          if ((citizen.llmEpoch ?? 0) !== epoch) {
+            this.emitIfLive(createEvent("LLMSkipped", { error: "decision arrived after it stopped applying", provider: cognition.name }, citizen.record.id));
+            return;
+          }
           citizen.pendingLlm = decision;
+          citizen.pendingLlmAssumptions = assumptions;
           contextPack.acknowledge();
           // Keep the list as shown: the model's line numbers refer to it, even if a line was withdrawn meanwhile.
           citizen.pendingBulletinEventIds = contextPack.bulletin.deliveredEventIds;
@@ -884,10 +907,25 @@ export class AgentManager {
   }
 
   /** Whatever this citizen was deciding no longer applies. Any late reply is discarded by its session. */
+  /** Takes the pending decision unless the situation it was based on has changed. */
+  private takeCurrentDecision(citizen: RuntimeCitizen, observation: BodyObservation): HighLevelDecision | undefined {
+    const decision = citizen.pendingLlm;
+    const assumptions = citizen.pendingLlmAssumptions;
+    citizen.pendingLlm = undefined;
+    citizen.pendingLlmAssumptions = undefined;
+    if (!decision || !assumptions) return decision;
+    const stale = isDecisionStale(assumptions, decisionAssumptions(observation));
+    if (!stale.stale) return decision;
+    this.emitIfLive(createEvent("LLMSkipped", { error: `decision is stale: ${stale.reason}`, provider: this.cognitionFor(citizen.record.id).name }, citizen.record.id));
+    return undefined;
+  }
+
   private cancelCognition(citizenId: string, suspendedFor?: string): void {
     const citizen = this.citizens.get(citizenId);
     if (!citizen) return;
+    citizen.llmEpoch = (citizen.llmEpoch ?? 0) + 1;
     citizen.pendingLlm = undefined;
+    citizen.pendingLlmAssumptions = undefined;
     citizen.pendingBulletinEventIds = undefined;
     const router = this.hooks.cognitionRouter;
     if (!router) return;
