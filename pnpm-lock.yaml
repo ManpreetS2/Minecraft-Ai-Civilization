@@ -164,6 +164,8 @@ importers:
         specifier: ^3.25.76
         version: 3.25.76
 
+  packages/session-isolation: {}
+
   packages/shared:
     dependencies:
       zod:
