@@ -50,9 +50,9 @@ Nothing unauthorized leaks, because the citizen could read the wrong event anywa
 
 | Check | `e85d7f9` | With correction | New failures |
 | --- | --- | --- | --- |
-| Security selection | 299 passed | see the PR for the final count | none |
-| `packages/cognition` | 204 passed | unchanged | none |
-| `pnpm test` | 1652 passed, 2 skipped, 0 failed | see the PR for the final count | none |
+| Security selection | 299 passed | 304 passed | none |
+| `packages/cognition` | 204 passed | not rerun, no cognition change | none |
+| `pnpm test` | 1652 passed, 2 skipped, 0 failed | 1657 passed, 2 skipped, 0 failed | none |
 | Workspace typecheck | 0 errors | 0 errors | none |
 | `pnpm lint` | 0 errors | 0 errors | none |
 
