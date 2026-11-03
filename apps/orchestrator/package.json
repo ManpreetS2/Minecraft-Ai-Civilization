@@ -9,6 +9,7 @@
     "start": "tsx src/index.ts",
     "atlas": "tsx src/atlas-cli.ts",
     "terrain": "tsx src/terrain-test.ts",
+    "world-lab:one-citizen": "tsx src/one-citizen.ts",
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },

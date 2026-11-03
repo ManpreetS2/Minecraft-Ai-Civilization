@@ -1,6 +1,7 @@
 import type { Bot } from "mineflayer";
 import type { MinecraftBody } from "@civ/minecraft-adapter";
-import type { EventBus } from "@civ/shared";
+import type { ActionTracer, EventBus } from "@civ/shared";
+import type { PropertyRegistry } from "./property.js";
 
 export type SkillContext = {
   body: MinecraftBody;
@@ -9,6 +10,10 @@ export type SkillContext = {
   events?: EventBus;
   citizenId?: string;
   timeoutMs?: number;
+  /** Optional property registry — when present, dig/deposit respect ownership. */
+  propertyRegistry?: PropertyRegistry;
+  /** Optional action tracer for DECISION→…→MEMORY spans. */
+  tracer?: ActionTracer;
 };
 
 export function contextBot(ctx: SkillContext): Bot {

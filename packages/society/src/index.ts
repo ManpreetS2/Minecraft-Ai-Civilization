@@ -76,6 +76,8 @@ export type ConversationRequest = {
   topic: string;
   now?: number;
   speakChance?: number;
+  /** Direct request that requires a response — bypasses silence chance / soft suppress. */
+  requiresResponse?: boolean;
 };
 
 export type ConversationDecision = {
@@ -134,21 +136,24 @@ export class SocialDirector {
     const eventKey = `${pairKey}:${request.trigger}:${normalizeTopic(request.topic)}`;
     const applyRelationship = this.canApplyRelationship(pairKey, eventKey, now);
 
-    const lastSpoke = this.lastSpokeAt.get(request.speaker);
-    if (lastSpoke !== undefined && now - lastSpoke < SPEAKER_COOLDOWN_MS) {
-      return { shouldSpeak: false, applyRelationship, suppressedReason: "speaker_cooldown" };
-    }
-    const lastPair = this.lastPairAt.get(pairKey);
-    if (lastPair !== undefined && now - lastPair < PAIR_COOLDOWN_MS) {
-      return { shouldSpeak: false, applyRelationship, suppressedReason: "pair_cooldown" };
-    }
-    const lastEvent = this.lastEventAt.get(eventKey);
-    if (lastEvent !== undefined && now - lastEvent < EVENT_SUPPRESS_MS) {
-      return { shouldSpeak: false, applyRelationship, suppressedReason: "repeated_event" };
+    // Required responses to direct requests bypass soft cooldowns/silence/duplicate gates.
+    if (!request.requiresResponse) {
+      const lastSpoke = this.lastSpokeAt.get(request.speaker);
+      if (lastSpoke !== undefined && now - lastSpoke < SPEAKER_COOLDOWN_MS) {
+        return { shouldSpeak: false, applyRelationship, suppressedReason: "speaker_cooldown" };
+      }
+      const lastPair = this.lastPairAt.get(pairKey);
+      if (lastPair !== undefined && now - lastPair < PAIR_COOLDOWN_MS) {
+        return { shouldSpeak: false, applyRelationship, suppressedReason: "pair_cooldown" };
+      }
+      const lastEvent = this.lastEventAt.get(eventKey);
+      if (lastEvent !== undefined && now - lastEvent < EVENT_SUPPRESS_MS) {
+        return { shouldSpeak: false, applyRelationship, suppressedReason: "repeated_event" };
+      }
     }
 
     const chance = request.speakChance ?? 0.22;
-    if (Math.random() > chance) {
+    if (!request.requiresResponse && Math.random() > chance) {
       return { shouldSpeak: false, applyRelationship, suppressedReason: "silence" };
     }
 
@@ -157,7 +162,8 @@ export class SocialDirector {
       return { shouldSpeak: false, applyRelationship, suppressedReason: "no_line" };
     }
     const previous = this.lastLines.get(request.speaker);
-    if (previous && similarLine(previous, message)) {
+    // Near-duplicate suppression — but never suppress a required response to a direct request.
+    if (!request.requiresResponse && previous && similarLine(previous, message)) {
       return { shouldSpeak: false, applyRelationship, suppressedReason: "duplicate_line" };
     }
 
@@ -226,6 +232,15 @@ function similarLine(a: string, b: string): boolean {
   const nb = b.toLowerCase().replaceAll(/[^a-z]+/g, "");
   return na === nb || (na.length > 12 && (na.includes(nb) || nb.includes(na)));
 }
+
+export {
+  applyBeliefEvent,
+  blankBelief,
+  resolvePromise,
+  resolveRequest,
+  type BeliefEvent,
+  type BeliefEventKind,
+} from "./relationship-belief.js";
 
 export function sameWorkFamily(a: string, b: string): boolean {
   const family = (task: string) => {

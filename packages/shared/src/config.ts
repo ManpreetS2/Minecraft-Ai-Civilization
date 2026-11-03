@@ -1,5 +1,10 @@
 import { z } from "zod";
 
+const boolFromEnv = z
+  .enum(["true", "false"])
+  .default("false")
+  .transform((v) => v === "true");
+
 const envSchema = z.object({
   MINECRAFT_HOST: z.string().default("127.0.0.1"),
   MINECRAFT_PORT: z.coerce.number().int().default(25565),
@@ -15,18 +20,55 @@ const envSchema = z.object({
     .enum(["true", "false"])
     .default("true")
     .transform((v) => v === "true"),
-  LLM_PROVIDER: z.enum(["ollama", "llamacpp", "none"]).default("ollama"),
+  SIM_ASSIGN_WORK_ROLES: boolFromEnv,
+  LLM_PROVIDER: z
+    .enum(["ollama", "llamacpp", "nvidia", "gemini", "openai_compatible", "heuristic", "none"])
+    .default("ollama"),
+  LLM_MODEL: z.string().optional(),
+  LLM_FALLBACK_PROVIDER: z
+    .enum(["ollama", "llamacpp", "nvidia", "gemini", "openai_compatible", "heuristic", "none"])
+    .optional(),
+  LLM_FALLBACK_MODEL: z.string().optional(),
   LLM_ENABLED: z
     .enum(["true", "false"])
     .default("false")
     .transform((v) => v === "true"),
+  LLM_TIMEOUT_MS: z.coerce.number().int().default(45_000),
+  LLM_MAX_RETRIES: z.coerce.number().int().default(2),
   OLLAMA_HOST: z.string().default("http://127.0.0.1:11434"),
   OLLAMA_MODEL: z.string().default("llama3.1:8b"),
   LLM_COOLDOWN_MS: z.coerce.number().int().default(60_000),
+  NVIDIA_API_KEY: z.string().optional(),
+  NVIDIA_BASE_URL: z.string().default("https://integrate.api.nvidia.com/v1"),
+  NVIDIA_MODEL: z.string().default("meta/llama-3.1-8b-instruct"),
+  GEMINI_API_KEY: z.string().optional(),
+  GEMINI_MODEL: z.string().default("gemini-2.0-flash"),
+  GEMINI_BASE_URL: z.string().default("https://generativelanguage.googleapis.com/v1beta"),
+  OPENAI_COMPAT_API_KEY: z.string().optional(),
+  OPENAI_COMPAT_BASE_URL: z.string().optional(),
+  OPENAI_COMPAT_MODEL: z.string().optional(),
 });
 
 export type AppConfig = z.infer<typeof envSchema>;
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   return envSchema.parse(env);
+}
+
+/** Resolve the primary model name for the configured provider. */
+export function resolveLlmModel(config: AppConfig): string {
+  if (config.LLM_MODEL && config.LLM_MODEL.trim()) return config.LLM_MODEL.trim();
+  switch (config.LLM_PROVIDER) {
+    case "ollama":
+    case "llamacpp":
+      return config.OLLAMA_MODEL;
+    case "nvidia":
+      return config.NVIDIA_MODEL;
+    case "gemini":
+      return config.GEMINI_MODEL;
+    case "openai_compatible":
+      return config.OPENAI_COMPAT_MODEL ?? "unknown";
+    default:
+      return "heuristic";
+  }
 }

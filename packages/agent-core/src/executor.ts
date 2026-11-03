@@ -1,8 +1,11 @@
 import type { MinecraftBody } from "@civ/minecraft-adapter";
 import {
   createEvent,
+  endTrace,
   FOOD_ITEM_NAMES,
+  inventoryDelta,
   LOG_BLOCK_NAMES,
+  startTrace,
   type ActionResult,
   type EventBus,
   type Vec3,
@@ -37,10 +40,31 @@ export async function executePlan(
   store: CivilizationStore,
   events: EventBus,
 ): Promise<ActionResult> {
+  const actionId = crypto.randomUUID();
+  const inventoryBefore = ctx.bot.inventory?.items?.().map((i) => ({ name: i.name, count: i.count })) ?? [];
+  let trace = startTrace({
+    actionId,
+    citizenId: ctx.citizenId,
+    phase: "PLAN",
+    reason: plan.reason,
+    selectedAction: plan.action,
+    taskId: plan.task,
+  });
+  ctx.tracer?.emit(trace);
+  trace = { ...trace, phase: "SKILL_START" };
+  ctx.tracer?.emit(trace);
+
   events.emit(
     createEvent(
       "ActionStarted",
-      { action: plan.action, task: plan.task, source: plan.source, reason: plan.reason },
+      { action: plan.action, task: plan.task, source: plan.source, reason: plan.reason, actionId },
+      ctx.citizenId,
+    ),
+  );
+  events.emit(
+    createEvent(
+      "ActionTrace",
+      { phase: "SKILL_START", actionId, action: plan.action, task: plan.task, reason: plan.reason },
       ctx.citizenId,
     ),
   );
@@ -80,12 +104,37 @@ export async function executePlan(
       break;
   }
 
+  const inventoryAfter = ctx.bot.inventory?.items?.().map((i) => ({ name: i.name, count: i.count })) ?? [];
+  trace = endTrace(trace, "SKILL_RESULT", {
+    failureCode: result.success ? undefined : result.code,
+    workComplete: result.success,
+    inventoryDelta: inventoryDelta(inventoryBefore, inventoryAfter),
+    elapsedMs: result.durationMs,
+  });
+  ctx.tracer?.emit(trace);
+  events.emit(
+    createEvent(
+      "ActionTrace",
+      {
+        phase: "SKILL_RESULT",
+        actionId,
+        action: plan.action,
+        success: result.success,
+        failureCode: result.success ? undefined : result.code,
+        elapsedMs: result.durationMs,
+        workComplete: result.success,
+      },
+      ctx.citizenId,
+    ),
+  );
+
   events.emit(
     createEvent(
       result.success ? "ActionCompleted" : "ActionFailed",
       {
         action: plan.action,
         task: plan.task,
+        actionId,
         success: result.success,
         code: result.success ? undefined : result.code,
         error: result.success ? undefined : result.error,
@@ -96,6 +145,7 @@ export async function executePlan(
 
   if (result.success && ctx.citizenId) {
     updateSettlementFromInventory(ctx, store);
+    ctx.tracer?.emit(endTrace(trace, "MEMORY_EVENT_UPDATE", { workComplete: true }));
   }
   return result;
 }

@@ -4,6 +4,7 @@ import { Vec3 as Vec3Class } from "vec3";
 import type { SkillContext } from "./context.js";
 import { moveTo } from "./movement.js";
 import { findBlock } from "./observe.js";
+import { assertMineAllowed, permissionFailure } from "./property.js";
 
 export async function mineBlock(
   ctx: SkillContext,
@@ -28,6 +29,13 @@ export async function mineBlock(
       const block = bot.blockAt(new Vec3Class(target.x, target.y, target.z));
       if (!block || block.name === "air") {
         return fail("BLOCK_NOT_FOUND", "Target block disappeared before mining", Date.now() - started, true);
+      }
+      if (ctx.propertyRegistry && ctx.citizenId) {
+        const permission = assertMineAllowed(ctx.propertyRegistry, ctx.citizenId, target, block.name);
+        if (!permission.allowed) {
+          ctx.body.unreachable.mark(target, 30_000);
+          return permissionFailure(permission, Date.now() - started);
+        }
       }
       try {
         if (ctx.signal?.aborted) {
