@@ -175,3 +175,14 @@ The validator will no longer generate synthetic defaults for missing experiment 
 - No inferred recording status or unobserved privacy test counters.
 
 When any of these fields lack genuine runtime provenance, the validator emits `NOT_PROVEN` and refrains from certifying the experiment manifest.
+
+---
+
+## 4. Mission 007 Cryptographic Trust Verification Contract
+
+As of Mission 007, string prefix checks on signatures are replaced with **genuine Ed25519 asymmetric cryptographic verification**:
+
+1. **Canonical Payload (`AGY-PAPER-ATTESTATION-V1`):** Binds `experiment_id`, `capture_session_id`, `server_version`, `server_build`, `source_sha`, `evidence_digest`, `started_at`, `ended_at`, and tick ranges.
+2. **Evidence Digest Binding:** `evidence_digest = SHA256(journalLines.join('\n'))`. Any tampering with journal lines invalidates the signature.
+3. **Operator Trust Root:** Signatures are verified against public keys supplied in `trustedKeys: Record<string, string | KeyObject>`. No signing keys are bundled in the repository.
+4. **Complete Capture Architecture:** Refer to `experiments/evidence-validator/PAPER_CAPTURE_DESIGN.md` and `experiments/evidence-validator/CURSOR_INTEGRATION_CONTRACT.md` for comprehensive implementation specifications.

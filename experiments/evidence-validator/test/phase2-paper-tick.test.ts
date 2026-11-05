@@ -12,9 +12,11 @@
  */
 
 import { describe, expect, it } from "vitest";
+import { createHash } from "node:crypto";
 import { validateExperimentEvidence } from "../src/validator.js";
 import { auditDurationAndTicks } from "../src/duration-verifier.js";
 import { adaptRecorderJournal, rehashJournalLines } from "../src/recorder-adapter.js";
+import { createTestAttestationKeypair, signTestAttestation } from "../src/source-authenticator.js";
 import { createTestManifest, JournalBuilder } from "../fixtures/helpers.js";
 
 describe("Phase 2 — Simulated vs. Real Paper Tick Distinction", () => {
@@ -33,14 +35,6 @@ describe("Phase 2 — Simulated vs. Real Paper Tick Distinction", () => {
       manifest,
       rawJournalLines: lines,
       journalRows: rows,
-      sourceAttestation: {
-        sourceType: "paper_server_attested",
-        serverBuild: 48,
-        captureSessionId: "11111111-2222-3333-4444-555555555555",
-        experimentId: manifest.experimentId,
-        signingAuthority: "paper-attestation-authority-v1",
-        signature: "ed25519:genuine-paper-attestation-signature",
-      },
     });
 
     // Mode is correctly identified as offline_simulated
@@ -83,17 +77,45 @@ describe("Phase 2 — Simulated vs. Real Paper Tick Distinction", () => {
     b.append({ kind: "shutdown", completedDuration: true, mode: "offline" });
 
     const { lines, rows } = b.build();
+    const kp1 = createTestAttestationKeypair();
+    const sessionId1 = "11111111-2222-3333-4444-555555555555";
+    const digest1 = createHash("sha256").update(lines.join("\n")).digest("hex");
+    const sig1 = signTestAttestation(
+      {
+        experimentId: manifest.experimentId,
+        captureSessionId: sessionId1,
+        serverBuild: 48,
+        serverVersion: "1.21.6",
+        sourceSha: manifest.sourceSha,
+        evidenceDigest: digest1,
+        startedAt: rows[0]!.at,
+        endedAt: rows[rows.length - 1]!.at,
+        firstServerTick: 1000,
+        lastServerTick: serverTick - 100,
+        totalServerTicks: 72000,
+      },
+      kp1.privateKeyPem,
+    );
+
     const report = validateExperimentEvidence({
       manifest,
       rawJournalLines: lines,
       journalRows: rows,
+      trustedKeys: { "paper-attestation-authority-v1": kp1.publicKeyPem },
       sourceAttestation: {
         sourceType: "paper_server_attested",
         serverBuild: 48,
-        captureSessionId: "11111111-2222-3333-4444-555555555555",
+        captureSessionId: sessionId1,
         experimentId: manifest.experimentId,
         signingAuthority: "paper-attestation-authority-v1",
-        signature: "ed25519:genuine-paper-attestation-signature",
+        signature: sig1.signatureFormatted,
+        startedAt: rows[0]!.at,
+        endedAt: rows[rows.length - 1]!.at,
+        firstServerTick: 1000,
+        lastServerTick: serverTick - 100,
+        totalServerTicks: 72000,
+        evidenceDigest: digest1,
+        sourceSha: manifest.sourceSha,
       },
     });
 
@@ -130,17 +152,45 @@ describe("Phase 2 — Simulated vs. Real Paper Tick Distinction", () => {
     b.append({ kind: "shutdown", completedDuration: true, mode: "offline" });
 
     const { lines, rows } = b.build();
+    const kp1 = createTestAttestationKeypair();
+    const sessionId1 = "11111111-2222-3333-4444-555555555555";
+    const digest1 = createHash("sha256").update(lines.join("\n")).digest("hex");
+    const sig1 = signTestAttestation(
+      {
+        experimentId: manifest.experimentId,
+        captureSessionId: sessionId1,
+        serverBuild: 48,
+        serverVersion: "1.21.6",
+        sourceSha: manifest.sourceSha,
+        evidenceDigest: digest1,
+        startedAt: rows[0]!.at,
+        endedAt: rows[rows.length - 1]!.at,
+        firstServerTick: 1000,
+        lastServerTick: serverTick - 100,
+        totalServerTicks: 72000,
+      },
+      kp1.privateKeyPem,
+    );
+
     const report = validateExperimentEvidence({
       manifest,
       rawJournalLines: lines,
       journalRows: rows,
+      trustedKeys: { "paper-attestation-authority-v1": kp1.publicKeyPem },
       sourceAttestation: {
         sourceType: "paper_server_attested",
         serverBuild: 48,
-        captureSessionId: "11111111-2222-3333-4444-555555555555",
+        captureSessionId: sessionId1,
         experimentId: manifest.experimentId,
         signingAuthority: "paper-attestation-authority-v1",
-        signature: "ed25519:genuine-paper-attestation-signature",
+        signature: sig1.signatureFormatted,
+        startedAt: rows[0]!.at,
+        endedAt: rows[rows.length - 1]!.at,
+        firstServerTick: 1000,
+        lastServerTick: serverTick - 100,
+        totalServerTicks: 72000,
+        evidenceDigest: digest1,
+        sourceSha: manifest.sourceSha,
       },
     });
 
@@ -176,17 +226,45 @@ describe("Phase 2 — Simulated vs. Real Paper Tick Distinction", () => {
     b.append({ kind: "shutdown", completedDuration: true, mode: "offline" });
 
     const { lines, rows } = b.build();
+    const kp1 = createTestAttestationKeypair();
+    const sessionId1 = "11111111-2222-3333-4444-555555555555";
+    const digest1 = createHash("sha256").update(lines.join("\n")).digest("hex");
+    const sig1 = signTestAttestation(
+      {
+        experimentId: manifest.experimentId,
+        captureSessionId: sessionId1,
+        serverBuild: 48,
+        serverVersion: "1.21.6",
+        sourceSha: manifest.sourceSha,
+        evidenceDigest: digest1,
+        startedAt: rows[0]!.at,
+        endedAt: rows[rows.length - 1]!.at,
+        firstServerTick: 1000,
+        lastServerTick: serverTick - 100,
+        totalServerTicks: 72000,
+      },
+      kp1.privateKeyPem,
+    );
+
     const report = validateExperimentEvidence({
       manifest,
       rawJournalLines: lines,
       journalRows: rows,
+      trustedKeys: { "paper-attestation-authority-v1": kp1.publicKeyPem },
       sourceAttestation: {
         sourceType: "paper_server_attested",
         serverBuild: 48,
-        captureSessionId: "11111111-2222-3333-4444-555555555555",
+        captureSessionId: sessionId1,
         experimentId: manifest.experimentId,
         signingAuthority: "paper-attestation-authority-v1",
-        signature: "ed25519:genuine-paper-attestation-signature",
+        signature: sig1.signatureFormatted,
+        startedAt: rows[0]!.at,
+        endedAt: rows[rows.length - 1]!.at,
+        firstServerTick: 1000,
+        lastServerTick: serverTick - 100,
+        totalServerTicks: 72000,
+        evidenceDigest: digest1,
+        sourceSha: manifest.sourceSha,
       },
     });
 
@@ -265,17 +343,42 @@ describe("Phase 2 — Duration Verifier Direct Unit Tests", () => {
       serverGameTick: i * 100,
     }));
 
+    const kp2 = createTestAttestationKeypair();
+    const sessionId2 = "11111111-2222-3333-4444-555555555555";
+    const sig2 = signTestAttestation(
+      {
+        experimentId: "test-exp",
+        captureSessionId: sessionId2,
+        serverBuild: 48,
+        serverVersion: "1.21.6",
+        sourceSha: "",
+        evidenceDigest: "",
+        startedAt: rows[0]!.at,
+        endedAt: rows[rows.length - 1]!.at,
+        firstServerTick: 0,
+        lastServerTick: 400,
+        totalServerTicks: 400,
+      },
+      kp2.privateKeyPem,
+    );
+
     const audit = auditDurationAndTicks({
       claimedDurationMinutes: 0,
       journalRows: rows,
       experimentId: "test-exp",
+      trustedKeys: { "paper-attestation-authority-v1": kp2.publicKeyPem },
       sourceAttestation: {
         sourceType: "paper_server_attested",
         serverBuild: 48,
-        captureSessionId: "11111111-2222-3333-4444-555555555555",
+        captureSessionId: sessionId2,
         experimentId: "test-exp",
         signingAuthority: "paper-attestation-authority-v1",
-        signature: "ed25519:genuine-paper-attestation-signature",
+        signature: sig2.signatureFormatted,
+        startedAt: rows[0]!.at,
+        endedAt: rows[rows.length - 1]!.at,
+        firstServerTick: 0,
+        lastServerTick: 400,
+        totalServerTicks: 400,
       },
     });
 

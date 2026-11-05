@@ -1,64 +1,162 @@
 /**
- * Source Authenticator and Trust Boundary (Mission 006)
+ * Source Authenticator and Cryptographic Trust Verification (Mission 007)
  *
- * Implements cryptographic trust boundary verification for Paper server evidence:
- * 1. Missing attestation fails closed (cannot establish Paper authenticity).
- * 2. 'unverified_client' and 'offline_simulated' cannot establish Paper authenticity.
- * 3. Mere declaration of 'paper_server_attested' is not proof without signature & authority.
- * 4. Missing signatures, unknown signing authorities, session mismatches, and invalid signatures fail closed.
- * 5. Self-generated SHA-256 digests cannot be passed off as digital signatures.
- * 6. Binds attestation to experimentId, captureSessionId, and serverBuild.
+ * Implements genuine Ed25519 asymmetric cryptographic verification:
+ * 1. Binds experimentId, captureSessionId, serverBuild, sourceSha, evidence digest, and ticks.
+ * 2. Uses canonical serialized signing payload (AGY-PAPER-ATTESTATION-V1).
+ * 3. Verifies signature bytes against operator-supplied trusted public keys (SPKI PEM or raw Ed25519 hex).
+ * 4. Strictly rejects self-generated SHA-256 digests, malformed bytes, wrong keys, and replayed runs.
+ * 5. Fails closed without inventing credentials or signing authorities.
  */
 
-export interface SourceAttestation {
-  /** Capture source mode */
-  sourceType: "offline_simulated" | "unverified_client" | "paper_server_attested";
-  /** Paper build number attested by server plugin or signed journal */
-  serverBuild?: number;
-  /** Unique capture session UUID created at server startup */
-  captureSessionId?: string;
-  /** Experiment ID that this capture was initialized for */
-  experimentId?: string;
-  /** Registered signing authority / CA identity */
-  signingAuthority?: string;
-  /** Asymmetric digital signature (e.g. ed25519:<hex>) binding session & experiment */
-  signature?: string;
-  /** Legacy SHA-256 token */
-  attestationSignature?: string;
-  /** Timestamp when attestation was produced */
-  timestamp?: string;
-}
+import {
+  createHash,
+  createPublicKey,
+  createPrivateKey,
+  generateKeyPairSync,
+  KeyObject,
+  sign,
+  verify,
+} from "node:crypto";
+import type { SourceAttestation, SourceAttestationAudit } from "./types.js";
 
-export interface SourceAttestationAudit {
-  /** True ONLY when all cryptographic and authority checks pass */
-  proven: boolean;
-  sourceType: "offline_simulated" | "unverified_client" | "paper_server_attested" | "missing";
-  authorityTrusted: boolean;
-  sessionBound: boolean;
-  experimentBound: boolean;
-  signatureValid: boolean;
-  reasons: string[];
-}
-
-/** Recognized trusted signing authorities for live Paper server verification */
-const DEFAULT_TRUSTED_AUTHORITIES = new Set([
-  "paper-attestation-authority-v1",
-  "minecraft-civilization-ca",
-]);
+export { type SourceAttestation, type SourceAttestationAudit };
 
 /**
- * Evaluates source attestation against the trusted boundary.
+ * Parameters for the canonical serialized attestation payload.
  */
-export function verifySourceAttestation(args: {
+export interface CanonicalAttestationParams {
+  experimentId: string;
+  captureSessionId: string;
+  serverBuild: number;
+  serverVersion: string;
+  sourceSha: string;
+  evidenceDigest: string;
+  startedAt: string;
+  endedAt: string;
+  firstServerTick?: number;
+  lastServerTick?: number;
+  totalServerTicks?: number;
+}
+
+/**
+ * Produces the deterministic, canonical byte representation signed by the Paper server.
+ */
+export function buildCanonicalAttestationPayload(params: CanonicalAttestationParams): Buffer {
+  const parts = [
+    "AGY-PAPER-ATTESTATION-V1",
+    `experiment_id:${params.experimentId}`,
+    `capture_session_id:${params.captureSessionId}`,
+    `server_version:${params.serverVersion}`,
+    `server_build:${params.serverBuild}`,
+    `source_sha:${params.sourceSha}`,
+    `evidence_digest:${params.evidenceDigest}`,
+    `started_at:${params.startedAt}`,
+    `ended_at:${params.endedAt}`,
+    `first_server_tick:${params.firstServerTick ?? 0}`,
+    `last_server_tick:${params.lastServerTick ?? 0}`,
+    `total_server_ticks:${params.totalServerTicks ?? 0}`,
+  ];
+  return Buffer.from(parts.join("\n"), "utf-8");
+}
+
+const ED25519_SPKI_PREFIX = Buffer.from("302a300506032b6570032100", "hex");
+
+/**
+ * Parses an Ed25519 public key from PEM string, raw 32-byte hex, or KeyObject.
+ */
+export function parseEd25519PublicKey(keyInput: string | KeyObject): KeyObject {
+  if (keyInput instanceof KeyObject) {
+    return keyInput;
+  }
+  const trimmed = keyInput.trim();
+  if (trimmed.startsWith("-----BEGIN PUBLIC KEY-----")) {
+    return createPublicKey(trimmed);
+  }
+  // Raw 32-byte hex string (64 characters)
+  if (/^[0-9a-fA-F]{64}$/.test(trimmed)) {
+    const rawBytes = Buffer.from(trimmed, "hex");
+    const spkiDer = Buffer.concat([ED25519_SPKI_PREFIX, rawBytes]);
+    return createPublicKey({ key: spkiDer, format: "der", type: "spki" });
+  }
+  // Raw 32-byte base64 string
+  if (/^[A-Za-z0-9+/]{43}=?$/.test(trimmed)) {
+    const rawBytes = Buffer.from(trimmed, "base64");
+    if (rawBytes.length === 32) {
+      const spkiDer = Buffer.concat([ED25519_SPKI_PREFIX, rawBytes]);
+      return createPublicKey({ key: spkiDer, format: "der", type: "spki" });
+    }
+  }
+  return createPublicKey(keyInput);
+}
+
+/**
+ * Parses and validates raw signature bytes for Ed25519.
+ */
+export function parseEd25519Signature(sigInput: string): { sigBuffer: Buffer | null; error?: string } {
+  let cleaned = sigInput.trim();
+  if (cleaned.startsWith("ed25519:")) {
+    cleaned = cleaned.slice(8).trim();
+  } else if (cleaned.startsWith("ecdsa:")) {
+    return {
+      sigBuffer: null,
+      error: "Unsupported signature algorithm: ecdsa is not supported; ed25519 required.",
+    };
+  }
+
+  // Reject self-generated SHA-256 digests (64 hex characters without ed25519 length)
+  if (sigInput.startsWith("sha256:") || /^[0-9a-fA-F]{64}$/.test(cleaned)) {
+    return {
+      sigBuffer: null,
+      error:
+        "Invalid signature algorithm: a self-generated SHA-256 digest cannot be represented as a trusted digital signature. Asymmetric Ed25519 signature required.",
+    };
+  }
+
+  let sigBuffer: Buffer;
+  if (/^[0-9a-fA-F]{128}$/.test(cleaned)) {
+    sigBuffer = Buffer.from(cleaned, "hex");
+  } else if (/^[A-Za-z0-9+/]{86}={0,2}$/.test(cleaned)) {
+    try {
+      sigBuffer = Buffer.from(cleaned, "base64");
+    } catch {
+      return { sigBuffer: null, error: "Invalid signature encoding: must be valid hex or base64." };
+    }
+  } else {
+    return {
+      sigBuffer: null,
+      error: "Invalid signature encoding: must be valid 64-byte hex (128 chars) or base64 (86-88 chars).",
+    };
+  }
+
+  if (sigBuffer.length !== 64) {
+    return {
+      sigBuffer: null,
+      error: `Invalid Ed25519 signature length: expected 64 bytes, got ${sigBuffer.length} bytes.`,
+    };
+  }
+
+  return { sigBuffer };
+}
+
+export interface VerifySourceAttestationOptions {
   attestation?: SourceAttestation;
   expectedExperimentId?: string;
   expectedCaptureSessionId?: string;
+  expectedSourceSha?: string;
+  rawJournalLines?: readonly string[];
+  firstServerTick?: number;
+  lastServerTick?: number;
+  totalServerTicks?: number;
   trustedAuthorities?: string[];
-}): SourceAttestationAudit {
+  trustedKeys?: Record<string, string | KeyObject> | Map<string, string | KeyObject>;
+}
+
+/**
+ * Evaluates source attestation against real cryptographic trust roots.
+ */
+export function verifySourceAttestation(args: VerifySourceAttestationOptions): SourceAttestationAudit {
   const reasons: string[] = [];
-  const trustedSet = args.trustedAuthorities
-    ? new Set(args.trustedAuthorities)
-    : DEFAULT_TRUSTED_AUTHORITIES;
 
   if (!args.attestation) {
     return {
@@ -117,7 +215,7 @@ export function verifySourceAttestation(args: {
     };
   }
 
-  // --- Strict Validation of paper_server_attested claims ---
+  // --- Strict Cryptographic Validation of paper_server_attested claims ---
   let experimentBound = true;
   let sessionBound = true;
   let authorityTrusted = true;
@@ -158,41 +256,197 @@ export function verifySourceAttestation(args: {
     );
   }
 
-  // 4. Signing Authority Verification
-  if (!attestation.signingAuthority) {
-    authorityTrusted = false;
-    reasons.push("Attestation missing signing authority declaration.");
-  } else if (!trustedSet.has(attestation.signingAuthority)) {
-    authorityTrusted = false;
+  // 3b. Source SHA Binding — required for proven Paper authenticity (Mission 007 Phase B)
+  if (!attestation.sourceSha || !/^[a-f0-9]{40}$/.test(attestation.sourceSha)) {
+    experimentBound = false;
     reasons.push(
-      `Untrusted signing authority: '${attestation.signingAuthority}' is unknown. Live Paper authenticity cannot be certified without trusted server key infrastructure.`,
+      `Attestation missing valid 40-hex sourceSha: '${attestation.sourceSha ?? "missing"}'. Incomplete attestation cannot prove Paper authenticity.`,
+    );
+  } else if (args.expectedSourceSha && attestation.sourceSha !== args.expectedSourceSha) {
+    experimentBound = false;
+    reasons.push(
+      `Attestation source SHA mismatch: expected '${args.expectedSourceSha}', but attestation binds to '${attestation.sourceSha}'.`,
+    );
+  } else if (!args.expectedSourceSha) {
+    experimentBound = false;
+    reasons.push(
+      "Expected candidate sourceSha missing: Paper authenticity requires verifying attestation against the exact candidate SHA.",
     );
   }
 
-  // 5. Signature Verification
-  const sig = attestation.signature ?? attestation.attestationSignature;
-  if (!sig) {
-    signatureValid = false;
-    reasons.push("Missing attestation signature: paper_server_attested claim lacks cryptographic digital signature.");
+  // 3c. Tick Progression Binding — attested ticks required; caller-only values are never enough
+  if (
+    attestation.firstServerTick === undefined ||
+    attestation.lastServerTick === undefined ||
+    attestation.totalServerTicks === undefined
+  ) {
+    sessionBound = false;
+    reasons.push(
+      "Attestation missing firstServerTick/lastServerTick/totalServerTicks. Caller-supplied tick ranges cannot substitute for signed Paper tick evidence.",
+    );
   } else {
-    // Check Requirement 6: Self-generated SHA-256 digest is NOT a digital signature!
-    if (sig.startsWith("sha256:") || /^[0-9a-fA-F]{64}$/.test(sig)) {
-      signatureValid = false;
+    if (args.firstServerTick !== undefined && attestation.firstServerTick !== args.firstServerTick) {
+      sessionBound = false;
       reasons.push(
-        "Invalid signature algorithm: a self-generated SHA-256 digest cannot be represented as a trusted digital signature. Asymmetric signature (e.g. ed25519) required.",
+        `Attestation first server tick mismatch: observed ${args.firstServerTick}, but attestation binds to ${attestation.firstServerTick}.`,
       );
-    } else if (sig.includes("corrupted") || sig.includes("forged") || sig.includes("invalid")) {
-      signatureValid = false;
-      reasons.push("Cryptographic signature verification failed: invalid signature bytes.");
-    } else if (!sig.startsWith("ed25519:") && !sig.startsWith("ecdsa:")) {
-      signatureValid = false;
+    }
+    if (args.lastServerTick !== undefined && attestation.lastServerTick !== args.lastServerTick) {
+      sessionBound = false;
       reasons.push(
-        `Unsupported signature format '${sig.slice(0, 16)}...': must use a recognized asymmetric signature scheme (e.g. ed25519:...).`,
+        `Attestation last server tick mismatch: observed ${args.lastServerTick}, but attestation binds to ${attestation.lastServerTick}.`,
+      );
+    }
+    if (
+      args.totalServerTicks !== undefined &&
+      attestation.totalServerTicks !== args.totalServerTicks
+    ) {
+      sessionBound = false;
+      reasons.push(
+        `Attestation total server ticks mismatch: observed ${args.totalServerTicks}, but attestation binds to ${attestation.totalServerTicks}.`,
       );
     }
   }
 
-  const proven = experimentBound && sessionBound && authorityTrusted && signatureValid && Boolean(attestation.serverBuild && attestation.serverBuild > 0);
+  // 3d. Signed wall-clock interval required on the attestation itself
+  if (!attestation.startedAt || !attestation.endedAt) {
+    sessionBound = false;
+    reasons.push(
+      "Attestation missing startedAt/endedAt timestamps. Unsigned or caller-only wall clocks cannot establish continuous Paper capture.",
+    );
+  }
+
+  // 4. Evidence Digest Verification — journal + attested digest both required for proven
+  let computedDigest: string | undefined;
+  if (!args.rawJournalLines || args.rawJournalLines.length === 0) {
+    signatureValid = false;
+    reasons.push(
+      "Raw journal lines absent: Paper authenticity requires hashing the complete operator evidence stream covered by the signature.",
+    );
+  } else {
+    computedDigest = createHash("sha256").update(args.rawJournalLines.join("\n")).digest("hex");
+    if (!attestation.evidenceDigest || !/^[a-f0-9]{64}$/.test(attestation.evidenceDigest)) {
+      signatureValid = false;
+      reasons.push(
+        "Attestation missing valid evidenceDigest. A signature that does not cover the evidence stream cannot prove authenticity.",
+      );
+    } else if (attestation.evidenceDigest !== computedDigest) {
+      signatureValid = false;
+      reasons.push(
+        `Evidence stream digest mismatch: computed '${computedDigest}' != attested '${attestation.evidenceDigest}'. The evidence log was modified or truncated after server signing.`,
+      );
+    }
+  }
+
+  // 5. Trust Root & Public Key Lookup
+  let trustedPublicKey: KeyObject | undefined;
+  if (!attestation.signingAuthority) {
+    authorityTrusted = false;
+    reasons.push("Attestation missing signing authority declaration.");
+  } else {
+    let keyInput: string | KeyObject | undefined;
+    if (args.trustedKeys) {
+      if (args.trustedKeys instanceof Map) {
+        keyInput = args.trustedKeys.get(attestation.signingAuthority);
+      } else {
+        keyInput = args.trustedKeys[attestation.signingAuthority];
+      }
+    }
+
+    if (!keyInput) {
+      authorityTrusted = false;
+      reasons.push(
+        `Untrusted signing authority: '${attestation.signingAuthority}' has no registered public key in the operator trust root. Live Paper authenticity cannot be certified without trusted key infrastructure.`,
+      );
+    } else {
+      try {
+        trustedPublicKey = parseEd25519PublicKey(keyInput);
+      } catch (err: unknown) {
+        authorityTrusted = false;
+        const message = err instanceof Error ? err.message : "unknown error";
+        reasons.push(
+          `Failed to parse trusted public key for authority '${attestation.signingAuthority}': ${message}`,
+        );
+      }
+    }
+  }
+
+  // 6. Cryptographic Asymmetric Signature Verification
+  const rawSig = attestation.signature ?? attestation.attestationSignature;
+  if (!rawSig) {
+    signatureValid = false;
+    reasons.push("Missing attestation signature: paper_server_attested claim lacks cryptographic digital signature.");
+  } else {
+    const { sigBuffer, error: sigError } = parseEd25519Signature(rawSig);
+    if (sigError || !sigBuffer) {
+      signatureValid = false;
+      reasons.push(sigError ?? "Invalid signature.");
+    } else if (trustedPublicKey) {
+      // Reconstruct payload ONLY from attested fields — never fill gaps from caller/computed fallbacks.
+      const incompletePayloadFields: string[] = [];
+      if (!attestation.experimentId) incompletePayloadFields.push("experimentId");
+      if (!attestation.captureSessionId) incompletePayloadFields.push("captureSessionId");
+      if (!attestation.serverBuild) incompletePayloadFields.push("serverBuild");
+      if (!attestation.serverVersion) incompletePayloadFields.push("serverVersion");
+      if (!attestation.sourceSha) incompletePayloadFields.push("sourceSha");
+      if (!attestation.evidenceDigest) incompletePayloadFields.push("evidenceDigest");
+      if (!attestation.startedAt) incompletePayloadFields.push("startedAt");
+      if (!attestation.endedAt) incompletePayloadFields.push("endedAt");
+      if (attestation.firstServerTick === undefined) incompletePayloadFields.push("firstServerTick");
+      if (attestation.lastServerTick === undefined) incompletePayloadFields.push("lastServerTick");
+      if (attestation.totalServerTicks === undefined) incompletePayloadFields.push("totalServerTicks");
+
+      if (incompletePayloadFields.length > 0) {
+        signatureValid = false;
+        reasons.push(
+          `Incomplete signed attestation fields (${incompletePayloadFields.join(", ")}): refusing to verify a signature that does not cover the complete expected evidence.`,
+        );
+      } else {
+        const canonicalPayload = buildCanonicalAttestationPayload({
+          experimentId: attestation.experimentId!,
+          captureSessionId: attestation.captureSessionId!,
+          serverBuild: attestation.serverBuild!,
+          serverVersion: attestation.serverVersion!,
+          sourceSha: attestation.sourceSha!,
+          evidenceDigest: attestation.evidenceDigest!,
+          startedAt: attestation.startedAt!,
+          endedAt: attestation.endedAt!,
+          firstServerTick: attestation.firstServerTick,
+          lastServerTick: attestation.lastServerTick,
+          totalServerTicks: attestation.totalServerTicks,
+        });
+
+        try {
+          const verified = verify(null, canonicalPayload, trustedPublicKey, sigBuffer);
+          if (!verified) {
+            signatureValid = false;
+            reasons.push(
+              `Cryptographic Ed25519 signature verification failed with trusted public key for '${attestation.signingAuthority}'.`,
+            );
+          }
+        } catch (err: unknown) {
+          signatureValid = false;
+          const message = err instanceof Error ? err.message : "verification failure";
+          reasons.push(`Crypto verify error: ${message}`);
+        }
+      }
+    }
+  }
+
+  const proven =
+    experimentBound &&
+    sessionBound &&
+    authorityTrusted &&
+    signatureValid &&
+    Boolean(trustedPublicKey) &&
+    Boolean(attestation.serverBuild && attestation.serverBuild > 0) &&
+    Boolean(attestation.sourceSha) &&
+    Boolean(attestation.evidenceDigest) &&
+    Boolean(args.rawJournalLines && args.rawJournalLines.length > 0) &&
+    Boolean(attestation.startedAt && attestation.endedAt) &&
+    attestation.firstServerTick !== undefined &&
+    attestation.lastServerTick !== undefined &&
+    attestation.totalServerTicks !== undefined;
 
   return {
     proven,
@@ -202,5 +456,43 @@ export function verifySourceAttestation(args: {
     experimentBound,
     signatureValid,
     reasons,
+  };
+}
+
+/**
+ * Test Helper: Generates a temporary synthetic Ed25519 keypair for offline tests.
+ * Never used for production.
+ */
+export function createTestAttestationKeypair(): {
+  publicKeyPem: string;
+  privateKeyPem: string;
+  rawPublicKeyHex: string;
+} {
+  const { publicKey, privateKey } = generateKeyPairSync("ed25519");
+  const publicKeyPem = publicKey.export({ type: "spki", format: "pem" }).toString();
+  const privateKeyPem = privateKey.export({ type: "pkcs8", format: "pem" }).toString();
+  const rawPublicKeyHex = publicKey.export({ type: "spki", format: "der" }).subarray(12).toString("hex");
+
+  return {
+    publicKeyPem,
+    privateKeyPem,
+    rawPublicKeyHex,
+  };
+}
+
+/**
+ * Test Helper: Signs a canonical attestation payload using a synthetic private key.
+ */
+export function signTestAttestation(
+  params: CanonicalAttestationParams,
+  privateKeyPem: string,
+): { signatureHex: string; signatureFormatted: string; payload: Buffer } {
+  const payload = buildCanonicalAttestationPayload(params);
+  const sigBuffer = sign(null, payload, createPrivateKey(privateKeyPem));
+  const signatureHex = sigBuffer.toString("hex");
+  return {
+    signatureHex,
+    signatureFormatted: `ed25519:${signatureHex}`,
+    payload,
   };
 }

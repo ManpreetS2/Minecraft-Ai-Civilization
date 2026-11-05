@@ -4,6 +4,7 @@ import { auditInformationBoundaries, buildDirectory } from "./information-verifi
 import { auditInventoryConservation } from "./inventory-verifier.js";
 import { auditDurationAndTicks } from "./duration-verifier.js";
 import type { SourceAttestation } from "./types.js";
+import type { KeyObject } from "node:crypto";
 import { redactSensitiveData } from "./redactor.js";
 import type {
   ActionAttemptEvidence,
@@ -32,6 +33,7 @@ export type ValidatorInput = {
   citizenPositionsHistory?: Map<string, Array<{ x: number; y: number; z: number }>>;
   sourceAttestation?: SourceAttestation;
   trustedAuthorities?: string[];
+  trustedKeys?: Record<string, string | KeyObject> | Map<string, string | KeyObject>;
 };
 
 export function validateExperimentEvidence(input: ValidatorInput): ValidationReport {
@@ -213,6 +215,9 @@ export function validateExperimentEvidence(input: ValidatorInput): ValidationRep
     sourceAttestation: input.sourceAttestation,
     experimentId: input.manifest?.experimentId,
     trustedAuthorities: input.trustedAuthorities,
+    trustedKeys: input.trustedKeys,
+    expectedSourceSha: input.manifest?.sourceSha,
+    rawJournalLines: input.rawJournalLines,
   });
 
   // Mission 006: Run mode upgraded to real_minecraft ONLY with proven server attestation
@@ -351,6 +356,7 @@ export function validateExperimentEvidence(input: ValidatorInput): ValidationRep
     },
     hashChainAudit,
     durationAudit,
+    sourceAttestationAudit: durationAudit.sourceAttestationAudit,
     inventoryAudit,
     informationAudit,
     actionVerifications,

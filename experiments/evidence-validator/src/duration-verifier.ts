@@ -1,5 +1,6 @@
 import type { DurationTickAudit } from "./types.js";
 import type { JournalRow } from "./schemas.js";
+import type { KeyObject } from "node:crypto";
 import {
   verifySourceAttestation,
   type SourceAttestation,
@@ -18,6 +19,9 @@ export function auditDurationAndTicks(args: {
   sourceAttestation?: SourceAttestation;
   experimentId?: string;
   trustedAuthorities?: string[];
+  trustedKeys?: Record<string, string | KeyObject> | Map<string, string | KeyObject>;
+  expectedSourceSha?: string;
+  rawJournalLines?: readonly string[];
 }): DurationTickAudit {
   const reasons: string[] = [];
   const gapsDetected: Array<{ fromSeq: number; toSeq: number; gapMs: number }> = [];
@@ -94,11 +98,20 @@ export function auditDurationAndTicks(args: {
     }
   }
 
-  // Phase 1 (Mission 006): Evaluate source attestation
+  // Phase 1 (Mission 006) & Phase A (Mission 007): Evaluate source attestation with cryptographic verification
   const attestationAudit = verifySourceAttestation({
     attestation: args.sourceAttestation,
     expectedExperimentId: args.experimentId,
     trustedAuthorities: args.trustedAuthorities,
+    trustedKeys: args.trustedKeys,
+    expectedSourceSha: args.expectedSourceSha,
+    rawJournalLines: args.rawJournalLines,
+    firstServerTick: firstServerGameTick,
+    lastServerTick: lastServerGameTick,
+    totalServerTicks:
+      serverTickCount > 0 && lastServerGameTick !== undefined && firstServerGameTick !== undefined
+        ? lastServerGameTick - firstServerGameTick
+        : undefined,
   });
 
   // Phase 2 (Mission 006): Rigorous duration logic
@@ -115,6 +128,10 @@ export function auditDurationAndTicks(args: {
     tickCount > 0 ? Number((totalDurationMs / tickCount).toFixed(2)) : 0;
   const averageTps = tpsCount > 0 ? Number((tpsSum / tpsCount).toFixed(2)) : undefined;
   const tpsEvidencePresent = tpsCount > 0;
+
+  // Shutdown evidence check (Phase C, Mission 007)
+  const shutdownRow = args.journalRows.find((r) => r.kind === "shutdown");
+  const hasShutdownEvidence = Boolean(shutdownRow) || Boolean(args.sourceAttestation?.endedAt);
 
   // Evaluate Server Ticks Progression & Authenticity
   if (serverTickCount > 0) {
@@ -163,6 +180,34 @@ export function auditDurationAndTicks(args: {
       );
     } else {
       durationComplete = true;
+    }
+
+    if (isLiveClaim) {
+      if (!hasShutdownEvidence) {
+        durationComplete = false;
+        reasons.push(
+          "Missing reliable shutdown evidence: live Paper demonstration requires graceful shutdown record or attested endedAt timestamp.",
+        );
+      } else if (shutdownRow && !shutdownRow.completedDuration) {
+        durationComplete = false;
+        reasons.push(
+          "Incomplete shutdown: server shutdown event indicates experiment was prematurely aborted.",
+        );
+      }
+
+      if (gapsDetected.length > 0) {
+        durationComplete = false;
+        reasons.push(
+          `Capture session interrupted: detected ${gapsDetected.length} unrecorded time gap(s) exceeding 60s in live event timeline.`,
+        );
+      }
+
+      if (!tpsEvidencePresent) {
+        durationComplete = false;
+        reasons.push(
+          "Absent TPS metrics: live Paper demonstration requires explicit server performance / TPS observations.",
+        );
+      }
     }
   } else if (args.claimedDurationMinutes > 0) {
     if (provenDurationMs < targetMs) {

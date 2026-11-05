@@ -152,12 +152,20 @@ export type InventoryConservationAudit = {
 export interface SourceAttestation {
   sourceType: "offline_simulated" | "unverified_client" | "paper_server_attested";
   serverBuild?: number;
+  serverVersion?: string;
   captureSessionId?: string;
   experimentId?: string;
   signingAuthority?: string;
   signature?: string;
   attestationSignature?: string;
   timestamp?: string;
+  sourceSha?: string;
+  evidenceDigest?: string;
+  startedAt?: string;
+  endedAt?: string;
+  firstServerTick?: number;
+  lastServerTick?: number;
+  totalServerTicks?: number;
 }
 
 export interface SourceAttestationAudit {

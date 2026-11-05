@@ -22,5 +22,14 @@ export * from "./v1-bridge.js";
 
 export * from "./offline-replay.js";
 
-export { verifySourceAttestation } from "./source-authenticator.js";
+export {
+  verifySourceAttestation,
+  buildCanonicalAttestationPayload,
+  parseEd25519PublicKey,
+  parseEd25519Signature,
+  createTestAttestationKeypair,
+  signTestAttestation,
+  type CanonicalAttestationParams,
+  type VerifySourceAttestationOptions,
+} from "./source-authenticator.js";
 export * from "./runtime-recorder-replay.js";
