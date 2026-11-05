@@ -66,6 +66,25 @@ export function migratePhysicalState(db: Database.Database): void {
     db.prepare(
       "SELECT seq,at,citizen_id,community_id,action,record_id FROM physical_state_audit LIMIT 0",
     ).all();
+    // Additive grant-scope column: same-community grants end when the grantee leaves; explicit
+    // cross-community grants (diplomacy) persist until revoked.
+    const grantCols = db.prepare("PRAGMA table_info(physical_asset_grants)").all() as Array<{ name: string }>;
+    if (!grantCols.some((c) => c.name === "cross_community")) {
+      db.exec(
+        "ALTER TABLE physical_asset_grants ADD COLUMN cross_community INTEGER NOT NULL DEFAULT 0 CHECK(cross_community IN (0,1))",
+      );
+      db.exec(`
+        UPDATE physical_asset_grants SET cross_community = 1
+        WHERE EXISTS (
+          SELECT 1 FROM physical_assets a
+          WHERE a.resource_key = physical_asset_grants.resource_key
+          AND NOT EXISTS (
+            SELECT 1 FROM community_members m
+            WHERE m.citizen_id = physical_asset_grants.citizen_id AND m.community_id = a.community_id
+          )
+        )`);
+    }
+    db.prepare("SELECT resource_key,citizen_id,cross_community FROM physical_asset_grants LIMIT 0").all();
     db.prepare("INSERT OR IGNORE INTO sim_meta(key,value) VALUES (?,?)").run(MIGRATION, "1");
   }).immediate();
 }
@@ -296,23 +315,38 @@ export class CitizenPhysicalState {
       const asset = this.store.db
         .prepare("SELECT owner_id FROM physical_assets WHERE resource_key=? AND community_id=?")
         .get(key, this.communityId) as { owner_id: string } | undefined;
-      if (asset?.owner_id !== this.citizenId || !this.store.getCitizen(recipientId)) return false;
+      const recipientCommunity = this.store.getCommunityDirectory().communityOf(recipientId);
+      if (asset?.owner_id !== this.citizenId || !this.store.getCitizen(recipientId) || !recipientCommunity) {
+        return false;
+      }
+      // Explicit marker: granting to a citizen already outside this community is cross-community
+      // diplomacy. Same-community grants stay community-scoped and end if the grantee leaves.
+      const crossCommunity = recipientCommunity !== this.communityId ? 1 : 0;
       this.store.db
-        .prepare("INSERT OR IGNORE INTO physical_asset_grants VALUES (?,?)")
-        .run(key, recipientId);
-      this.audit("grant_asset", JSON.stringify([key, recipientId]));
+        .prepare(
+          "INSERT OR IGNORE INTO physical_asset_grants(resource_key,citizen_id,cross_community) VALUES (?,?,?)",
+        )
+        .run(key, recipientId, crossCommunity);
+      this.audit("grant_asset", JSON.stringify([key, recipientId, crossCommunity ? "cross" : "community"]));
       return true;
     });
   }
 
   accessibleAssets(): PhysicalAsset[] {
     return this.transaction(() => {
+      // Owner access requires current membership in the asset's community. Same-community grants
+      // require the same. Explicit cross-community grants remain valid until revoked.
       const rows = this.store.db
         .prepare(
           `SELECT a.* FROM physical_assets a WHERE
-        a.owner_id=? OR EXISTS(SELECT 1 FROM physical_asset_grants g WHERE g.resource_key=a.resource_key AND g.citizen_id=?)`,
+        (a.owner_id=? AND a.community_id=?)
+        OR EXISTS(
+          SELECT 1 FROM physical_asset_grants g WHERE g.resource_key=a.resource_key AND g.citizen_id=? AND (
+            g.cross_community=1 OR a.community_id=?
+          )
+        )`,
         )
-        .all(this.citizenId, this.citizenId) as Array<{
+        .all(this.citizenId, this.communityId, this.citizenId, this.communityId) as Array<{
         resource_key: string;
         kind: PhysicalAssetKind;
         owner_id: string;
@@ -331,10 +365,16 @@ export class CitizenPhysicalState {
     return Boolean(
       this.store.db
         .prepare(
-          `SELECT 1 FROM physical_assets a WHERE a.resource_key=? AND a.kind='chest' AND (a.owner_id=? OR EXISTS(
-        SELECT 1 FROM physical_asset_grants g WHERE g.resource_key=a.resource_key AND g.citizen_id=?))`,
+          `SELECT 1 FROM physical_assets a WHERE a.resource_key=? AND a.kind='chest' AND (
+        (a.owner_id=? AND a.community_id=?)
+        OR EXISTS(
+          SELECT 1 FROM physical_asset_grants g WHERE g.resource_key=a.resource_key AND g.citizen_id=? AND (
+            g.cross_community=1 OR a.community_id=?
+          )
         )
-        .get(key, this.citizenId, this.citizenId),
+      )`,
+        )
+        .get(key, this.citizenId, this.communityId, this.citizenId, this.communityId),
     );
   }
 

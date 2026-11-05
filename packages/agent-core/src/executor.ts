@@ -1003,6 +1003,14 @@ async function withdrawItemsNamed(
       store.saveSettlement(settlement);
     }
     events.emit(createEvent("ItemWithdrawn", { item: itemName, count: result.data.count, position: chest }, ctx.citizenId));
+  } else if (
+    store.hasCommunities() &&
+    (result.code === "ITEM_NOT_FOUND" || result.code === "VERIFY_FAILED")
+  ) {
+    // Live adapter proved this item is absent (or the withdraw did not move it). Clear only that
+    // item's last-observed count so planners do not retry a stale positive stock belief. Do not
+    // invent a full inventory snapshot from the failure.
+    recordObservedContents(ctx, store, chest, { [itemName]: 0 });
   }
   return result;
 }

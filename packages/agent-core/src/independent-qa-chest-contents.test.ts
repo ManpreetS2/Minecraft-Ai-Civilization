@@ -7,9 +7,9 @@ import { executePlan } from "./executor.js";
 import { loadCraftFixture } from "./testing/load-craft-fixture.js";
 
 /**
- * Independent QA of community-owned chest contents (dbbb7c4), test-only. Real store and executor; the skill layer is
- * mocked exactly as in the branch's own tests, so physical transfers are simulated. `it.fails` marks a reproduced
- * defect and turns red when it is fixed.
+ * Independent QA of community-owned chest contents (dbbb7c4). Real store and executor; the skill layer is mocked
+ * exactly as in the branch's own tests, so physical transfers are simulated. Former `it.fails` defect markers are
+ * ordinary assertions after the V1 membership-scoped access + stale-observation invalidation fix.
  */
 vi.mock("@civ/skills", async (original) => ({
   ...(await original<typeof import("@civ/skills")>()),
@@ -78,7 +78,7 @@ describe("QA: access to observed contents follows authorization", () => {
     expect(of("citizen_atlas").observedContainerContents(key)).toBeUndefined();
   });
 
-  it.fails("DEFECT: after the owner changes community, a fresh handle still reads the old community's chest contents", () => {
+  it("after the owner changes community, a fresh handle cannot read the old community's chest contents", () => {
     const owner = of("citizen_atlas");
     owner.grantAsset(key, "citizen_maya");
     expect(of("citizen_maya").recordContainerObservation(key, { bread: 4 })).toBe(true);
@@ -89,7 +89,7 @@ describe("QA: access to observed contents follows authorization", () => {
     expect(of("citizen_atlas").observedContainerContents(key)).toBeUndefined();
   });
 
-  it.fails("DEFECT: a grantee who changes community keeps reading the granting community's chest contents", () => {
+  it("a grantee who changes community loses read access to the granting community's chest contents", () => {
     of("citizen_atlas").grantAsset(key, "citizen_maya");
     of("citizen_atlas").recordContainerObservation(key, { bread: 4 });
     store.removeCommunityMember("north", "citizen_maya", audit);
@@ -99,7 +99,7 @@ describe("QA: access to observed contents follows authorization", () => {
 });
 
 describe("QA: a failed withdrawal must not leave a stale positive observation", () => {
-  it.fails("DEFECT: observed bread stays after a live withdrawal finds the chest empty, so the same doomed attempt repeats", async () => {
+  it("clears observed bread after a live withdrawal proves the chest holds none", async () => {
     of("citizen_atlas").recordContainerObservation(key, { bread: 4 });
     vi.mocked(withdrawItems).mockResolvedValue(fail("VERIFY_FAILED", "chest holds no bread", 1, true));
     const actor = await ctx("citizen_atlas");

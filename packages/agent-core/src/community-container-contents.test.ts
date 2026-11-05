@@ -117,11 +117,12 @@ describe("executor uses observed contents, not global stock", () => {
     expect(withdrawItems).not.toHaveBeenCalled();
   });
 
-  it("does not trust a stale observation: a failed live withdraw is reported and the observation is not fabricated", async () => {
-    of("citizen_atlas").recordContainerObservation(key, { bread: 2 });
+  it("invalidates the observed item after a live withdraw proves absence, without fabricating other stock", async () => {
+    of("citizen_atlas").recordContainerObservation(key, { bread: 2, apple: 1 });
     vi.mocked(withdrawItems).mockResolvedValue({ success: false, code: "ITEM_NOT_FOUND", error: "empty", durationMs: 1, retryable: true });
     const result = await executePlan(await ctx("citizen_atlas"), withdrawPlan, store, new EventBus());
     expect(result.success).toBe(false);
-    expect(of("citizen_atlas").observedContainerContents(key)).toEqual({ bread: 2 });
+    // Only the attempted item is cleared; unrelated last-observed keys remain until a later live observation.
+    expect(of("citizen_atlas").observedContainerContents(key)).toEqual({ apple: 1 });
   });
 });
