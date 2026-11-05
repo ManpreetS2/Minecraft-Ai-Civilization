@@ -99,6 +99,7 @@ export async function runScenario(input: ScenarioInput) {
         authorizedKnowledge: true,
       });
     }
+    // Fact receipts are written after scripted provider ticks once model/session identities exist.
 
     const before = Object.fromEntries([...fixture.bodies].map(([id, body]) => [id, body.count("oak_log")]));
     const beforeBags = Object.fromEntries([...fixture.bodies].map(([id, body]) => [id, bag(body.items)]));
@@ -237,6 +238,45 @@ export async function runScenario(input: ScenarioInput) {
         accounting: fixture.registry.accounting().citizens[a.citizenId] ?? null,
       };
     });
+
+    if (input.evidenceDirectory) {
+      for (const fact of persistentFacts) {
+        const provider = routing.find((p) => p.citizenId === fact.citizenId);
+        const assignment = fixture.assignments.find((a) => a.citizenId === fact.citizenId);
+        if (!provider?.model || !provider.sessionId || !assignment || !fact.sourceEventId) {
+          throw new Error(`Fact receipt requires observed model/session for ${fact.citizenId}`);
+        }
+        const receiptId = `receipt-fact-${fact.id}`;
+        const receipt: SourceReceipt = {
+          id: receiptId,
+          eventId: fact.sourceEventId,
+          attemptId: `fact-attempt-${fact.id}`,
+          runId,
+          sourceSha,
+          repository,
+          citizenId: fact.citizenId,
+          family: assignment.family,
+          model: provider.model,
+          sessionId: provider.sessionId,
+        };
+        const bytes = JSON.stringify(receipt);
+        const reference = `receipts/${receiptId}.json`;
+        mkdirSync(join(input.evidenceDirectory, "receipts"), { recursive: true });
+        writeFileSync(join(input.evidenceDirectory, reference), bytes);
+        sourceReceipts.push({
+          id: receiptId,
+          eventId: fact.sourceEventId,
+          attemptId: receipt.attemptId,
+          runId,
+          sourceSha,
+          repository,
+          citizenId: fact.citizenId,
+          reference,
+          sha256: createHash("sha256").update(bytes).digest("hex"),
+        });
+        fact.receiptId = receiptId;
+      }
+    }
 
     journal.recordIntervention("operator_stop");
     await fixture.manager.stop();

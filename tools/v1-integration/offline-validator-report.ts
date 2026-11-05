@@ -20,9 +20,11 @@ export function writeOfflineValidatorReport(input: {
     .filter((line) => line.trim().length > 0);
   const adapted = adaptRecorderJournal(rawLines);
   const bridged = bridgeV1RunBundle(input.bundle as unknown as V1RunBundle);
+  // Hash-chain over the full operator journal; adapter rows remain for typed action audits.
+  // Filtered adapter lines alone would break contiguous seq/hash linkage (Mission 006 wiring).
   const report = validateExperimentEvidence({
     manifest: bridged.manifest,
-    rawJournalLines: adapted.rawJournalLines.length > 0 ? adapted.rawJournalLines : bridged.rawJournalLines,
+    rawJournalLines: rawLines,
     journalRows: adapted.journalRows.length > 0 ? adapted.journalRows : bridged.journalRows,
     events: bridged.events,
     facts: bridged.facts,
