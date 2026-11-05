@@ -202,7 +202,10 @@ async function main() {
         Boolean(result.evidenceJournalPath) &&
         result.evidenceSummary.attempted === count &&
         result.evidenceSummary.verified === count &&
-        result.sourceReceipts.length === count &&
+        result.actions.every((a) => result.sourceReceipts.some((r) => r.id === a.receiptId)) &&
+        result.persistentFacts.every(
+          (f) => f.receiptId && result.sourceReceipts.some((r) => r.id === f.receiptId),
+        ) &&
         result.decisionTransport === "scripted-in-process",
     },
   ];
