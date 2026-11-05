@@ -105,6 +105,7 @@ describe("Phase 2 — Simulated vs. Real Paper Tick Distinction", () => {
       sourceAttestation: {
         sourceType: "paper_server_attested",
         serverBuild: 48,
+        serverVersion: "1.21.6",
         captureSessionId: sessionId1,
         experimentId: manifest.experimentId,
         signingAuthority: "paper-attestation-authority-v1",
@@ -342,6 +343,9 @@ describe("Phase 2 — Duration Verifier Direct Unit Tests", () => {
       measuredTps: 20 as number,
       serverGameTick: i * 100,
     }));
+    const rawJournalLines = rows.map((r) => JSON.stringify(r));
+    const sourceSha = "b".repeat(40);
+    const evidenceDigest = createHash("sha256").update(rawJournalLines.join("\n")).digest("hex");
 
     const kp2 = createTestAttestationKeypair();
     const sessionId2 = "11111111-2222-3333-4444-555555555555";
@@ -351,8 +355,8 @@ describe("Phase 2 — Duration Verifier Direct Unit Tests", () => {
         captureSessionId: sessionId2,
         serverBuild: 48,
         serverVersion: "1.21.6",
-        sourceSha: "",
-        evidenceDigest: "",
+        sourceSha,
+        evidenceDigest,
         startedAt: rows[0]!.at,
         endedAt: rows[rows.length - 1]!.at,
         firstServerTick: 0,
@@ -366,10 +370,13 @@ describe("Phase 2 — Duration Verifier Direct Unit Tests", () => {
       claimedDurationMinutes: 0,
       journalRows: rows,
       experimentId: "test-exp",
+      expectedSourceSha: sourceSha,
+      rawJournalLines,
       trustedKeys: { "paper-attestation-authority-v1": kp2.publicKeyPem },
       sourceAttestation: {
         sourceType: "paper_server_attested",
         serverBuild: 48,
+        serverVersion: "1.21.6",
         captureSessionId: sessionId2,
         experimentId: "test-exp",
         signingAuthority: "paper-attestation-authority-v1",
@@ -379,6 +386,8 @@ describe("Phase 2 — Duration Verifier Direct Unit Tests", () => {
         firstServerTick: 0,
         lastServerTick: 400,
         totalServerTicks: 400,
+        sourceSha,
+        evidenceDigest,
       },
     });
 

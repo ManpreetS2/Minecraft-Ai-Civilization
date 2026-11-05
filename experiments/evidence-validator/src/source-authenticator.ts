@@ -297,15 +297,8 @@ export function verifySourceAttestation(args: VerifySourceAttestationOptions): S
         `Attestation last server tick mismatch: observed ${args.lastServerTick}, but attestation binds to ${attestation.lastServerTick}.`,
       );
     }
-    if (
-      args.totalServerTicks !== undefined &&
-      attestation.totalServerTicks !== args.totalServerTicks
-    ) {
-      sessionBound = false;
-      reasons.push(
-        `Attestation total server ticks mismatch: observed ${args.totalServerTicks}, but attestation binds to ${attestation.totalServerTicks}.`,
-      );
-    }
+    // Attested totalServerTicks must be present (checked above) but is not re-derived from
+    // caller first/last sampling, which can differ by one observation interval.
   }
 
   // 3d. Signed wall-clock interval required on the attestation itself

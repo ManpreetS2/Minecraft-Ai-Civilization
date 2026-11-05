@@ -25,11 +25,7 @@ import {
   verifySourceAttestation,
   createTestAttestationKeypair,
   signTestAttestation,
-  buildCanonicalAttestationPayload,
-  parseEd25519PublicKey,
-  parseEd25519Signature,
 } from "../src/source-authenticator.js";
-import { auditDurationAndTicks } from "../src/duration-verifier.js";
 import { validateExperimentEvidence } from "../src/validator.js";
 import { createTestManifest, JournalBuilder } from "../fixtures/helpers.js";
 
@@ -69,7 +65,7 @@ describe("Mission 007, Phase D — Adversarial Cryptographic Verification", () =
   };
 
   it("Vector 1: Valid Ed25519 signature passes when public key is in operator trust root", () => {
-    const { lines, rows } = build60MinJournal();
+    const { lines } = build60MinJournal();
     const digest = createHash("sha256").update(lines.join("\n")).digest("hex");
 
     const signed = signTestAttestation(
@@ -665,7 +661,6 @@ describe("Mission 007, Phase D — Adversarial Cryptographic Verification", () =
   });
 
   it("Vector 15: Offline simulated source strictly rejected from real_minecraft claims even with valid-looking signature", () => {
-    const { lines, rows } = build60MinJournal();
     const audit = verifySourceAttestation({
       attestation: {
         sourceType: "offline_simulated", // Stated as simulated
