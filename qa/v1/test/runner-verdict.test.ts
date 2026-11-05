@@ -6,7 +6,7 @@ const file = (name: string, ...tests: ReturnType<typeof t>[]) => ({ name, status
 const json = (...files: ReturnType<typeof file>[]): VitestJson => ({ numTotalTests: 0, numPassedTests: 0, numFailedTests: 0, testResults: files });
 const good = (): RunFacts => ({
   vitest: json(file("C:/x/qa/v1/test/a.test.ts", t("[ADV-01] ok"), t("[ADV-02] ok"))),
-  exitCode: 0, actualSha: "a".repeat(40), dirty: false, requiredFiles: ["qa/v1/test/a.test.ts"], requiredScenarios: ["ADV-01", "ADV-02"],
+  exitCode: 0, actualSha: "a".repeat(40), claimedSha: "a".repeat(40), dirty: false, requiredFiles: ["qa/v1/test/a.test.ts"], requiredScenarios: ["ADV-01", "ADV-02"],
 });
 
 describe("QA runner verdict refuses to report PASS", () => {
@@ -55,4 +55,37 @@ describe("QA runner verdict refuses to report PASS", () => {
     const v = evaluate({ ...good(), requireLive: true }); expect(v.verdict).toBe("FAIL"); expect(v.reasons.join()).toMatch(/OFFLINE_FIXTURE/);
   });
   it("a run that crashed before reporting", () => { expect(evaluate({ ...good(), vitest: undefined, exitCode: 1 }).verdict).toBe("FAIL"); });
+
+  it("a scenario with an ordinary pass AND a passing [DEFECT] reproduction is not PASS and blocks the overall verdict", () => {
+    const f = good();
+    f.vitest = json(file("C:/x/qa/v1/test/a.test.ts", t("[ADV-01] ok"), t("[ADV-02] ok"), t("[ADV-02][DEFECT] stale stock reproduced")));
+    const v = evaluate(f);
+    expect(v.perScenario["ADV-02"]!.status).toBe("KNOWN_DEFECT_REPRODUCED");
+    expect(v.perScenario["ADV-02"]!.passed).toBe(1);
+    expect(v.perScenario["ADV-01"]!.status).toBe("PASS");
+    expect(v.totals.defectsReproduced).toBe(1);
+    expect(v.verdict).toBe("FAIL");
+    expect(v.reasons.join()).toMatch(/known defect/);
+  });
+  it("a reproduced defect outside the required scenarios still blocks PASS", () => {
+    const f = good();
+    f.vitest = json(file("C:/x/qa/v1/test/a.test.ts", t("[ADV-01] ok"), t("[ADV-02] ok"), t("[ADV-09][DEFECT] x")));
+    expect(evaluate(f).verdict).toBe("FAIL");
+  });
+  it("defect, BLOCKED, skipped and real pass stay distinct statuses", () => {
+    const f = good();
+    f.requiredScenarios = [];
+    f.vitest = json(file("C:/x/qa/v1/test/a.test.ts", t("[ADV-01] ok"), t("[ADV-02][DEFECT] d"), t("[ADV-03][BLOCKED] b", "skipped"), t("[ADV-04] s", "skipped")));
+    const v = evaluate(f);
+    expect(Object.fromEntries(Object.entries(v.perScenario).map(([k, x]) => [k, x.status]))).toEqual({ "ADV-01": "PASS", "ADV-02": "KNOWN_DEFECT_REPRODUCED", "ADV-03": "BLOCKED", "ADV-04": "SKIPPED" });
+  });
+  it("candidate acceptance fails closed when no expected SHA was supplied", () => {
+    const f = good();
+    delete f.claimedSha;
+    const v = evaluate(f);
+    expect(v.verdict).toBe("FAIL");
+    expect(v.reasons.join()).toMatch(/no expected SHA/);
+    expect(evaluate({ ...f, claimedSha: "" }).verdict).toBe("FAIL");
+    expect(evaluate({ ...f, claimedSha: "abc123" }).reasons.join()).toMatch(/full 40-character/);
+  });
 });

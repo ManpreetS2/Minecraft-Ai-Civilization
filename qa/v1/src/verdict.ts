@@ -51,7 +51,10 @@ export function evaluate(f: RunFacts): Verdict {
   if (!f.vitest) reasons.push("no Vitest result was produced (the run crashed before reporting)");
   if (f.exitCode !== 0) reasons.push(`test process exited ${f.exitCode}`);
   if (f.dirty) reasons.push("working tree has uncommitted changes; evidence is not attributable to one SHA");
-  if (f.claimedSha && f.claimedSha !== f.actualSha) reasons.push(`tested SHA ${f.actualSha} differs from claimed SHA ${f.claimedSha}`);
+  // Fail closed: acceptance must name the candidate it is about, otherwise any checkout could be "accepted".
+  if (!f.claimedSha) reasons.push("no expected SHA supplied; a candidate verdict must name the exact full SHA (--expect-sha)");
+  else if (!/^[0-9a-f]{40}$/.test(f.claimedSha)) reasons.push("expected SHA must be the full 40-character commit id");
+  else if (f.claimedSha !== f.actualSha) reasons.push(`tested SHA ${f.actualSha} differs from claimed SHA ${f.claimedSha}`);
   if (f.claimedBranch && f.actualBranch && f.claimedBranch !== f.actualBranch) {
     reasons.push(`evidence is from branch ${f.actualBranch}, not claimed branch ${f.claimedBranch}`);
   }
@@ -75,10 +78,11 @@ export function evaluate(f: RunFacts): Verdict {
     }
   }
   for (const s of Object.values(perScenario)) {
-    s.status = s.failed > 0 ? "FAIL" : s.blocked > 0 ? "BLOCKED" : s.skipped > 0 ? "SKIPPED" : s.passed > 0 ? "PASS" : s.defects > 0 ? "KNOWN_DEFECT_REPRODUCED" : "NOT_RUN";
+    s.status = s.failed > 0 ? "FAIL" : s.defects > 0 ? "KNOWN_DEFECT_REPRODUCED" : s.blocked > 0 ? "BLOCKED" : s.skipped > 0 ? "SKIPPED" : s.passed > 0 ? "PASS" : "NOT_RUN";
     totals.blocked += s.blocked;
   }
   if (totals.tests === 0) reasons.push("zero tests executed");
+  if (totals.defectsReproduced > 0) reasons.push(`${totals.defectsReproduced} known defect(s) still reproduce (it.fails); a reproduced defect is never a pass`);
   if (totals.failed > 0) reasons.push(`${totals.failed} test(s) failed`);
   if (totals.passed === 0 && totals.tests > 0) reasons.push("no test passed");
   for (const id of f.requiredScenarios ?? SCENARIO_IDS) {
@@ -86,7 +90,7 @@ export function evaluate(f: RunFacts): Verdict {
     if (!s || s.tests === 0) reasons.push(`scenario ${id} has no executed test`);
     else if (s.status === "BLOCKED") reasons.push(`scenario ${id} is BLOCKED by a missing interface; blocked is not passed`);
     else if (s.status === "SKIPPED" || s.status === "NOT_RUN") reasons.push(`scenario ${id} only skipped (${s.status}); skipped is not passed`);
-    else if (s.status === "KNOWN_DEFECT_REPRODUCED") reasons.push(`scenario ${id} only reproduces a known defect; that is not a fix`);
+    else if (s.status === "KNOWN_DEFECT_REPRODUCED") reasons.push(`scenario ${id} has a reproduced known defect; that is not a fix`);
   }
   if (f.requireLive) reasons.push("live Paper proof was required but every scenario is OFFLINE_FIXTURE evidence");
   return { verdict: reasons.length === 0 ? "PASS" : "FAIL", mode: "OFFLINE_FIXTURE", reasons, perScenario, totals };

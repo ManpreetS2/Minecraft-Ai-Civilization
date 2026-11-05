@@ -1,5 +1,5 @@
 /**
- * Independent QA entry point:  npx tsx qa/v1/src/run.ts [--expect-sha <full sha>] [--expect-branch <name>] [--require-live]
+ * Independent QA entry point:  npx tsx qa/v1/src/run.ts --expect-sha <full 40-char sha> (required: without it the verdict is FAIL) [--expect-branch <name>] [--require-live]
  *                              [--scenarios ADV-01,ADV-02] [--out <dir>]
  *
  * Runs the qa/v1 Vitest suites offline, then evaluates the result with the pure verdict logic. Exit 0 only for PASS.

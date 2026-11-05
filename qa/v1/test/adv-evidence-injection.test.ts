@@ -35,7 +35,7 @@ describe("evidence mode and provenance", () => {
   const t = (title: string) => ({ fullName: title, title, status: "passed" });
   const passing = (): RunFacts => {
     const v: VitestJson = { numTotalTests: 1, numPassedTests: 1, numFailedTests: 0, testResults: [{ name: "C:/x/qa/v1/test/a.test.ts", status: "passed", assertionResults: [t("[ADV-13] simulated sixty-minute fixture")] }] };
-    return { vitest: v, exitCode: 0, actualSha: "c".repeat(40), dirty: false, requiredFiles: [], requiredScenarios: ["ADV-13"] };
+    return { vitest: v, exitCode: 0, actualSha: "c".repeat(40), claimedSha: "c".repeat(40), dirty: false, requiredFiles: [], requiredScenarios: ["ADV-13"] };
   };
 
   it(caseTitle("ADV-12", "evidence is attributable to exactly one clean source SHA; a dirty tree or a different claimed SHA is refused"), () => {

@@ -62,3 +62,27 @@ allowlist of accepted keys. Alternative where in-process enforcement is impossib
 a launch-policy check that `createBody` is the project's own factory or a test double. Reviewer checklist: confirm 1 to 3 by running
 the file; decide whether a trusted-caller model is acceptable for the offline root; confirm no live entrypoint can reach the root.
 Reviewer must be Codex or Gemini, not CLAUDE 2.
+
+## Running against Cursor's integrated candidate (no verdict until its exact SHA exists)
+
+```
+qa/v1/scripts/run-on-candidate.sh <candidate-checkout> <full-40-char-sha> [expected-branch]
+```
+
+Refuses if the checkout is not at that SHA or has tracked changes; copies `qa/v1` in untracked; no patch, no cherry-pick,
+no runtime edit. Omitting the SHA makes the verdict FAIL by design. Per-area commands (run from the candidate checkout after
+the copy; each is offline):
+
+| Area | Command |
+|---|---|
+| Chest access and stale stock (ADV-03) | `npx vitest run -c qa/v1/vitest.config.ts qa/v1/test/adv-chest-access.test.ts` |
+| Private knowledge, session isolation (ADV-01, 02, 07) | `npx vitest run -c qa/v1/vitest.config.ts qa/v1/test/adv-identity-privacy.test.ts` |
+| Provider cancellation and accounting (ADV-08, 10, 11) | `npx vitest run -c qa/v1/vitest.config.ts qa/v1/test/adv-provider-faults.test.ts` |
+| Offline transport boundaries (ADV-09, 14) | `npx vitest run -c qa/v1/vitest.config.ts qa/v1/test/adv-offline-boundary.test.ts qa/v1/test/adv-evidence-injection.test.ts` |
+| Physical action truthfulness (ADV-04..06) | `npx vitest run -c qa/v1/vitest.config.ts qa/v1/test/adv-physical.test.ts` |
+| Shutdown and restart | ADV-07/08 above, plus the candidate's own shutdown suite: `npx vitest run shutdown sqlite` (QA gap: no ADV test yet for callbacks writing to a closed store after `stop()`; see Issue #6) |
+| Everything plus verdict | `qa/v1/scripts/run-on-candidate.sh ...` |
+
+Expected on a candidate that integrates #42, #52 and #53: the two ADV-10 `[DEFECT]` cases flip RED (their `it.fails` then
+fails because the defect is fixed). Remove `{ defect: true }` and `it.fails.each` in `adv-provider-faults.test.ts` for that
+candidate; the historical red reproductions stay in git history at `ae784fd` and in `reference/`.
