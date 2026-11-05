@@ -150,7 +150,7 @@ pnpm exec vitest run packages/agent-core/src/community-container-contents.test.t
 | Offline network-guarded candidate | windows-backup | `agents/t3-provider-hardening-integration` | `9945f02f38e14a7d63b3eed66279d191ad06ad3d` | PR #37; QA #46 found GPT fetch gap |
 | Mission 013 stack tip | origin | `agents/t3-community-chest-contents` | `dbbb7c4fde2d809bf259dc5452133507717b9453` | PR #14; ancestry #12→#13→#14 |
 | Chest QA (test-only) | windows-backup | `agents/claude2-qa-chest-contents` | `f443bb386c1adfc5ce6f9d7c3d69de14c3a58aa1` | PR #50 |
-| This integration worktree | windows-backup target | `agents/cursor-v1-acceptance-ledger` | `581759ccaec6da0b829c35ed2658dd1c0598c641` | Ledger + P0 chest fixes (not yet a full 1v1 integrate SHA) |
+| This integration worktree | windows-backup draft PR [#52](https://github.com/ManpreetS2/Minecraft-Ai-Civilization-windows-backup/pull/52) | `agents/cursor-v1-acceptance-ledger` | `8bb2c731ae24b364de7d434f67209f3c5e63bf1a` (fix `581759ccaec6da0b829c35ed2658dd1c0598c641`) | Ledger + P0 chest fixes (not yet a full 1v1 integrate SHA) |
 
 ---
 
