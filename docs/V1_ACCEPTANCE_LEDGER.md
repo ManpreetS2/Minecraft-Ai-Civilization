@@ -99,9 +99,9 @@ These must reach `OFFLINE_PASS` on **one** reconciled candidate SHA before reque
 | OFF-04 | Community physical isolation (executor/storage/workstations) | Mission 013; origin PR #12 | `IMPLEMENTED_UNVERIFIED` | `repro-manager-executor-isolation` + QA #38/#44 | `55d5a86` | Claude2 QA done | Stacked; not on combined SHA |
 | OFF-05 | Per-community construction persistence | origin PR #13 | `IMPLEMENTED_UNVERIFIED` | Construction community tests + QA #49 | `7b1bd98` | QA #49 | Stacked on #12 |
 | OFF-06 | Owner/grantee chest contents; no community snapshot leak | origin PR #14 | `IMPLEMENTED_UNVERIFIED` | `community-container-contents` + QA #50 | Source `dbbb7c4`; QA `f443bb3` | QA #50 CHANGES REQUIRED → fix in progress on this branch | Three P0 defects (see OFF-07…09) |
-| OFF-07 | Former community owner loses old-community chest access | Issue #51 P0; QA #50 DEFECT 1 | `IMPLEMENTED_UNVERIFIED` | QA: owner change → `observedContainerContents` undefined | Fix drafting on `agents/cursor-v1-acceptance-ledger` from `f443bb3` | Needs non-author re-check after green | Pending commit/push/review |
-| OFF-08 | Grantee loses access after changing community | Issue #51 P0; QA #50 DEFECT 2 | `IMPLEMENTED_UNVERIFIED` | QA: grantee change → undefined | Same as OFF-07 | Same | Same |
-| OFF-09 | Failed live withdraw proving absence invalidates stale positive observation | Issue #51 P0; QA #50 DEFECT 3 | `IMPLEMENTED_UNVERIFIED` | QA: VERIFY_FAILED → `{}` / cleared item | Same as OFF-07 | Same | Same |
+| OFF-07 | Former community owner loses old-community chest access | Issue #51 P0; QA #50 DEFECT 1 | `IMPLEMENTED_UNVERIFIED` | QA: owner change → `observedContainerContents` undefined | Branch `agents/cursor-v1-acceptance-ledger` @ `581759ccaec6da0b829c35ed2658dd1c0598c641`; `pnpm exec vitest run packages/agent-core/src/independent-qa-chest-contents.test.ts` → 7/7 pass (2026-11-05) | Needs non-author re-check | Not on reconciled 1v1 integrate SHA |
+| OFF-08 | Grantee loses access after changing community | Issue #51 P0; QA #50 DEFECT 2 | `IMPLEMENTED_UNVERIFIED` | QA: grantee change → undefined | Same SHA; same command | Same | Same |
+| OFF-09 | Failed live withdraw proving absence invalidates stale positive observation | Issue #51 P0; QA #50 DEFECT 3 | `IMPLEMENTED_UNVERIFIED` | QA: VERIFY_FAILED → `{}` / cleared item | Same SHA; related suite 59/59 pass across 6 community files | Same | Same |
 | OFF-10 | Offline default-deny transports (no injectable network) | windows-backup PR #48 | `IMPLEMENTED_UNVERIFIED` | Security/offline deny suite | `ae784fd` | **Must be non-Claude2** | Self-approval forbidden |
 | OFF-11 | GPT retry / quota / Retry-After hardening | PR #32 | `IMPLEMENTED_UNVERIFIED` | Provider retry tests | `8bd0941` | Non-author | Not integrated |
 | OFF-12 | Mixed GPT/Claude fault accounting (no charge on cancelled wait) | PR #42 | `IMPLEMENTED_UNVERIFIED` | Mixed fault suite | `1a690f6` | Non-author | Not integrated |
@@ -150,7 +150,7 @@ pnpm exec vitest run packages/agent-core/src/community-container-contents.test.t
 | Offline network-guarded candidate | windows-backup | `agents/t3-provider-hardening-integration` | `9945f02f38e14a7d63b3eed66279d191ad06ad3d` | PR #37; QA #46 found GPT fetch gap |
 | Mission 013 stack tip | origin | `agents/t3-community-chest-contents` | `dbbb7c4fde2d809bf259dc5452133507717b9453` | PR #14; ancestry #12→#13→#14 |
 | Chest QA (test-only) | windows-backup | `agents/claude2-qa-chest-contents` | `f443bb386c1adfc5ce6f9d7c3d69de14c3a58aa1` | PR #50 |
-| This integration worktree | windows-backup target | `agents/cursor-v1-acceptance-ledger` | *(pending first commit)* | Ledger + P0 chest fixes |
+| This integration worktree | windows-backup target | `agents/cursor-v1-acceptance-ledger` | `581759ccaec6da0b829c35ed2658dd1c0598c641` | Ledger + P0 chest fixes (not yet a full 1v1 integrate SHA) |
 
 ---
 
