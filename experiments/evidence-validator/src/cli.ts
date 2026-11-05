@@ -170,7 +170,11 @@ Options:
   return 0;
 }
 
-if (process.argv[1]?.endsWith("cli.ts") || process.argv[1]?.endsWith("cli.js")) {
+const entry = process.argv[1]?.replaceAll("\\", "/") ?? "";
+if (
+  /experiments\/evidence-validator\/src\/cli\.(ts|js)$/.test(entry) ||
+  entry.endsWith("/civ-evidence-validator")
+) {
   const code = runCli();
   process.exitCode = code;
 }
