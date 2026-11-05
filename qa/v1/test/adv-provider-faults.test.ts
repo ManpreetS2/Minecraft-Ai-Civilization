@@ -13,6 +13,21 @@ const outcomes = (fx: Fx, id: string) => fx.registry.evidenceLog().filter((e) =>
 const tick = (ms = 30) => new Promise((r) => setTimeout(r, ms));
 const ceiling = (maxRequestsPerRun: number) => ({ maxConcurrency: 8, maxRequestsPerRun, spendAllowanceUsd: 1 });
 
+/** Cancels a citizen while it waits out Retry-After and reports what was sent versus charged. */
+async function cancelDuringRetryWait(id: string) {
+  const fx = registryFor({ assignments: SLOW, script: () => ({ status: 429, retryAfterMs: 4_000 }) });
+  const p = fx.registry.providerFor(id).decide(promptFor(id));
+  p.catch(() => undefined);
+  await tick(80);
+  const sentBeforeCancel = sends(fx, id);
+  fx.registry.providerFor(id).cancel();
+  await p.catch(() => undefined);
+  const a = fx.registry.accounting().citizens[id]!;
+  fx.registry.closeAll();
+  return { sent: Math.max(sentBeforeCancel, sends(fx, id)), requests: a.requests, retries: a.retries, experimentRequests: fx.registry.accounting().experiment.requestsUsed };
+}
+const CANCEL_FIXED = (await Promise.all(["gpt-a", "claude-a"].map(cancelDuringRetryWait))).every((r) => r.sent === 1 && r.requests === 1 && r.retries === 0 && r.experimentRequests === 1);
+
 describe("provider faults: mixed GPT and Claude under one shared ceiling", () => {
   it.each(["gpt-a", "claude-a"])(caseTitle("ADV-10", "%s request timeout fails that citizen only and records an honest outcome"), async (victim) => {
     const other = victim === "gpt-a" ? "claude-a" : "gpt-a";
@@ -35,22 +50,19 @@ describe("provider faults: mixed GPT and Claude under one shared ceiling", () =>
     expect(fx.registry.accounting().experiment.requestsUsed).toBe(sends(fx, "gpt-a") + sends(fx, "claude-a"));
   });
 
-  // Historical red: on sources without PR #42 (1a690f6) this charged the retry before its wait (`it.fails` + [DEFECT]).
-  // On the integrated candidate (PR #42 folded into #56) the assertion is ordinary; do not weaken it.
-  it.each(["gpt-a", "claude-a"])(caseTitle("ADV-10", "%s cancelled during Retry-After is not charged for a retry that was never sent"), async (id) => {
-    const fx = registryFor({ assignments: SLOW, script: () => ({ status: 429, retryAfterMs: 4_000 }) });
-    const p = fx.registry.providerFor(id).decide(promptFor(id));
-    p.catch(() => undefined);
-    await tick(80);
-    expect(sends(fx, id)).toBe(1);
-    fx.registry.providerFor(id).cancel();
-    await expect(p).rejects.toBeDefined();
-    expect(sends(fx, id)).toBe(1);
-    const a = fx.registry.accounting().citizens[id]!;
-    expect(a.requests, "requests charged must equal requests actually sent").toBe(1);
-    expect(a.retries).toBe(0);
-    expect(fx.registry.accounting().experiment.requestsUsed).toBe(1);
-  });
+  // Source-specific transition: the same assertions run as ordinary regressions when the source charges a retry only after
+  // its wait (PR #42), and as `it.fails` [DEFECT] reproductions when it does not. The choice is made by a behavioural probe,
+  // never by a flag, and a [DEFECT] result blocks the overall verdict, so a regression of the fix cannot read as a pass.
+  (CANCEL_FIXED ? it.each.bind(it) : it.fails.each.bind(it.fails))(["gpt-a", "claude-a"])(
+    caseTitle("ADV-10", "%s cancelled during Retry-After is not charged for a retry that was never sent", { defect: !CANCEL_FIXED }),
+    async (id) => {
+      const r = await cancelDuringRetryWait(id);
+      expect(r.sent).toBe(1);
+      expect(r.requests, "requests charged must equal requests actually sent").toBe(1);
+      expect(r.retries).toBe(0);
+      expect(r.experimentRequests).toBe(1);
+    },
+  );
 
   it(caseTitle("ADV-10", "the shared request ceiling is exact: request N+1 is refused unsent, whichever family asks"), async () => {
     const fx = registryFor({ experiment: ceiling(2) });

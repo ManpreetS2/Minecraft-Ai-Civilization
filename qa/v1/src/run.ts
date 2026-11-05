@@ -33,6 +33,8 @@ const requiredFiles = [
   `${harness}/test/adv-evidence-injection.test.ts`,
   `${harness}/test/runner-verdict.test.ts`,
   `${harness}/test/wrapper-safety.test.ts`,
+  `${harness}/test/adv-shutdown.test.ts`,
+  `${harness}/test/adv-chest-freshness.test.ts`,
 ];
 
 const actualSha = git("rev-parse", "HEAD");

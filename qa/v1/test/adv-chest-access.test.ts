@@ -134,11 +134,9 @@ suite("ADV-03 physical stock observations", () => {
   });
 });
 
-describe(caseTitle("ADV-03", "interface gaps (recorded, not faked)"), () => {
-  // The container-contents interface returns bare counts. There is no observedAt/verified-live metadata, and no
-  // ordering token for concurrent observers, so these two obligations cannot be asserted honestly yet.
-  it.skip(caseTitle("ADV-03", "a stale observation is never treated as verified live stock without a recheck (needs observation metadata: observedAt/verifiedLive)", { blocked: true }), () => undefined);
-  it.skip(caseTitle("ADV-03", "concurrent observations cannot overwrite a newer authoritative result (needs an ordering token on recordContainerObservation)", { blocked: true }), () => undefined);
-  // Skipped while the interface is absent (HAS_CONTENTS false); when present the real suites above run instead.
-  (BLOCK ? it.skip : it.skip)(caseTitle("ADV-03", "chest contents interface (recordContainerObservation) does not exist on this source", { blocked: true }), () => undefined);
-});
+// Recorded only while the interface is absent; when present the real suites above run instead.
+if (BLOCK) {
+  describe(caseTitle("ADV-03", "interface gaps (recorded, not faked)"), () => {
+    it.skip(caseTitle("ADV-03", "chest contents interface (recordContainerObservation) does not exist on this source", { blocked: true }), () => undefined);
+  });
+}

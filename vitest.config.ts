@@ -1,18 +1,9 @@
-import { fileURLToPath } from "node:url";
 import { defineConfig } from "vitest/config";
-
-const src = (p: string) => fileURLToPath(new URL(`./packages/${p}`, import.meta.url));
+import { civPackageAliases } from "./test-support/civ-package-aliases.mjs";
 
 export default defineConfig({
   resolve: {
-    alias: [
-      { find: "@civ/cognition/routing", replacement: src("cognition/src/routing/index.ts") },
-      { find: "@civ/skills/testing", replacement: src("skills/src/testing/mineflayer-craft-fixture.ts") },
-      ...["agent-core", "cognition", "shared", "skills", "minecraft-adapter", "psychology", "memory", "society", "minecraft-knowledge", "session-isolation"].map((name) => ({
-        find: new RegExp(`^@civ/${name}$`),
-        replacement: src(`${name}/src/index.ts`),
-      })),
-    ],
+    alias: civPackageAliases(new URL("./packages/", import.meta.url)),
   },
   test: {
     include: ["packages/**/*.test.ts", "apps/**/*.test.ts", "test-support/**/*.test.ts", "tools/**/*.test.ts"],

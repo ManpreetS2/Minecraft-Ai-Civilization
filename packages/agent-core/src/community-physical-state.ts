@@ -41,7 +41,8 @@ export function migratePhysicalState(db: Database.Database): void {
       );
       CREATE TABLE IF NOT EXISTS physical_asset_contents (
         resource_key TEXT PRIMARY KEY REFERENCES physical_assets(resource_key),
-        contents_json TEXT NOT NULL, observed_by TEXT NOT NULL, observed_at TEXT NOT NULL
+        contents_json TEXT NOT NULL, observed_by TEXT NOT NULL, observed_at TEXT NOT NULL,
+        revision INTEGER NOT NULL DEFAULT 0
       );
       CREATE TABLE IF NOT EXISTS physical_state_audit (
         seq INTEGER PRIMARY KEY, at TEXT NOT NULL, citizen_id TEXT NOT NULL,
@@ -85,6 +86,14 @@ export function migratePhysicalState(db: Database.Database): void {
         )`);
     }
     db.prepare("SELECT resource_key,citizen_id,cross_community FROM physical_asset_grants LIMIT 0").all();
+    // Additive observation revision for expectedRevision compare-and-swap (ADV-03 freshness contract).
+    const contentCols = db.prepare("PRAGMA table_info(physical_asset_contents)").all() as Array<{ name: string }>;
+    if (!contentCols.some((c) => c.name === "revision")) {
+      db.exec("ALTER TABLE physical_asset_contents ADD COLUMN revision INTEGER NOT NULL DEFAULT 0");
+    }
+    db.prepare(
+      "SELECT resource_key,contents_json,observed_by,observed_at,revision FROM physical_asset_contents LIMIT 0",
+    ).all();
     db.prepare("INSERT OR IGNORE INTO sim_meta(key,value) VALUES (?,?)").run(MIGRATION, "1");
   }).immediate();
 }
@@ -383,53 +392,77 @@ export class CitizenPhysicalState {
    * earlier observations (an adapter transfer reports only the items it touched), so values are last-observed, not
    * authoritative stock: every physical use must still be verified live. Contents are visible only to the owner and
    * explicit grantees, never to the community-wide snapshot.
+   *
+   * Optional `expectedRevision` is compare-and-swap: when provided and stale, returns false and changes nothing.
+   * Omitting it preserves prior overwrite behaviour.
    */
-  recordContainerObservation(key: string, observed: Record<string, number>): boolean {
+  recordContainerObservation(
+    key: string,
+    observed: Record<string, number>,
+    options?: { expectedRevision?: number },
+  ): boolean {
     for (const [item, count] of Object.entries(observed)) {
       if (!item || !Number.isSafeInteger(count) || count < 0) throw new Error("invalid observed container count");
     }
     return this.transaction(() => {
       if (!this.mayUse(key)) return false;
       const row = this.store.db
-        .prepare("SELECT contents_json FROM physical_asset_contents WHERE resource_key=?")
-        .get(key) as { contents_json: string } | undefined;
+        .prepare("SELECT contents_json, revision FROM physical_asset_contents WHERE resource_key=?")
+        .get(key) as { contents_json: string; revision: number } | undefined;
+      if (options?.expectedRevision !== undefined && options.expectedRevision !== (row?.revision ?? 0)) return false;
       const merged = { ...(row ? (JSON.parse(row.contents_json) as Record<string, number>) : {}), ...observed };
       for (const item of Object.keys(merged)) if (merged[item] === 0) delete merged[item];
       this.store.db
         .prepare(
-          `INSERT INTO physical_asset_contents(resource_key,contents_json,observed_by,observed_at) VALUES (?,?,?,?)
-        ON CONFLICT(resource_key) DO UPDATE SET contents_json=excluded.contents_json,observed_by=excluded.observed_by,observed_at=excluded.observed_at`,
+          `INSERT INTO physical_asset_contents(resource_key,contents_json,observed_by,observed_at,revision) VALUES (?,?,?,?,?)
+        ON CONFLICT(resource_key) DO UPDATE SET contents_json=excluded.contents_json,observed_by=excluded.observed_by,observed_at=excluded.observed_at,revision=excluded.revision`,
         )
-        .run(key, JSON.stringify(merged), this.citizenId, new Date().toISOString());
+        .run(key, JSON.stringify(merged), this.citizenId, new Date().toISOString(), (row?.revision ?? 0) + 1);
       this.audit("observe_container", key);
       return true;
     });
   }
 
-  observedContainerContents(key: string): Record<string, number> | undefined {
-    return this.observedContainerProvenance(key)?.contents;
-  }
-
   /**
-   * Additive read of stored observation provenance. `observedAt` / `observedBy` are already persisted;
-   * this does not claim verified-live stock and does not add an ordering token (ADV-03 freshness /
-   * concurrency assertions remain BLOCKED until callers treat metadata explicitly).
+   * Additive observation details (qa/v1/CHEST_OBSERVATION_CONTRACT.md). Stored rows are always basis "observed";
+   * verified-live is a per-use adapter check, never a persisted state. Same authorization as contents.
    */
-  observedContainerProvenance(
-    key: string,
-  ): { contents: Record<string, number>; observedBy: string; observedAt: string } | undefined {
+  observedContainerDetails(key: string):
+    | {
+        contents: Record<string, number>;
+        observedBy: string;
+        observedAt: string;
+        revision: number;
+        basis: "observed";
+      }
+    | undefined {
     return this.transaction(() => {
       if (!this.mayUse(key)) return undefined;
       const row = this.store.db
-        .prepare("SELECT contents_json, observed_by, observed_at FROM physical_asset_contents WHERE resource_key=?")
-        .get(key) as { contents_json: string; observed_by: string; observed_at: string } | undefined;
+        .prepare("SELECT contents_json, observed_by, observed_at, revision FROM physical_asset_contents WHERE resource_key=?")
+        .get(key) as
+        | { contents_json: string; observed_by: string; observed_at: string; revision: number }
+        | undefined;
       if (!row) return undefined;
       return {
         contents: JSON.parse(row.contents_json) as Record<string, number>,
         observedBy: row.observed_by,
         observedAt: row.observed_at,
+        revision: row.revision,
+        basis: "observed" as const,
       };
     });
+  }
+
+  observedContainerContents(key: string): Record<string, number> | undefined {
+    return this.observedContainerDetails(key)?.contents;
+  }
+
+  /** @deprecated Prefer observedContainerDetails; kept as a thin alias for earlier Mission 004 callers. */
+  observedContainerProvenance(key: string) {
+    const details = this.observedContainerDetails(key);
+    if (!details) return undefined;
+    return { contents: details.contents, observedBy: details.observedBy, observedAt: details.observedAt };
   }
 
   /** Owner may abandon a bed/home/workstation; prior ownership remains in the audit. */

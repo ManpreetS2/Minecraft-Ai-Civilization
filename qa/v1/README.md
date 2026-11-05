@@ -63,26 +63,22 @@ a launch-policy check that `createBody` is the project's own factory or a test d
 the file; decide whether a trusted-caller model is acceptable for the offline root; confirm no live entrypoint can reach the root.
 Reviewer must be Codex or Gemini, not CLAUDE 2.
 
-## Running against Cursor's integrated candidate (no verdict until its exact SHA exists)
+## Running against an integrated candidate (non-destructive)
 
 ```
-qa/v1/scripts/run-on-candidate.sh <candidate-checkout> <full-40-char-sha> [expected-branch]
+qa/v1/scripts/run-on-candidate.sh <candidate-repo> <full-40-char-sha> <NEW-worktree-dir> [expected-branch]
 ```
 
-Refuses if the checkout is not at that SHA or has tracked changes; copies `qa/v1` in untracked; no patch, no cherry-pick,
-no runtime edit. Omitting the SHA makes the verdict FAIL by design. Per-area commands (run from the candidate checkout after
-the copy; each is offline):
+Creates a new disposable detached worktree at that exact SHA and overlays the harness as UNTRACKED `qa-independent/v1` (never at
+`qa/v1`, which a candidate may already track in an older copy). It never deletes, overwrites or moves anything: it refuses an
+existing destination, a symlinked path, a destination inside the candidate or harness, a short or unknown SHA, tracked changes in
+the candidate repo, an uncommitted harness, and symlinks in the harness (`test/wrapper-safety.test.ts`). The report records the
+candidate SHA and the harness commit, so the executed test code is always attributable. Omitting the SHA makes the verdict FAIL.
+Do not pass `expected-branch` for a detached worktree.
 
-| Area | Command |
-|---|---|
-| Chest access and stale stock (ADV-03) | `npx vitest run -c qa/v1/vitest.config.ts qa/v1/test/adv-chest-access.test.ts` |
-| Private knowledge, session isolation (ADV-01, 02, 07) | `npx vitest run -c qa/v1/vitest.config.ts qa/v1/test/adv-identity-privacy.test.ts` |
-| Provider cancellation and accounting (ADV-08, 10, 11) | `npx vitest run -c qa/v1/vitest.config.ts qa/v1/test/adv-provider-faults.test.ts` |
-| Offline transport boundaries (ADV-09, 14) | `npx vitest run -c qa/v1/vitest.config.ts qa/v1/test/adv-offline-boundary.test.ts qa/v1/test/adv-evidence-injection.test.ts` |
-| Physical action truthfulness (ADV-04..06) | `npx vitest run -c qa/v1/vitest.config.ts qa/v1/test/adv-physical.test.ts` |
-| Shutdown and restart | ADV-07/08 above, plus the candidate's own shutdown suite: `npx vitest run shutdown sqlite` (QA gap: no ADV test yet for callbacks writing to a closed store after `stop()`; see Issue #6) |
-| Everything plus verdict | `qa/v1/scripts/run-on-candidate.sh ...` |
+Areas (from inside the worktree, offline): chest `adv-chest-access` and `adv-chest-freshness`; privacy and sessions `adv-identity-privacy`;
+provider cancellation and accounting `adv-provider-faults`; transport boundaries `adv-offline-boundary` and `adv-evidence-injection`;
+shutdown and restart `adv-shutdown`; physical truthfulness `adv-physical`. Each: `npx vitest run -c qa-independent/v1/vitest.config.ts qa-independent/v1/test/<file>.test.ts`.
 
-Expected on a candidate that integrates #42, #52 and #53: the two ADV-10 `[DEFECT]` cases flip RED (their `it.fails` then
-fails because the defect is fixed). Remove `{ defect: true }` and `it.fails.each` in `adv-provider-faults.test.ts` for that
-candidate; the historical red reproductions stay in git history at `ae784fd` and in `reference/`.
+ADV-10 cancel-during-retry tests choose their mode by a behavioural probe: ordinary regressions on source that charges a retry only
+after its wait (PR #42), `it.fails` `[DEFECT]` reproductions on older source. The historical reproductions stay in git history.

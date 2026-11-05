@@ -1,0 +1,59 @@
+diff --git a/packages/agent-core/src/community-physical-state.ts b/packages/agent-core/src/community-physical-state.ts
+index 55ddae1..300c65a 100644
+--- a/packages/agent-core/src/community-physical-state.ts
++++ b/packages/agent-core/src/community-physical-state.ts
+@@ -41,7 +41,7 @@ export function migratePhysicalState(db: Database.Database): void {
+       );
+       CREATE TABLE IF NOT EXISTS physical_asset_contents (
+         resource_key TEXT PRIMARY KEY REFERENCES physical_assets(resource_key),
+-        contents_json TEXT NOT NULL, observed_by TEXT NOT NULL, observed_at TEXT NOT NULL
++        contents_json TEXT NOT NULL, observed_by TEXT NOT NULL, observed_at TEXT NOT NULL, revision INTEGER NOT NULL DEFAULT 0
+       );
+       CREATE TABLE IF NOT EXISTS physical_state_audit (
+         seq INTEGER PRIMARY KEY, at TEXT NOT NULL, citizen_id TEXT NOT NULL,
+@@ -384,28 +384,39 @@ export class CitizenPhysicalState {
+    * authoritative stock: every physical use must still be verified live. Contents are visible only to the owner and
+    * explicit grantees, never to the community-wide snapshot.
+    */
+-  recordContainerObservation(key: string, observed: Record<string, number>): boolean {
++  recordContainerObservation(key: string, observed: Record<string, number>, options?: { expectedRevision?: number }): boolean {
+     for (const [item, count] of Object.entries(observed)) {
+       if (!item || !Number.isSafeInteger(count) || count < 0) throw new Error("invalid observed container count");
+     }
+     return this.transaction(() => {
+       if (!this.mayUse(key)) return false;
+       const row = this.store.db
+-        .prepare("SELECT contents_json FROM physical_asset_contents WHERE resource_key=?")
+-        .get(key) as { contents_json: string } | undefined;
++        .prepare("SELECT contents_json, revision FROM physical_asset_contents WHERE resource_key=?")
++        .get(key) as { contents_json: string; revision: number } | undefined;
++      if (options?.expectedRevision !== undefined && options.expectedRevision !== (row?.revision ?? 0)) return false;
+       const merged = { ...(row ? (JSON.parse(row.contents_json) as Record<string, number>) : {}), ...observed };
+       for (const item of Object.keys(merged)) if (merged[item] === 0) delete merged[item];
+       this.store.db
+         .prepare(
+-          `INSERT INTO physical_asset_contents(resource_key,contents_json,observed_by,observed_at) VALUES (?,?,?,?)
+-        ON CONFLICT(resource_key) DO UPDATE SET contents_json=excluded.contents_json,observed_by=excluded.observed_by,observed_at=excluded.observed_at`,
++          `INSERT INTO physical_asset_contents(resource_key,contents_json,observed_by,observed_at,revision) VALUES (?,?,?,?,?)
++        ON CONFLICT(resource_key) DO UPDATE SET contents_json=excluded.contents_json,observed_by=excluded.observed_by,observed_at=excluded.observed_at,revision=excluded.revision`,
+         )
+-        .run(key, JSON.stringify(merged), this.citizenId, new Date().toISOString());
++        .run(key, JSON.stringify(merged), this.citizenId, new Date().toISOString(), (row?.revision ?? 0) + 1);
+       this.audit("observe_container", key);
+       return true;
+     });
+   }
+ 
++  observedContainerDetails(key: string) {
++    return this.transaction(() => {
++      if (!this.mayUse(key)) return undefined;
++      const row = this.store.db
++        .prepare("SELECT contents_json,observed_by,observed_at,revision FROM physical_asset_contents WHERE resource_key=?")
++        .get(key) as { contents_json: string; observed_by: string; observed_at: string; revision: number } | undefined;
++      return row ? { contents: JSON.parse(row.contents_json) as Record<string, number>, observedBy: row.observed_by, observedAt: row.observed_at, revision: row.revision, basis: "observed" as const } : undefined;
++    });
++  }
++
+   observedContainerContents(key: string): Record<string, number> | undefined {
+     return this.transaction(() => {
+       if (!this.mayUse(key)) return undefined;

@@ -11,10 +11,7 @@ import { describe, expect, it } from "vitest";
  */
 const script = fileURLToPath(new URL("../scripts/run-on-candidate.sh", import.meta.url)).replaceAll("\\", "/");
 const sh = (cwd: string, ...a: string[]) => spawnSync("git", a, { cwd, encoding: "utf8" });
-/**
- * On Windows, PATH `bash` is often WSL, which cannot open Win32 script paths (exit 127).
- * Prefer Git Bash so refusal tests exercise the real wrapper on this candidate platform.
- */
+/** Windows PATH `bash` is often WSL and cannot open Win32 script paths; prefer Git Bash. */
 function resolveBash(): string {
   if (platform() === "win32") {
     for (const candidate of [
