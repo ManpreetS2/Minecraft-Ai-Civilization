@@ -1,4 +1,7 @@
 /** Community-owned container contents: observed (not global stock), readable only by owner and grantees. Offline. */
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { EventBus, ok } from "@civ/shared";
 import { depositItems, withdrawItems, type SkillContext } from "@civ/skills";
@@ -135,5 +138,37 @@ describe("executor uses observed contents, not global stock", () => {
     expect(result.success).toBe(false);
     // Only the attempted item is cleared; unrelated last-observed keys remain until a later live observation.
     expect(of("citizen_atlas").observedContainerContents(key)).toEqual({ apple: 1 });
+  });
+});
+
+describe("chest observation revision survives SQLite reopen", () => {
+  it("keeps revision/observedAt and rejects stale expectedRevision after restart", () => {
+    const dir = mkdtempSync(join(tmpdir(), "chest-rev-"));
+    const path = join(dir, "chest.sqlite");
+    try {
+      const first = new CivilizationStore(path);
+      first.upsertCommunity("north", "North", audit);
+      first.addCommunityMember("north", "citizen_atlas", audit);
+      const write = communityPhysicalState(first).forCitizen("citizen_atlas");
+      write.registerAsset("chest", "overworld", pos);
+      expect(write.recordContainerObservation(key, { bread: 4 })).toBe(true);
+      const before = write.observedContainerDetails(key)!;
+      expect(before.revision).toBe(1);
+      first.close();
+
+      const second = new CivilizationStore(path);
+      const read = communityPhysicalState(second).forCitizen("citizen_atlas");
+      const after = read.observedContainerDetails(key)!;
+      expect(after.contents).toEqual({ bread: 4 });
+      expect(after.revision).toBe(before.revision);
+      expect(after.observedAt).toBe(before.observedAt);
+      expect(after.basis).toBe("observed");
+      expect(read.recordContainerObservation(key, { bread: 99 }, { expectedRevision: 0 })).toBe(false);
+      expect(read.recordContainerObservation(key, { bread: 3 }, { expectedRevision: after.revision })).toBe(true);
+      expect(read.observedContainerDetails(key)?.revision).toBe(after.revision + 1);
+      second.close();
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

@@ -125,18 +125,46 @@ describe("operator evidence, correlated actions and physical witnesses", () => {
     j.forCitizen("a").lifecycle("respawn");
     j.recordTick(30);
     j.recordTick(40, 19.8);
+    j.recordTick(50, undefined, undefined, { simulatedStep: 2 });
     j.recordIntervention("operator_stop");
     j.close(false);
     const rows = readFileSync(path, "utf8")
       .trim()
       .split("\n")
       .map((line) => JSON.parse(line));
-    expect(rows.filter((r) => r.kind === "tick")).toMatchObject([
-      { durationMs: 30 },
-      { measuredTps: 19.8 },
+    const ticks = rows.filter((r) => r.kind === "tick");
+    expect(ticks).toMatchObject([
+      { durationMs: 30, serverGameTick: null, tickProvenance: "unavailable" },
+      { measuredTps: 19.8, serverGameTick: null },
+      { simulatedStep: 2, serverGameTick: null, tickProvenance: "unavailable" },
     ]);
-    expect(rows.find((r) => r.kind === "tick")).not.toHaveProperty("measuredTps");
+    expect(ticks[0]).not.toHaveProperty("measuredTps");
     expect(j.operatorSummary()).toMatchObject({ deaths: 1, respawns: 1, interventions: 1 });
+  });
+
+  it("records originPosition on attempts and accepts observed tool durability without inventing wear", () => {
+    const { j, path } = fixture();
+    const a = j.forCitizen("a");
+    a.observe(
+      a.attempt({
+        ...attempt("move"),
+        target: { x: 5, y: 64, z: 0 },
+        originPosition: { x: 0, y: 64, z: 0 },
+        range: 8,
+      }),
+      observation({
+        position: { x: 5, y: 64, z: 0 },
+        toolDurabilityBefore: { wooden_pickaxe: 59 },
+        toolDurabilityAfter: { wooden_pickaxe: 57 },
+      }),
+    );
+    j.close(false);
+    const attemptRow = readFileSync(path, "utf8")
+      .trim()
+      .split("\n")
+      .map((line) => JSON.parse(line))
+      .find((r) => r.kind === "action_attempt");
+    expect(attemptRow.originPosition).toEqual({ x: 0, y: 64, z: 0 });
   });
 
   it("rejects raw secrets and prompts instead of logging arbitrary payloads", () => {

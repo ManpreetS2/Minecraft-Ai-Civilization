@@ -11,9 +11,16 @@ describe('offline composition scenario', () => {
     expect(run.providers.filter(p => p.family === 'claude')).toHaveLength(count / 2);
     for (const p of run.providers) { expect(p.requests).toBeGreaterThan(0); expect(p.sessionId).toBeTruthy(); expect(p.model).toBeTruthy(); expect(p.requests).toBeLessThanOrEqual(3); expect(p.ownMemorySeen).toBe(true); expect(p.leakedMemoryIds).toEqual([]); expect(run.inventoryBefore[p.citizenId]).toBe(0); expect(run.inventoryAfter[p.citizenId]).toBeGreaterThan(0); }
     expect(new Set(run.providers.map(p => p.sessionId)).size).toBe(count); expect(run.restart.citizens).toEqual(run.citizens); expect(run.restart.memoryPreserved).toBe(true); expect(run.unproven).toContain('session persistence across process restart');
+    expect(run.decisionTransport).toBe('scripted-in-process');
+    expect(run.evidenceSummary.attempted).toBe(count);
+    expect(run.evidenceSummary.verified).toBe(count);
+    expect(run.actions).toHaveLength(count);
+    expect(run.actions.every(a => a.decisionTransport === 'scripted-in-process' && a.originPosition !== null && a.observedSuccess === true)).toBe(true);
+    expect(run.evidenceJournalSha256).toMatch(/^[a-f0-9]{64}$/);
+    expect(run.unproven).toContain('Paper serverGameTick');
   }, 60_000);
   it('refuses injected body, network and database options before startup', async () => {
-    for (const injected of [{ createBody: () => { throw Error('called'); } }, { host: 'example.com', port: 25565 }, { databasePath: 'production.sqlite' }, { transport: 'real' }]) await expect(runScenario({ count: 2, goal: 'observe', ...injected } as never)).rejects.toThrow(/fixture data/);
+    for (const injected of [{ createBody: () => { throw Error('called'); } }, { host: 'example.com', port: 25565 }, { databasePath: 'production.sqlite' }, { transport: 'real' }]) await expect(runScenario({ count: 2, goal: 'observe', ...injected } as never)).rejects.toThrow(/Only count, scripted goal/);
   });
   it('exposes the lower composition root createBody trust boundary without network access', async () => {
     const fx = buildFixture(2, 'observe'); const callback = vi.fn(fx.args.createBody); const network = vi.spyOn(globalThis, 'fetch');

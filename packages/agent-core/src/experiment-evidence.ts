@@ -17,6 +17,8 @@ const attemptSchema = z
     expectedItem: itemName.optional(),
     target: point.optional(),
     range: z.number().finite().nonnegative().max(8).optional(),
+    /** Citizen position at attempt initiation — never reconstructed from the post-action pose. */
+    originPosition: point.optional(),
   })
   .strict();
 const observationSchema = z
@@ -35,6 +37,9 @@ const observationSchema = z
       .string()
       .regex(/^[A-Z0-9_]+$/)
       .optional(),
+    /** Observed tool damage counts only; omit when not measurable — never guess wear. */
+    toolDurabilityBefore: inventory.optional(),
+    toolDurabilityAfter: inventory.optional(),
   })
   .strict();
 export type ExperimentAttempt = z.infer<typeof attemptSchema>;
@@ -108,12 +113,26 @@ export class ExperimentEvidenceJournal {
     private readonly experimentId: string,
     private readonly citizens: ReadonlySet<string>,
     private readonly mode: "offline" | "live",
+    options?: {
+      /** How model-family decisions are produced for this run. Offline rehearsals must declare scripted. */
+      decisionTransport?: "scripted-in-process" | "live-provider";
+      sourceSha?: string;
+      runId?: string;
+    },
   ) {
     if (!isAbsolute(path) || !/^[a-zA-Z0-9_-]{1,64}$/.test(experimentId))
       throw new Error("invalid evidence destination");
     mkdirSync(dirname(path), { recursive: true });
     this.fd = openSync(path, "wx", 0o600); // Never overwrite a previous experiment.
-    this.append({ kind: "start", recordingAudience: "operator_only", mode });
+    this.append({
+      kind: "start",
+      recordingAudience: "operator_only",
+      mode,
+      decisionTransport: options?.decisionTransport ?? null,
+      sourceSha: options?.sourceSha ?? null,
+      runId: options?.runId ?? null,
+      citizens: [...citizens],
+    });
   }
 
   private append(payload: Record<string, unknown>): void {
@@ -171,7 +190,17 @@ export class ExperimentEvidenceJournal {
     };
   }
 
-  recordTick(durationMs: number, measuredTps?: number): void {
+  /**
+   * `serverGameTick` is the Paper/world tick when genuinely available.
+   * Offline rehearsals must omit it (or pass undefined) — never fabricate Paper ticks.
+   * Callers may record a separate simulated step via `simulatedStep` without claiming Paper authenticity.
+   */
+  recordTick(
+    durationMs: number,
+    measuredTps?: number,
+    serverGameTick?: number,
+    options?: { simulatedStep?: number },
+  ): void {
     if (
       !Number.isFinite(durationMs) ||
       durationMs < 0 ||
@@ -179,7 +208,24 @@ export class ExperimentEvidenceJournal {
         (!Number.isFinite(measuredTps) || measuredTps < 0 || measuredTps > 20))
     )
       throw new Error("invalid performance observation");
-    this.append({ kind: "tick", durationMs, measuredTps });
+    if (
+      serverGameTick !== undefined &&
+      (!Number.isSafeInteger(serverGameTick) || serverGameTick < 0)
+    )
+      throw new Error("invalid serverGameTick");
+    if (
+      options?.simulatedStep !== undefined &&
+      (!Number.isSafeInteger(options.simulatedStep) || options.simulatedStep < 0)
+    )
+      throw new Error("invalid simulatedStep");
+    this.append({
+      kind: "tick",
+      durationMs,
+      measuredTps,
+      serverGameTick: serverGameTick ?? null,
+      simulatedStep: options?.simulatedStep ?? null,
+      tickProvenance: serverGameTick !== undefined ? "paper-or-world" : "unavailable",
+    });
   }
 
   recordIntervention(code: "operator_stop" | "operator_restart" | "human_directive"): void {
