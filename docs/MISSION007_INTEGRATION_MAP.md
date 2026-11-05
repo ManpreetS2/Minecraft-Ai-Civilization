@@ -1,6 +1,7 @@
 # Mission 007 — Offline release candidate integration map
 
-**Publish tip:** `a176fcaee0e4e72cf2d40a738d3bfcad5343cc80`  
+**Publish tip:** `fd83bd9e7a5216e8b5d4cea88be3ec2bc3619d15`  
+**Author matrix code SHA:** `a176fcaee0e4e72cf2d40a738d3bfcad5343cc80`  
 **Base:** Mission 006 tip `50940be26bcd2fa1ab5ee904ecc38f4229285e64`  
 **Gemini crypto:** PR #47 @ `fad541f2863473df8f9ffd119c09d631472eb37b`  
 **Claude QA tip available:** PR #54 @ `e7e08e7a0977fe812cc38a77e6653cf6d9b35ef0` (already on tip from prior missions)
