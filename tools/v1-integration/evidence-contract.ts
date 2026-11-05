@@ -42,6 +42,8 @@ export interface ValidationContext {
   evidenceRoot?: string;
 }
 export interface SourceReceipt extends Omit<ReceiptReference, "reference" | "sha256"> {
+  /** Original operator journal row coordinates, never inferred from action order. */
+  journal?: { attemptSequence: number; observationSequence: number };
   family: "gpt" | "claude";
   model: string;
   sessionId: string;
@@ -55,7 +57,7 @@ export interface SourceReceipt extends Omit<ReceiptReference, "reference" | "sha
   hungerBefore?: number;
   hungerAfter?: number;
   authorizedRecipients?: string[];
-  worldChanges?: { before: string; after: string }[];
+  worldChanges?: { before: string; after: string; position?: { x: number; y: number; z: number } }[];
 }
 const sha = /^[a-f0-9]{40}$/;
 const count = (v: unknown): v is number => Number.isSafeInteger(v) && Number(v) >= 0;
