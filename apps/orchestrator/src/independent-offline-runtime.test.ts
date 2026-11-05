@@ -143,6 +143,13 @@ describe("independent offline composition and normal manager startup", () => {
   });
 });
 
+/**
+ * OFF-17 (scripted offline 1v1) evidence lives here. Peer OFF-03…OFF-16 are separate ledger criteria, not
+ * inherited by this suite. Codex's independent OFF-17 support covers limited scripted 1v1 only — not
+ * process-crash recovery, not live survival. The late-callback case below is author tip evidence for
+ * shutdown/pending-ops, distinct from Codex's limited OFF-17 scope. Provider session text across restart
+ * requires the explicit session store; it is not claimed as automatic process-session durability.
+ */
 describe("scripted 1 GPT vs 1 Claude integrated offline 1v1", () => {
   it("starts identities, verifies survival, keeps secrets, restarts, and shuts down with no network", async () => {
     const dir = mkdtempSync(join(tmpdir(), "civ-offline-1v1-")); dirs.push(dir);
