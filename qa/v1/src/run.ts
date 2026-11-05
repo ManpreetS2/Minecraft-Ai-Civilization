@@ -7,7 +7,8 @@
  */
 import { spawnSync } from "node:child_process";
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { dirname, join, relative, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { SCENARIO_IDS } from "./scenario.js";
 import { evaluate, type VitestJson } from "./verdict.js";
 
@@ -16,28 +17,35 @@ const flag = (name: string) => (argv.includes(name) ? argv[argv.indexOf(name) + 
 const root = resolve(flag("--root") ?? process.cwd());
 const git = (...a: string[]) => spawnSync("git", a, { cwd: root, encoding: "utf8" }).stdout.trim();
 
-const outDir = resolve(flag("--out") ?? join(root, "qa/v1/out"));
+// The harness may live at qa/v1 or, when overlaid on a candidate that already tracks a qa/v1, at qa-independent/v1.
+const harness = relative(root, dirname(dirname(fileURLToPath(import.meta.url)))).replaceAll("\\", "/");
+const outDir = resolve(flag("--out") ?? join(root, harness, "out"));
 mkdirSync(outDir, { recursive: true });
 const jsonFile = join(outDir, "vitest.json");
 if (existsSync(jsonFile)) writeFileSync(jsonFile, ""); // a stale file must never be mistaken for this run
 
 const requiredFiles = [
-  "qa/v1/test/adv-identity-privacy.test.ts",
-  "qa/v1/test/adv-physical.test.ts",
-  "qa/v1/test/adv-provider-faults.test.ts",
-  "qa/v1/test/adv-offline-boundary.test.ts",
-  "qa/v1/test/adv-chest-access.test.ts",
-  "qa/v1/test/adv-evidence-injection.test.ts",
-  "qa/v1/test/runner-verdict.test.ts",
+  `${harness}/test/adv-identity-privacy.test.ts`,
+  `${harness}/test/adv-physical.test.ts`,
+  `${harness}/test/adv-provider-faults.test.ts`,
+  `${harness}/test/adv-offline-boundary.test.ts`,
+  `${harness}/test/adv-chest-access.test.ts`,
+  `${harness}/test/adv-evidence-injection.test.ts`,
+  `${harness}/test/runner-verdict.test.ts`,
+  `${harness}/test/wrapper-safety.test.ts`,
 ];
 
 const actualSha = git("rev-parse", "HEAD");
 const actualBranch = git("rev-parse", "--abbrev-ref", "HEAD");
-const dirty = git("status", "--porcelain", "--untracked-files=no").length > 0;
+// Tracked changes, and untracked files other than the overlaid harness itself (qa/), make the tree unattributable.
+const dirty = git("status", "--porcelain", "--untracked-files=all")
+  .split(String.fromCharCode(10))
+  .filter((l) => l.trim() && !/^\?\? "?(qa|qa-independent)\//.test(l)).length > 0;
+const harnessSha = process.env.QA_HARNESS_SHA ?? "unknown (harness run in place)";
 
 const run = spawnSync(
   process.execPath,
-  [join(root, "node_modules/vitest/vitest.mjs"), "run", "-c", "qa/v1/vitest.config.ts", "--reporter=json", `--outputFile=${jsonFile}`],
+  [join(root, "node_modules/vitest/vitest.mjs"), "run", "-c", `${harness}/vitest.config.ts`, "--reporter=json", `--outputFile=${jsonFile}`],
   { cwd: root, encoding: "utf8", env: { ...process.env, NODE_ENV: "test" } },
 );
 
@@ -62,7 +70,7 @@ const verdict = evaluate({
   requireLive: argv.includes("--require-live"),
 });
 
-const report = { source: { sha: actualSha, branch: actualBranch, dirty }, ...verdict, generatedAt: new Date().toISOString() };
+const report = { source: { sha: actualSha, branch: actualBranch, dirty, harnessSha }, ...verdict, generatedAt: new Date().toISOString() };
 writeFileSync(join(outDir, "qa-v1-report.json"), JSON.stringify(report, null, 2));
 const rows = Object.entries(verdict.perScenario).sort().map(([id, s]) => `| ${id} | ${s.status} | ${s.passed} | ${s.failed} | ${s.skipped} | ${s.defects} |`);
 writeFileSync(
@@ -70,7 +78,7 @@ writeFileSync(
   [
     `# QA v1 report: ${verdict.verdict}`,
     ``,
-    `Source: \`${actualSha}\` (${actualBranch}${dirty ? ", DIRTY" : ""}) | Mode: ${verdict.mode} (never live Paper evidence)`,
+    `Source: \`${actualSha}\` (${actualBranch}${dirty ? ", DIRTY" : ""}) | QA harness commit: ${harnessSha} | Mode: ${verdict.mode} (never live Paper evidence)`,
     `Totals: ${verdict.totals.tests} tests, ${verdict.totals.passed} passed, ${verdict.totals.failed} failed, ${verdict.totals.skipped} skipped, ${verdict.totals.defectsReproduced} known defects reproduced, ${verdict.totals.blocked} blocked`,
     ``,
     verdict.reasons.length ? `Reasons for FAIL:\n${verdict.reasons.map((r) => `- ${r}`).join("\n")}\n` : "",

@@ -1,3 +1,4 @@
+import { relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "vitest/config";
 
@@ -16,7 +17,7 @@ export default defineConfig({
     ],
   },
   test: {
-    include: ["qa/v1/test/**/*.test.ts"],
+    include: [`${relative(process.cwd(), fileURLToPath(new URL(".", import.meta.url))).replaceAll("\\", "/")}/test/**/*.test.ts`],
     setupFiles: ["./test-support/setup.ts"],
     environment: "node",
     testTimeout: 60_000,
