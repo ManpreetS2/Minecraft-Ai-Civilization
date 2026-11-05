@@ -1,6 +1,8 @@
 # Mission 006 — Source ownership and integration map
 
 **Base tip:** PR #56 @ `502ed5903e44ec187d73f4058efd9fa005006569` (Mission 005 complete)  
+**Publish tip:** `ac8871ea08ac6dca9470346eaf549d462646c91d`  
+**Author matrix code SHA:** `90c3ba41000bacd2977ea0135585391e2c275f3d`  
 **Repository:** `ManpreetS2/Minecraft-Ai-Civilization-windows-backup`  
 **Branch:** `agents/cursor-v1-single-sha-integration`
 
