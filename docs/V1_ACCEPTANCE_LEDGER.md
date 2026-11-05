@@ -34,7 +34,7 @@ Count of `OFF-*` rows that are at least `IMPLEMENTED_UNVERIFIED` or `OFFLINE_PAS
 | Total offline criteria | **18** |
 | Ratio | **11/18** |
 | Full-matrix code SHA | `43c02cb8ab9cc06d83c08143d7e574e1f65ed79f` |
-| Publish HEAD | *(filled at push; docs+provenance may tip HEAD — see matrix notes)* |
+| Publish HEAD | d3acc2ab0aaeb1fc89ebb7f58afa0a9c74ce473a |
 
 ### B. Independently accepted offline evidence
 
