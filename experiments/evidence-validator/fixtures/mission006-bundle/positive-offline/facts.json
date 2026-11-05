@@ -1,0 +1,11 @@
+[
+  {
+    "id": "fact-atlas-log",
+    "citizenId": "gpt_atlas",
+    "factKey": "gathered_log",
+    "content": "Gathered 1 oak log",
+    "kind": "observed_fact",
+    "createdAt": "2026-11-05T12:00:02Z",
+    "sourceEventId": "ev-atlas-gather-1"
+  }
+]

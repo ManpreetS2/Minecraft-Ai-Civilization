@@ -1,18 +1,21 @@
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
-import { mkdirSync, readFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { CivilizationStore, ExperimentEvidenceJournal } from "../../packages/agent-core/src/index.js";
 import { createEvent } from "../../packages/shared/src/index.js";
 import { createIndependentOfflineRuntime } from "../../apps/orchestrator/src/independent-offline-runtime.js";
 import { buildFixture } from "./fixtures.js";
+import type { FactEvidence, ReceiptReference, SourceReceipt } from "./manifest.js";
 
 export interface ScenarioInput {
   count: 2 | 4;
   goal: "observe" | "gather_wood";
-  /** Absolute directory for operator.jsonl when recording. */
+  /** Absolute directory for operator.jsonl and V2 source receipts. */
   evidenceDirectory?: string;
   experimentId?: string;
+  runId?: string;
+  repository?: string;
 }
 
 function bag(items: Array<{ name: string; count: number }>): Record<string, number> {
@@ -30,15 +33,17 @@ export async function runScenario(input: ScenarioInput) {
     !input ||
     ![2, 4].includes(input.count) ||
     !["observe", "gather_wood"].includes(input.goal) ||
-    Object.keys(input).some((k) => !["count", "goal", "evidenceDirectory", "experimentId"].includes(k))
+    Object.keys(input).some((k) => !["count", "goal", "evidenceDirectory", "experimentId", "runId", "repository"].includes(k))
   ) {
-    throw new Error("Only count, scripted goal, and optional evidenceDirectory/experimentId are accepted");
+    throw new Error("Only count, scripted goal, and optional evidenceDirectory/experimentId/runId/repository are accepted");
   }
   const sourceSha = execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim();
   const fixture = buildFixture(input.count, input.goal);
   let restarted: ReturnType<typeof createIndependentOfflineRuntime> | undefined;
   let reopened: CivilizationStore | undefined;
   const experimentId = input.experimentId ?? `off${input.count}`;
+  const runId = input.runId ?? `fixture-${input.count}-${sourceSha.slice(0, 12)}`;
+  const repository = input.repository ?? "ManpreetS2/Minecraft-Ai-Civilization-windows-backup";
   if (input.evidenceDirectory) mkdirSync(input.evidenceDirectory, { recursive: true });
   const journalPath = input.evidenceDirectory
     ? join(input.evidenceDirectory, "operator.jsonl")
@@ -48,7 +53,7 @@ export async function runScenario(input: ScenarioInput) {
     experimentId,
     new Set(fixture.assignments.map((a) => a.citizenId)),
     "offline",
-    { decisionTransport: "scripted-in-process", sourceSha, runId: experimentId },
+    { decisionTransport: "scripted-in-process", sourceSha, runId },
   );
   let journalClosed = false;
   const actions: Array<{
@@ -60,7 +65,18 @@ export async function runScenario(input: ScenarioInput) {
     authorizedKnowledge: boolean | null;
     decisionTransport: "scripted-in-process";
     originPosition: { x: number; y: number; z: number } | null;
+    actionType: "gather";
+    expectedDelta: Record<string, number>;
+    inventoryScope: "citizen";
+    eventId: string;
+    attemptId: string;
+    runId: string;
+    sourceSha: string;
+    receiptId: string;
+    sourceEventId: string;
   }> = [];
+  const sourceReceipts: ReceiptReference[] = [];
+  const persistentFacts: FactEvidence[] = [];
 
   try {
     await fixture.manager.start(undefined, { deferTicks: true });
@@ -73,6 +89,15 @@ export async function runScenario(input: ScenarioInput) {
         { id: `memory-${c.id}`, citizenId: c.id, kind: "episodic", content: secret, importance: 1, createdAt: new Date().toISOString() },
         { sourceEventId: event.id },
       );
+      persistentFacts.push({
+        id: `memory-${c.id}`,
+        citizenId: c.id,
+        runId,
+        sourceSha,
+        sourceEventId: event.id,
+        receiptId: null,
+        authorizedKnowledge: true,
+      });
     }
 
     const before = Object.fromEntries([...fixture.bodies].map(([id, body]) => [id, body.count("oak_log")]));
@@ -101,37 +126,95 @@ export async function runScenario(input: ScenarioInput) {
       const beforeBag = beforeBags[id]!;
       const origin = origins[id]!;
       const woodDelta = (afterBag.oak_log ?? 0) - (beforeBag.oak_log ?? 0);
+      const assignment = fixture.assignments.find((a) => a.citizenId === id)!;
+      const evidence = fixture.registry.evidenceLog().filter((e) => e.citizenId === id);
+      const eventId = `scripted-${id}-gather`;
       const channel = journal.forCitizen(id);
       const attemptId = channel.attempt({
         action: "gather",
         decisionSource: "model",
-        decisionEventId: `scripted-${id}-gather`,
+        decisionEventId: eventId,
         expectedItem: "oak_log",
         originPosition: origin,
       });
       const success = woodDelta > 0;
+      const positionAfter = {
+        x: body.bot.entity.position.x,
+        y: body.bot.entity.position.y,
+        z: body.bot.entity.position.z,
+      };
       channel.observe(attemptId, {
         successReported: success,
         beforeInventory: beforeBag,
         afterInventory: afterBag,
-        position: { x: body.bot.entity.position.x, y: body.bot.entity.position.y, z: body.bot.entity.position.z },
+        position: positionAfter,
         hungerBefore: 20,
         hungerAfter: body.bot.food,
         worldChanges: [],
         failureCode: success ? undefined : "NOT_OBSERVED",
-        // Tool wear is not exposed by the craft fixture — omit rather than invent.
       });
+      const receiptId = `receipt-${attemptId}`;
+      const expectedDelta = { oak_log: woodDelta };
       sequence += 1;
       actions.push({
         sequence,
         citizenId: id,
         reportedSuccess: success,
         observedSuccess: success,
-        inventoryDelta: { oak_log: woodDelta },
+        inventoryDelta: expectedDelta,
         authorizedKnowledge: true,
         decisionTransport: "scripted-in-process",
         originPosition: origin,
+        actionType: "gather",
+        expectedDelta,
+        inventoryScope: "citizen",
+        eventId,
+        attemptId,
+        runId,
+        sourceSha,
+        receiptId,
+        sourceEventId: eventId,
       });
+      if (input.evidenceDirectory) {
+        const model = evidence[0]?.model ?? assignment.model;
+        const sessionId = evidence[0]?.sessionId;
+        if (!model || !sessionId) {
+          throw new Error(`Source receipt requires observed model/session for ${id}; refusing synthetic identity`);
+        }
+        const receipt: SourceReceipt = {
+          id: receiptId,
+          eventId,
+          attemptId,
+          runId,
+          sourceSha,
+          repository,
+          citizenId: id,
+          family: assignment.family,
+          model,
+          sessionId,
+          actionType: "gather",
+          inventoryScope: "citizen",
+          observedSuccess: success,
+          inventoryBefore: beforeBag,
+          inventoryAfter: afterBag,
+          positionAfter,
+        };
+        const bytes = JSON.stringify(receipt);
+        const reference = `receipts/${receiptId}.json`;
+        mkdirSync(join(input.evidenceDirectory, "receipts"), { recursive: true });
+        writeFileSync(join(input.evidenceDirectory, reference), bytes);
+        sourceReceipts.push({
+          id: receiptId,
+          eventId,
+          attemptId,
+          runId,
+          sourceSha,
+          repository,
+          citizenId: id,
+          reference,
+          sha256: createHash("sha256").update(bytes).digest("hex"),
+        });
+      }
     }
 
     const after = Object.fromEntries([...fixture.bodies].map(([id, body]) => [id, body.count("oak_log")]));
@@ -182,6 +265,10 @@ export async function runScenario(input: ScenarioInput) {
       inventoryBefore: before,
       inventoryAfter: after,
       actions,
+      sourceReceipts,
+      persistentFacts,
+      runId,
+      repository,
       restart,
       evidenceJournalPath: input.evidenceDirectory ? journalPath : null,
       evidenceJournalSha256,

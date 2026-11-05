@@ -1,0 +1,2 @@
+{"id":"ev-start-1","type":"SimulationStarted","timestamp":"2026-11-01T12:00:00.000Z","payload":{"stage":"2v2","mode":"offline","visibility":{"class":"observer_only"}}}
+{"id":"ev-gather-atlas","type":"ResourceCollected","timestamp":"2026-11-01T12:01:00.000Z","citizenId":"gpt_atlas","payload":{"item":"oak_log","count":1,"visibility":{"class":"settlement_public","audience":{"scope":"community","communityId":"north_cove"}}}}

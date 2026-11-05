@@ -1,0 +1,14 @@
+{
+    "testOverlay":  "Initial five ordinary assertions from evidence-contract.test.ts, later extended with positive/negative cases",
+    "passed":  0,
+    "independentQaSha":  "e7e08e7a0977fe812cc38a77e6653cf6d9b35ef0",
+    "command":  "pnpm exec vitest run --maxWorkers=1 --no-file-parallelism --config tools/vitest.config.ts tools/v1-integration/evidence-contract.test.ts",
+    "skipped":  0,
+    "logSha256":  "f67ee774a8f4865b77b13d3e01f78f8641cdf023f2e94aacb8420defed2a1ce8",
+    "integratedSourceSha":  "5ec19e53faa18c90f67200b500bcdbe9e763d09d",
+    "manifestBlobSha":  "90c2465eefc8ce7445d73bb8377e2592299a3ee6",
+    "sourceSha":  "6f354472d2232695da17c542eb6bb9e479f483f4",
+    "failed":  5,
+    "log":  "red-before.txt",
+    "exitCode":  1
+}

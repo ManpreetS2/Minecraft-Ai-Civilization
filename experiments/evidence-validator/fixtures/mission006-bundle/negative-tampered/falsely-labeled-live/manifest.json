@@ -1,0 +1,101 @@
+{
+  "experimentId": "exp-m006-positive-offline-001",
+  "sourceSha": "06b7e5038c11bf88d55d7870fbf155a0f12d4d8a",
+  "stage": "1v1",
+  "durationMinutes": 60,
+  "worldSeed": "civilization-seed-alpha",
+  "sites": [
+    {
+      "communityId": "north_cove",
+      "x": 100,
+      "y": 64,
+      "z": 100,
+      "biome": "plains"
+    },
+    {
+      "communityId": "south_vale",
+      "x": 250,
+      "y": 64,
+      "z": 250,
+      "biome": "forest"
+    }
+  ],
+  "citizens": [
+    {
+      "id": "gpt_atlas",
+      "communityId": "north_cove",
+      "personalitySeed": "seed_atlas",
+      "family": "gpt",
+      "model": "gpt-4o",
+      "sessionId": "session_atlas_001",
+      "inventoryVerified": true,
+      "inventory": [],
+      "shelterVerifiedAbsent": true
+    },
+    {
+      "id": "gpt_maya",
+      "communityId": "north_cove",
+      "personalitySeed": "seed_maya",
+      "family": "gpt",
+      "model": "gpt-4o",
+      "sessionId": "session_maya_001",
+      "inventoryVerified": true,
+      "inventory": [],
+      "shelterVerifiedAbsent": true
+    },
+    {
+      "id": "claude_theo",
+      "communityId": "south_vale",
+      "personalitySeed": "seed_theo",
+      "family": "claude",
+      "model": "claude-3-5-sonnet",
+      "sessionId": "session_theo_001",
+      "inventoryVerified": true,
+      "inventory": [],
+      "shelterVerifiedAbsent": true
+    },
+    {
+      "id": "claude_ava",
+      "communityId": "south_vale",
+      "personalitySeed": "seed_ava",
+      "family": "claude",
+      "model": "claude-3-5-sonnet",
+      "sessionId": "session_ava_001",
+      "inventoryVerified": true,
+      "inventory": [],
+      "shelterVerifiedAbsent": true
+    }
+  ],
+  "server": {
+    "version": "1.21.6",
+    "paperBuild": 48,
+    "difficulty": "normal",
+    "keepInventory": false,
+    "hardcore": false,
+    "doDaylightCycle": true,
+    "doMobSpawning": true,
+    "doMobLoot": true
+  },
+  "paths": {
+    "runRoot": "/civ/live-authenticated/exp-fake-live",
+    "world": "C:\\Users\\sh1ft\\.gemini\\antigravity\\scratch\\Minecraft-Ai-Civilization-windows-backup\\experiments\\evidence-validator\\fixtures\\mission006-bundle\\positive-offline\\world",
+    "database": "C:\\Users\\sh1ft\\.gemini\\antigravity\\scratch\\Minecraft-Ai-Civilization-windows-backup\\experiments\\evidence-validator\\fixtures\\mission006-bundle\\positive-offline\\db.sqlite",
+    "evidence": "C:\\Users\\sh1ft\\.gemini\\antigravity\\scratch\\Minecraft-Ai-Civilization-windows-backup\\experiments\\evidence-validator\\fixtures\\mission006-bundle\\positive-offline\\operator-journal.jsonl"
+  },
+  "budget": {
+    "ceilingUsd": 10,
+    "accountingEnabled": true,
+    "unknownUsageFailClosed": true
+  },
+  "recording": {
+    "enabled": true,
+    "audience": "operator_only"
+  },
+  "humanDirectives": [],
+  "privacyReplay": {
+    "sourceSha": "9945f02f38e14a7d63b3eed66279d191ad06ad3d",
+    "passed": 220,
+    "failed": 0,
+    "skipped": 0
+  }
+}

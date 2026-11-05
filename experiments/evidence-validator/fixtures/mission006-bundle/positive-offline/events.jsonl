@@ -1,0 +1,2 @@
+{"id":"ev-atlas-gather-1","type":"CitizenDecisionMade","timestamp":"2026-11-05T12:00:00Z","citizenId":"gpt_atlas","payload":{"action":"gather"}}
+{"id":"ev-theo-craft-1","type":"CitizenDecisionMade","timestamp":"2026-11-05T12:00:01Z","citizenId":"claude_theo","payload":{"action":"craft"}}

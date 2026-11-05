@@ -1,0 +1,156 @@
+{
+  "version": "1.0.0",
+  "validatorName": "antigravity-evidence-validator",
+  "generatedAt": "2026-11-05T21:09:04.066Z",
+  "experimentId": "exp-m006-positive-offline-001",
+  "sourceSha": "06b7e5038c11bf88d55d7870fbf155a0f12d4d8a",
+  "mode": "offline_simulated",
+  "overallStatus": "VIOLATIONS_DETECTED",
+  "summary": {
+    "totalAttemptedActions": 2,
+    "verifiedActions": 2,
+    "unverifiedActions": 0,
+    "failedActions": 0,
+    "interruptedActions": 0,
+    "observedFacts": 0,
+    "communicatedClaims": 0,
+    "privacyViolationsCount": 0,
+    "inventoryViolationsCount": 0,
+    "hashChainValid": true,
+    "durationVerified": false,
+    "notProvenChecksCount": 1
+  },
+  "hashChainAudit": {
+    "valid": true,
+    "totalRows": 9
+  },
+  "durationAudit": {
+    "claimedDurationMinutes": 60,
+    "provenDurationMs": 60000,
+    "provenDurationMinutes": 1,
+    "tickCount": 2,
+    "averageTickDurationMs": 30000,
+    "averageTps": 19.95,
+    "tpsEvidencePresent": true,
+    "serverTickProven": false,
+    "serverTickCount": 0,
+    "durationComplete": false,
+    "gapsDetected": [],
+    "sourceAttestationAudit": {
+      "proven": false,
+      "sourceType": "missing",
+      "authorityTrusted": false,
+      "sessionBound": false,
+      "experimentBound": false,
+      "signatureValid": false,
+      "reasons": [
+        "Missing source attestation: no cryptographic source attestation provided. Live Paper server authenticity cannot be established without genuine server capture attestation."
+      ]
+    },
+    "reasons": [
+      "Simulation duration deficit: claimed 60 minutes, but evidence only proves 1 minutes (60000 ms vs required 3600000 ms). A 58.8-minute run cannot be accepted as a completed 60-minute demonstration."
+    ]
+  },
+  "inventoryAudit": {
+    "initialInventoriesEmpty": true,
+    "totalItemsAcquired": {
+      "minecraft:oak_log": 1,
+      "minecraft:oak_planks": 4
+    },
+    "totalItemsConsumed": {
+      "minecraft:oak_log": 1
+    },
+    "citizenFinalInventories": {},
+    "discrepancies": [],
+    "valid": true
+  },
+  "informationAudit": {
+    "totalAuditedEvents": 0,
+    "totalAuditedFacts": 0,
+    "observedFactsCount": 0,
+    "communicatedClaimsCount": 0,
+    "violations": [],
+    "valid": true
+  },
+  "actionVerifications": [
+    {
+      "attemptId": "att-atlas-001",
+      "citizenId": "gpt_atlas",
+      "action": "gather",
+      "decisionEventId": "ev-atlas-gather-1",
+      "decisionSource": "model",
+      "status": "VERIFIED",
+      "classification": "successful_action",
+      "chain": {
+        "worldEventProven": true,
+        "legitimatelyObserved": true,
+        "legitimateBelief": true,
+        "decisionDocumented": true,
+        "actionAttempted": true,
+        "physicalOutcomeVerified": true
+      },
+      "physicalDeltas": {
+        "inventoryDelta": {
+          "minecraft:oak_log": 1
+        },
+        "worldChangesCount": 0
+      },
+      "reasons": []
+    },
+    {
+      "attemptId": "att-theo-001",
+      "citizenId": "claude_theo",
+      "action": "craft",
+      "decisionEventId": "ev-theo-craft-1",
+      "decisionSource": "model",
+      "status": "VERIFIED",
+      "classification": "successful_action",
+      "chain": {
+        "worldEventProven": true,
+        "legitimatelyObserved": true,
+        "legitimateBelief": true,
+        "decisionDocumented": true,
+        "actionAttempted": true,
+        "physicalOutcomeVerified": true
+      },
+      "physicalDeltas": {
+        "inventoryDelta": {
+          "minecraft:oak_log": -1,
+          "minecraft:oak_planks": 4
+        },
+        "worldChangesCount": 0
+      },
+      "reasons": []
+    }
+  ],
+  "violations": [
+    {
+      "code": "DURATION_EVIDENCE_DEFICIT",
+      "description": "Simulation duration deficit: claimed 60 minutes, but evidence only proves 1 minutes (60000 ms vs required 3600000 ms). A 58.8-minute run cannot be accepted as a completed 60-minute demonstration.",
+      "severity": "ERROR"
+    }
+  ],
+  "notProven": [
+    {
+      "code": "UNPROVEN_PAPER_AUTHENTICITY",
+      "description": "Experiment path or configuration claims live Minecraft execution, but Paper server authenticity and continuous tick progression are not proven",
+      "missingFields": [
+        "sourceAttestation"
+      ]
+    }
+  ],
+  "redacted": true,
+  "attribution": {
+    "runId": "exp-m006-positive-offline-001",
+    "citizens": [
+      "gpt_atlas",
+      "gpt_maya",
+      "claude_theo",
+      "claude_ava"
+    ],
+    "communities": [
+      "north_cove",
+      "south_vale"
+    ]
+  }
+}

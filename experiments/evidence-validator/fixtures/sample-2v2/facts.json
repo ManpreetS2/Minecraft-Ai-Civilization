@@ -1,0 +1,11 @@
+[
+  {
+    "id": "fact-atlas-1",
+    "citizenId": "gpt_atlas",
+    "factKey": "gathered_wood",
+    "content": "Gathered 1 oak log from natural tree",
+    "kind": "observed_fact",
+    "createdAt": "2026-11-01T12:01:05.000Z",
+    "sourceEventId": "ev-gather-atlas"
+  }
+]

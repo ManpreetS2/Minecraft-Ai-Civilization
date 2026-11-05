@@ -27,6 +27,7 @@
     "build": "pnpm -r --if-present build",
     "typecheck": "pnpm -r --if-present typecheck",
     "typecheck:tools": "tsc -p tools/tsconfig.json",
+    "typecheck:evidence-validator": "tsc -p experiments/evidence-validator/tsconfig.json --noEmit",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
@@ -35,10 +36,12 @@
     "test:security": "vitest run sec001 knowledge-provenance downstream-prompt-isolation persistent-fact-provenance citizen-context-2v2 bulletin-2v2 visibility-2v2 untrusted-model-output pr16-review http-server-origin workstations-community storage-community-access",
     "test:ai": "vitest run packages/cognition manager-citizen-routing manager-physical-integration manager-roster-start independent-offline-runtime",
     "test:v1": "vitest run --config tools/vitest.config.ts",
+    "test:evidence-validator": "vitest run --config experiments/evidence-validator/vitest.config.mjs",
     "test:watch": "vitest",
     "v1:acceptance": "tsx tools/v1-acceptance/cli.ts",
     "v1:branches": "tsx tools/v1-integration/branch-cli.ts",
     "v1:offline": "tsx tools/v1-integration/cli.ts",
+    "v1:validate-offline": "tsx experiments/evidence-validator/src/cli.ts",
     "experiment:preflight": "tsx scripts/experiment-preflight.ts"
   },
   "devDependencies": {

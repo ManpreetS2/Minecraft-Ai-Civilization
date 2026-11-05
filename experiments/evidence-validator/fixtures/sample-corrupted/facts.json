@@ -1,0 +1,10 @@
+[
+  {
+    "id": "fact-leaked-site",
+    "citizenId": "claude_theo",
+    "factKey": "rival_site",
+    "content": "Rival settlement is at x=100, z=100",
+    "kind": "observed_fact",
+    "createdAt": "2026-11-01T12:00:00.000Z"
+  }
+]
