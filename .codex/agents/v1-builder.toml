@@ -1,0 +1,5 @@
+name = "v1_builder"
+description = "V1 builder"
+model = "gpt-6.1-terra"
+model_reasoning_effort = "low"
+developer_instructions = "Implement only explicitly assigned files. Preserve other owners runtime code. Run focused tests; never use live providers or Minecraft."

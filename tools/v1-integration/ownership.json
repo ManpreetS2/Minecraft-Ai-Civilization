@@ -1,0 +1,8 @@
+[
+  { "pathPrefix": "tools/v1-", "owner": "Codex supporting infrastructure", "sourceBranch": "agents/codex-v1-integration-foundation", "sourceSha": "ae784fdcd41f00be4dc09f08e75bfaf02b9156df", "restriction": "tooling-only", "pendingIndependentQa": true, "handoff": null },
+  { "pathPrefix": "packages/agent-core/src/store", "owner": "CODEX 1 / Cursor integration", "sourceBranch": "agents/t3-community-chest-contents", "sourceSha": "dbbb7c4fde2d809bf259dc5452133507717b9453", "restriction": "no-modification", "pendingIndependentQa": true, "handoff": null },
+  { "pathPrefix": "apps/orchestrator/src/independent-offline", "owner": "Claude 2 / Cursor integration", "sourceBranch": "agents/claude2-offline-default-deny", "sourceSha": "ae784fdcd41f00be4dc09f08e75bfaf02b9156df", "restriction": "no-modification", "pendingIndependentQa": true, "handoff": null },
+  { "pathPrefix": "packages/cognition/src/routing/", "owner": "Provider owners / Cursor integration", "sourceBranch": "agents/t3-provider-hardening-integration", "sourceSha": "9945f02f38e14a7d63b3eed66279d191ad06ad3d", "restriction": "no-modification", "pendingIndependentQa": true, "handoff": null },
+  { "pathPrefix": "packages/minecraft-adapter/src/navigation", "owner": "CODEX 1.2", "sourceBranch": "agents/codex-movement-reliability", "sourceSha": "bdfba7473d79487ffdcf467592e1f2328efabc4c", "restriction": "no-modification", "pendingIndependentQa": true, "handoff": null }
+]
+

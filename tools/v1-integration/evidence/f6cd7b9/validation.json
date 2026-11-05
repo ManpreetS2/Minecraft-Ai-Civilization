@@ -1,0 +1,112 @@
+{
+    "acceptance":  {
+                       "liveDeclared":  37,
+                       "gatesAccepted":  0,
+                       "offlineAccepted":  0,
+                       "liveAccepted":  0,
+                       "measurement":  "NOT MEASURABLE",
+                       "denominatorReviewed":  false,
+                       "offlineDeclared":  30,
+                       "gatesTotal":  2
+                   },
+    "sourceSha":  "f6cd7b9a8aaaeb9f77588c1f6a595e08f1e57da4",
+    "results":  [
+                    {
+                        "exitCode":  0,
+                        "command":  "pnpm test:ai",
+                        "finishedAt":  "2026-11-05T18:58:17.1864807Z",
+                        "sourceSha":  "f6cd7b9a8aaaeb9f77588c1f6a595e08f1e57da4",
+                        "workingTree":  {
+
+                                        },
+                        "logSha256":  "af88b9ebd817b3c844641fd4add7a39260c3392a533fa4bc0b7416b759832992"
+                    },
+                    {
+                        "exitCode":  0,
+                        "command":  "pnpm v1:branches artifacts/v1/branch-contract.json",
+                        "finishedAt":  "2026-11-05T18:57:55.1900098Z",
+                        "sourceSha":  "f6cd7b9a8aaaeb9f77588c1f6a595e08f1e57da4",
+                        "workingTree":  {
+
+                                        },
+                        "logSha256":  "1500a3ebe275e0df923629ab7ed96cbaabe216c4369c51bef7a2f1fe5ec65460"
+                    },
+                    {
+                        "exitCode":  0,
+                        "command":  "pnpm build",
+                        "finishedAt":  "2026-11-05T18:58:26.6869128Z",
+                        "sourceSha":  "f6cd7b9a8aaaeb9f77588c1f6a595e08f1e57da4",
+                        "workingTree":  {
+
+                                        },
+                        "logSha256":  "a0261120df73a7ac2c9fa9185c335f0f97ef8bf41b42b7c15bc5c57bf2cd1b67"
+                    },
+                    {
+                        "exitCode":  0,
+                        "command":  "pnpm lint",
+                        "finishedAt":  "2026-11-05T18:57:55.4451777Z",
+                        "sourceSha":  "f6cd7b9a8aaaeb9f77588c1f6a595e08f1e57da4",
+                        "workingTree":  {
+
+                                        },
+                        "logSha256":  "0033bfad71e7ddff3717ec571cc41b510f925a73ac26e98fa9ba5a36c5e62975"
+                    },
+                    {
+                        "exitCode":  0,
+                        "command":  "pnpm v1:offline 2",
+                        "finishedAt":  "2026-11-05T18:57:58.6991129Z",
+                        "sourceSha":  "f6cd7b9a8aaaeb9f77588c1f6a595e08f1e57da4",
+                        "workingTree":  {
+
+                                        },
+                        "logSha256":  "b3ff4f2beb1d9e8a9f3fc7c02d1b8ce63d9372a606c58480476a9596b15f84e4"
+                    },
+                    {
+                        "exitCode":  0,
+                        "command":  "pnpm v1:offline 4",
+                        "finishedAt":  "2026-11-05T18:57:58.7985615Z",
+                        "sourceSha":  "f6cd7b9a8aaaeb9f77588c1f6a595e08f1e57da4",
+                        "workingTree":  {
+
+                                        },
+                        "logSha256":  "80235adb40c1ae235fb491865a19e4eb71134348dc1eb23bd6113b292ea78d44"
+                    },
+                    {
+                        "exitCode":  0,
+                        "command":  "pnpm test:security",
+                        "finishedAt":  "2026-11-05T18:58:05.8855751Z",
+                        "sourceSha":  "f6cd7b9a8aaaeb9f77588c1f6a595e08f1e57da4",
+                        "workingTree":  {
+
+                                        },
+                        "logSha256":  "5749ff29780d1d6658cd4c7f66a05948b07102b72eed6bbe6a2cbe46f63bc34c"
+                    },
+                    {
+                        "exitCode":  0,
+                        "command":  "pnpm test",
+                        "finishedAt":  "2026-11-05T18:58:43.4066565Z",
+                        "sourceSha":  "f6cd7b9a8aaaeb9f77588c1f6a595e08f1e57da4",
+                        "workingTree":  {
+
+                                        },
+                        "logSha256":  "1004ec8340dbd30bf40011b743a35ab1c948944cfca70577257d60486f0cb96e"
+                    },
+                    {
+                        "exitCode":  0,
+                        "command":  "pnpm typecheck",
+                        "finishedAt":  "2026-11-05T18:58:16.8647984Z",
+                        "sourceSha":  "f6cd7b9a8aaaeb9f77588c1f6a595e08f1e57da4",
+                        "workingTree":  {
+
+                                        },
+                        "logSha256":  "c969cebe6f8d3f0138db4e12487ac532cd6e1fb4e243160846ad4da73529565d"
+                    }
+                ],
+    "testCounts":  {
+                       "securityPassed":  358,
+                       "aiPassed":  505,
+                       "skipped":  2,
+                       "failed":  0,
+                       "passed":  2146
+                   }
+}

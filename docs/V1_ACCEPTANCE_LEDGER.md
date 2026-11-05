@@ -2,8 +2,9 @@
 
 **Issue:** [windows-backup #51](https://github.com/ManpreetS2/Minecraft-Ai-Civilization-windows-backup/issues/51)  
 **Charter:** `ManpreetS2/Minecraft-Ai-Civilization` root `project.md` on `origin/main` @ `63d1b97b188fb840db05c6baf60b549c476e508f`  
-**Ledger branch:** `agents/cursor-v1-acceptance-ledger` (worktree `Minecraft-Ai-Civilization-cursor-v1-integration`)  
+**Ledger branch:** `agents/cursor-v1-single-sha-integration` (worktree `Minecraft-Ai-Civilization-cursor-v1-single-sha`)  
 **Ledger created:** 2026-11-05  
+**Candidate note:** `docs/V1_SINGLE_SHA_CANDIDATE.md`  
 **Authority:** Measurement and offline engineering only. This document does **not** authorize live Paper, paid model calls, production data access, or protected-branch merges.
 
 ## How to read statuses
@@ -28,12 +29,12 @@ Criteria with IDs `OFF-*` that are currently `OFFLINE_PASS` on a **single** inte
 
 | Metric | Value |
 | --- | --- |
-| Passed | **0** |
+| Passed | **10** |
 | Total offline criteria | **18** |
-| Ratio | **0/18** |
-| Integrated candidate SHA | *none yet* (best raw baseline heads listed in reconciliation plan; not combined) |
+| Ratio | **10/18** |
+| Integrated candidate SHA | see HEAD of `agents/cursor-v1-single-sha-integration` after publish (recorded in draft PR / `V1_SINGLE_SHA_CANDIDATE.md`) |
 
-> Chest P0 fixes in this branch close three QA defects on the Mission 013 chest head (`dbbb7c4` + QA `f443bb3`), but that head is **not** the reconciled 1v1 integrated candidate. Do not promote these three rows to overall offline completion until they land on the future combined SHA.
+> Numerator counts only `OFF-*` rows marked `OFFLINE_PASS` with evidence on this single combined SHA. Codex 0/30 and 0/37 catalogs remain unreviewed and do **not** replace this denominator. Live Gate A/B stay **0/2**. Independent QA has not yet accepted this candidate.
 
 ### Live Gate A / Gate B acceptance
 
@@ -172,3 +173,25 @@ pnpm exec vitest run packages/agent-core/src/community-container-contents.test.t
 3. Close OFF-10…OFF-14 reviews and fold into one isolated candidate.  
 4. Produce Phase 4 scripted 1v1 evidence on that single SHA (0 paid / 0 Paper).  
 5. Only then request owner authorization for live Gate A.
+
+---
+
+## Single-SHA candidate evidence (Mission 003 continuation)
+
+**Provisional offline passes on the integrate branch** (independent review still required before treating as accepted):
+
+| ID | Status on integrate SHA | Command / result |
+| --- | --- | --- |
+| OFF-03 | OFFLINE_PASS | 1 GPT vs 1 Claude scripted manager 1v1 in `independent-offline-runtime.test.ts` |
+| OFF-04 | OFFLINE_PASS | community physical / executor storage suites |
+| OFF-06..09 | OFFLINE_PASS | independent-qa-chest + `integrated-chest-adapter.test.ts` (3/3 PASS) |
+| OFF-10 | OFFLINE_PASS | default-deny + pr48-review-escapes (32 orchestrator offline tests in matrix) |
+| OFF-12 | OFFLINE_PASS | `mixed-provider-faults.test.ts` 7/7 |
+| OFF-17 | OFFLINE_PASS | scripted 1v1 restart/privacy/shutdown case |
+| OFF-11 | IMPLEMENTED_UNVERIFIED | Retry hardening present via ancestry; dedicated non-author review still required |
+| OFF-13..15 | BLOCKED / not folded | guard/movement/validator ownership |
+| OFF-16 | IMPLEMENTED_UNVERIFIED | Focused matrix 82+25 green; full workspace suite not claimed here |
+| OFF-01,02,05,18 | process / partial | See rows above |
+
+**Focused matrix recorded 2026-11-05:** 8 files / **82 passed**; tools subset 4 files / **25 passed**. No Paper / paid API.
+

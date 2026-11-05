@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "policy": "Entries select existing executable tests, not new pass claims. Execute on one candidate SHA and retain command results.",
+  "groups": [
+    { "id": "identity-routing-memory-restart", "paths": ["tools/v1-integration/scenario.test.ts", "packages/session-isolation/src/cancellation.test.ts"], "command": "pnpm test:v1", "scope": "scripted 1v1/2v2 manager, registry, prompt isolation, SQLite reopen; session persistence across process restart unproven" },
+    { "id": "privacy-observer-coordinates-messages", "paths": ["packages/agent-core/src/persistent-fact-provenance.test.ts", "packages/shared/src/bulletin-2v2-contract.test.ts"], "command": "pnpm test:security", "scope": "existing security regression dependencies" },
+    { "id": "physical-inventory-food-crafting", "paths": ["packages/skills/src/craft-e2e-empty-start.test.ts", "packages/skills/src/eat-food.test.ts", "packages/skills/src/collect-inventory-delta.test.ts", "packages/agent-core/src/manager-physical-integration.test.ts"], "command": "pnpm test", "scope": "existing fake-body physical action checks; no live survival claim" },
+    { "id": "cancellation-retries-shutdown-respawn", "paths": ["packages/cognition/src/openai-retry.test.ts", "packages/agent-core/src/ops-cancellation.test.ts", "packages/minecraft-adapter/src/death.test.ts"], "command": "pnpm test", "scope": "existing component checks; integrated provider fault and respawn scenario remains unproven" },
+    { "id": "chest-authorization-current-stock", "paths": ["tools/v1-integration/regressions.test.ts", "tools/v1-integration/integrated-chest-adapter.test.ts", "packages/agent-core/src/independent-qa-chest-contents.test.ts"], "command": "pnpm exec vitest run --config tools/vitest.config.ts tools/v1-integration/regressions.test.ts tools/v1-integration/integrated-chest-adapter.test.ts", "scope": "controlled doubles plus real store/executor ChestRegressionAdapter on the integrated candidate; ADV-03 freshness/concurrency metadata remains an explicit gap" },
+    { "id": "default-deny-createBody", "paths": ["tools/v1-integration/scenario.test.ts", "apps/orchestrator/src/independent-offline-default-deny.test.ts"], "command": "pnpm test", "scope": "supported tooling wrapper denies body injection; lower runtime API remains a trusted callback boundary" }
+  ]
+}

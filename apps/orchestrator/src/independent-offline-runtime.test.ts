@@ -1,12 +1,23 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { CivilizationStore } from "@civ/agent-core";
-import { OFFLINE_2V2_ASSIGNMENTS, createInMemoryCitizenSessionStore } from "@civ/cognition/routing";
+import {
+  OFFLINE_2V2_ASSIGNMENTS,
+  createInMemoryCitizenSessionStore,
+  createJsonFileCitizenSessionStore,
+  type CitizenAssignment,
+  type CitizenSessionStore,
+} from "@civ/cognition/routing";
 import { createMineflayerCraftFixture, createSharedCraftWorld } from "@civ/skills/testing";
 import { createNavigationBackend, setNavigationBackend, type MinecraftBody, type NavigationBackend } from "@civ/minecraft-adapter";
 import { createEvent, loadConfig, ok, type BodyObservation } from "@civ/shared";
 import { createIndependentOfflineRuntime } from "./independent-offline-runtime.js";
-const managers: ReturnType<typeof createIndependentOfflineRuntime>["manager"][] = [];
+type OfflineRuntime = ReturnType<typeof createIndependentOfflineRuntime>;
+const managers: OfflineRuntime["manager"][] = [];
 const stores: CivilizationStore[] = [];
+const dirs: string[] = [];
 const network = vi.fn(() => { throw new Error("real network forbidden"); });
 beforeEach(() => { network.mockClear(); vi.stubGlobal("fetch", network); });
 afterEach(async () => {
@@ -14,15 +25,24 @@ afterEach(async () => {
   for (const store of stores.splice(0)) if (store.isOpen()) store.close();
   setNavigationBackend(createNavigationBackend("pathfinder"));
   vi.unstubAllGlobals();
+  for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true });
   expect(network).not.toHaveBeenCalled();
 });
-function fixture(count: 2 | 4 = 2) {
-  const store = new CivilizationStore(":memory:"); stores.push(store);
+function fixture(count: 2 | 4 = 2, options: { databasePath?: string; sessionStore?: CitizenSessionStore; store?: CivilizationStore } = {}) {
+  const store = options.store ?? new CivilizationStore(options.databasePath ?? ":memory:");
+  if (!options.store) stores.push(store);
   const assignments = OFFLINE_2V2_ASSIGNMENTS.filter((a) => count === 4 || a.citizenId.endsWith("-a")).map((a) => ({ ...a, citizenName: a.citizenName.replaceAll("-", "_") }));
   const audit = { actor: "orchestrator-config" as const, reason: "disposable independent runtime fixture" };
-  store.upsertCommunity("north", "North", audit); store.upsertCommunity("south", "South", audit);
-  store.addCommunityMember("north", "gpt-a", audit); store.addCommunityMember("south", "claude-a", audit);
-  if (count === 4) { store.addCommunityMember("south", "gpt-b", audit); store.addCommunityMember("north", "claude-b", audit); }
+  const directory = store.getCommunityDirectory();
+  if (!directory.hasCommunity("north") || !directory.hasCommunity("south")) {
+    store.upsertCommunity("north", "North", audit); store.upsertCommunity("south", "South", audit);
+  }
+  if (!store.getCommunityDirectory().communityOf("gpt-a")) store.addCommunityMember("north", "gpt-a", audit);
+  if (!store.getCommunityDirectory().communityOf("claude-a")) store.addCommunityMember("south", "claude-a", audit);
+  if (count === 4) {
+    if (!store.getCommunityDirectory().communityOf("gpt-b")) store.addCommunityMember("south", "gpt-b", audit);
+    if (!store.getCommunityDirectory().communityOf("claude-b")) store.addCommunityMember("north", "claude-b", audit);
+  }
   const config = loadConfig({ DEMO_PROFILE: "none", SIM_CITIZEN_COUNT: String(count), SIM_RUN_ID: "offline-composed-run", LLM_ENABLED: "true", LLM_PROVIDER: "none", CLOUD_LLM_ENABLED: "false", LLM_COOLDOWN_MS: "1", CLOUD_MAX_CONCURRENCY: "4", HUMAN_DIRECTIVES_ENABLED: "false" });
   const shared = createSharedCraftWorld();
   const bodies = new Map(assignments.map((a, i) => {
@@ -50,10 +70,23 @@ function fixture(count: 2 | 4 = 2) {
     } as unknown as MinecraftBody;
   });
   return { store, assignments, bodies, resolveSecret, createBody, args: {
-    config, store, assignmentsJson: JSON.stringify(assignments), sessionStore: createInMemoryCitizenSessionStore(), resolveSecret,
+    config, store, assignmentsJson: JSON.stringify(assignments), sessionStore: options.sessionStore ?? createInMemoryCitizenSessionStore(), resolveSecret,
     script: (citizenId: string) => (citizenId.startsWith("gpt") ? { goal: "gather_wood" } : { goal: "craft_tools" }),
      createBody,
   } };
+}
+
+async function drainTicks(runtime: OfflineRuntime, store: CivilizationStore, steps = 3) {
+  for (let step = 0; step < steps; step++) {
+    await Promise.all(runtime.manager.list().map((c) => runtime.manager["tickCitizen"](c, store.getSettlement(), [], undefined)));
+    await vi.waitFor(() => expect(runtime.manager.pendingOps()).toBe(0), { timeout: 20_000 });
+  }
+}
+
+function sessionText(runtime: OfflineRuntime, assignment: CitizenAssignment): string {
+  return assignment.family === "gpt"
+    ? runtime.openai.calls.filter((call) => call.apiKey === `synthetic-${assignment.credential.env}`).map((call) => call.body).join("\n")
+    : JSON.stringify(runtime.claude.get(assignment.citizenId)?.calls ?? []);
 }
 
 describe("independent offline composition and normal manager startup", () => {
@@ -108,4 +141,96 @@ describe("independent offline composition and normal manager startup", () => {
     expect(fx.createBody).not.toHaveBeenCalled();
     expect(fx.resolveSecret).not.toHaveBeenCalled();
   });
+});
+
+describe("scripted 1 GPT vs 1 Claude integrated offline 1v1", () => {
+  it("starts identities, verifies survival, keeps secrets, restarts, and shuts down with no network", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "civ-offline-1v1-")); dirs.push(dir);
+    const sessionStore = createJsonFileCitizenSessionStore(join(dir, "sessions.json"));
+    const fx = fixture(2, { databasePath: join(dir, "offline.sqlite"), sessionStore });
+    const first = createIndependentOfflineRuntime(fx.args); managers.push(first.manager);
+    await first.manager.start(undefined, { deferTicks: true });
+
+    const [gpt, claude] = fx.assignments;
+    expect(fx.assignments.map((a) => [a.citizenId, a.family])).toEqual([["gpt-a", "gpt"], ["claude-a", "claude"]]);
+    expect(first.manager.list().map((c) => c.record.id)).toEqual(["gpt-a", "claude-a"]);
+    expect(first.manager.list().map((c) => c.record.minecraftUsername)).toEqual(["GPT_A", "Claude_A"]);
+    expect(fx.store.getMeta("runId")).toBe("offline-composed-run");
+    expect(fx.store.getCommunityDirectory().communityOf("gpt-a")).toBe("north");
+    expect(fx.store.getCommunityDirectory().communityOf("claude-a")).toBe("south");
+    expect(first.registry.providerFor("gpt-a").family).toBe("gpt");
+    expect(first.registry.providerFor("claude-a").family).toBe("claude");
+    expect(first.registry.providerFor("gpt-a").sessionId).not.toBe(first.registry.providerFor("claude-a").sessionId);
+    for (const body of fx.bodies.values()) expect(body.totalItems()).toBe(0);
+
+    for (const a of fx.assignments) {
+      const secret = `1V1-PRIVATE-${a.citizenId}`;
+      const event = createEvent("TaskCompleted", { summary: secret, visibility: { class: "actor_private" } }, a.citizenId);
+      first.manager.events.emit(event);
+      fx.store.addMemory({ id: `1v1-${a.citizenId}`, citizenId: a.citizenId, kind: "episodic", content: secret, importance: 1, createdAt: new Date().toISOString() }, { sourceEventId: event.id });
+    }
+    first.manager.events.emit(createEvent(
+      "ConversationOccurred",
+      { message: "NORTH-ONLY-PLAN", speakerId: "gpt-a", visibility: { class: "settlement_public", audience: { scope: "community", communityId: "north" } } },
+      "gpt-a",
+    ));
+
+    await drainTicks(first, fx.store, 3);
+    expect(fx.bodies.get("gpt-a")!.count("oak_log")).toBeGreaterThan(0);
+    expect(fx.bodies.get("claude-a")!.count("wooden_pickaxe")).toBe(1);
+    for (const body of fx.bodies.values()) {
+      expect(body.count("sweet_berries")).toBe(1);
+      expect(body.bot.food).toBe(9);
+    }
+    expect(first.manager.list().every((c) => c.lastPlan?.source === "llm")).toBe(true);
+    expect(sessionText(first, gpt!)).toContain("1V1-PRIVATE-gpt-a");
+    expect(sessionText(first, gpt!)).not.toContain("1V1-PRIVATE-claude-a");
+    expect(sessionText(first, claude!)).toContain("1V1-PRIVATE-claude-a");
+    expect(sessionText(first, claude!)).not.toContain("1V1-PRIVATE-gpt-a");
+    expect(sessionText(first, gpt!)).toContain("NORTH-ONLY-PLAN");
+    expect(sessionText(first, claude!)).not.toContain("NORTH-ONLY-PLAN");
+    const gptSession = first.registry.providerFor("gpt-a").sessionId;
+    const claudeSession = first.registry.providerFor("claude-a").sessionId;
+    const spent = first.registry.accounting();
+    expect(spent.experiment.requestsUsed).toBeGreaterThanOrEqual(2);
+    expect(spent.citizens["gpt-a"]!.requests).toBeGreaterThanOrEqual(1);
+    expect(spent.citizens["claude-a"]!.requests).toBeGreaterThanOrEqual(1);
+    const inventories = [...fx.bodies].map(([id, body]) => [id, body.items.map((item) => ({ name: item.name, count: item.count }))]);
+
+    await first.manager.stop();
+    expect(first.manager.lastShutdownDrain()).toMatchObject({ fullyDrained: true, remaining: 0, timedOut: false });
+    expect(first.manager.pendingOps()).toBe(0);
+    expect(fx.store.isOpen()).toBe(false);
+    expect(fx.store.safeWrite("appendEvent", () => { throw new Error("closed store must not run writes"); })).toEqual({ ok: false, reason: "closed" });
+    await expect(first.manager.start(undefined, { deferTicks: true })).rejects.toThrow(/shutting down or after stop/);
+    await expect(first.registry.providerFor("gpt-a").decide({ citizenName: "GPT_A", inventory: [], settlementNeeds: [], memories: [], nearbyCitizens: [] })).rejects.toMatchObject({ code: "CLOSED" });
+
+    const resumedStore = new CivilizationStore(join(dir, "offline.sqlite")); stores.push(resumedStore);
+    const second = createIndependentOfflineRuntime({ ...fx.args, store: resumedStore, sessionStore }); managers.push(second.manager);
+    expect(second.registry.providerFor("gpt-a").sessionId).toBe(gptSession);
+    expect(second.registry.providerFor("claude-a").sessionId).toBe(claudeSession);
+    expect(second.registry.accounting().citizens["gpt-a"]!.requests).toBe(spent.citizens["gpt-a"]!.requests);
+    expect(second.registry.accounting().citizens["claude-a"]!.estimatedSpendUsd).toBe(spent.citizens["claude-a"]!.estimatedSpendUsd);
+    expect(resumedStore.getCommunityDirectory().communityOf("gpt-a")).toBe("north");
+    expect(resumedStore.getCommunityDirectory().communityOf("claude-a")).toBe("south");
+    expect(resumedStore.getCitizen("gpt-a")?.minecraftUsername).toBe("GPT_A");
+    expect(resumedStore.getMemories("gpt-a").map((m) => m.content)).toContain("1V1-PRIVATE-gpt-a");
+    expect(resumedStore.getMemories("claude-a").map((m) => m.content)).not.toContain("1V1-PRIVATE-gpt-a");
+
+    await second.manager.start(undefined, { deferTicks: true });
+    expect(second.manager.list().map((c) => c.record.id)).toEqual(["gpt-a", "claude-a"]);
+    expect([...fx.bodies].map(([id, body]) => [id, body.items.map((item) => ({ name: item.name, count: item.count }))])).toEqual(inventories);
+    await drainTicks(second, resumedStore, 1);
+    expect(sessionText(second, gpt!)).toContain("1V1-PRIVATE-gpt-a");
+    expect(sessionText(second, gpt!)).not.toContain("1V1-PRIVATE-claude-a");
+    expect(sessionText(second, claude!)).toContain("1V1-PRIVATE-claude-a");
+    expect(sessionText(second, claude!)).not.toContain("1V1-PRIVATE-gpt-a");
+    expect(sessionText(second, claude!)).not.toContain("NORTH-ONLY-PLAN");
+    expect(second.registry.accounting().citizens["gpt-a"]!.requests).toBeGreaterThan(spent.citizens["gpt-a"]!.requests);
+
+    await second.manager.stop();
+    expect(second.manager.lastShutdownDrain()).toMatchObject({ fullyDrained: true, remaining: 0, timedOut: false });
+    expect(resumedStore.isOpen()).toBe(false);
+    expect(network).not.toHaveBeenCalled();
+  }, 60_000);
 });

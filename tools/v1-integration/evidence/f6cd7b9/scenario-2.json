@@ -1,0 +1,62 @@
+{
+  "sourceSha": "f6cd7b9a8aaaeb9f77588c1f6a595e08f1e57da4",
+  "mode": "offline-fixture",
+  "citizens": [
+    {
+      "id": "gpt-a",
+      "username": "GPT_A"
+    },
+    {
+      "id": "claude-a",
+      "username": "Claude_A"
+    }
+  ],
+  "providers": [
+    {
+      "citizenId": "gpt-a",
+      "family": "gpt",
+      "model": "gpt-4o-mini",
+      "sessionId": "v1-offline-fixture:gpt-a:c58cad76-e3ad-4274-8051-d324784485a5",
+      "requests": 3,
+      "ownMemorySeen": true,
+      "leakedMemoryIds": []
+    },
+    {
+      "citizenId": "claude-a",
+      "family": "claude",
+      "model": "claude-haiku-5-5",
+      "sessionId": "v1-offline-fixture:claude-a:1e6f6118-52be-42d7-a20e-743140a92862",
+      "requests": 3,
+      "ownMemorySeen": true,
+      "leakedMemoryIds": []
+    }
+  ],
+  "inventoryBefore": {
+    "gpt-a": 0,
+    "claude-a": 0
+  },
+  "inventoryAfter": {
+    "gpt-a": 3,
+    "claude-a": 3
+  },
+  "restart": {
+    "citizens": [
+      {
+        "id": "gpt-a",
+        "username": "GPT_A"
+      },
+      {
+        "id": "claude-a",
+        "username": "Claude_A"
+      }
+    ],
+    "memoryPreserved": true,
+    "storage": "reopened disposable SQLite database; in-memory session store"
+  },
+  "unproven": [
+    "real model decisions",
+    "session persistence across process restart",
+    "respawn",
+    "live Minecraft"
+  ]
+}

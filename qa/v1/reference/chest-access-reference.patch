@@ -1,0 +1,31 @@
+diff --git a/packages/agent-core/src/community-physical-state.ts b/packages/agent-core/src/community-physical-state.ts
+index 0a2ab7d..a43e03b 100644
+--- a/packages/agent-core/src/community-physical-state.ts
++++ b/packages/agent-core/src/community-physical-state.ts
+@@ -331,10 +331,10 @@ export class CitizenPhysicalState {
+     return Boolean(
+       this.store.db
+         .prepare(
+-          `SELECT 1 FROM physical_assets a WHERE a.resource_key=? AND a.kind='chest' AND (a.owner_id=? OR EXISTS(
++          `SELECT 1 FROM physical_assets a WHERE a.resource_key=? AND a.kind='chest' AND a.community_id=? AND (a.owner_id=? OR EXISTS(
+         SELECT 1 FROM physical_asset_grants g WHERE g.resource_key=a.resource_key AND g.citizen_id=?))`,
+         )
+-        .get(key, this.citizenId, this.citizenId),
++        .get(key, this.communityId, this.citizenId, this.citizenId),
+     );
+   }
+ 
+diff --git a/packages/agent-core/src/executor.ts b/packages/agent-core/src/executor.ts
+index f358c92..7822702 100644
+--- a/packages/agent-core/src/executor.ts
++++ b/packages/agent-core/src/executor.ts
+@@ -1003,6 +1003,9 @@ async function withdrawItemsNamed(
+       store.saveSettlement(settlement);
+     }
+     events.emit(createEvent("ItemWithdrawn", { item: itemName, count: result.data.count, position: chest }, ctx.citizenId));
++  } else if (result.code === "VERIFY_FAILED" && store.hasCommunities()) {
++    // A live check proved this item absent: drop only that item's stale positive observation.
++    recordObservedContents(ctx, store, chest, { [itemName]: 0 });
+   }
+   return result;
+ }

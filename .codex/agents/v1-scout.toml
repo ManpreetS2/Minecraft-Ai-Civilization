@@ -1,0 +1,5 @@
+name = "v1_scout"
+description = "V1 scout"
+model = "gpt-6-luna"
+model_reasoning_effort = "low"
+developer_instructions = "Read-only repository discovery. Never modify runtime code."

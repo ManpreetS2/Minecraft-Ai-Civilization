@@ -1,0 +1,100 @@
+{
+  "sourceSha": "f6cd7b9a8aaaeb9f77588c1f6a595e08f1e57da4",
+  "mode": "offline-fixture",
+  "citizens": [
+    {
+      "id": "gpt-a",
+      "username": "GPT_A"
+    },
+    {
+      "id": "gpt-b",
+      "username": "GPT_B"
+    },
+    {
+      "id": "claude-a",
+      "username": "Claude_A"
+    },
+    {
+      "id": "claude-b",
+      "username": "Claude_B"
+    }
+  ],
+  "providers": [
+    {
+      "citizenId": "gpt-a",
+      "family": "gpt",
+      "model": "gpt-4o-mini",
+      "sessionId": "v1-offline-fixture:gpt-a:30761391-1b27-46b1-b8ad-5ff956743886",
+      "requests": 3,
+      "ownMemorySeen": true,
+      "leakedMemoryIds": []
+    },
+    {
+      "citizenId": "gpt-b",
+      "family": "gpt",
+      "model": "gpt-4.1-mini",
+      "sessionId": "v1-offline-fixture:gpt-b:3148e1aa-fc68-4c78-8df4-ef85cf18f736",
+      "requests": 3,
+      "ownMemorySeen": true,
+      "leakedMemoryIds": []
+    },
+    {
+      "citizenId": "claude-a",
+      "family": "claude",
+      "model": "claude-haiku-5-5",
+      "sessionId": "v1-offline-fixture:claude-a:aa0f4ebd-db3f-4ffe-a440-3fdb5247043c",
+      "requests": 3,
+      "ownMemorySeen": true,
+      "leakedMemoryIds": []
+    },
+    {
+      "citizenId": "claude-b",
+      "family": "claude",
+      "model": "claude-sonnet-5-5",
+      "sessionId": "v1-offline-fixture:claude-b:6284df23-7945-411b-a1d3-3c323c09eb7c",
+      "requests": 3,
+      "ownMemorySeen": true,
+      "leakedMemoryIds": []
+    }
+  ],
+  "inventoryBefore": {
+    "gpt-a": 0,
+    "gpt-b": 0,
+    "claude-a": 0,
+    "claude-b": 0
+  },
+  "inventoryAfter": {
+    "gpt-a": 3,
+    "gpt-b": 3,
+    "claude-a": 3,
+    "claude-b": 3
+  },
+  "restart": {
+    "citizens": [
+      {
+        "id": "gpt-a",
+        "username": "GPT_A"
+      },
+      {
+        "id": "gpt-b",
+        "username": "GPT_B"
+      },
+      {
+        "id": "claude-a",
+        "username": "Claude_A"
+      },
+      {
+        "id": "claude-b",
+        "username": "Claude_B"
+      }
+    ],
+    "memoryPreserved": true,
+    "storage": "reopened disposable SQLite database; in-memory session store"
+  },
+  "unproven": [
+    "real model decisions",
+    "session persistence across process restart",
+    "respawn",
+    "live Minecraft"
+  ]
+}

@@ -1,0 +1,5 @@
+name = "v1_architect"
+description = "V1 architect"
+model = "gpt-6.1-sol"
+model_reasoning_effort = "low"
+developer_instructions = "Produce bounded integration decisions and interface plans. Avoid speculative rewrites."
