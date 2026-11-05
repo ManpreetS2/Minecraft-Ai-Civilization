@@ -1,5 +1,5 @@
 import { defineConfig } from "vitest/config";
-import { civPackageAliases } from "../test-support/civ-package-aliases.mjs";
+import { civPackageAliases } from "./civ-package-aliases.js";
 
 export default defineConfig({
   resolve: {
