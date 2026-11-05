@@ -8,7 +8,7 @@ import {
   type CitizenSessionStore,
   type ScriptedReply,
 } from "@civ/cognition/routing";
-import { VALID_USERNAME } from "@civ/minecraft-adapter";
+import { MinecraftBody, VALID_USERNAME } from "@civ/minecraft-adapter";
 import type { AppConfig } from "@civ/shared";
 
 /**
@@ -20,6 +20,11 @@ import type { AppConfig } from "@civ/shared";
  * is the real fetch, a bound or wrapped copy of it, or a custom transport that claims not to be paid. A request that
  * reaches a transport is answered from `script` and goes nowhere else. This does not sandbox arbitrary code running in
  * the same process; it removes the supported route by which a model request could leave it.
+ *
+ * Additional offline boundaries (independent review of PR #48):
+ * - Assignment fallbacks may be `none`/`heuristic` only; `loopback-ollama` is refused here because it uses fetch.
+ * - `createBody` is required and must return a non-`MinecraftBody` in-process body (no mineflayer connect path).
+ * - Credential env names and resolved secret values must uniquely identify one GPT citizen for scripted replies.
  */
 const FORBIDDEN_INJECTIONS = ["fetchImpl", "claudeTransportFor", "allowPaidRequests", "transport"] as const;
 
@@ -40,6 +45,9 @@ export function createIndependentOfflineRuntime(args: {
     }
   }
   if (typeof args.script !== "function") throw new Error("Offline runtime is default-deny: a scripted reply function is required");
+  if (typeof args.createBody !== "function") {
+    throw new Error("Offline runtime requires an offline createBody factory; omitting one would fall through to MinecraftBody");
+  }
   const { config, store } = args;
   const assignments = parseCitizenAssignments(args.assignmentsJson);
   if (!config.SIM_RUN_ID?.trim()) throw new Error("Independent runtime needs an explicit stable run ID");
@@ -52,6 +60,12 @@ export function createIndependentOfflineRuntime(args: {
     const existing = store.getCitizen(a.citizenId);
     if (existing && existing.minecraftUsername !== a.citizenName) throw new Error("Independent identity conflicts with persisted username");
     ids.add(a.citizenId); names.add(a.citizenName.toLowerCase());
+    // Network-backed fallbacks are valid in the general registry, but not through this offline root.
+    if (a.fallback && a.fallback.kind !== "none" && a.fallback.kind !== "heuristic") {
+      throw new Error(
+        `Offline runtime refuses network-backed fallback '${a.fallback.kind}' for ${a.citizenId}; use heuristic or none`,
+      );
+    }
   }
   if (assignments.filter((a) => a.family === "gpt").length !== assignments.length / 2) throw new Error("Independent experiment needs equal GPT and Claude citizen counts");
   // Membership comes from the authenticated directory already seeded by the operator, never from model family.
@@ -62,17 +76,49 @@ export function createIndependentOfflineRuntime(args: {
     communities.set(community, (communities.get(community) ?? 0) + 1);
   }
   if (communities.size !== 2 || [...communities.values()].some((n) => n !== assignments.length / 2)) throw new Error("Independent experiment needs two equally sized starting communities");
-  // Registry callers identify a GPT citizen by the key it sends, so remember which citizen each resolved key belongs to.
-  const citizenByEnv = new Map(assignments.map((a) => [a.credential.env, a.citizenId]));
+
+  // Bind scripted GPT replies by unique credential identity. Shared env names or shared resolved values would
+  // otherwise let the later map entry steal another citizen's script.
+  const citizenByEnv = new Map<string, string>();
+  for (const a of assignments) {
+    if (citizenByEnv.has(a.credential.env)) {
+      throw new Error(`Offline runtime refuses shared credential env '${a.credential.env}' across citizens`);
+    }
+    citizenByEnv.set(a.credential.env, a.citizenId);
+  }
+  const assignmentById = new Map(assignments.map((a) => [a.citizenId, a]));
   const citizenByKey = new Map<string, string>();
   const resolveSecret: CitizenRegistryOptions["resolveSecret"] = (ref) => {
     const secret = args.resolveSecret(ref);
     const citizenId = citizenByEnv.get(ref.env);
-    if (citizenId && typeof secret === "string") citizenByKey.set(secret, citizenId);
+    if (!citizenId) throw new Error(`Offline runtime has no citizen for credential env '${ref.env}'`);
+    // Only GPT scripted replies are keyed by the Bearer secret; Claude is bound by citizenId already.
+    if (assignmentById.get(citizenId)?.family === "gpt") {
+      if (typeof secret !== "string" || !secret) throw new Error(`Offline runtime requires a non-empty secret for ${citizenId}`);
+      const prior = citizenByKey.get(secret);
+      if (prior && prior !== citizenId) {
+        throw new Error(`Offline runtime refuses shared credential values across citizens (${prior} vs ${citizenId})`);
+      }
+      citizenByKey.set(secret, citizenId);
+    }
     return secret;
   };
-  const openai = createScriptedOpenAiFetch((apiKey) => args.script(citizenByKey.get(apiKey) ?? "unknown"));
+  const openai = createScriptedOpenAiFetch((apiKey) => {
+    const citizenId = citizenByKey.get(apiKey);
+    if (!citizenId) throw new Error("Offline scripted GPT transport saw an unknown API key");
+    return args.script(citizenId);
+  });
   const claude = new Map<string, ReturnType<typeof createScriptedClaudeTransport>>();
+  const createBody: NonNullable<AgentManagerHooks["createBody"]> = (options) => {
+    const body = args.createBody(options);
+    if (body == null) {
+      throw new Error("Offline runtime createBody must return a body; omitting one would fall through to MinecraftBody");
+    }
+    if (body instanceof MinecraftBody) {
+      throw new Error("Offline runtime refuses MinecraftBody; supply an in-process offline body");
+    }
+    return body;
+  };
   const registry = new CitizenProviderRegistry({
     runId: config.SIM_RUN_ID,
     assignments,
@@ -91,7 +137,7 @@ export function createIndependentOfflineRuntime(args: {
     const manager = new AgentManager(config, store, {
       cognitionRouter: registry,
       roster: assignments.map((a) => ({ id: a.citizenId, name: a.citizenName })),
-      createBody: args.createBody,
+      createBody,
     });
     return { manager, registry, openai, claude };
   } catch (error) {
