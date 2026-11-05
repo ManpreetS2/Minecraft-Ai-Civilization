@@ -1,197 +1,102 @@
 # V1 Acceptance Ledger
 
 **Issue:** [windows-backup #51](https://github.com/ManpreetS2/Minecraft-Ai-Civilization-windows-backup/issues/51)  
-**Charter:** `ManpreetS2/Minecraft-Ai-Civilization` root `project.md` on `origin/main` @ `63d1b97b188fb840db05c6baf60b549c476e508f`  
-**Ledger branch:** `agents/cursor-v1-single-sha-integration` (worktree `Minecraft-Ai-Civilization-cursor-v1-single-sha`)  
-**Ledger created:** 2026-11-05  
-**Candidate note:** `docs/V1_SINGLE_SHA_CANDIDATE.md`  
-**Authority:** Measurement and offline engineering only. This document does **not** authorize live Paper, paid model calls, production data access, or protected-branch merges.
+**Charter:** `ManpreetS2/Minecraft-Ai-Civilization` `project.md` @ `63d1b97b188fb840db05c6baf60b549c476e508f`  
+**Candidate branch:** `agents/cursor-v1-single-sha-integration` (PR [#56](https://github.com/ManpreetS2/Minecraft-Ai-Civilization-windows-backup/pull/56))  
+**Ledger updated:** 2026-11-05 (Mission 004)  
+**Authority:** Offline measurement only. Does **not** authorize live Paper, paid calls, production data, or protected merges.
 
-## How to read statuses
+## Status vocabulary
 
 | Status | Meaning |
 | --- | --- |
-| `NOT_IMPLEMENTED` | No integrated source implements the behavior |
-| `IMPLEMENTED_UNVERIFIED` | Code exists on some branch; no accepted evidence on a single integrated SHA |
-| `OFFLINE_PASS` | Deterministic offline test evidence on **one** integrated source SHA |
+| `NOT_IMPLEMENTED` | Behavior absent on the candidate |
+| `IMPLEMENTED_UNVERIFIED` | Present on the candidate SHA; Cursor/self tests only — **not** independently accepted |
+| `OFFLINE_PASS` | Deterministic offline evidence on the candidate SHA **and** independent reviewer acceptance recorded |
 | `LIVE_PASS` | Authentic disposable Paper / real provider evidence (owner-authorized) |
-| `BLOCKED` | Known defect, missing dependency, or ownership/review gate |
+| `BLOCKED` | Ownership, missing interface, or review gate |
 
-**Rules:** Never count tests on independent unreconciled branches as combined-source pass. Never treat simulated 60-minute fixtures as Paper success. Percentages use explicit numerator/denominator only from rows below.
+**Implementation coverage** ≠ **independently accepted offline evidence**. Self-green tests raise a row at most to `IMPLEMENTED_UNVERIFIED` until a non-author records acceptance.
+
+Codex unreviewed catalogs (30 offline / 37 live) are **separate** and do not replace the 18-item official denominator.
 
 ---
 
 ## Completion metrics (explicit)
 
-### Offline / integrated-code acceptance
+### A. Implementation coverage on the candidate (self-verified, not independent acceptance)
 
-Criteria with IDs `OFF-*` that are currently `OFFLINE_PASS` on a **single** integrated SHA / all `OFF-*` criteria.
+Count of `OFF-*` rows that are at least `IMPLEMENTED_UNVERIFIED` or `OFFLINE_PASS` on the published candidate SHA.
 
 | Metric | Value |
 | --- | --- |
-| Passed | **10** |
+| Implemented (self-verified) | **11** |
 | Total offline criteria | **18** |
-| Ratio | **10/18** |
-| Integrated candidate SHA | `1af386e539cb04f98d7584712f665dec79c04d36` |
+| Ratio | **11/18** |
+| Candidate SHA | *(filled at each publish; see latest PR #56 head)* |
 
-> Numerator counts only `OFF-*` rows marked `OFFLINE_PASS` with evidence on this single combined SHA. Codex 0/30 and 0/37 catalogs remain unreviewed and do **not** replace this denominator. Live Gate A/B stay **0/2**. Independent QA has not yet accepted this candidate.
+### B. Independently accepted offline evidence
 
-### Live Gate A / Gate B acceptance
+| Metric | Value |
+| --- | --- |
+| Independently accepted (`OFFLINE_PASS`) | **0** |
+| Total offline criteria | **18** |
+| Ratio | **0/18** |
+
+> No OFF row is `OFFLINE_PASS` until Claude/Codex/other non-author acceptance is recorded for that criterion on this SHA.
+
+### C. Live Gate A / Gate B
 
 | Metric | Value |
 | --- | --- |
 | Live gates completed | **0** |
-| Live gates declared | **2** (Gate A, Gate B) |
+| Live gates declared | **2** |
 | Ratio | **0/2** |
-| Notes | Live criteria remain `NOT_IMPLEMENTED` / unauthorized. Offline unit tests do not close Gate A or Gate B. |
 
 ---
 
-## Gate A — Solo survival + 1v1 GPT/Claude technical verification
+## OFF-01 … OFF-18
 
-Source: `project.md` § Gate A (lines ~248–249 on `origin/main` @ `63d1b97b`).
-
-| ID | Requirement | Source | Status | Acceptance test | Evidence | Independent review | Blocker |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| GA-01 | One citizen connects on an isolated engine | Gate A | `IMPLEMENTED_UNVERIFIED` | Disposable Paper connect + spawn identity | Scattered Windows/live docs; no single integrated SHA | Required | Live unauthorized; integrate runtime first |
-| GA-02 | Gather food with physical inventory evidence | Gate A + research differentiator #2 | `IMPLEMENTED_UNVERIFIED` | Offline gather/food inventory proofs; later live hunger delta | Branches: survival readiness `2983c17`, manager physical `4da60f0` | Required | Not on one integrated SHA; live unverified |
-| GA-03 | Navigate / avoid drowning | Gate A | `IMPLEMENTED_UNVERIFIED` | Movement reliability suite; live path evidence | `agents/codex-movement-reliability` @ `bdfba74` | CODEX 1.2 owns | Not integrated |
-| GA-04 | Find/use shelter/bed when possible | Gate A | `IMPLEMENTED_UNVERIFIED` | Sleep/shelter offline + live | Homes/sleep paths exist across WIP | Required | Unreconciled |
-| GA-05 | Preserve identity across reconnect/respawn | Gate A | `IMPLEMENTED_UNVERIFIED` | Restart SQLite identity/memory suite | Manager restart isolation `5d0268f` | Required | Not integrated candidate |
-| GA-06 | Stop safely (no closed-SQLite writes) | Gate A + original issue #6 | `IMPLEMENTED_UNVERIFIED` | Deferred-promise shutdown test | Original PR #7 draft; Windows reliability paths | Required | Shutdown lifecycle still tracked as open risk |
-| GA-07 | One GPT + one Claude independent sessions | Gate A / milestones (1) | `IMPLEMENTED_UNVERIFIED` | Scripted dual-provider offline 1v1; no cross session | Candidate `9945f02` + provider PRs #32/#42/#48 | Non-author review required | Not reconciled; paid/live forbidden |
-| GA-08 | Independent memories / no private leakage | Gate A + differentiator #1 | `IMPLEMENTED_UNVERIFIED` | Negative privacy suite (unobserved chest, DM, rival site) | SEC-001 / reviewed security branches | Independent SEC review | Reconciliation + review open |
-| GA-09 | Accurate subscription/API cost attribution | Gate A | `IMPLEMENTED_UNVERIFIED` | Offline accounting fixtures; live cost ledger later | Provider retry/fault PRs #32/#42 | Non-author | Live cost proof unauthorized |
-| GA-10 | Offline unit tests alone do **not** close Gate A | Gate A explicit | `OFFLINE_PASS` (meta) | Ledger rule: Gate A live rows stay open | This ledger | N/A | N/A — measurement rule |
-
-Live Gate A criteria: GA-01…GA-09 → **0/9 LIVE_PASS**.
-
----
-
-## Gate B — 2v2 / 60 continuous real-world minutes
-
-Source: `project.md` § Gate B (lines ~251–252) + public acceptance target.
-
-| ID | Requirement | Source | Status | Acceptance test | Evidence | Independent review | Blocker |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| GB-01 | Two GPT + two Claude independent citizens | Gate B | `NOT_IMPLEMENTED` | Live 2v2 roster with separate sessions | None on integrated SHA | Required | Depends on Gate A |
-| GB-02 | Two comparable natural start sites, empty inventories | Gate B | `NOT_IMPLEMENTED` | Preflight inventory/world witnesses | Experiment preflight `e3f6579` (offline only) | Required | Live unauthorized |
-| GB-03 | Real food/shelter pressure; no gifted setup | Gate B | `NOT_IMPLEMENTED` | Empty-start + natural pressure check | Design only | Required | Live unauthorized |
-| GB-04 | Neutral prompts; no forced rivalry/leader/outcome | Gate B / Option A | `NOT_IMPLEMENTED` | Prompt/fixture audit + run log | Design only | Required | Live unauthorized |
-| GB-05 | Authorized information exchange only | Gate B + differentiator #1 | `IMPLEMENTED_UNVERIFIED` | Cross-community negative privacy tests | Community isolation stack #12–#14 + QA | Required | Defects/integration open |
-| GB-06 | Log inventory/block/health/death/model/cost | Gate B | `IMPLEMENTED_UNVERIFIED` | Evidence validator + operator journal | Validator PRs #43/#47 | Gemini/validator review | Base ancestry of #47 disputed |
-| GB-07 | 60 continuous real-world minutes, normal speed | Gate B | `NOT_IMPLEMENTED` | Timed Paper run with TPS/ticks | None — simulations ≠ LIVE_PASS | Required | Unauthorized |
-| GB-08 | Normal respawn; keepInventory=false; memory preserved | Gate B + death-policy phases | `NOT_IMPLEMENTED` | Live death/drop/respawn evidence | Design locked | Required | Unauthorized |
-| GB-09 | No operator resources / human construction during run | Gate B | `NOT_IMPLEMENTED` | Intervention log empty (or recorded invalidation) | None | Required | Unauthorized |
-
-Live Gate B criteria: **0/9 LIVE_PASS**.
+| ID | Requirement | Status | Required test | Tested SHA | Evidence command | Result | Independent reviewer | Blocker |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| OFF-01 | Preserve Windows WIP / worktrees / DBs | `IMPLEMENTED_UNVERIFIED` (process) | Worktree inventory; no clean/reset | PR #56 heads | Local audit Mission 003/004 | Worktrees preserved | — | Ongoing discipline |
+| OFF-02 | YC harness offline evaluation | `IMPLEMENTED_UNVERIFIED` | Harness eval docs/tests | `0a23306` (not this SHA) | PR #41 | Separate branch | Required | Not folded into #56 |
+| OFF-03 | Per-citizen GPT/Claude routing + private context | `IMPLEMENTED_UNVERIFIED` | Scripted 1v1 offline runtime | PR #56 HEAD | `vitest … independent-offline-runtime.test.ts` | Self-green | Pending | Needs non-author |
+| OFF-04 | Community physical isolation | `IMPLEMENTED_UNVERIFIED` | Community physical/storage suites | PR #56 HEAD | `community-physical-state` / `executor-community-storage` | Self-green | Pending | Needs non-author |
+| OFF-05 | Per-community construction persistence | `IMPLEMENTED_UNVERIFIED` | Construction community tests | Ancestry on #56 | Partial via Mission 013 stack | Partial | Required | Full construction QA not re-run as Gate |
+| OFF-06 | Owner/grantee chest contents isolation | `IMPLEMENTED_UNVERIFIED` | `community-container-contents` + QA chest | PR #56 HEAD | chest suites + integrated adapter | Self-green 3/3 adapter | Pending Claude | Independent re-QA |
+| OFF-07 | Former owner loses old-community chest access | `IMPLEMENTED_UNVERIFIED` | QA / integrated chest former-owner | PR #56 HEAD | `integrated-chest-adapter.test.ts` | Self-green | Pending Claude | — |
+| OFF-08 | Grantee loses access after community change | `IMPLEMENTED_UNVERIFIED` | QA / integrated former-grantee | PR #56 HEAD | same | Self-green | Pending Claude | — |
+| OFF-09 | Failed withdraw invalidates stale positive observation | `IMPLEMENTED_UNVERIFIED` | QA / integrated failed-withdrawal | PR #56 HEAD | same | Self-green | Pending Claude | ADV-03 freshness metadata still BLOCKED |
+| OFF-10 | Offline default-deny transports + body/credential guards | `IMPLEMENTED_UNVERIFIED` | default-deny + pr48 escapes | PR #56 HEAD (+ QA runner `f5e2228`) | deny + escape suites | Self-green | Pending Codex non-author on #53 | — |
+| OFF-11 | GPT Retry-After / quota hardening | `IMPLEMENTED_UNVERIFIED` | Provider retry / ADV-10 | PR #56 HEAD | mixed-provider + ADV provider | Self-green ancestry | Pending non-author | — |
+| OFF-12 | Cancelled retry wait not charged; mixed faults | `IMPLEMENTED_UNVERIFIED` | `mixed-provider-faults` + ADV-10 | PR #56 HEAD | `mixed-provider-faults.test.ts` 7/7 | Self-green | Pending; convert QA `it.fails` after confirm | Historical red preserved in comments |
+| OFF-13 | Construction filesystem / host-port guard | `BLOCKED` | Guard QA | `7cb4bf4` | — | Not on #56 as required gate | CODEX 1.2 | Ownership / narrow reconcile |
+| OFF-14 | Movement reliability | `BLOCKED` | Movement suite | `bdfba74` | — | Not folded | CODEX 1.2 | Ownership handoff |
+| OFF-15 | Evidence validator correct base | `BLOCKED` | Validator suite | #43/#47 | — | Ancestry dispute | Gemini | Correct #47 base |
+| OFF-16 | Full suite + security + AI + typecheck + lint + build | `IMPLEMENTED_UNVERIFIED` | Full workspace matrix | PR #56 HEAD after Mission 004 matrix | See matrix section below | Recorded on publish | Pending | Must match this SHA’s matrix log |
+| OFF-17 | Deterministic scripted 1v1 offline integration | `IMPLEMENTED_UNVERIFIED` | Manager 1v1 scenario | PR #56 HEAD | `independent-offline-runtime` 1v1 case | Self-green | Pending | — |
+| OFF-18 | No paid calls / no live Paper in offline phases | `IMPLEMENTED_UNVERIFIED` (process) | Network guard + audit | PR #56 sessions | Offline-only engineering | Observed | — | Ongoing |
 
 ---
 
-## Offline integration prerequisites (`OFF-*`)
+## Gate A / Gate B (live)
 
-These must reach `OFFLINE_PASS` on **one** reconciled candidate SHA before requesting live authorization.
-
-| ID | Requirement | Source | Status | Acceptance test | Evidence | Independent review | Blocker |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| OFF-01 | Preserve Windows WIP / worlds / DBs / unpublished Mission 013 | Issue #51; milestones (0) | `BLOCKED` (process) | Inventory worktrees; no clean/reset/force-push | Local audit 2026-11-05: 20+ worktrees preserved; root `main` clean @ `15c13c8` (behind origin by docs commits) | Owner | Unpublished Mission 013 may exist outside git |
-| OFF-02 | YC harness offline feasibility evaluation | project.md YC section; PR #41 | `IMPLEMENTED_UNVERIFIED` | Offline harness eval docs/tests only | `agents/claude2-yc-harness-eval` @ `0a23306` / PR #41 | Required | No adoption decision yet |
-| OFF-03 | Per-citizen GPT/Claude routing + private context (scripted) | Issue #51 §5; Gate A | `IMPLEMENTED_UNVERIFIED` | Deterministic dual-citizen offline suite | Candidate `9945f02` PR #37 | Non-author | Needs reconcile + QA |
-| OFF-04 | Community physical isolation (executor/storage/workstations) | Mission 013; origin PR #12 | `IMPLEMENTED_UNVERIFIED` | `repro-manager-executor-isolation` + QA #38/#44 | `55d5a86` | Claude2 QA done | Stacked; not on combined SHA |
-| OFF-05 | Per-community construction persistence | origin PR #13 | `IMPLEMENTED_UNVERIFIED` | Construction community tests + QA #49 | `7b1bd98` | QA #49 | Stacked on #12 |
-| OFF-06 | Owner/grantee chest contents; no community snapshot leak | origin PR #14 | `IMPLEMENTED_UNVERIFIED` | `community-container-contents` + QA #50 | Source `dbbb7c4`; QA `f443bb3` | QA #50 CHANGES REQUIRED → fix in progress on this branch | Three P0 defects (see OFF-07…09) |
-| OFF-07 | Former community owner loses old-community chest access | Issue #51 P0; QA #50 DEFECT 1 | `IMPLEMENTED_UNVERIFIED` | QA: owner change → `observedContainerContents` undefined | Branch `agents/cursor-v1-acceptance-ledger` @ `581759ccaec6da0b829c35ed2658dd1c0598c641`; `pnpm exec vitest run packages/agent-core/src/independent-qa-chest-contents.test.ts` → 7/7 pass (2026-11-05) | Needs non-author re-check | Not on reconciled 1v1 integrate SHA |
-| OFF-08 | Grantee loses access after changing community | Issue #51 P0; QA #50 DEFECT 2 | `IMPLEMENTED_UNVERIFIED` | QA: grantee change → undefined | Same SHA; same command | Same | Same |
-| OFF-09 | Failed live withdraw proving absence invalidates stale positive observation | Issue #51 P0; QA #50 DEFECT 3 | `IMPLEMENTED_UNVERIFIED` | QA: VERIFY_FAILED → `{}` / cleared item | Same SHA; related suite 59/59 pass across 6 community files | Same | Same |
-| OFF-10 | Offline default-deny transports (no injectable network) | windows-backup PR #48 + fix [#53](https://github.com/ManpreetS2/Minecraft-Ai-Civilization-windows-backup/pull/53) | `IMPLEMENTED_UNVERIFIED` | Deny suite + escape refusals: `pnpm exec vitest run apps/orchestrator/src/pr48-review-escapes.test.ts …default-deny… …runtime…` → 32/32 on `4e79684dfb493b2d553673e5bd84b62b025ea323` | Codex review of `ae784fd`: **CHANGES REQUIRED**; Cursor fix closes ollama/`MinecraftBody`/credential escapes. Reviewer repro `914689b` | Codex reviewed #48; **needs second non-author pass on #53** | Not on reconciled 1v1 SHA |
-| OFF-11 | GPT retry / quota / Retry-After hardening | PR #32 | `IMPLEMENTED_UNVERIFIED` | Provider retry tests | `8bd0941` | Non-author | Not integrated |
-| OFF-12 | Mixed GPT/Claude fault accounting (no charge on cancelled wait) | PR #42 | `IMPLEMENTED_UNVERIFIED` | Mixed fault suite | `1a690f6` | Non-author | Not integrated |
-| OFF-13 | Construction filesystem / host-port guard | CODEX cross-platform PR #14 (backup) | `IMPLEMENTED_UNVERIFIED` | Guard QA #39/#45 | `7cb4bf4` | Claude2 QA | Integrate carefully; CODEX owns |
-| OFF-14 | Movement reliability truthful results | backup PR #25 | `IMPLEMENTED_UNVERIFIED` | Movement suite | `bdfba74` | CODEX 1.2 | Ownership reserved |
-| OFF-15 | Evidence validator compares correct base | Issue #51 §7; PRs #43/#47 | `BLOCKED` | Validator suite vs Phase1 `f8f4506` (11 files), not 342-file Windows WIP base | PR #47 ancestry dispute | Gemini | Correct base or clean stacked PR |
-| OFF-16 | Full suite + security + AI + typecheck + lint + build on candidate | Issue #51 §5 | `NOT_IMPLEMENTED` | Single SHA matrix | None combined | Required | Needs integration branch |
-| OFF-17 | Deterministic 1v1 offline integration (scripted models, restart, no network) | Issue #51 §5 / Phase 4 | `NOT_IMPLEMENTED` | Scripted 1v1 harness on combined SHA | None | Required | Depends OFF-03…16 |
-| OFF-18 | No paid calls / no live Paper during offline phases | Working rules | `OFFLINE_PASS` (process) | Audit: no live/paid in this engagement | This Cursor session: offline only | N/A | Ongoing discipline |
-
-**Offline score today: 0/18 OFFLINE_PASS on a single integrated SHA** (OFF-18 is process-only and is excluded from the integrated-code numerator until a candidate SHA exists; if counted as process gate alone it does not certify product readiness).
-
-Practical numerator used for Issue #51 reporting: **0/18** integrated offline criteria with single-SHA evidence.
+All live rows remain `NOT_IMPLEMENTED` / unauthorized. Offline tests do **not** close Gate A or Gate B. **0/2**.
 
 ---
 
-## P0 chest defect closure log (this branch)
+## Mission 004 matrix log
 
-**Policy (explicit, V1):** Owner access requires current membership in the asset’s community. Same-community grants (`cross_community=0`) require the grantee to still belong to that community. Grants issued to a citizen already outside the owner’s community are stored with `cross_community=1` (explicit diplomacy) and remain until revoked. Stale same-community membership must not imply continued access. Failed live withdraw with `ITEM_NOT_FOUND` / `VERIFY_FAILED` clears only that item’s observed count (no fabricated full stock). Legacy single-settlement mode is unchanged.
+Filled when the full matrix finishes on the published HEAD (do not paste older SHAs’ logs here).
 
-**Ownership check (2026-11-05):**
-
-| Path | Latest published head | Active unpublished owner? | Action |
-| --- | --- | --- | --- |
-| `community-physical-state.ts` | `dbbb7c4` (origin PR #14 / Mission 013) | No newer commits; campaign worktree parked at `dbbb7c4` | Cursor scoped fix on isolated branch per Issue #51 |
-| `executor.ts` withdraw observation | `dbbb7c4` | Same | Narrow invalidation only |
-| QA file | `f443bb3` (PR #50, test-only) | Claude2 QA complete | Convert `it.fails` → `it` after green |
-
-**Reproduction:** On `f443bb3`, vitest reported all three `it.fails` as expected failures (suite green while assertions failed). After fix, markers converted to ordinary `it`.
-
-**Commands (to be filled with SHAs after commit):**
-
-```text
-pnpm exec vitest run packages/agent-core/src/independent-qa-chest-contents.test.ts
-pnpm exec vitest run packages/agent-core/src/community-container-contents.test.ts
-```
-
----
-
-## Best existing baselines (do not treat as integrated success)
-
-| Role | Repo | Ref | SHA | Notes |
+| Check | Command | Exit | Counts | SHA |
 | --- | --- | --- | --- | --- |
-| Public charter / docs main | origin | `main` | `63d1b97b188fb840db05c6baf60b549c476e508f` | Docs only; not runtime |
-| Local checkout main | local | `main` | `15c13c8` | Behind origin docs; clean WT |
-| Offline network-guarded candidate | windows-backup | `agents/t3-provider-hardening-integration` | `9945f02f38e14a7d63b3eed66279d191ad06ad3d` | PR #37; QA #46 found GPT fetch gap |
-| Mission 013 stack tip | origin | `agents/t3-community-chest-contents` | `dbbb7c4fde2d809bf259dc5452133507717b9453` | PR #14; ancestry #12→#13→#14 |
-| Chest QA (test-only) | windows-backup | `agents/claude2-qa-chest-contents` | `f443bb386c1adfc5ce6f9d7c3d69de14c3a58aa1` | PR #50 |
-| This integration worktree | windows-backup draft PR [#52](https://github.com/ManpreetS2/Minecraft-Ai-Civilization-windows-backup/pull/52) | `agents/cursor-v1-acceptance-ledger` | `8bb2c731ae24b364de7d434f67209f3c5e63bf1a` (fix `581759ccaec6da0b829c35ed2658dd1c0598c641`) | Ledger + P0 chest fixes (not yet a full 1v1 integrate SHA) |
+| *(pending Mission 004 run)* | | | | |
 
 ---
 
-## Independent review queue (non-negotiable)
+## Provenance notes
 
-1. Re-check chest P0 fix (someone other than this Cursor session / CODEX1 author of `dbbb7c4`).  
-2. Non-Claude2 review of PR #48 (`ae784fd`).  
-3. Non-author reviews of provider #32 and #42.  
-4. Guard/movement ownership retained by CODEX 1.2; integrate only after review.  
-5. Validator #47 base correction (Gemini).  
-6. Combined 1v1 candidate security + offline QA before any live request.
-
----
-
-## Remaining blockers (ordered)
-
-1. Finish/publish chest P0 fix + independent re-QA.  
-2. File-by-file reconcile origin #12–#14 with backup candidate `#37`/`9945f02` and reviewed safety/adapters (see `docs/V1_BRANCH_RECONCILIATION_PLAN.md`).  
-3. Close OFF-10…OFF-14 reviews and fold into one isolated candidate.  
-4. Produce Phase 4 scripted 1v1 evidence on that single SHA (0 paid / 0 Paper).  
-5. Only then request owner authorization for live Gate A.
-
----
-
-## Single-SHA candidate evidence (Mission 003 continuation)
-
-**Provisional offline passes on the integrate branch** (independent review still required before treating as accepted):
-
-| ID | Status on integrate SHA | Command / result |
-| --- | --- | --- |
-| OFF-03 | OFFLINE_PASS | 1 GPT vs 1 Claude scripted manager 1v1 in `independent-offline-runtime.test.ts` |
-| OFF-04 | OFFLINE_PASS | community physical / executor storage suites |
-| OFF-06..09 | OFFLINE_PASS | independent-qa-chest + `integrated-chest-adapter.test.ts` (3/3 PASS) |
-| OFF-10 | OFFLINE_PASS | default-deny + pr48-review-escapes (32 orchestrator offline tests in matrix) |
-| OFF-12 | OFFLINE_PASS | `mixed-provider-faults.test.ts` 7/7 |
-| OFF-17 | OFFLINE_PASS | scripted 1v1 restart/privacy/shutdown case |
-| OFF-11 | IMPLEMENTED_UNVERIFIED | Retry hardening present via ancestry; dedicated non-author review still required |
-| OFF-13..15 | BLOCKED / not folded | guard/movement/validator ownership |
-| OFF-16 | IMPLEMENTED_UNVERIFIED | Focused matrix 82+25 green; full workspace suite not claimed here |
-| OFF-01,02,05,18 | process / partial | See rows above |
-
-**Focused matrix recorded 2026-11-05:** 8 files / **82 passed**; tools subset 4 files / **25 passed**. No Paper / paid API.
-
+- QA runner corrections integrated from Claude PR #54 head `f5e22288287214c99c15767856d8a3e2d4a21611` (verdict/run/tests). Destructive `run-on-candidate.sh` **not** imported; see `qa/v1/scripts/README-RUN-ON-CANDIDATE.md`.
+- Independent acceptance still required before any `OFFLINE_PASS`.

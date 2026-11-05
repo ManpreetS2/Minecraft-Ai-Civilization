@@ -35,8 +35,9 @@ describe("provider faults: mixed GPT and Claude under one shared ceiling", () =>
     expect(fx.registry.accounting().experiment.requestsUsed).toBe(sends(fx, "gpt-a") + sends(fx, "claude-a"));
   });
 
-  // Red on any source without PR #42 (1a690f6): the retry is charged before its wait. Flip DEFECT off when integrated.
-  it.fails.each(["gpt-a", "claude-a"])(caseTitle("ADV-10", "%s cancelled during Retry-After is not charged for a retry that was never sent", { defect: true }), async (id) => {
+  // Historical red: on sources without PR #42 (1a690f6) this charged the retry before its wait (`it.fails` + [DEFECT]).
+  // On the integrated candidate (PR #42 folded into #56) the assertion is ordinary; do not weaken it.
+  it.each(["gpt-a", "claude-a"])(caseTitle("ADV-10", "%s cancelled during Retry-After is not charged for a retry that was never sent"), async (id) => {
     const fx = registryFor({ assignments: SLOW, script: () => ({ status: 429, retryAfterMs: 4_000 }) });
     const p = fx.registry.providerFor(id).decide(promptFor(id));
     p.catch(() => undefined);

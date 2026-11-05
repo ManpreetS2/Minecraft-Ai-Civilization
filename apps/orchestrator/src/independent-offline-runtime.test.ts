@@ -233,4 +233,31 @@ describe("scripted 1 GPT vs 1 Claude integrated offline 1v1", () => {
     expect(resumedStore.isOpen()).toBe(false);
     expect(network).not.toHaveBeenCalled();
   }, 60_000);
+
+  it("a late cognition callback after shutdown cannot write closed SQLite or throw", async () => {
+    let release!: (value: { goal: string; priority: number; reason: string; targetCitizenId: null; communication: null }) => void;
+    const deferred = new Promise<{ goal: string; priority: number; reason: string; targetCitizenId: null; communication: null }>((resolve) => {
+      release = resolve;
+    });
+    const fx = fixture(2);
+    const runtime = createIndependentOfflineRuntime({
+      ...fx.args,
+      script: () => ({ after: deferred, goal: "gather_wood" }),
+    });
+    managers.push(runtime.manager);
+    await runtime.manager.start(undefined, { deferTicks: true });
+    // Arm one planning tick so a cognition decide() is in flight and waiting on `deferred`.
+    await Promise.all(runtime.manager.list().map((c) => runtime.manager["tickCitizen"](c, fx.store.getSettlement(), [], undefined)));
+    expect(runtime.manager.pendingOps()).toBeGreaterThan(0);
+
+    const stopping = runtime.manager.stop();
+    // Resolve the late provider reply only after stop has begun draining.
+    release({ goal: "gather_wood", priority: 0.5, reason: "late after shutdown", targetCitizenId: null, communication: null });
+    await stopping;
+
+    expect(runtime.manager.lastShutdownDrain()).toMatchObject({ fullyDrained: true, remaining: 0, timedOut: false });
+    expect(fx.store.isOpen()).toBe(false);
+    expect(fx.store.safeWrite("late-llm", () => fx.store.setMeta("late-llm", "1"))).toEqual({ ok: false, reason: "closed" });
+    expect(network).not.toHaveBeenCalled();
+  }, 60_000);
 });

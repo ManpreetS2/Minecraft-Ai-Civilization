@@ -1,2 +1,13 @@
-{ "extends": "../tsconfig.base.json", "compilerOptions": { "noEmit": true }, "include": ["**/*.ts"] }
-
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "baseUrl": ".",
+    "paths": {
+      "@civ/cognition/routing": ["../packages/cognition/src/routing/index.ts"],
+      "@civ/skills/testing": ["../packages/skills/src/testing/mineflayer-craft-fixture.ts"],
+      "@civ/*": ["../packages/*/src/index.ts"]
+    }
+  },
+  "include": ["**/*.ts"]
+}
