@@ -407,12 +407,28 @@ export class CitizenPhysicalState {
   }
 
   observedContainerContents(key: string): Record<string, number> | undefined {
+    return this.observedContainerProvenance(key)?.contents;
+  }
+
+  /**
+   * Additive read of stored observation provenance. `observedAt` / `observedBy` are already persisted;
+   * this does not claim verified-live stock and does not add an ordering token (ADV-03 freshness /
+   * concurrency assertions remain BLOCKED until callers treat metadata explicitly).
+   */
+  observedContainerProvenance(
+    key: string,
+  ): { contents: Record<string, number>; observedBy: string; observedAt: string } | undefined {
     return this.transaction(() => {
       if (!this.mayUse(key)) return undefined;
       const row = this.store.db
-        .prepare("SELECT contents_json FROM physical_asset_contents WHERE resource_key=?")
-        .get(key) as { contents_json: string } | undefined;
-      return row ? (JSON.parse(row.contents_json) as Record<string, number>) : undefined;
+        .prepare("SELECT contents_json, observed_by, observed_at FROM physical_asset_contents WHERE resource_key=?")
+        .get(key) as { contents_json: string; observed_by: string; observed_at: string } | undefined;
+      if (!row) return undefined;
+      return {
+        contents: JSON.parse(row.contents_json) as Record<string, number>,
+        observedBy: row.observed_by,
+        observedAt: row.observed_at,
+      };
     });
   }
 

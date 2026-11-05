@@ -3,7 +3,7 @@
 **Issue:** [windows-backup #51](https://github.com/ManpreetS2/Minecraft-Ai-Civilization-windows-backup/issues/51)  
 **Charter:** `ManpreetS2/Minecraft-Ai-Civilization` `project.md` @ `63d1b97b188fb840db05c6baf60b549c476e508f`  
 **Candidate branch:** `agents/cursor-v1-single-sha-integration` (PR [#56](https://github.com/ManpreetS2/Minecraft-Ai-Civilization-windows-backup/pull/56))  
-**Ledger updated:** 2026-11-05 (Mission 004)  
+**Ledger updated:** 2026-11-05 (Mission 004 publish)  
 **Authority:** Offline measurement only. Does **not** authorize live Paper, paid calls, production data, or protected merges.
 
 ## Status vocabulary
@@ -33,7 +33,8 @@ Count of `OFF-*` rows that are at least `IMPLEMENTED_UNVERIFIED` or `OFFLINE_PAS
 | Implemented (self-verified) | **11** |
 | Total offline criteria | **18** |
 | Ratio | **11/18** |
-| Candidate SHA | *(filled at each publish; see latest PR #56 head)* |
+| Full-matrix code SHA | `43c02cb8ab9cc06d83c08143d7e574e1f65ed79f` |
+| Publish HEAD | *(filled at push; docs+provenance may tip HEAD — see matrix notes)* |
 
 ### B. Independently accepted offline evidence
 
@@ -59,24 +60,24 @@ Count of `OFF-*` rows that are at least `IMPLEMENTED_UNVERIFIED` or `OFFLINE_PAS
 
 | ID | Requirement | Status | Required test | Tested SHA | Evidence command | Result | Independent reviewer | Blocker |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| OFF-01 | Preserve Windows WIP / worktrees / DBs | `IMPLEMENTED_UNVERIFIED` (process) | Worktree inventory; no clean/reset | PR #56 heads | Local audit Mission 003/004 | Worktrees preserved | — | Ongoing discipline |
+| OFF-01 | Preserve Windows WIP / worktrees / DBs | `IMPLEMENTED_UNVERIFIED` (process) | Worktree inventory; no clean/reset | Mission 004 sessions | Local audit | Worktrees preserved | — | Ongoing discipline |
 | OFF-02 | YC harness offline evaluation | `IMPLEMENTED_UNVERIFIED` | Harness eval docs/tests | `0a23306` (not this SHA) | PR #41 | Separate branch | Required | Not folded into #56 |
-| OFF-03 | Per-citizen GPT/Claude routing + private context | `IMPLEMENTED_UNVERIFIED` | Scripted 1v1 offline runtime | PR #56 HEAD | `vitest … independent-offline-runtime.test.ts` | Self-green | Pending | Needs non-author |
-| OFF-04 | Community physical isolation | `IMPLEMENTED_UNVERIFIED` | Community physical/storage suites | PR #56 HEAD | `community-physical-state` / `executor-community-storage` | Self-green | Pending | Needs non-author |
+| OFF-03 | Per-citizen GPT/Claude routing + private context | `IMPLEMENTED_UNVERIFIED` | Scripted 1v1 offline runtime | `43c02cb…` | `vitest … independent-offline-runtime.test.ts` | 11/11 self-green | Pending | Needs non-author |
+| OFF-04 | Community physical isolation | `IMPLEMENTED_UNVERIFIED` | Community physical/storage suites | `43c02cb…` | `community-physical-state` / `executor-community-storage` | Self-green in `pnpm test` | Pending | Needs non-author |
 | OFF-05 | Per-community construction persistence | `IMPLEMENTED_UNVERIFIED` | Construction community tests | Ancestry on #56 | Partial via Mission 013 stack | Partial | Required | Full construction QA not re-run as Gate |
-| OFF-06 | Owner/grantee chest contents isolation | `IMPLEMENTED_UNVERIFIED` | `community-container-contents` + QA chest | PR #56 HEAD | chest suites + integrated adapter | Self-green 3/3 adapter | Pending Claude | Independent re-QA |
-| OFF-07 | Former owner loses old-community chest access | `IMPLEMENTED_UNVERIFIED` | QA / integrated chest former-owner | PR #56 HEAD | `integrated-chest-adapter.test.ts` | Self-green | Pending Claude | — |
-| OFF-08 | Grantee loses access after community change | `IMPLEMENTED_UNVERIFIED` | QA / integrated former-grantee | PR #56 HEAD | same | Self-green | Pending Claude | — |
-| OFF-09 | Failed withdraw invalidates stale positive observation | `IMPLEMENTED_UNVERIFIED` | QA / integrated failed-withdrawal | PR #56 HEAD | same | Self-green | Pending Claude | ADV-03 freshness metadata still BLOCKED |
-| OFF-10 | Offline default-deny transports + body/credential guards | `IMPLEMENTED_UNVERIFIED` | default-deny + pr48 escapes | PR #56 HEAD (+ QA runner `f5e2228`) | deny + escape suites | Self-green | Pending Codex non-author on #53 | — |
-| OFF-11 | GPT Retry-After / quota hardening | `IMPLEMENTED_UNVERIFIED` | Provider retry / ADV-10 | PR #56 HEAD | mixed-provider + ADV provider | Self-green ancestry | Pending non-author | — |
-| OFF-12 | Cancelled retry wait not charged; mixed faults | `IMPLEMENTED_UNVERIFIED` | `mixed-provider-faults` + ADV-10 | PR #56 HEAD | `mixed-provider-faults.test.ts` 7/7 | Self-green | Pending; convert QA `it.fails` after confirm | Historical red preserved in comments |
+| OFF-06 | Owner/grantee chest contents isolation | `IMPLEMENTED_UNVERIFIED` | `community-container-contents` + QA chest | `43c02cb…` | chest suites + integrated adapter | Self-green | Pending Claude | Independent re-QA |
+| OFF-07 | Former owner loses old-community chest access | `IMPLEMENTED_UNVERIFIED` | QA / integrated chest former-owner | `43c02cb…` | `integrated-chest-adapter.test.ts` | Self-green | Pending Claude | — |
+| OFF-08 | Grantee loses access after community change | `IMPLEMENTED_UNVERIFIED` | QA / integrated former-grantee | `43c02cb…` | same | Self-green | Pending Claude | — |
+| OFF-09 | Failed withdraw invalidates stale positive observation | `IMPLEMENTED_UNVERIFIED` | QA / integrated failed-withdrawal | `43c02cb…` | same | Self-green | Pending Claude | ADV-03 verifiedLive + ordering still BLOCKED; `observedContainerProvenance` additive read only |
+| OFF-10 | Offline default-deny transports + body/credential guards | `IMPLEMENTED_UNVERIFIED` | default-deny + pr48 escapes | `43c02cb…` (+ QA runner `f5e2228`) | deny + escape suites | 23/23 self-green | Pending Codex non-author on #53 | — |
+| OFF-11 | GPT Retry-After / quota hardening | `IMPLEMENTED_UNVERIFIED` | Provider retry / ADV-10 | `43c02cb…` | mixed-provider + ADV provider | Self-green | Pending non-author | — |
+| OFF-12 | Cancelled retry wait not charged; mixed faults | `IMPLEMENTED_UNVERIFIED` | `mixed-provider-faults` + ADV-10 | `43c02cb…` | `mixed-provider-faults` 7/7; ADV-10 ordinary assertions | Self-green | Pending | Historical red preserved in comments (`it.fails` era) |
 | OFF-13 | Construction filesystem / host-port guard | `BLOCKED` | Guard QA | `7cb4bf4` | — | Not on #56 as required gate | CODEX 1.2 | Ownership / narrow reconcile |
-| OFF-14 | Movement reliability | `BLOCKED` | Movement suite | `bdfba74` | — | Not folded | CODEX 1.2 | Ownership handoff |
+| OFF-14 | Movement reliability | `BLOCKED` | Movement suite | `bdfba7473d79487ffdcf467592e1f2328efabc4c` | — | Not folded | CODEX 1.2 | Ownership handoff (see below) |
 | OFF-15 | Evidence validator correct base | `BLOCKED` | Validator suite | #43/#47 | — | Ancestry dispute | Gemini | Correct #47 base |
-| OFF-16 | Full suite + security + AI + typecheck + lint + build | `IMPLEMENTED_UNVERIFIED` | Full workspace matrix | PR #56 HEAD after Mission 004 matrix | See matrix section below | Recorded on publish | Pending | Must match this SHA’s matrix log |
-| OFF-17 | Deterministic scripted 1v1 offline integration | `IMPLEMENTED_UNVERIFIED` | Manager 1v1 scenario | PR #56 HEAD | `independent-offline-runtime` 1v1 case | Self-green | Pending | — |
-| OFF-18 | No paid calls / no live Paper in offline phases | `IMPLEMENTED_UNVERIFIED` (process) | Network guard + audit | PR #56 sessions | Offline-only engineering | Observed | — | Ongoing |
+| OFF-16 | Full suite + security + AI + typecheck + lint + build | `IMPLEMENTED_UNVERIFIED` | Full workspace matrix | `43c02cb8ab9cc06d83c08143d7e574e1f65ed79f` | See matrix section | All exits 0 | Pending | Must match this SHA’s matrix log |
+| OFF-17 | Deterministic scripted 1v1 offline integration | `IMPLEMENTED_UNVERIFIED` | Manager 1v1 (+ 2v2 composition) | `43c02cb…` | independent-offline-runtime 1v1+2v2 cases | Self-green | Pending | — |
+| OFF-18 | No paid calls / no live Paper in offline phases | `IMPLEMENTED_UNVERIFIED` (process) | Network guard + audit | Mission 004 sessions | Offline-only engineering | Observed | — | Ongoing |
 
 ---
 
@@ -88,15 +89,44 @@ All live rows remain `NOT_IMPLEMENTED` / unauthorized. Offline tests do **not** 
 
 ## Mission 004 matrix log
 
-Filled when the full matrix finishes on the published HEAD (do not paste older SHAs’ logs here).
+**Platform:** win32 Microsoft Windows NT 10.0.26300.0; node v22.17.1; pnpm 10.13.1  
+**Source SHA:** `43c02cb8ab9cc06d83c08143d7e574e1f65ed79f`  
+**Log file:** `artifacts/v1/mission004-matrix.log` (local worktree; not authority for independent acceptance)
 
-| Check | Command | Exit | Counts | SHA |
-| --- | --- | --- | --- | --- |
-| *(pending Mission 004 run)* | | | | |
+| Check | Command | Exit | Counts |
+| --- | --- | --- | --- |
+| typecheck | `pnpm typecheck` | 0 | workspace packages Done |
+| typecheck:tools | `pnpm typecheck:tools` | 0 | tools tsconfig with `@civ/*` paths |
+| lint | `pnpm lint` | 0 | clean |
+| build | `pnpm build` | 0 | workspace build |
+| test | `pnpm test` | 0 | 197 files; 2205 passed; 2 skipped |
+| test:security | `pnpm test:security` | 0 | 21 files; 358 passed |
+| test:ai | `pnpm test:ai` | 0 | 20 files; 514 passed |
+| test:v1 | `pnpm test:v1` | 0 | 8 files; 50 passed |
+| Independent QA adversarial | `pnpm exec vitest run --config qa/v1/vitest.config.ts qa/v1/test` | 0 | 7 files; 75 passed; 3 skipped (ADV-03 interface gaps) |
+| Scripted offline 1v1 (+2v2 + late shutdown) | `pnpm exec vitest run apps/orchestrator/src/independent-offline-runtime.test.ts` | 0 | 1 file; 11 passed |
+| Integrated chest regressions | `pnpm exec vitest run --config tools/vitest.config.ts tools/v1-integration/regressions.test.ts tools/v1-integration/integrated-chest-adapter.test.ts` | 0 | 2 files; 6 passed |
+| Offline startup refusal / escapes | `pnpm exec vitest run apps/orchestrator/src/independent-offline-default-deny.test.ts apps/orchestrator/src/pr48-review-escapes.test.ts` | 0 | 2 files; 23 passed |
+| Provider cancelled-retry / mixed faults | `pnpm exec vitest run packages/cognition/src/routing/mixed-provider-faults.test.ts` | 0 | 1 file; 7 passed |
+
+Shutdown / persistence notes covered inside the offline runtime suite: drain fully, late cognition after `stop()` cannot write closed SQLite, restart reopens SQLite memories/community/identity while in-memory provider session text is restored only via the explicit session store (not claimed as automatic process-session durability).
+
+---
+
+## Movement / guard handoff (CODEX 1.2)
+
+Not integrated into #56. Reviewed tips in tooling refs:
+
+- Movement: `agents/codex-movement-reliability` @ `bdfba7473d79487ffdcf467592e1f2328efabc4c`
+- Guard / filesystem-host work remains under CODEX 1.2 ownership (`7cb4bf4` lineage for OFF-13)
+
+**Ask:** authorize narrow cherry-pick or leave BLOCKED until CODEX 1.2 lands reviewed commits onto this candidate.
 
 ---
 
 ## Provenance notes
 
 - QA runner corrections integrated from Claude PR #54 head `f5e22288287214c99c15767856d8a3e2d4a21611` (verdict/run/tests). Destructive `run-on-candidate.sh` **not** imported; see `qa/v1/scripts/README-RUN-ON-CANDIDATE.md`.
+- ADV-10 cancelled-retry cases converted from historical `it.fails` to ordinary assertions on the integrated PR #42 source; comment preserves historical red.
+- Additive `observedContainerProvenance()` exposes existing `observed_at` / `observed_by` without changing write merge semantics. ADV-03 `verifiedLive` + concurrent ordering token remain BLOCKED for Claude to wire.
 - Independent acceptance still required before any `OFFLINE_PASS`.

@@ -48,10 +48,16 @@ describe("observed container contents API", () => {
     const owner = of("citizen_atlas");
     expect(owner.recordContainerObservation(key, { bread: 4 })).toBe(true);
     expect(owner.observedContainerContents(key)).toEqual({ bread: 4 });
+    const provenance = owner.observedContainerProvenance(key);
+    expect(provenance?.contents).toEqual({ bread: 4 });
+    expect(provenance?.observedBy).toBe("citizen_atlas");
+    expect(provenance?.observedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
     expect(of("citizen_maya").observedContainerContents(key)).toBeUndefined();
+    expect(of("citizen_maya").observedContainerProvenance(key)).toBeUndefined();
     expect(of("citizen_theo").observedContainerContents(key)).toBeUndefined();
     owner.grantAsset(key, "citizen_maya");
     expect(of("citizen_maya").observedContainerContents(key)).toEqual({ bread: 4 });
+    expect(of("citizen_maya").observedContainerProvenance(key)?.observedBy).toBe("citizen_atlas");
     owner.revokeAsset(key, "citizen_maya");
     expect(of("citizen_maya").observedContainerContents(key)).toBeUndefined();
   });
