@@ -1,42 +1,31 @@
 # V1 single-SHA offline 1v1 candidate
 
 **Branch:** `agents/cursor-v1-single-sha-integration`  
-**PR:** [#56](https://github.com/ManpreetS2/Minecraft-Ai-Civilization-windows-backup/pull/56)  
-**Authority:** Offline engineering candidate only. Does **not** close live Gate A/B.
+**PR:** [#56](https://github.com/ManpreetS2/Minecraft-Ai-Civilization-windows-backup/pull/56)
 
-## Measurements (do not invent completion %)
+## Measurements (no completion %)
 
-| Measurement | Value | Notes |
+| Measurement | Ratio | Notes |
 | --- | --- | --- |
-| Implementation coverage (author) | **13/18** | Present + author suites on tip |
-| Independently supported (Codex audit of `ea4ada9`) | **5/18** | OFF-03,10,11,12,17 limited — **not** transferred to tip without revalidation |
-| `OFFLINE_PASS` on tip | **0/18** | Needs non-author acceptance on tip |
-| Live Gate A/B | **0/2** | Unauthorized |
+| Author-tested on matrix SHA | **13/18** | Cursor suites on tip matrix |
+| Independently supported (Codex on `ea4ada9`) | **5/18** | OFF-03,10,11,12,17 limited — not transferred |
+| Accepted (`OFFLINE_PASS` on tip) | **0/18** | Needs non-author on tip |
+| Blocked | **5/18** | OFF-01,02,13,14,15 |
+| Live Gate A/B | **0/2** | |
 
-Codex verdict on `ea4ada9`: **CHANGES REQUIRED**. 5/18 is not overall project completion.
+Claude harness `53602ba` vs `ea4ada9`: **CHANGES REQUIRED** (tools test load under root Vitest). Fixed on tip via shared `test-support/civ-package-aliases.mjs`.
 
 ## Matrix evidence SHA
 
-`2384766185398cadb14f40f4b72ca4ab9d003b97` (win32 / node 22.17.1 / pnpm 10.13.1) — all listed matrix exits 0. See `docs/V1_ACCEPTANCE_LEDGER.md`.
-
-## Combined sources
-
-| Source | Role |
-| --- | --- |
-| PR #52 / #48 / #53 / #42 | Chest, deny, provider faults |
-| PR #54 tip `1500087` | Corrected QA verdict + non-destructive `run-on-candidate.sh` + wrapper-safety (Windows uses Git Bash) |
-| PR #55 tools | Codex tooling / chest adapter |
-| Mission 004 audit corrections | Ledger rewrite to Codex findings; OFF-04/05/06–09/16 author re-runs |
+`38f61ce1b2986e7bd16c38e3953dcbfb15548e71` — root `pnpm test` **2205 passed** / 2 skipped; QA **91 passed**; all matrix exits 0. See ledger.
 
 ## Independent QA handoff
 
-1. **Revalidate on tip** (do not inherit `ea4ada9` support): OFF-03,10,11,12,17.
-2. **Claude:** full chest ADV-03 + packages suites; keep BLOCKED freshness/ordering until policy agreed; optional `observedContainerProvenance`.
-3. **Owner:** OFF-01 worktree/world/DB preservation confirmation.
-4. **CODEX 1.2:** OFF-13/14 ownership integrate — local guard greens are not integrated evidence.
-5. **Gemini #47 `60ed5ca`:** inspected; validator package **not** folded (workspace/Phase-1 readiness).
-6. No Paper / paid calls.
+1. Revalidate OFF-03/10/11/12/17 on tip (do not inherit `ea4ada9`).
+2. Claude: re-run ADV suite including ADV-03 freshness (now implemented) + ADV-07.
+3. Owner OFF-01; CODEX 1.2 OFF-13/14; Gemini #47 OFF-15 not folded.
+4. No Paper / paid APIs.
 
 ## Gate A
 
-**Not ready for authorization.** Tip `OFFLINE_PASS` is 0/18; blockers remain on OFF-01/02/13/14/15 and independent tip revalidation.
+**Not ready.**
