@@ -49,3 +49,7 @@ Do **not** treat `qa/v1` PASS as Gate A/B. Claude owns the runner mixed-pass fin
 - Movement/guard (CODEX 1.2) and validator ancestry (#47) not folded.
 - Live Gate A/B: **0/2**.
 - Codex catalog 0/30 and 0/37 remain unreviewed denominators — do not replace the official ledger denominator.
+
+
+**Published HEAD:** `1af386e539cb04f98d7584712f665dec79c04d36`
+

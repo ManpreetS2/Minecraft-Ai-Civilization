@@ -32,7 +32,7 @@ Criteria with IDs `OFF-*` that are currently `OFFLINE_PASS` on a **single** inte
 | Passed | **10** |
 | Total offline criteria | **18** |
 | Ratio | **10/18** |
-| Integrated candidate SHA | see HEAD of `agents/cursor-v1-single-sha-integration` after publish (recorded in draft PR / `V1_SINGLE_SHA_CANDIDATE.md`) |
+| Integrated candidate SHA | `1af386e539cb04f98d7584712f665dec79c04d36` |
 
 > Numerator counts only `OFF-*` rows marked `OFFLINE_PASS` with evidence on this single combined SHA. Codex 0/30 and 0/37 catalogs remain unreviewed and do **not** replace this denominator. Live Gate A/B stay **0/2**. Independent QA has not yet accepted this candidate.
 
