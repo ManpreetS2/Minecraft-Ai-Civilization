@@ -110,7 +110,8 @@ export function bridgeV1RunBundle(bundle: V1RunBundle): V1BridgeResult {
   }
 
   // 1b. Check source attestation for live claims (Mission 006)
-  const rawAttestation = (bundle.configuration?.["sourceAttestation"] ?? (bundle as any).sourceAttestation) as SourceAttestation | undefined;
+  const rawAttestation = (bundle.configuration?.["sourceAttestation"] ??
+    (bundle as unknown as Record<string, unknown>)["sourceAttestation"]) as SourceAttestation | undefined;
   if (bundle.mode !== "offline-fixture" && (!rawAttestation || rawAttestation.sourceType !== "paper_server_attested")) {
     notProven.push({
       code: "UNPROVEN_PAPER_AUTHENTICITY",
@@ -173,7 +174,7 @@ export function bridgeV1RunBundle(bundle: V1RunBundle): V1BridgeResult {
         missingFields: ["sessionId"],
       });
     }
-    const communityId = (c as any).communityId ?? (typeof cfg[`communityId_${c.id}`] === "string" ? String(cfg[`communityId_${c.id}`]) : undefined);
+    const communityId = (c as Record<string, unknown>).communityId ?? (typeof cfg[`communityId_${c.id}`] === "string" ? String(cfg[`communityId_${c.id}`]) : undefined);
     if (!communityId) {
       missingManifestFields.push(`citizens.${c.id}.communityId`);
       notProven.push({
@@ -183,7 +184,7 @@ export function bridgeV1RunBundle(bundle: V1RunBundle): V1BridgeResult {
         missingFields: [`communityId_${c.id}`],
       });
     }
-    const personalitySeed = (c as any).personalitySeed ?? (typeof cfg[`personalitySeed_${c.id}`] === "string" ? String(cfg[`personalitySeed_${c.id}`]) : undefined);
+    const personalitySeed = (c as Record<string, unknown>).personalitySeed ?? (typeof cfg[`personalitySeed_${c.id}`] === "string" ? String(cfg[`personalitySeed_${c.id}`]) : undefined);
     if (!personalitySeed) {
       missingManifestFields.push(`citizens.${c.id}.personalitySeed`);
       notProven.push({
@@ -358,8 +359,8 @@ export function bridgeV1RunBundle(bundle: V1RunBundle): V1BridgeResult {
 
     const manifestCitizens = bundle.citizens.map((c) => ({
       id: c.id,
-      communityId: String((c as any).communityId ?? cfg[`communityId_${c.id}`]),
-      personalitySeed: String((c as any).personalitySeed ?? cfg[`personalitySeed_${c.id}`]),
+      communityId: String((c as Record<string, unknown>).communityId ?? cfg[`communityId_${c.id}`]),
+      personalitySeed: String((c as Record<string, unknown>).personalitySeed ?? cfg[`personalitySeed_${c.id}`]),
       family: c.family,
       model: c.model!,
       sessionId: c.sessionId!,

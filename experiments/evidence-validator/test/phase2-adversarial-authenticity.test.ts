@@ -28,8 +28,6 @@ import { describe, expect, it } from "vitest";
 import { auditDurationAndTicks } from "../src/duration-verifier.js";
 import { verifySourceAttestation } from "../src/source-authenticator.js";
 import { validateExperimentEvidence } from "../src/validator.js";
-import { bridgeV1RunBundle } from "../src/v1-bridge.js";
-import { buildRealisticOfflineFixture } from "../src/offline-replay.js";
 import { createTestManifest, JournalBuilder } from "../fixtures/helpers.js";
 
 describe("Mission 006, Phase 5 — Adversarial Authenticity and Trust Boundary", () => {
@@ -60,7 +58,7 @@ describe("Mission 006, Phase 5 — Adversarial Authenticity and Trust Boundary",
     const audit = auditDurationAndTicks({
       claimedDurationMinutes: 0,
       journalRows: dummyTickRows,
-      sourceAttestation: {} as any,
+      sourceAttestation: {} as never,
     });
     expect(audit.serverTickProven).toBe(false);
     expect(audit.reasons.some((r) => r.includes("Unrecognized source attestation type"))).toBe(true);
@@ -83,7 +81,7 @@ describe("Mission 006, Phase 5 — Adversarial Authenticity and Trust Boundary",
   });
 
   it("Vector 4: capture session mismatch fails closed", () => {
-    const audit = auditDurationAndTicks({
+    const _sessionProbe = auditDurationAndTicks({
       claimedDurationMinutes: 0,
       journalRows: dummyTickRows,
       experimentId: "exp-adversarial-001",
@@ -96,6 +94,7 @@ describe("Mission 006, Phase 5 — Adversarial Authenticity and Trust Boundary",
         signature: "ed25519:valid-sig-1234",
       },
     });
+    void _sessionProbe;
     // Now verify against mismatched session
     const check = verifySourceAttestation({
       attestation: {

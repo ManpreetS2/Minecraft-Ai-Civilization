@@ -8,9 +8,9 @@
 
 import { describe, expect, it } from "vitest";
 import { bridgeV1RunBundle, type V1RunBundle } from "../src/v1-bridge.js";
-import { validateExperimentEvidence } from "../src/validator.js";
+// import { validateExperimentEvidence } from "../src/validator.js";
 import { auditDurationAndTicks } from "../src/duration-verifier.js";
-import { createTestManifest, JournalBuilder } from "../fixtures/helpers.js";
+// import { createTestManifest, JournalBuilder } from "../fixtures/helpers.js";
 
 describe("Mission 004 — V1 Evidence Schema Integration Bridge", () => {
   function createSampleRunBundle(overrides?: Partial<V1RunBundle>): V1RunBundle {

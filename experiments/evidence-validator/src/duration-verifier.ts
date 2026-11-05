@@ -3,7 +3,6 @@ import type { JournalRow } from "./schemas.js";
 import {
   verifySourceAttestation,
   type SourceAttestation,
-  type SourceAttestationAudit,
 } from "./source-authenticator.js";
 
 /**

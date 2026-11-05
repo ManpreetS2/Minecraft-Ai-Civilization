@@ -132,8 +132,8 @@ const posReport = validateExperimentEvidence({
   manifest: posManifest,
   rawJournalLines: posLines,
   journalRows: posRows,
-  events: posEvents as any,
-  facts: posFacts as any,
+  events: posEvents as never,
+  facts: posFacts as never,
   finalInventories: posInventories,
 });
 

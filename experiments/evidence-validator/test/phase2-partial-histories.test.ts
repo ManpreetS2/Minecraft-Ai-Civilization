@@ -156,7 +156,7 @@ describe("Phase 2 — Duplicated Events", () => {
     // gather should verify since the observation correctly shows a berry gain.
     // However the duplicate itself should not silently yield a VERIFIED result
     // for the original oak_log attempt.
-    const incompleteNotProven = report.notProven.filter(
+    const _incompleteNotProven = report.notProven.filter(
       (n) => n.code === "INCOMPLETE_ACTION_ATTEMPT",
     );
     // At least the first overwritten attempt has no observation

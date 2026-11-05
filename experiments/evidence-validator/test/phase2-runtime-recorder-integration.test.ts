@@ -8,7 +8,7 @@
 
 import { describe, expect, it } from "vitest";
 import { executeActualRecorderPipeline } from "../src/runtime-recorder-replay.js";
-import { adaptRecorderJournal } from "../src/recorder-adapter.js";
+// import { adaptRecorderJournal } from "../src/recorder-adapter.js";
 import { validateExperimentEvidence } from "../src/validator.js";
 
 describe("Mission 006, Phase 3 — Actual Application Recorder Integration", () => {

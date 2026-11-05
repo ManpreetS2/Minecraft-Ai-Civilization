@@ -11,6 +11,7 @@ export default tseslint.config(
       "server/**",
       "data/**",
       "coverage/**",
+      "artifacts/**",
     ],
   },
   {

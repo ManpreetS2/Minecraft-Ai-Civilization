@@ -14,7 +14,6 @@ import { ExperimentEvidenceJournal } from "../../../packages/agent-core/src/expe
 import { adaptRecorderJournal, adaptPersistentFacts } from "./recorder-adapter.js";
 import { createTestManifest } from "../fixtures/helpers.js";
 import { validateExperimentEvidence, type ValidatorInput } from "./validator.js";
-import type { ValidatedManifest } from "./schemas.js";
 import type { ValidationReport } from "./types.js";
 
 export interface ActualRecorderPipelineResult {
