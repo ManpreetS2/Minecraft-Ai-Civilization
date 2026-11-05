@@ -1,0 +1,77 @@
+
+> minecraft-ai-civilization@0.1.0 test:security C:\Users\sh1ft\Minecraft-Ai-Civilization-off13-off14
+> vitest run sec001 knowledge-provenance downstream-prompt-isolation persistent-fact-provenance citizen-context-2v2 bulletin-2v2 visibility-2v2 untrusted-model-output pr16-review http-server-origin workstations-community storage-community-access
+
+
+ RUN  v3.2.7 C:/Users/sh1ft/Minecraft-Ai-Civilization-off13-off14
+
+ âœ“ apps/orchestrator/src/http-server-origin.test.ts (4 tests) 78ms
+ âœ“ packages/agent-core/src/workstations-community.test.ts (9 tests) 201ms
+ âœ“ packages/agent-core/src/persistent-fact-provenance.test.ts (12 tests) 80ms
+ âœ“ packages/agent-core/src/t3-sec001-boundaries.test.ts (10 tests) 81ms
+ âœ“ packages/agent-core/src/sec001-audience.test.ts (8 tests) 1437ms
+   âœ“ SEC-001 real store: migration of a pre-SEC-001 database > runs once: reopening neither re-flags new facts nor loses flagged ones, and a flagged fact is never overwritten  365ms
+ âœ“ packages/agent-core/src/knowledge-provenance.test.ts (19 tests) 1784ms
+   âœ“ owner policy: fail-closed provenance and per-record recovery > constructor interruption rolls back provenance DDL, flags, audit and marker; closes its handle and recovers  818ms
+ âœ“ packages/agent-core/src/storage-community-access.test.ts (8 tests) 80ms
+ âœ“ packages/agent-core/src/citizen-context-2v2.test.ts (27 tests) 50ms
+ âœ“ packages/shared/src/bulletin-2v2-contract.test.ts (9 tests) 20ms
+ âœ“ packages/shared/src/visibility-2v2-contract.test.ts (19 tests) 6ms
+ âœ“ packages/agent-core/src/sec001-round3.test.ts (14 tests) 2926ms
+   âœ“ legacy migration: backup -> dry run -> flags, never a delete > restart: no second migration, no second backup, flags and rows persist, hidden facts stay out of the prompt surface  337ms
+   âœ“ removeCommunityMember flags in place > no fact row is moved or deleted: counts, ids and content are unchanged; reads exclude the flagged fact  354ms
+ âœ“ packages/agent-core/src/sec001-round2.test.ts (20 tests) 3076ms
+   âœ“ fix 5: membership is writable only through the orchestrator-config path, and is audited > removeCommunityMember is audited, persists across restart and quarantines the facts its community authorized  381ms
+ âœ“ packages/agent-core/src/pr16-review.test.ts (5 tests) 790ms
+ âœ“ packages/agent-core/src/downstream-prompt-isolation.test.ts (13 tests) 1435ms
+ âœ“ packages/agent-core/src/sec001-manager.test.ts (38 tests) 3609ms
+   âœ“ same-community announcements (criterion 2) > a citizen's own choice reaches every member of its community through the real manager path, and no one else  446ms
+   âœ“ voluntary cross-community sharing (criterion 3) > a citizen may tell a rival it has met about a line it was shown; only that community receives it  310ms
+ âœ“ packages/agent-core/src/untrusted-model-output.test.ts (37 tests) 4521ms
+ âœ“ packages/agent-core/src/sec001-migration-recovery-qa.test.ts (7 tests) 9226ms
+   âœ“ Independent SEC-001 migration fault/recovery QA > fails closed when VACUUM backup encounters a real SQLite destination error; no quarantine marker or data loss  1731ms
+   âœ“ Independent SEC-001 migration fault/recovery QA > rolls all flag inserts back on a SQLite trigger abort mid-transaction, then retries on reopen  1430ms
+   âœ“ Independent SEC-001 migration fault/recovery QA > recovers idempotently after flags commit but before the completion marker is written  1116ms
+   âœ“ Independent SEC-001 migration fault/recovery QA > backup includes committed WAL rows even while another connection keeps the WAL open  1122ms
+   âœ“ Independent SEC-001 migration fault/recovery QA > aborts before flagging if the dry-run report cannot be written, retaining a usable backup  1217ms
+   âœ“ Independent SEC-001 migration fault/recovery QA > completes provenance backfill on reopen after the completion marker commits but backfill aborts  1836ms
+   âœ“ Independent SEC-001 migration fault/recovery QA > can restore a migration backup to another disposable database and reapply quarantine without losing audit content  773ms
+ âœ“ packages/agent-core/src/sec001-independent-review.test.ts (74 tests) 6359ms
+   âœ“ community membership timing reaches the model-facing context > a citizen who joins after an announcement never receives it  364ms
+   âœ“ audience, class and observer boundaries through the real manager > another citizen's model reasoning, goals and refused actions stay out of cognition  311ms
+   âœ“ audience, class and observer boundaries through the real manager > speech reaches only citizens within hearing, attributed to the real speaker, never over server chat  309ms
+   âœ“ quarantine cannot be escaped through copies and imports > rows imported after the migration marker stay quarantined across repeated restarts, and migration is idempotent  664ms
+ âœ“ packages/agent-core/src/sec001-migration-manager-qa.test.ts (5 tests) 6404ms
+   âœ“ Independent migrated SQLite -> actual manager cognition QA > migrated flagged fact and exact-derived memory cannot reach manager cognition, including after restart  1439ms
+   âœ“ Independent migrated SQLite -> actual manager cognition QA > SECURITY REGRESSION: unverified legacy non-event poison must not reach actual manager memory  1231ms
+   âœ“ Independent migrated SQLite -> actual manager cognition QA > SECURITY CONTRACT GAP: paraphrased historical poison must not reach actual manager memory  1201ms
+   âœ“ Independent migrated SQLite -> actual manager cognition QA > SECURITY REGRESSION: suspicion replacement must not inherit manager observed-fact eligibility  1783ms
+   âœ“ Independent migrated SQLite -> actual manager cognition QA > correctly flagged poison is absent for the other reader and private memory ownership remains separate  749ms
+ âœ“ packages/agent-core/src/sec001-quarantine-durability-qa.test.ts (8 tests) 9615ms
+   âœ“ Independent SEC-001 quarantine durability and provenance QA > filters quarantined facts before applying the reader retrieval limit  1552ms
+   âœ“ Independent SEC-001 quarantine durability and provenance QA > a shared source key is quarantined per recipient without hiding its authorized owner's fact  1422ms
+   âœ“ Independent SEC-001 quarantine durability and provenance QA > source_event_id makes a non-event-key fact eligible for source authorization during migration  1196ms
+   âœ“ Independent SEC-001 quarantine durability and provenance QA > explicit source identity overrides a misleading authorized-looking fact key  1118ms
+   âœ“ Independent SEC-001 quarantine durability and provenance QA > SECURITY REGRESSION: rerunning quarantine must exclude a later memory copied from already-flagged poison  1159ms
+   âœ“ Independent SEC-001 quarantine durability and provenance QA > SECURITY REGRESSION: a completed migration marker must not authorize subsequently imported source-linked poison  1788ms
+   âœ“ Independent SEC-001 quarantine durability and provenance QA > dry-run reports are read-only even when they propose additional quarantine  769ms
+   âœ“ Independent SEC-001 quarantine durability and provenance QA > a newly inserted suspicion keeps its classification; the known kind defect requires replacement  609ms
+ âœ“ packages/agent-core/src/sec001-migration-qa.test.ts (12 tests) 11062ms
+   âœ“ Independent SEC-001 authentic legacy SQLite migration QA > starts without SEC schema; migrates a COPY, preserves audit rows and backs up all historical content  1724ms
+   âœ“ Independent SEC-001 authentic legacy SQLite migration QA > keeps authorized private/directed history; flags unauthorized, missing-source and unaudienced public facts  1282ms
+   âœ“ Independent SEC-001 authentic legacy SQLite migration QA > persists flags, source references, deliveries and audit contents across two reopen/migration passes  1157ms
+   âœ“ Independent SEC-001 authentic legacy SQLite migration QA > SECURITY REGRESSION: unverified non-event observed facts require quarantine rather than automatic trust  1093ms
+   âœ“ Independent SEC-001 authentic legacy SQLite migration QA > SECURITY CONTRACT GAP: provenance-free paraphrased poisoned memories must not remain model-eligible  1175ms
+   âœ“ Independent SEC-001 authentic legacy SQLite migration QA > SECURITY REGRESSION: same-key suspicion replacement must update trust classification  1791ms
+   âœ“ Independent SEC-001 authentic legacy SQLite migration QA > SECURITY CONTRACT GAP: an authorized historical source key cannot authenticate unrelated secret fact content  787ms
+   âœ“ Independent SEC-001 authentic legacy SQLite migration QA > cannot shed quarantine by overwriting a flagged key with a fresh ID  600ms
+   âœ“ Independent SEC-001 authentic legacy SQLite migration QA > preserves public announcements, directed speech and explicit cross-community sharing without widening the source  383ms
+   âœ“ Independent SEC-001 authentic legacy SQLite migration QA > membership removal flags community-derived facts but preserves private and directed historical knowledge  382ms
+   âœ“ Independent SEC-001 authentic legacy SQLite migration QA > records authorized speech as an attributed conversation (not proof of the speaker's claim)  341ms
+   âœ“ Independent SEC-001 authentic legacy SQLite migration QA > SECURITY CONTRACT GAP: a reported claim needs a trust classification distinct from an undifferentiated observed fact  346ms
+
+ Test Files  21 passed (21)
+      Tests  358 passed (358)
+   Start at  14:55:39
+   Duration  12.49s (transform 2.79s, setup 2.31s, collect 26.83s, tests 62.84s, environment 4ms, prepare 6.03s)
+

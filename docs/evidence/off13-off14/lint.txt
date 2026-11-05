@@ -1,0 +1,4 @@
+
+> minecraft-ai-civilization@0.1.0 lint C:\Users\sh1ft\Minecraft-Ai-Civilization-off13-off14
+> eslint .
+

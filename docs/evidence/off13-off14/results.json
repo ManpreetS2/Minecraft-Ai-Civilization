@@ -1,0 +1,97 @@
+{
+    "mode":  "offline",
+    "checks":  [
+                   {
+                       "passed":  2476,
+                       "command":  "pnpm test",
+                       "skipped":  2,
+                       "log":  "test.txt",
+                       "logSha256":  "6490ce415e9389e7f6d9db0e7daf650fdad181e2d82c11a8a54c39b3eb09893d",
+                       "exitCode":  0,
+                       "failed":  0
+                   },
+                   {
+                       "exitCode":  0,
+                       "command":  "pnpm typecheck",
+                       "logSha256":  "1981dc626cc756988afd720efa9c0f2bd7b5de2e4a9a9f7ee58a4e6dc473b84e",
+                       "log":  "typecheck.txt"
+                   },
+                   {
+                       "exitCode":  0,
+                       "command":  "pnpm typecheck:tools",
+                       "logSha256":  "1df1baff255e0d1f4c28c1e837fb98416e2d7f9c68c8e8a8b335de1b4653758f",
+                       "log":  "typecheck-tools.txt"
+                   },
+                   {
+                       "exitCode":  0,
+                       "command":  "pnpm typecheck:evidence-validator",
+                       "logSha256":  "deb517a3f28c7cae70767033a5e2240b6739931b03ada58d2470df731e17e703",
+                       "log":  "typecheck-validator.txt"
+                   },
+                   {
+                       "exitCode":  0,
+                       "command":  "pnpm lint",
+                       "logSha256":  "57ee6b10cd5069c480511d65e9578905f44a72397a7179683fbad3d5aaa74d6f",
+                       "log":  "lint.txt"
+                   },
+                   {
+                       "exitCode":  0,
+                       "command":  "pnpm build",
+                       "logSha256":  "4c80dba1c1889293c32765c3eb864aa2b3ca544219859a889ffd243d1c9facc5",
+                       "log":  "build.txt"
+                   },
+                   {
+                       "passed":  358,
+                       "command":  "pnpm test:security",
+                       "skipped":  0,
+                       "log":  "security.txt",
+                       "logSha256":  "975faa2d936bd7c8bdaea4f0115bfad022d18c0acabb1af10517356d1e4d0d51",
+                       "exitCode":  0,
+                       "failed":  0
+                   },
+                   {
+                       "passed":  514,
+                       "command":  "pnpm test:ai",
+                       "skipped":  0,
+                       "log":  "ai.txt",
+                       "logSha256":  "502522e7acd75f60cd3a55e7f05aa2295634e51f46eb258d809acce511a1526e",
+                       "exitCode":  0,
+                       "failed":  0
+                   },
+                   {
+                       "passed":  100,
+                       "command":  "pnpm test:v1 --maxWorkers=1 --no-file-parallelism",
+                       "skipped":  0,
+                       "log":  "v1.txt",
+                       "logSha256":  "735f8506d7249787d58e7fc9e19062aa157ae9bed0b7ba6c4626337a43cacedb",
+                       "exitCode":  0,
+                       "failed":  0
+                   }
+               ],
+    "focused":  {
+                    "passed":  423,
+                    "evidence":  "Captured tool execution transcript; no separate redirected log. Extra unmatched orchestratorator filter was harmless; correct QA test executed (17 tests).",
+                    "exitCode":  0,
+                    "failed":  0,
+                    "command":  "pnpm exec vitest run packages/minecraft-adapter/src apps/orchestrator/src/construction-experiment-guard.test.ts apps/orchestrator/src/construction-path-isolation.test.ts apps/orchestrator/src/construction-live-boundaries.test.ts apps/orchestratorator/src/off13-qa39-regressions.test.ts apps/orchestrator/src/off13-qa39-regressions.test.ts",
+                    "filesPassed":  32,
+                    "skipped":  2
+                },
+    "platform":  "win32-x64",
+    "node":  "22.17.1",
+    "baseSha":  "875ebf707b93a082a6423c9a3aecc7d00ae02e48",
+    "pnpm":  "10.13.1",
+    "sourceAttribution":  "Focused/full/typecheck/lint/build checks ran on the uncommitted source subsequently committed verbatim as codeSha. Security ran across that commit with unchanged files. AI/V1 ran after codeSha; only handoff docs and native CI command timeout options changed. No runtime/test code changed between checks.",
+    "limitations":  [
+                        "Two existing POSIX-only lock tests skipped on Windows",
+                        "8.3 alias control does not prove an alias exists when short names are disabled",
+                        "Combined native Linux/macOS checks not executed locally",
+                        "Historical guard native CI is not combined-candidate evidence",
+                        "Owner-run QA39 replay requires independent review",
+                        "Offline results do not prove live Minecraft outcomes"
+                    ],
+    "codeSha":  "b7842be4ec4d8057d5441f8ccd47c22b04f76830",
+    "repository":  "ManpreetS2/Minecraft-Ai-Civilization-windows-backup",
+    "schemaVersion":  1,
+    "logHashEncoding":  "UTF-8 without BOM, LF newlines"
+}

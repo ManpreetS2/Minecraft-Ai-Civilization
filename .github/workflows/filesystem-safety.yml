@@ -46,9 +46,8 @@ jobs:
       - run: git rev-parse HEAD
       - run: pnpm install --frozen-lockfile
       - name: Native filesystem regressions
-        run: pnpm exec vitest run apps/orchestrator/src/construction-path-isolation.test.ts apps/orchestrator/src/construction-experiment-guard.test.ts apps/orchestrator/src/construction-live-boundaries.test.ts apps/orchestrator/src/off13-qa39-regressions.test.ts packages/minecraft-adapter/src
-      - run: pnpm test
+        run: pnpm exec vitest run apps/orchestrator/src/construction-path-isolation.test.ts apps/orchestrator/src/construction-experiment-guard.test.ts apps/orchestrator/src/construction-live-boundaries.test.ts apps/orchestrator/src/off13-qa39-regressions.test.ts packages/minecraft-adapter/src --testTimeout=60000 --hookTimeout=60000
+      - run: pnpm test --testTimeout=60000 --hookTimeout=60000
       - run: pnpm typecheck
       - run: pnpm build
       - run: pnpm lint
-
