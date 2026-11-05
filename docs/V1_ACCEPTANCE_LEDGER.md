@@ -3,7 +3,7 @@
 **Issue:** [windows-backup #51](https://github.com/ManpreetS2/Minecraft-Ai-Civilization-windows-backup/issues/51)  
 **Charter:** `ManpreetS2/Minecraft-Ai-Civilization` `project.md` @ `63d1b97b188fb840db05c6baf60b549c476e508f`  
 **Candidate branch:** `agents/cursor-v1-single-sha-integration` (PR [#56](https://github.com/ManpreetS2/Minecraft-Ai-Civilization-windows-backup/pull/56))  
-**Ledger updated:** 2026-11-05 (Mission 004 priority — Claude CHANGES REQUIRED / shared Vitest aliases / QA `53602ba`)  
+**Ledger updated:** 2026-11-05 (Mission 005 offline e2e rehearsal + evidence journal)  
 **Authority:** Offline measurement only. Does **not** authorize live Paper, paid calls, production data, or protected merges.
 
 ## Status vocabulary
@@ -41,7 +41,7 @@ Counts rows with code on tip including `BLOCKED` rows that still have partial lo
 | Author-tested on matrix SHA | **13** |
 | Denominator | **18** |
 | Ratio | **13/18** |
-| Matrix evidence SHA | `38f61ce1b2986e7bd16c38e3953dcbfb15548e71` |
+| Matrix evidence SHA (Mission 005) | `c13567f4ab8d253480c18423d5908cafbe750455` |
 
 ### 3. Independently supported behavior (Codex audit)
 
@@ -105,7 +105,19 @@ Claude adversarial QA harness `53602ba…` against `ea4ada9…`: **CHANGES REQUI
 
 ## Gate A
 
-**Not ready.** Tip `OFFLINE_PASS` **0/18**; blockers remain; Codex/Claude prior findings require tip revalidation.
+**Not ready.** Tip `OFFLINE_PASS` **0/18**; live **0/2**. See `docs/MISSION005_GATE_A_READINESS.md`. Offline `pnpm v1:offline 2|4` rehearsals are scripted evidence only (`NOT PROVEN` for Paper ticks / live models).
+
+## Mission 005 author matrix (`c13567f4ab8d253480c18423d5908cafbe750455`)
+
+| Check | Exit | Counts |
+| --- | --- | --- |
+| typecheck / typecheck:tools / lint / build | 0 | clean |
+| `pnpm test` | 0 | 197 files; 2207 passed; 2 skipped |
+| test:security / test:ai / test:v1 | 0 | 358 / 514 / 50 |
+| qa/v1 adversarial | 0 | 91 passed |
+| independent-offline-runtime | 0 | 11 passed |
+| experiment-evidence | 0 | 11 passed |
+| `pnpm v1:offline 2` / `4` | 0 | bundles under `artifacts/v1/mission005-*`; structural verdict **NOT PROVEN** |
 
 ---
 
