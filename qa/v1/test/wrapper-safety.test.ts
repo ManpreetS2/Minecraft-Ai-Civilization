@@ -1,6 +1,6 @@
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, symlinkSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { platform, tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
@@ -11,7 +11,23 @@ import { describe, expect, it } from "vitest";
  */
 const script = fileURLToPath(new URL("../scripts/run-on-candidate.sh", import.meta.url)).replaceAll("\\", "/");
 const sh = (cwd: string, ...a: string[]) => spawnSync("git", a, { cwd, encoding: "utf8" });
-const bash = (...a: string[]) => spawnSync("bash", [script, ...a], { encoding: "utf8" });
+/**
+ * On Windows, PATH `bash` is often WSL, which cannot open Win32 script paths (exit 127).
+ * Prefer Git Bash so refusal tests exercise the real wrapper on this candidate platform.
+ */
+function resolveBash(): string {
+  if (platform() === "win32") {
+    for (const candidate of [
+      join(process.env["ProgramFiles"] ?? "C:\\Program Files", "Git", "bin", "bash.exe"),
+      join(process.env["ProgramFiles(x86)"] ?? "C:\\Program Files (x86)", "Git", "bin", "bash.exe"),
+    ]) {
+      if (existsSync(candidate)) return candidate;
+    }
+  }
+  return "bash";
+}
+const bashBin = resolveBash();
+const bash = (...a: string[]) => spawnSync(bashBin, [script, ...a], { encoding: "utf8" });
 
 function candidateRepo() {
   const root = realpathSync(mkdtempSync(join(tmpdir(), "qa-wrap-")));
