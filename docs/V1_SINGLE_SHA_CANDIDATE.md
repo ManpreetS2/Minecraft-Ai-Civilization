@@ -68,4 +68,4 @@ Do **not** treat Cursor self-green or `qa/v1` PASS as Gate A/B. ADV-03 freshness
 Self-verified implementation coverage is **11/18**. Offline Gate A prerequisites are **not** met for independent acceptance: reviewers must still accept evidence, movement/guard remain BLOCKED, and live gates stay closed.
 
 **Matrix SHA:** `43c02cb8ab9cc06d83c08143d7e574e1f65ed79f`  
-**Published HEAD:** d3acc2ab0aaeb1fc89ebb7f58afa0a9c74ce473a
+**Published HEAD:** 8a8b41546fb2ecf015cfdd77d168f3f67d612fb2
