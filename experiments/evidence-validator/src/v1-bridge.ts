@@ -174,7 +174,7 @@ export function bridgeV1RunBundle(bundle: V1RunBundle): V1BridgeResult {
         missingFields: ["sessionId"],
       });
     }
-    const communityId = (c as Record<string, unknown>).communityId ?? (typeof cfg[`communityId_${c.id}`] === "string" ? String(cfg[`communityId_${c.id}`]) : undefined);
+    const communityId = (c as unknown as Record<string, unknown>).communityId ?? (typeof cfg[`communityId_${c.id}`] === "string" ? String(cfg[`communityId_${c.id}`]) : undefined);
     if (!communityId) {
       missingManifestFields.push(`citizens.${c.id}.communityId`);
       notProven.push({
@@ -184,7 +184,7 @@ export function bridgeV1RunBundle(bundle: V1RunBundle): V1BridgeResult {
         missingFields: [`communityId_${c.id}`],
       });
     }
-    const personalitySeed = (c as Record<string, unknown>).personalitySeed ?? (typeof cfg[`personalitySeed_${c.id}`] === "string" ? String(cfg[`personalitySeed_${c.id}`]) : undefined);
+    const personalitySeed = (c as unknown as Record<string, unknown>).personalitySeed ?? (typeof cfg[`personalitySeed_${c.id}`] === "string" ? String(cfg[`personalitySeed_${c.id}`]) : undefined);
     if (!personalitySeed) {
       missingManifestFields.push(`citizens.${c.id}.personalitySeed`);
       notProven.push({
@@ -359,8 +359,8 @@ export function bridgeV1RunBundle(bundle: V1RunBundle): V1BridgeResult {
 
     const manifestCitizens = bundle.citizens.map((c) => ({
       id: c.id,
-      communityId: String((c as Record<string, unknown>).communityId ?? cfg[`communityId_${c.id}`]),
-      personalitySeed: String((c as Record<string, unknown>).personalitySeed ?? cfg[`personalitySeed_${c.id}`]),
+      communityId: String((c as unknown as Record<string, unknown>).communityId ?? cfg[`communityId_${c.id}`]),
+      personalitySeed: String((c as unknown as Record<string, unknown>).personalitySeed ?? cfg[`personalitySeed_${c.id}`]),
       family: c.family,
       model: c.model!,
       sessionId: c.sessionId!,
