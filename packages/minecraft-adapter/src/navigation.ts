@@ -1,5 +1,7 @@
 import type { Bot } from "mineflayer";
-import { fail, ok, type ActionResult, type Vec3 } from "@civ/shared";
+import { abortedResult, fail, ok, type ActionResult, type Vec3 } from "@civ/shared";
+import { releaseMovementControls } from "./step-jump.js";
+import { navigationBodyReady, navigationParametersValid } from "./connection-health.js";
 import { followPlayer, moveToGetToBlock, moveToLookAtBlock, moveToPosition } from "./pathing.js";
 import { probeReachability } from "./path-probe.js";
 import { blockInteractDistance, findReachablePlacementPosition, isWithinBlockReach, rankedInteractionPositions } from "./interaction.js";
@@ -17,6 +19,7 @@ export type NavigationBackend = {
 };
 
 function currentReachResult(bot: Bot, block: Vec3) {
+  if (!navigationBodyReady(bot)) return undefined;
   if (!isWithinBlockReach(bot, block)) return undefined;
   const pos = bot.entity?.position;
   if (!pos) return undefined;
@@ -47,6 +50,9 @@ export class MineflayerPathfinderBackend implements NavigationBackend {
   async navigateToInteractWithBlock(bot: Bot, block: Vec3, options?: { timeoutMs?: number; signal?: AbortSignal }) {
     const budget = options?.timeoutMs ?? 16_000;
     const started = Date.now();
+    if (options?.signal?.aborted) return abortedResult(0);
+    if (!navigationBodyReady(bot)) return fail("NOT_CONNECTED", "Bot has no active navigation body", 0);
+    if (!navigationParametersValid(block, 4.5, budget)) return fail("INVALID_ARGUMENT", "Invalid interaction target or timeout", 0);
     const already = closeInteractResult(bot, block);
     if (already) return already;
     const here = bot.entity?.position;
@@ -59,9 +65,10 @@ export class MineflayerPathfinderBackend implements NavigationBackend {
           signal: options?.signal,
           recover: true,
         });
+        if (options?.signal?.aborted) return abortedResult(Date.now() - started);
+        if (isAbortNavResult(approach)) return approach;
         const reached = closeInteractResult(bot, block);
         if (reached) return reached;
-        if (isAbortNavResult(approach)) return approach;
       }
     }
     const cells = rankedInteractionPositions(bot, block, 2).slice(0, 6);
@@ -78,14 +85,16 @@ export class MineflayerPathfinderBackend implements NavigationBackend {
         signal: options?.signal,
         recover: true,
       });
-      if (last.success) return last;
-      const reached = closeInteractResult(bot, block);
-      if (reached) return reached;
+      if (options?.signal?.aborted) return abortedResult(Date.now() - started);
       if (isAbortNavResult(last)) return last;
+      const reached = closeInteractResult(bot, block);
+      if (reached) return ok(reached.data, Date.now() - started);
     }
     const remaining = budget - (Date.now() - started);
     if (remaining >= 800) {
       last = await moveToLookAtBlock(bot, block, { timeoutMs: Math.min(8_000, remaining), signal: options?.signal });
+      if (options?.signal?.aborted) return abortedResult(Date.now() - started);
+      if (isAbortNavResult(last)) return last;
       if (last.success) {
         const reached = closeInteractResult(bot, block);
         if (reached) return reached;
@@ -95,6 +104,8 @@ export class MineflayerPathfinderBackend implements NavigationBackend {
     if (leftover >= 800) {
       last = await moveToGetToBlock(bot, block, { timeoutMs: Math.min(6_000, leftover), signal: options?.signal });
     }
+    if (options?.signal?.aborted) return abortedResult(Date.now() - started);
+    if (isAbortNavResult(last)) return last;
     const close = closeInteractResult(bot, block);
     if (close) return close;
     const pos = bot.entity?.position;
@@ -107,11 +118,24 @@ export class MineflayerPathfinderBackend implements NavigationBackend {
         true,
       );
     }
+    if (last.success) {
+      return fail("VERIFY_FAILED", "Movement finished without verified block interaction reach", Date.now() - started, true);
+    }
     return last;
   }
-  navigateToPlaceBlock(bot: Bot, target: Vec3, options?: { timeoutMs?: number; signal?: AbortSignal }) {
+  async navigateToPlaceBlock(bot: Bot, target: Vec3, options?: { timeoutMs?: number; signal?: AbortSignal }) {
+    const started = Date.now();
+    if (options?.signal?.aborted) return abortedResult(0);
+    if (!navigationBodyReady(bot)) return fail("NOT_CONNECTED", "Bot has no active navigation body", 0);
+    if (!navigationParametersValid(target, 4.5, options?.timeoutMs ?? 22_000)) return fail("INVALID_ARGUMENT", "Invalid placement target or timeout", 0);
     const standing = findReachablePlacementPosition(bot, target) ?? target;
-    return moveToPosition(bot, standing, { range: 2, ...options });
+    const result = await moveToPosition(bot, standing, { range: 2, ...options });
+    if (options?.signal?.aborted) return abortedResult(Date.now() - started);
+    if (!result.success) return result;
+    if (!navigationBodyReady(bot)) return fail("NOT_CONNECTED", "Lost body during placement navigation", Date.now() - started);
+    const reached = currentReachResult(bot, target);
+    if (!reached) return fail("VERIFY_FAILED", "Movement finished without verified placement reach", Date.now() - started, true);
+    return ok(reached.data, Date.now() - started);
   }
   followEntity(bot: Bot, username: string, options?: { timeoutMs?: number; signal?: AbortSignal }) {
     return followPlayer(bot, username, options);
@@ -137,6 +161,12 @@ export class MineflayerPathfinderBackend implements NavigationBackend {
     } catch {
       // ignore
     }
+    try {
+      (bot as unknown as { pathfinder?: { setGoal?: (goal: null) => void } }).pathfinder?.setGoal?.(null);
+    } catch {
+      // Controls must still be released when a plugin is already disconnected.
+    }
+    releaseMovementControls(bot);
   }
 }
 

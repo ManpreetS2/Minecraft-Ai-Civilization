@@ -2,7 +2,8 @@
  * Mission 006A — construction physical experiment guards.
  * Default: refuse live connect. Isolation paths must not alias the original World-Lab.
  */
-import { existsSync, lstatSync, realpathSync, statSync } from "node:fs";
+import { closeSync, constants, existsSync, fstatSync, lstatSync, openSync, readdirSync, realpathSync, statSync, type BigIntStats } from "node:fs";
+import { isIP } from "node:net";
 import { basename, dirname, isAbsolute, join, normalize, posix, win32 } from "node:path";
 import { resolveFromRoot, workspaceRoot, type Vec3 } from "@civ/shared";
 import { WORLD_LAB_CLAIMABLE_HOMES } from "@civ/agent-core";
@@ -175,6 +176,22 @@ export function pathsAliasSameTree(a: string, b: string): boolean {
   return na.value === nb.value || na.value.startsWith(nb.value + na.separator) || nb.value.startsWith(na.value + na.separator);
 }
 
+/** Walk a path and its ancestors; missing components are skipped, other errors refuse. */
+function ancestorSharesIdentity(path: string, protectedIds: Set<string>): boolean {
+  let current = path;
+  while (true) {
+    try {
+      const stats = statSync(current, { bigint: true });
+      if (protectedIds.has(`${stats.dev}:${stats.ino}`)) return true;
+    } catch (error) {
+      if (!(error instanceof Error) || !("code" in error) || error.code !== "ENOENT") throw error;
+    }
+    const parent = dirname(current);
+    if (parent === current) return false;
+    current = parent;
+  }
+}
+
 export function assertIsolatedNotOriginal(args: {
   isolatedWorldLab: string;
   isolatedSqlite: string;
@@ -192,6 +209,10 @@ function checkIsolationPaths(args: {
   const originalDb = validatePathExists(ORIGINAL_WORLD_LAB_SQLITE, "original sqlite");
   if (!originalWl.ok) return originalWl;
   if (!originalDb.ok) return originalDb;
+  const originalData = validatePathExists(dirname(originalDb.resolved), "original data directory");
+  const originalDbDirectory = validatePathExists(dirname(originalDb.real), "original database directory");
+  if (!originalData.ok) return originalData;
+  if (!originalDbDirectory.ok) return originalDbDirectory;
 
   const isoWl = validatePathExists(args.isolatedWorldLab, "isolated world-lab");
   const isoDb = validatePathExists(args.isolatedSqlite, "isolated sqlite");
@@ -208,7 +229,7 @@ function checkIsolationPaths(args: {
       if (!statSync(db.real).isFile()) throw new Error("SQLite target must be a regular file");
     }
     for (const isolated of [isoWl, isoDb]) {
-      for (const original of [originalWl, originalDb]) {
+      for (const original of [originalWl, originalDb, originalData, originalDbDirectory]) {
         if (pathsAliasSameTree(isolated.real, original.real)) {
           return { ok: false, error: `Isolated path aliases original: ${isolated.resolved}` };
         }
@@ -219,13 +240,140 @@ function checkIsolationPaths(args: {
         }
       }
     }
-    if (evidence?.ok && [originalWl, originalDb].some((original) => pathsAliasSameTree(evidence.real, original.real))) {
+    if (evidence?.ok && [originalWl, originalDb, originalData, originalDbDirectory].some((original) => pathsAliasSameTree(evidence.real, original.real))) {
       return { ok: false, error: "Evidence path aliases original" };
     }
+    // Spelling cannot prove containment on case-insensitive filesystems (a DATA alias
+    // keeps its own case through realpath), so also compare device/inode identity of
+    // every existing ancestor against the protected originals.
+    const protectedIds = new Set([originalWl, originalDb, originalData, originalDbDirectory].map((original) => {
+      const stats = statSync(original.real, { bigint: true });
+      return `${stats.dev}:${stats.ino}`;
+    }));
+    for (const target of [isoWl.real, isoDb.real, evidence?.real]) {
+      if (target !== undefined && ancestorSharesIdentity(target, protectedIds)) {
+        return { ok: false, error: `Isolated path is inside an original filesystem tree: ${target}` };
+      }
+    }
+    inspectIsolationFiles(isoWl.real, isoDb.real, evidence?.real);
   } catch (error) {
     return { ok: false, error: `Isolation identity unavailable: ${error instanceof Error ? error.message : String(error)}` };
   }
   return { ok: true, worldLabDir: isoWl.real, sqlitePath: isoDb.real, evidenceDir: evidence?.real };
+}
+
+const SQLITE_SIDECARS = ["-wal", "-shm", "-journal"] as const;
+
+function identity(stats: BigIntStats): string {
+  return [stats.dev, stats.ino, stats.mode, stats.nlink, stats.size, stats.mtimeNs, stats.ctimeNs].join(":");
+}
+
+/** Inspect only the disposable tree. Never follow descendant links or scan originals. */
+function inspectIsolationFiles(world: string, database: string, evidence?: string): Map<string, string> {
+  const manifest = new Map<string, string>();
+  let entries = 0;
+  const visit = (path: string, depth = 0): void => {
+    if (++entries > 50_000 || depth > 64) throw new Error("Isolation scan limit exceeded");
+    const stats = lstatSync(path, { bigint: true });
+    if (stats.isSymbolicLink()) throw new Error(`Isolation contains a link: ${path}`);
+    if (!stats.isFile() && !stats.isDirectory()) throw new Error(`Unsupported isolation entry: ${path}`);
+    if (stats.isFile() && stats.nlink !== 1n) throw new Error(`Isolation file has shared or unknown link identity: ${path}`);
+    manifest.set(path, identity(stats));
+    if (stats.isDirectory()) {
+      for (const name of readdirSync(path).sort()) visit(join(path, name), depth + 1);
+    }
+  };
+  visit(world);
+  visit(database);
+  for (const suffix of SQLITE_SIDECARS) {
+    const path = database + suffix;
+    try {
+      const stats = lstatSync(path, { bigint: true });
+      if (!stats.isFile()) throw new Error(`SQLite sidecar must be an unlinked regular file: ${path}`);
+      visit(path);
+    } catch (error) {
+      if (!(error instanceof Error) || !("code" in error) || error.code !== "ENOENT") throw error;
+      manifest.set(path, "missing");
+    }
+  }
+  if (evidence) {
+    // Capture existing ancestors too: replacing one after preflight invalidates handoff.
+    let ancestor = evidence;
+    while (true) {
+      try {
+        const stats = lstatSync(ancestor, { bigint: true });
+        if (stats.isSymbolicLink() || !stats.isDirectory()) throw new Error("Evidence ancestor changed identity");
+        manifest.set(ancestor, identity(stats));
+        if (ancestor === evidence) visit(evidence);
+        break;
+      } catch (error) {
+        if (!(error instanceof Error) || !("code" in error) || error.code !== "ENOENT") throw error;
+        manifest.set(ancestor, "missing");
+        const parent = dirname(ancestor);
+        if (parent === ancestor) throw error;
+        ancestor = parent;
+      }
+    }
+  }
+  return manifest;
+}
+
+function captureConstructionManifest(gate: AllowedConstructionGate): Map<string, string> {
+  const manifest = inspectIsolationFiles(gate.worldLabDir, gate.sqlitePath, gate.evidenceDir);
+  for (const path of [ORIGINAL_WORLD_LAB_DIR, ORIGINAL_WORLD_LAB_SQLITE]) {
+    const protectedPath = validatePathExists(path, "protected target");
+    if (!protectedPath.ok) throw new Error(protectedPath.error);
+    manifest.set(`protected:${protectedPath.resolved}`, `${protectedPath.real}:${identity(lstatSync(protectedPath.resolved, { bigint: true }))}:${identity(statSync(protectedPath.real, { bigint: true }))}`);
+    if (path === ORIGINAL_WORLD_LAB_SQLITE) {
+      for (const suffix of SQLITE_SIDECARS) {
+        const sidecar = protectedPath.real + suffix;
+        try {
+          manifest.set(`protected:${sidecar}`, identity(lstatSync(sidecar, { bigint: true })));
+        } catch (error) {
+          if (!(error instanceof Error) || !("code" in error) || error.code !== "ENOENT") throw error;
+          manifest.set(`protected:${sidecar}`, "missing");
+        }
+      }
+    }
+  }
+  return manifest;
+}
+
+type AllowedConstructionGate = Extract<ConstructionLiveGate, { allowed: true }>;
+const handoffs = new WeakMap<AllowedConstructionGate, Map<string, string>>();
+
+/** Single-use, read-only descriptor handoff for offline verification. Consumers must
+ * use this descriptor, not reopen its pathname. This is not a SQLite connection:
+ * better-sqlite3 opens by name and needs its own launch integration/security review.
+ */
+export function openVerifiedConstructionDatabaseFile(gate: AllowedConstructionGate):
+  | { ok: true; fd: number; close: () => void }
+  | { ok: false; error: string } {
+  const expected = handoffs.get(gate);
+  handoffs.delete(gate);
+  if (!expected) return { ok: false, error: "Unknown or consumed construction handoff" };
+  let fd: number | undefined;
+  try {
+    const current = captureConstructionManifest(gate);
+    if (current.size !== expected.size || [...expected].some(([path, value]) => current.get(path) !== value)) {
+      throw new Error("Filesystem changed after construction preflight");
+    }
+    fd = openSync(gate.sqlitePath, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
+    if (identity(fstatSync(fd, { bigint: true })) !== expected.get(gate.sqlitePath)) {
+      throw new Error("Database identity changed while opening");
+    }
+    // A second manifest check detects sidecar/tree swaps during the open syscall.
+    const after = captureConstructionManifest(gate);
+    if (after.size !== expected.size || [...expected].some(([path, value]) => after.get(path) !== value)) {
+      throw new Error("Filesystem changed during construction handoff");
+    }
+    const verifiedFd = fd;
+    let closed = false;
+    return { ok: true, fd: verifiedFd, close: () => { if (!closed) { closed = true; closeSync(verifiedFd); } } };
+  } catch (error) {
+    if (fd !== undefined) closeSync(fd);
+    return { ok: false, error: `Construction handoff refused: ${error instanceof Error ? error.message : String(error)}` };
+  }
 }
 
 export function distance2(a: Vec3, b: Vec3): number {
@@ -267,6 +415,14 @@ export type ConstructionLiveGate =
     }
   | { allowed: false; error: string };
 
+function isLoopbackLiteral(host: string): boolean {
+  const version = isIP(host);
+  if (version === 4) return host.startsWith("127.");
+  if (version !== 6) return false;
+  try { return new URL(`http://[${host}]/`).hostname === "[::1]"; }
+  catch { return false; } // Scoped/unsupported IPv6 syntax cannot establish this endpoint.
+}
+
 /**
  * Live construction experiment gate. Default deny.
  * Requires explicit env approvals AND isolated paths AND non-original ports.
@@ -285,8 +441,16 @@ export function evaluateConstructionExperimentLive(env: NodeJS.ProcessEnv = proc
     return { allowed: false, error: "AUTO_START_PAPER must be false for construction experiments" };
   }
 
-  const paperPort = Number(env.MINECRAFT_PORT ?? ISOLATED_PAPER_PORT);
-  const rconPort = Number(env.CONSTRUCTION_EXPERIMENT_RCON_PORT ?? ISOLATED_RCON_PORT);
+  const host = env.MINECRAFT_HOST ?? "127.0.0.1";
+  if (!isLoopbackLiteral(host)) return { allowed: false, error: "MINECRAFT_HOST must be a loopback IP literal" };
+
+  const paperText = env.MINECRAFT_PORT ?? String(ISOLATED_PAPER_PORT);
+  const rconText = env.CONSTRUCTION_EXPERIMENT_RCON_PORT ?? String(ISOLATED_RCON_PORT);
+  if (![paperText, rconText].every((port) => /^[0-9]+$/.test(port))) {
+    return { allowed: false, error: "Paper and RCON ports must use decimal digits only" };
+  }
+  const paperPort = Number(paperText);
+  const rconPort = Number(rconText);
   if (![paperPort, rconPort].every((port) => Number.isInteger(port) && port >= 1 && port <= 65535)) {
     return { allowed: false, error: "Paper and RCON ports must be integers from 1 to 65535" };
   }
@@ -301,6 +465,12 @@ export function evaluateConstructionExperimentLive(env: NodeJS.ProcessEnv = proc
       allowed: false,
       error: `Refusing RCON port ${rconPort}; use isolated ${ISOLATED_RCON_PORT}`,
     };
+  }
+
+  if (paperPort === rconPort) return { allowed: false, error: "Paper and RCON ports must be distinct" };
+  const protectedPorts = new Set([ORIGINAL_PAPER_PORT, LIVE_CIVILIZATION_PORT, ORIGINAL_RCON_PORT, 25575]);
+  if (protectedPorts.has(paperPort) || protectedPorts.has(rconPort)) {
+    return { allowed: false, error: "Paper and RCON must both avoid protected service ports" };
   }
 
   const worldLabDir = env.CONSTRUCTION_EXPERIMENT_WORLD_LAB ?? ISOLATED_WORLD_LAB_REL;
@@ -320,7 +490,7 @@ export function evaluateConstructionExperimentLive(env: NodeJS.ProcessEnv = proc
     };
   }
 
-  return {
+  const gate: AllowedConstructionGate = {
     allowed: true,
     paperPort,
     rconPort,
@@ -329,6 +499,13 @@ export function evaluateConstructionExperimentLive(env: NodeJS.ProcessEnv = proc
     evidenceDir: isolation.evidenceDir,
     pad,
   };
+  try {
+    const manifest = captureConstructionManifest(gate);
+    handoffs.set(gate, manifest);
+    return Object.freeze(gate);
+  } catch (error) {
+    return { allowed: false, error: `Cannot capture construction handoff: ${error instanceof Error ? error.message : String(error)}` };
+  }
 }
 
 export function originalWorldLabFingerprint(): {

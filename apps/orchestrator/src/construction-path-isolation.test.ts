@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { linkSync, mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { closeSync, existsSync, linkSync, mkdirSync, mkdtempSync, openSync, readFileSync, realpathSync, renameSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { createRequire } from "node:module";
 
 const fixture = vi.hoisted(() => ({ root: "" }));
 vi.mock("@civ/shared", async (importOriginal) => {
@@ -11,10 +12,10 @@ vi.mock("@civ/shared", async (importOriginal) => {
 });
 vi.mock("node:fs", async (importOriginal) => {
   const actual = await importOriginal<typeof import("node:fs")>();
-  return { ...actual, realpathSync: vi.fn(actual.realpathSync) };
+  return { ...actual, realpathSync: vi.fn(actual.realpathSync), openSync: vi.fn(actual.openSync), closeSync: vi.fn(actual.closeSync) };
 });
 
-import { assertIsolatedNotOriginal, evaluateConstructionExperimentLive, pathsAliasSameTree, validatePathExists } from "./construction-experiment-guard.js";
+import { assertIsolatedNotOriginal, evaluateConstructionExperimentLive, openVerifiedConstructionDatabaseFile, pathsAliasSameTree, validatePathExists } from "./construction-experiment-guard.js";
 
 describe("host-independent path syntax (lexical semantics, not foreign OS execution)", () => {
   it.each([
@@ -48,6 +49,8 @@ describe("canonical isolation on the actual host filesystem", () => {
   beforeEach(async () => {
     const actual = await vi.importActual<typeof import("node:fs")>("node:fs");
     vi.mocked(realpathSync).mockImplementation(actual.realpathSync);
+    vi.mocked(openSync).mockImplementation(actual.openSync);
+    vi.mocked(closeSync).mockImplementation(actual.closeSync);
     fixture.root = mkdtempSync(join(tmpdir(), "civ-isolation-"));
     mkdirSync(join(fixture.root, "world-lab"));
     mkdirSync(join(fixture.root, "data"));
@@ -146,5 +149,123 @@ describe("canonical isolation on the actual host filesystem", () => {
     ["CONSTRUCTION_EXPERIMENT_RCON_PORT", "25577"],
   ])("keeps the existing protected port refusal for %s=%s", (key, port) => {
     expect(evaluateConstructionExperimentLive({ ...approvedEnv(), [key]: port }).allowed).toBe(false);
+  });
+  it.each(["0x63e0", "2.5568e4", "+25568", " 25568", "25568\n"])("refuses non-decimal port spelling %j", (port) => {
+    expect(evaluateConstructionExperimentLive({ ...approvedEnv(), MINECRAFT_PORT: port }).allowed).toBe(false);
+    expect(evaluateConstructionExperimentLive({ ...approvedEnv(), CONSTRUCTION_EXPERIMENT_RCON_PORT: port }).allowed).toBe(false);
+  });
+  it.each(["-wal", "-shm", "-journal"])("rejects a SQLite %s sidecar hard-linked to a protected file", (suffix) => {
+    linkSync(join(fixture.root, "data/world-lab-civilization.sqlite"), join(fixture.root, "isolated/test.sqlite" + suffix));
+    expect(check().ok).toBe(false);
+  });
+  it("rejects an unexpected sidecar directory", () => {
+    mkdirSync(join(fixture.root, "isolated/test.sqlite-wal"));
+    expect(check().ok).toBe(false);
+  });
+  it("rejects a nested directory link before it can redirect a later world open", () => {
+    mkdirSync(join(fixture.root, "isolated/region"));
+    symlinkSync(join(fixture.root, "world-lab"), join(fixture.root, "isolated/region/redirect"), process.platform === "win32" ? "junction" : "dir");
+    expect(check().ok).toBe(false);
+  });
+  it("rejects a nested hard link to a protected world file", () => {
+    writeFileSync(join(fixture.root, "world-lab/region.dat"), "protected region fixture");
+    linkSync(join(fixture.root, "world-lab/region.dat"), join(fixture.root, "isolated/region.dat"));
+    expect(check().ok).toBe(false);
+  });
+  it("does not expose protected bytes when the database is replaced after preflight", () => {
+    const gate = evaluateConstructionExperimentLive(approvedEnv());
+    if (!gate.allowed) throw new Error(gate.error);
+    renameSync(gate.sqlitePath, gate.sqlitePath + ".previous");
+    linkSync(join(fixture.root, "data/world-lab-civilization.sqlite"), gate.sqlitePath);
+    const opened = openVerifiedConstructionDatabaseFile(gate);
+    expect(opened.ok).toBe(false);
+    if (opened.ok) {
+      try { expect(readFileSync(opened.fd, "utf8")).not.toBe("disposable protected fixture"); }
+      finally { opened.close(); }
+    }
+  });
+  it("hands off the verified descriptor once and keeps it bound across a later rename", () => {
+    const gate = evaluateConstructionExperimentLive(approvedEnv());
+    if (!gate.allowed) throw new Error(gate.error);
+    const opened = openVerifiedConstructionDatabaseFile(gate);
+    if (!opened.ok) throw new Error(opened.error);
+    try {
+      expect(openVerifiedConstructionDatabaseFile(gate).ok).toBe(false);
+      renameSync(gate.sqlitePath, gate.sqlitePath + ".previous");
+      linkSync(join(fixture.root, "data/world-lab-civilization.sqlite"), gate.sqlitePath);
+      expect(readFileSync(opened.fd, "utf8")).toBe("disposable isolated fixture");
+    } finally {
+      opened.close();
+      opened.close();
+    }
+  });
+  it("rejects a copied/forged gate without opening any file", () => {
+    const gate = evaluateConstructionExperimentLive(approvedEnv());
+    if (!gate.allowed) throw new Error(gate.error);
+    const calls = vi.mocked(openSync).mock.calls.length;
+    expect(openVerifiedConstructionDatabaseFile({ ...gate }).ok).toBe(false);
+    expect(vi.mocked(openSync).mock.calls).toHaveLength(calls);
+  });
+  it("detects replacement during open and closes the unexpected descriptor", () => {
+    const gate = evaluateConstructionExperimentLive(approvedEnv());
+    if (!gate.allowed) throw new Error(gate.error);
+    const actual = vi.mocked(openSync).getMockImplementation()!;
+    vi.mocked(openSync).mockImplementationOnce((path, flags, mode) => {
+      renameSync(gate.sqlitePath, gate.sqlitePath + ".previous");
+      linkSync(join(fixture.root, "data/world-lab-civilization.sqlite"), gate.sqlitePath);
+      return actual(path, flags, mode);
+    });
+    expect(openVerifiedConstructionDatabaseFile(gate).ok).toBe(false);
+    expect(vi.mocked(closeSync)).toHaveBeenCalledTimes(1);
+  });
+  it.each(["-wal", "-shm", "-journal"])("detects creation of SQLite %s after preflight", (suffix) => {
+    const gate = evaluateConstructionExperimentLive(approvedEnv());
+    if (!gate.allowed) throw new Error(gate.error);
+    writeFileSync(gate.sqlitePath + suffix, "unexpected sidecar");
+    expect(openVerifiedConstructionDatabaseFile(gate).ok).toBe(false);
+  });
+  it("detects a nested junction inserted after preflight", () => {
+    const gate = evaluateConstructionExperimentLive(approvedEnv());
+    if (!gate.allowed) throw new Error(gate.error);
+    symlinkSync(join(fixture.root, "world-lab"), join(fixture.root, "isolated/redirect"), process.platform === "win32" ? "junction" : "dir");
+    expect(openVerifiedConstructionDatabaseFile(gate).ok).toBe(false);
+  });
+  it("detects an in-place file edit after preflight", () => {
+    const gate = evaluateConstructionExperimentLive(approvedEnv());
+    if (!gate.allowed) throw new Error(gate.error);
+    writeFileSync(gate.sqlitePath, "changed isolated fixture with a different size");
+    expect(openVerifiedConstructionDatabaseFile(gate).ok).toBe(false);
+  });
+  it("detects replacement of a protected root after preflight", () => {
+    const gate = evaluateConstructionExperimentLive(approvedEnv());
+    if (!gate.allowed) throw new Error(gate.error);
+    renameSync(join(fixture.root, "world-lab"), join(fixture.root, "previous-world"));
+    symlinkSync(gate.worldLabDir, join(fixture.root, "world-lab"), process.platform === "win32" ? "junction" : "dir");
+    const opened = openVerifiedConstructionDatabaseFile(gate);
+    if (opened.ok) opened.close();
+    expect(opened.ok).toBe(false);
+  });
+  it("checks actual disposable SQLite WAL/SHM files and refuses later WAL changes", () => {
+    // Resolve the existing workspace dependency without adding or editing packages.
+    const require = createRequire(new URL("../../../packages/agent-core/package.json", import.meta.url));
+    const SQLite = require("better-sqlite3") as new (path: string) => {
+      pragma: (sql: string) => unknown;
+      exec: (sql: string) => void;
+      close: () => void;
+    };
+    const path = join(fixture.root, "isolated/real.sqlite");
+    const db = new SQLite(path);
+    try {
+      db.pragma("journal_mode = WAL");
+      db.exec("CREATE TABLE example (value TEXT); INSERT INTO example VALUES ('first');");
+      expect(existsSync(path + "-wal")).toBe(true);
+      expect(existsSync(path + "-shm")).toBe(true);
+      const gate = evaluateConstructionExperimentLive({ ...approvedEnv(), DATABASE_PATH: path });
+      if (!gate.allowed) throw new Error(gate.error);
+      db.exec("INSERT INTO example VALUES ('second');");
+      expect(openVerifiedConstructionDatabaseFile(gate).ok).toBe(false);
+    } finally {
+      db.close();
+    }
   });
 });

@@ -1,3 +1,4 @@
+import { movementOperationOutcome, movementTickOutcome, waitForMovementTicks, type MovementWaitOutcome } from "./movement-wait.js";
 import type { Bot } from "mineflayer";
 import { Vec3 as Vec3Class } from "vec3";
 import type { Vec3 } from "@civ/shared";
@@ -221,29 +222,18 @@ function evaluateHeading(
   return { ok: true, landing, obstacle: obstacle.name, heading };
 }
 
-function wait(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-async function waitTicks(bot: Bot, n: number): Promise<void> {
-  const fn = (bot as Bot & { waitForTicks?: (ticks: number) => Promise<void> }).waitForTicks;
-  if (typeof fn === "function") {
-    try {
-      await fn.call(bot, n);
-      return;
-    } catch {
-      // physics may be paused
-    }
-  }
-  await wait(Math.max(40, n * 50));
-}
-
-export async function waitUntilOnGround(bot: Bot, ticks = 10): Promise<boolean> {
+export async function groundWaitOutcome(bot: Bot, ticks = 10, signal?: AbortSignal, deadline = Infinity): Promise<MovementWaitOutcome> {
   for (let i = 0; i < ticks; i += 1) {
-    if (bot.entity?.onGround) return true;
-    await waitTicks(bot, 1);
+    if (signal?.aborted) return "cancelled";
+    if (bot.entity?.onGround) return "complete";
+    const outcome = await movementTickOutcome(bot, 1, signal, deadline);
+    if (outcome !== "complete") return outcome;
   }
-  return Boolean(bot.entity?.onGround);
+  return bot.entity?.onGround ? "complete" : "timeout";
+}
+
+export async function waitUntilOnGround(bot: Bot, ticks = 10, signal?: AbortSignal): Promise<boolean> {
+  return await groundWaitOutcome(bot, ticks, signal) === "complete";
 }
 
 function faceXZ(bot: Bot, x: number, z: number): void {
@@ -293,10 +283,10 @@ export async function walkForward(
     return { x: start.x, y: start.y, z: start.z };
   }
   bot.setControlState("forward", true);
-  await waitTicks(bot, ticks);
+  const completed = await waitForMovementTicks(bot, ticks, signal);
   releaseMovementControls(bot);
   const end = bot.entity?.position;
-  return end ? { x: end.x, y: end.y, z: end.z } : undefined;
+  return completed && end ? { x: end.x, y: end.y, z: end.z } : undefined;
 }
 
 export async function tryOpenAdjacentDoor(bot: Bot, signal?: AbortSignal): Promise<DoorResolution> {
@@ -308,9 +298,11 @@ export async function tryOpenAdjacentDoor(bot: Bot, signal?: AbortSignal): Promi
   try {
     const block = sample(bot, door.cell.x, door.cell.y, door.cell.z);
     if (!block) return { handled: false, toggled: false, name: door.name, open: false };
-    await bot.lookAt(block.position.offset(0.5, 0.5, 0.5), true);
-    await bot.activateBlock(block);
-    await waitTicks(bot, 4);
+    const facing = await movementOperationOutcome(bot, () => bot.lookAt(block.position.offset(0.5, 0.5, 0.5), true), signal);
+    if (facing !== "complete") return { handled: false, toggled: false, name: door.name, open: false };
+    const activation = await movementOperationOutcome(bot, () => bot.activateBlock(block), signal);
+    if (activation !== "complete") return { handled: false, toggled: false, name: door.name, open: false };
+    if (!await waitForMovementTicks(bot, 4, signal)) return { handled: false, toggled: true, name: door.name, open: false };
     const after = inspectAdjacentDoor(bot);
     return { handled: true, toggled: true, name: door.name, open: Boolean(after?.open) };
   } catch {
@@ -336,13 +328,12 @@ export async function attemptStepJump(
   const tz = Math.floor(landing.z) + 0.5;
   const heading = headingToward(start, { x: tx, y: landing.y, z: tz });
   faceXZ(bot, tx, tz);
-  try {
-    await bot.lookAt(new Vec3Class(tx, start.y + 1, tz), true);
-  } catch {
-    // yaw already set
-  }
+  const facing = await movementOperationOutcome(bot, async () => {
+    try { await bot.lookAt(new Vec3Class(tx, start.y + 1, tz), true); } catch { /* yaw already set */ }
+  }, signal);
+  if (facing !== "complete") return done(false, false);
   releaseMovementControls(bot);
-  await waitUntilOnGround(bot, 8);
+  if (!await waitUntilOnGround(bot, 8, signal)) return done(false, false);
   if (signal?.aborted) return done(false, false);
 
   let here = bot.entity?.position ?? start;
@@ -354,15 +345,14 @@ export async function attemptStepJump(
     };
     if (isVerifiedStanding(bot, backCell, { fromY: here.y, maxDrop: 0 })) {
       bot.setControlState("back", true);
-      await waitTicks(bot, STEP_JUMP_LIMITS.backupTicks);
+      if (!await waitForMovementTicks(bot, STEP_JUMP_LIMITS.backupTicks, signal)) return done(false, false);
       bot.setControlState("back", false);
-      await waitUntilOnGround(bot, 6);
+      if (!await waitUntilOnGround(bot, 6, signal)) return done(false, false);
       faceXZ(bot, tx, tz);
-      try {
-        await bot.lookAt(new Vec3Class(tx, (bot.entity?.position.y ?? here.y) + 1, tz), true);
-      } catch {
-        // yaw already set
-      }
+      const facingAgain = await movementOperationOutcome(bot, async () => {
+        try { await bot.lookAt(new Vec3Class(tx, (bot.entity?.position.y ?? here.y) + 1, tz), true); } catch { /* yaw already set */ }
+      }, signal);
+      if (facingAgain !== "complete") return done(false, false);
     }
   }
   if (signal?.aborted) return done(false, false);
@@ -372,19 +362,19 @@ export async function attemptStepJump(
   bot.setControlState("sprint", false);
   bot.setControlState("forward", true);
   if (approach > 0) {
-    await waitTicks(bot, approach);
+    if (!await waitForMovementTicks(bot, approach, signal)) return done(false, false);
   }
   if (signal?.aborted) return done(false, false);
   bot.setControlState("jump", true);
   bot.setControlState("forward", true);
-  await waitTicks(bot, STEP_JUMP_LIMITS.jumpTicks);
+  if (!await waitForMovementTicks(bot, STEP_JUMP_LIMITS.jumpTicks, signal)) return done(false, false);
   bot.setControlState("jump", false);
   bot.setControlState("forward", true);
   for (let i = 0; i < STEP_JUMP_LIMITS.forwardHoldTicks; i += 1) {
     if (signal?.aborted) return done(false, false);
     const now = bot.entity?.position;
     if (now && landingVerified({ x: now.x, y: now.y, z: now.z }, landing) && bot.entity?.onGround) break;
-    await waitTicks(bot, 1);
+    if (!await waitForMovementTicks(bot, 1, signal)) return done(false, false);
   }
   releaseMovementControls(bot);
   const end = bot.entity?.position;

@@ -1,6 +1,6 @@
 import type { Bot } from "mineflayer";
 import type { Vec3 } from "@civ/shared";
-import { configureMovements } from "./pathing.js";
+import { probePathToPosition } from "./pathing.js";
 import { findReachableInteractionPosition } from "./interaction.js";
 
 export function probeReachability(
@@ -19,16 +19,10 @@ export function probeReachability(
   }
 
   try {
-    const api = configureMovements(bot);
-    if (typeof api.getPathTo !== "function") {
+    const path = probePathToPosition(bot, standing, 40);
+    if (!path) {
       return { reachable: true, cost: euclid };
     }
-    const goal = {
-      x: Math.floor(standing.x),
-      y: Math.floor(standing.y),
-      z: Math.floor(standing.z),
-    };
-    const path = api.getPathTo(undefined as never, goal, 40);
     const status = path?.status ?? "success";
     if (status === "noPath" || status === "timeout") {
       return { reachable: false, cost: euclid + 60, reason: status };

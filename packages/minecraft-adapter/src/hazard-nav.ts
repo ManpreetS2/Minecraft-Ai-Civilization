@@ -1,3 +1,4 @@
+import { waitForMovementTicks } from "./movement-wait.js";
 import type { Bot } from "mineflayer";
 import { Vec3 as Vec3Class } from "vec3";
 import { fail, ok, type ActionResult, type Vec3 } from "@civ/shared";
@@ -547,23 +548,6 @@ export async function attemptHazardBridge(
   return ok({ placed: plan.placeAt, item: after.name }, 0);
 }
 
-function wait(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-async function waitTicks(bot: Bot, n: number): Promise<void> {
-  const fn = (bot as Bot & { waitForTicks?: (ticks: number) => Promise<void> }).waitForTicks;
-  if (typeof fn === "function") {
-    try {
-      await fn.call(bot, n);
-      return;
-    } catch {
-      // physics paused
-    }
-  }
-  await wait(Math.max(40, n * 50));
-}
-
 export async function retreatFromHazard(
   bot: Bot,
   heading: { dx: number; dz: number },
@@ -589,9 +573,10 @@ export async function retreatFromHazard(
     bot.entity.pitch = 0;
   }
   bot.setControlState("back", true);
-  await waitTicks(bot, 8);
+  const completed = await waitForMovementTicks(bot, 8, signal);
   bot.setControlState("back", false);
   releaseMovementControls(bot);
+  if (!completed) return fail(signal?.aborted ? "CANCELLED" : "TIMEOUT", "hazard retreat interrupted", 0, true);
   const end = bot.entity?.position ?? start;
   const here = { x: end.x, y: end.y, z: end.z };
   if (cellIsUnsafeToEnter(bot, here) || !isVerifiedStanding(bot, here, { fromY: start.y, maxDrop: 0 })) {

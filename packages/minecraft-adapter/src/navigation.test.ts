@@ -29,6 +29,6 @@ describe("interact navigation contracts", () => {
     const result = await backend.navigateToInteractWithBlock(bot, { x: 5, y: 64, z: 5 }, { timeoutMs: 1 });
     expect(result.success).toBe(false);
     if (result.success) throw new Error("unspawned interact should fail");
-    expect(result.code === "NO_INTERACTION_POSITION" || result.code === "VERIFY_FAILED").toBe(true);
+    expect(result.code).toBe("NOT_CONNECTED");
   });
 });

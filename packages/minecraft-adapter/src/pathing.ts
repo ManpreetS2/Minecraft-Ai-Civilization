@@ -26,12 +26,13 @@ import {
   releaseMovementControls,
   STEP_JUMP_LIMITS,
   tryOpenAdjacentDoor,
-  waitUntilOnGround,
+  groundWaitOutcome,
 } from "./step-jump.js";
 import { terrainMemory } from "./terrain-memory.js";
 import { attemptHazardBridge, cellIsUnsafeToEnter, classifyHazardName, headingToward, hazardAhead, pathContainsUnsafeCell, planHazardRecovery, MAX_HAZARD_REROUTES, SAFE_FALL_MAX_DROP, retreatFromHazard } from "./hazard-nav.js";
 import { installModernMovement } from "./movement-sync.js";
 import { stepToStandingCell, twoBlockRecovery } from "./obstacle-detour.js";
+import { navigationBodyReady, navigationParametersValid } from "./connection-health.js";
 
 const require = createRequire(import.meta.url);
 const pathfinderModule = require("mineflayer-pathfinder") as {
@@ -82,7 +83,7 @@ export type PathfinderApi = {
   getPathTo?: (movements: MovementSettings, goal: unknown, timeout?: number) => { status?: string; cost?: number };
 };
 
-const configured = new WeakMap<Bot, { api: PathfinderApi; key: string }>();
+const configured = new WeakMap<Bot, { api: PathfinderApi; key: string; movements: MovementSettings }>();
 let activePaths = 0;
 let lastPathMs = 0;
 let pathAttempts = 0;
@@ -139,11 +140,12 @@ export function configureMovements(bot: Bot, profile: MovementProfile = "SAFE_NA
   bot.loadPlugin(pathfinder);
   const scaffold = scaffoldingIds(bot);
   const key = `${profile}:${scaffold.join(",")}`;
+  const api = botPathfinder(bot);
+  installModernMovement(bot);
   const existing = configured.get(bot);
-  if (existing && existing.key === key) {
+  if (existing && existing.key === key && existing.api === api) {
     return existing.api;
   }
-  installModernMovement(bot);
   const movements = new Movements(bot);
   movements.canDig = movementAllowsDig(profile);
   // getMoveJumpUp is always registered: ordinary 1-block step-ups. Parkour is 2-block gaps.
@@ -165,10 +167,17 @@ export function configureMovements(bot: Bot, profile: MovementProfile = "SAFE_NA
     if (typeof id === "number") movements.blocksToAvoid?.add(id);
   }
   protectFromPathfinder(bot, movements);
-  const api = botPathfinder(bot);
   api.setMovements(movements);
-  configured.set(bot, { api, key });
+  configured.set(bot, { api, key, movements });
   return api;
+}
+
+/** A path query needs the configured movement policy and a Goal implementation. */
+export function probePathToPosition(bot: Bot, target: Vec3, timeoutMs = 40): { status?: string; cost?: number } | undefined {
+  const api = configureMovements(bot);
+  const settings = configured.get(bot);
+  if (!api.getPathTo || !settings) return undefined;
+  return api.getPathTo(settings.movements, new goals.GoalNear(Math.floor(target.x), Math.floor(target.y), Math.floor(target.z), 1), timeoutMs);
 }
 
 function protectFromPathfinder(bot: Bot, movements: MovementSettings): void {
@@ -210,10 +219,17 @@ export async function moveToPosition(
   const started = Date.now();
   const budget = options.timeoutMs ?? 22_000;
   const recover = options.recover !== false;
+  if (options.signal?.aborted) return abortedResult(0);
+  if (!navigationBodyReady(bot)) return fail("NOT_CONNECTED", "Bot has no active navigation body", 0);
+  if (!navigationParametersValid(target, options.range ?? 2, budget)) return fail("INVALID_ARGUMENT", "Invalid movement target, range or timeout", 0);
   const waitStart = Date.now();
-  while (activePaths >= 3 && Date.now() - waitStart < 4_000) {
-    await new Promise((resolve) => setTimeout(resolve, 50));
+  while (activePaths >= 3 && Date.now() - waitStart < Math.min(4_000, budget)) {
+    if (options.signal?.aborted) return abortedResult(Date.now() - started);
+    if (!navigationBodyReady(bot)) return fail("NOT_CONNECTED", "Lost body while waiting for navigation", Date.now() - started);
+    await new Promise((resolve) => setTimeout(resolve, Math.min(50, budget - (Date.now() - started))));
   }
+  if (options.signal?.aborted) return abortedResult(Date.now() - started);
+  if (Date.now() - started >= budget) return fail("TIMEOUT", "Navigation budget expired while waiting", Date.now() - started, true);
 
   if (recover) {
     const report = inspectLocalTerrain(bot);
@@ -309,7 +325,7 @@ async function attemptGoto(
   options: { timeoutMs: number; signal?: AbortSignal; allowHazardBridge?: boolean },
 ): Promise<ActionResult<{ position: Vec3; distance: number }>> {
   if (options.signal?.aborted) return abortedResult(0);
-  if (!bot.entity?.position) {
+  if (!navigationBodyReady(bot)) {
     return fail("NOT_CONNECTED", "Bot is not spawned", 0);
   }
   const occupied = occupantNear({ x: target.x, y: target.y, z: target.z }, bot.username, 1.2);
@@ -333,6 +349,7 @@ export async function moveToLookAtBlock(
   options: { timeoutMs?: number; signal?: AbortSignal; reach?: number } = {},
 ): Promise<ActionResult<{ position: Vec3; distance: number }>> {
   const started = Date.now();
+  if (!navigationParametersValid(block, options.reach ?? 4.5, options.timeoutMs ?? 12_000)) return fail("INVALID_ARGUMENT", "Invalid interaction target, reach or timeout", 0);
   if (!bot.entity?.position) {
     return fail("NOT_CONNECTED", "Bot is not spawned", Date.now() - started);
   }
@@ -349,6 +366,7 @@ export async function moveToGetToBlock(
   block: Vec3,
   options: { timeoutMs?: number; signal?: AbortSignal } = {},
 ): Promise<ActionResult<{ position: Vec3; distance: number }>> {
+  if (!navigationParametersValid(block, 2, options.timeoutMs ?? 12_000)) return fail("INVALID_ARGUMENT", "Invalid block target or timeout", 0);
   const goal = new goals.GoalGetToBlock(Math.floor(block.x), Math.floor(block.y), Math.floor(block.z));
   return runGoto(bot, goal, { ...block, range: 2 }, { timeoutMs: options.timeoutMs ?? 12_000, signal: options.signal });
 }
@@ -381,11 +399,41 @@ async function runGoto(
   options: { timeoutMs: number; signal?: AbortSignal; allowHazardBridge?: boolean },
 ): Promise<ActionResult<{ position: Vec3; distance: number }>> {
   const started = Date.now();
+  if (options.signal?.aborted) return abortedResult(0);
+  const controller = new AbortController();
+  let reason: "timeout" | "lost" | undefined;
+  const abort = () => controller.abort();
+  const lost = () => { reason ??= "lost"; controller.abort(); };
+  const events = ["end", "kicked", "death", "respawn"] as const;
+  const timer = setTimeout(() => { reason ??= "timeout"; controller.abort(); }, options.timeoutMs);
+  options.signal?.addEventListener("abort", abort, { once: true });
+  for (const event of events) bot.on(event, lost);
+  try {
+    const result = await runGotoWithinScope(bot, goal, target, { ...options, signal: controller.signal });
+    if (options.signal?.aborted) return abortedResult(Date.now() - started);
+    if (reason) return fail(reason === "lost" ? "NOT_CONNECTED" : "TIMEOUT", reason === "lost" ? "Navigation life ended during recovery" : "Navigation budget exhausted", Date.now() - started, reason === "timeout");
+    return result;
+  } finally {
+    clearTimeout(timer);
+    options.signal?.removeEventListener("abort", abort);
+    for (const event of events) bot.removeListener(event, lost);
+    if (controller.signal.aborted) haltPathfinder(bot, configureMovements(bot));
+  }
+}
+
+async function runGotoWithinScope(
+  bot: Bot,
+  goal: unknown,
+  target: { x: number; y: number; z: number; range?: number },
+  options: { timeoutMs: number; signal?: AbortSignal; allowHazardBridge?: boolean },
+): Promise<ActionResult<{ position: Vec3; distance: number }>> {
+  const started = Date.now();
   let recoveries = 0;
   let hazardReroutes = 0;
   let lastObstacle = "none";
   let last: ActionResult<{ position: Vec3; distance: number }> | undefined;
   while (Date.now() - started < options.timeoutMs - 400) {
+    if (!navigationBodyReady(bot)) return fail("NOT_CONNECTED", "Lost navigation body", Date.now() - started);
     if (options.signal?.aborted) {
       haltPathfinder(bot, configureMovements(bot));
       return abortedResult(Date.now() - started);
@@ -397,7 +445,8 @@ async function runGoto(
       last.code === "CANCELLED" ||
       last.code === "NOT_CONNECTED" ||
       (last.code === "HAZARD_BLOCKED" && last.retryable === false) ||
-      (last.code === "PATH_BLOCKED" && last.retryable === false)
+      (last.code === "PATH_BLOCKED" && last.retryable === false) ||
+      (last.code === "TIMEOUT" && last.retryable === false)
     ) {
       haltPathfinder(bot, configureMovements(bot));
       return last;
@@ -410,12 +459,15 @@ async function runGoto(
       last.code === "VERIFY_FAILED" ||
       last.code === "PATH_BLOCKED" ||
       last.code === "HAZARD_BLOCKED";
-    if (!stallLike) break;
+    if (!stallLike || Date.now() - started >= options.timeoutMs - 400) break;
     if (recoveryLock.has(bot)) break;
     recoveryLock.add(bot);
     try {
       haltPathfinder(bot, configureMovements(bot));
-      await waitUntilOnGround(bot, 6);
+      const grounded = await groundWaitOutcome(bot, 6, options.signal, started + options.timeoutMs);
+      if (grounded !== "complete") {
+        return fail(grounded === "cancelled" ? "CANCELLED" : grounded === "unavailable" ? "NOT_CONNECTED" : "TIMEOUT", "Recovery ground wait interrupted", Date.now() - started, false);
+      }
       const memory = terrainMemory(bot);
       memory.observeVisible(bot);
       const here = bot.entity?.position;
@@ -624,12 +676,16 @@ async function runGotoOnce(
   const started = Date.now();
   pathAttempts += 1;
   if (options.signal?.aborted) return abortedResult(0);
-  if (!bot.entity?.position) {
+  if (!navigationBodyReady(bot)) {
     return fail("NOT_CONNECTED", "Bot is not spawned", Date.now() - started);
   }
   const pf = configureMovements(bot);
   if (!bot.entity.onGround) {
-    await waitUntilOnGround(bot, 8);
+    const grounded = await groundWaitOutcome(bot, 8, options.signal, started + options.timeoutMs);
+    if (grounded !== "complete") {
+      haltPathfinder(bot, pf);
+      return fail(grounded === "cancelled" ? "CANCELLED" : grounded === "unavailable" ? "NOT_CONNECTED" : "TIMEOUT", "Airborne preflight interrupted", Date.now() - started, false);
+    }
   }
   terrainMemory(bot).observeVisible(bot);
   const preHazard = hazardAhead(bot, target);
@@ -652,7 +708,7 @@ async function runGotoOnce(
   let unsafePath = false;
   const originPos = { x: bot.entity.position.x, y: bot.entity.position.y, z: bot.entity.position.z };
   let lastSafe = { ...originPos };
-  const stall = startStallWatch(bot, options.timeoutMs, options.signal, () => {
+  const stall = startStallWatch(bot, Math.max(1, options.timeoutMs - (Date.now() - started)), options.signal, () => {
     const pos = bot.entity?.position;
     if (!pos) return undefined;
     if (Math.hypot(pos.x - lastSafe.x, pos.y - lastSafe.y, pos.z - lastSafe.z) > 16) {
@@ -690,13 +746,19 @@ async function runGotoOnce(
   };
   options.signal?.addEventListener("abort", abort, { once: true });
   activePaths += 1;
-  const gotoPromise = pf.goto(goal);
-
+  let gotoPromise: Promise<void> | undefined;
   try {
+    gotoPromise = pf.goto(goal);
     await Promise.race([gotoPromise, stall.promise]);
+    if (options.signal?.aborted) throw new DOMException("Aborted", "AbortError");
+    const interruption = stall.failure();
+    if (interruption) throw interruption;
+    if (!navigationBodyReady(bot)) throw new Error("NOT_CONNECTED");
   } catch (error) {
     abort();
-    await gotoPromise.catch(() => undefined);
+    // stop() is advisory: a broken/disconnected plugin may never settle goto.
+    // Observe late rejection without blocking cancellation, timeout or cleanup.
+    void gotoPromise?.catch(() => undefined);
     await new Promise((resolve) => setTimeout(resolve, 250));
     const duration = Date.now() - started;
     const message = error instanceof Error ? error.message : String(error);
@@ -811,21 +873,30 @@ function startStallWatch(
   timeoutMs: number,
   signal?: AbortSignal,
   unsafe?: () => string | undefined,
-): { promise: Promise<never>; cancel: () => void; markPathStarted: () => void } {
+): { promise: Promise<never>; cancel: () => void; markPathStarted: () => void; failure: () => Error | undefined } {
   let timer: ReturnType<typeof setTimeout> | undefined;
   let stall: ReturnType<typeof setInterval> | undefined;
   let pathStarted = false;
+  let failure: Error | undefined;
+  const rejectWatch = (error: Error) => { failure ??= error; rejectLost(error); };
   const cancel = () => {
     if (timer) clearTimeout(timer);
     if (stall) clearInterval(stall);
     bot.removeListener("end", onLost);
     bot.removeListener("kicked", onLost);
+    bot.removeListener("death", onLost);
+    bot.removeListener("respawn", onLost);
+    signal?.removeEventListener("abort", onAbort);
   };
   const onLost = () => {
     cancel();
-    rejectLost(new Error("NOT_CONNECTED"));
+    rejectWatch(new Error("NOT_CONNECTED"));
   };
   let rejectLost: (error: Error) => void = () => undefined;
+  const onAbort = () => {
+    cancel();
+    rejectWatch(new DOMException("Aborted", "AbortError"));
+  };
   const promise = new Promise<never>((_, reject) => {
     rejectLost = reject;
     let last = bot.entity?.position
@@ -835,21 +906,23 @@ function startStallWatch(
     let progressed = false;
     timer = setTimeout(() => {
       cancel();
-      reject(new Error("PATH_TIMEOUT"));
+      rejectWatch(new Error("PATH_TIMEOUT"));
     }, timeoutMs);
     bot.once("end", onLost);
     bot.once("kicked", onLost);
+    bot.once("death", onLost);
+    bot.once("respawn", onLost);
     stall = setInterval(() => {
       const reason = unsafe?.();
       if (reason) {
         cancel();
-        reject(new Error(reason));
+        rejectWatch(new Error(reason));
         return;
       }
       const pos = bot.entity?.position;
-      if (!pos) {
+      if (!navigationBodyReady(bot) || !pos) {
         cancel();
-        reject(new Error("NOT_CONNECTED"));
+        rejectWatch(new Error("NOT_CONNECTED"));
         return;
       }
       if (!last) return;
@@ -865,19 +938,12 @@ function startStallWatch(
         msSinceMove: Date.now() - lastMove,
       }) && !recoveryLock.has(bot)) {
         cancel();
-        reject(new Error(progressed ? "STUCK" : "NAV_NO_INITIAL_PROGRESS"));
+        rejectWatch(new Error(progressed ? "STUCK" : "NAV_NO_INITIAL_PROGRESS"));
       }
     }, 400);
-    signal?.addEventListener(
-      "abort",
-      () => {
-        cancel();
-        reject(new DOMException("Aborted", "AbortError"));
-      },
-      { once: true },
-    );
+    signal?.addEventListener("abort", onAbort, { once: true });
   });
-  return { promise, cancel, markPathStarted: () => { pathStarted = true; } };
+  return { promise, cancel, failure: () => failure, markPathStarted: () => { pathStarted = true; } };
 }
 
 function fmt(target: { x: number; y: number; z: number }): string {
@@ -892,36 +958,46 @@ export async function followPlayer(
   const started = Date.now();
   const range = options.range ?? 3;
   const timeoutMs = options.timeoutMs ?? 45_000;
+  if (options.signal?.aborted) return abortedResult(0);
+  if (!navigationBodyReady(bot)) return fail("NOT_CONNECTED", "Bot has no active navigation body", 0);
   const entity = bot.players[username]?.entity;
   if (!entity) {
     return fail("PLAYER_NOT_FOUND", `Player ${username} is not loaded nearby`, Date.now() - started, true);
   }
+  if (!navigationParametersValid(entity.position, range, timeoutMs)) return fail("INVALID_ARGUMENT", "Invalid follow target, range or timeout", 0);
   const pf = configureMovements(bot);
   const goal = new goals.GoalFollow(entity, range);
+  const targetState = () => {
+    if (bot.players[username]?.entity !== entity) return "ENTITY_REMOVED";
+    const presence = classifyEntityPresence(bot.entities, entity);
+    return presence === "PRESENT" ? undefined : presence;
+  };
+  const watch = startStallWatch(bot, timeoutMs, options.signal, targetState);
+  const onPath = (update: { path?: unknown[] }) => { if (update.path?.length) watch.markPathStarted(); };
+  const pathBot = bot as Bot & {
+    on(event: "path_update", listener: (update: { path?: unknown[] }) => void): Bot;
+    removeListener(event: "path_update", listener: (update: { path?: unknown[] }) => void): Bot;
+  };
+  pathBot.on("path_update", onPath);
   const abort = () => {
     haltPathfinder(bot, pf);
   };
   options.signal?.addEventListener("abort", abort, { once: true });
   try {
-    await Promise.race([
-      pf.goto(goal),
-      new Promise<never>((_, reject) => {
-        const timer = setTimeout(() => reject(new Error("FOLLOW_TIMEOUT")), timeoutMs);
-        options.signal?.addEventListener(
-          "abort",
-          () => {
-            clearTimeout(timer);
-            reject(new DOMException("Aborted", "AbortError"));
-          },
-          { once: true },
-        );
-      }),
-    ]);
+    await Promise.race([pf.goto(goal), watch.promise]);
+    if (options.signal?.aborted) throw new DOMException("Aborted", "AbortError");
+    const interruption = watch.failure();
+    if (interruption) throw interruption;
   } catch (error) {
+    abort();
     const duration = Date.now() - started;
     if (options.signal?.aborted || (error instanceof Error && error.name === "AbortError")) {
       abort();
       return abortedResult(duration);
+    }
+    const message = error instanceof Error ? error.message : String(error);
+    if (message === "NOT_CONNECTED" || !navigationBodyReady(bot)) {
+      return fail("NOT_CONNECTED", "Lost body while following", duration);
     }
     if (!bot.players[username]) {
       abort();
@@ -933,30 +1009,45 @@ export async function followPlayer(
       abort();
       return fail(presence, entityGoneMessage(presence, username), duration, true);
     }
-    const message = error instanceof Error ? error.message : String(error);
-    if (message.includes("FOLLOW_TIMEOUT")) {
+    if (message.includes("TIMEOUT")) {
       return fail("TIMEOUT", `follow ${username} timed out`, duration, true);
+    }
+    if (message === "STUCK" || message === "NAV_NO_INITIAL_PROGRESS") {
+      return fail(message, `follow ${username} made no progress`, duration, true);
     }
     if (message.toLowerCase().includes("no path")) {
       return fail("PATH_BLOCKED", message, duration, true);
     }
     return fail("PATH_FAILED", message, duration, true);
   } finally {
+    watch.cancel();
+    pathBot.removeListener("path_update", onPath);
     options.signal?.removeEventListener("abort", abort);
+    abort();
   }
+  if (options.signal?.aborted) return abortedResult(Date.now() - started);
   const pos = bot.entity?.position;
-  if (!pos) {
+  if (!navigationBodyReady(bot) || !pos) {
     return fail("NOT_CONNECTED", "Lost body while following", Date.now() - started, true);
+  }
+  const state = targetState();
+  if (state) return fail(state, entityGoneMessage(state, username), Date.now() - started, true);
+  if (distance(pos, entity.position) > range) {
+    return fail("VERIFY_FAILED", `follow ${username} finished outside range ${range}`, Date.now() - started, true);
   }
   return ok({ username, position: { x: pos.x, y: pos.y, z: pos.z } }, Date.now() - started);
 }
 
 export function startFollowing(bot: Bot, username: string, range = 3): ActionResult<{ username: string }> {
   const started = Date.now();
+  if (!navigationBodyReady(bot)) return fail("NOT_CONNECTED", "Bot has no active navigation body", 0);
   const entity = bot.players[username]?.entity;
   if (!entity) {
     return fail("PLAYER_NOT_FOUND", `Player ${username} is not loaded nearby`, Date.now() - started, true);
   }
+  if (!navigationParametersValid(entity.position, range, 1)) return fail("INVALID_ARGUMENT", "Invalid follow target or range", 0);
+  const presence = classifyEntityPresence(bot.entities, entity);
+  if (presence !== "PRESENT") return fail(presence, entityGoneMessage(presence, username), Date.now() - started, true);
   const pf = configureMovements(bot);
   pf.setGoal(new goals.GoalFollow(entity, range), true);
   return ok({ username }, Date.now() - started);

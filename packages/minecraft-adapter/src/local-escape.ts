@@ -1,3 +1,4 @@
+import { movementOperationOutcome, waitForMovementTicks } from "./movement-wait.js";
 import type { Bot } from "mineflayer";
 import { Vec3 as Vec3Class } from "vec3";
 import { fail, ok, type ActionResult, type Vec3 } from "@civ/shared";
@@ -195,23 +196,6 @@ export function localEscapeCells(bot: Bot): Vec3[] {
   return unique.slice(0, 8);
 }
 
-function wait(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-async function waitTicks(bot: Bot, n: number): Promise<void> {
-  const fn = (bot as Bot & { waitForTicks?: (ticks: number) => Promise<void> }).waitForTicks;
-  if (typeof fn === "function") {
-    try {
-      await fn.call(bot, n);
-      return;
-    } catch {
-      // physics ticks can time out if the body is frozen after a teleport
-    }
-  }
-  await wait(Math.max(50, n * 50));
-}
-
 function faceXZ(bot: Bot, x: number, z: number): void {
   const start = bot.entity?.position;
   if (!start || !bot.entity) return;
@@ -230,7 +214,7 @@ function leftWalkableCell(bot: Bot, start: Vec3): boolean {
   return isWalkableStanding(bot, { x: Math.floor(now.x), y: Math.floor(now.y), z: Math.floor(now.z) });
 }
 
-async function centerInCell(bot: Bot): Promise<void> {
+async function centerInCell(bot: Bot, waitTicks: TickWait): Promise<void> {
   const start = bot.entity?.position;
   if (!start) return;
   const cx = Math.floor(start.x) + 0.5;
@@ -245,17 +229,15 @@ async function centerInCell(bot: Bot): Promise<void> {
   await waitTicks(bot, 1);
 }
 
-async function walkToward(bot: Bot, dest: Vec3): Promise<boolean> {
+async function walkToward(bot: Bot, dest: Vec3, waitTicks: TickWait, waitLook: LookWait): Promise<boolean> {
   const start = bot.entity?.position;
   if (!start) return false;
   const tx = Math.floor(dest.x) + 0.5;
   const tz = Math.floor(dest.z) + 0.5;
   faceXZ(bot, tx, tz);
-  try {
-    await bot.look(bot.entity?.yaw ?? 0, 0, true);
-  } catch {
-    // yaw already set
-  }
+  await waitLook(async () => {
+    try { await bot.look(bot.entity?.yaw ?? 0, 0, true); } catch { /* yaw already set */ }
+  });
   bot.clearControlStates();
   bot.setControlState("forward", true);
   bot.setControlState("sprint", (bot.food ?? 20) > 6);
@@ -265,11 +247,11 @@ async function walkToward(bot: Bot, dest: Vec3): Promise<boolean> {
   return leftWalkableCell(bot, start);
 }
 
-async function jumpToward(bot: Bot, dest: Vec3, mode: 0 | 1 = 0): Promise<boolean> {
+async function jumpToward(bot: Bot, dest: Vec3, mode: 0 | 1, waitTicks: TickWait, waitLook: LookWait): Promise<boolean> {
   const start = bot.entity?.position;
   if (!start) return false;
   if (!hasHeadroom(bot, { x: Math.floor(start.x), y: Math.floor(start.y), z: Math.floor(start.z) })) return false;
-  await centerInCell(bot);
+  await centerInCell(bot, waitTicks);
   const grounded = bot.entity?.onGround;
   if (!grounded) {
     await waitTicks(bot, 6);
@@ -278,15 +260,14 @@ async function jumpToward(bot: Bot, dest: Vec3, mode: 0 | 1 = 0): Promise<boolea
   const tx = Math.floor(dest.x) + 0.5;
   const tz = Math.floor(dest.z) + 0.5;
   faceXZ(bot, tx, tz);
-  try {
-    await bot.look(bot.entity?.yaw ?? 0, 0, true);
-  } catch {
+  await waitLook(async (active) => {
     try {
-      await bot.lookAt(new Vec3Class(tx, from.y + 1, tz), true);
+      await bot.look(bot.entity?.yaw ?? 0, 0, true);
     } catch {
-      // yaw already set on the entity
+      if (!active()) return;
+      try { await bot.lookAt(new Vec3Class(tx, from.y + 1, tz), true); } catch { /* yaw already set */ }
     }
-  }
+  });
 
   bot.clearControlStates();
   const writeInput = (inputs: Record<string, boolean>) => {
@@ -327,74 +308,95 @@ async function jumpToward(bot: Bot, dest: Vec3, mode: 0 | 1 = 0): Promise<boolea
   return leftWalkableCell(bot, from);
 }
 
+type LookWait = (operation: (active: () => boolean) => Promise<void>) => Promise<void>;
+type TickWait = (bot: Bot, ticks: number) => Promise<void>;
+class InterruptedRecovery extends Error {}
+
 export async function localEscape(
   bot: Bot,
   options: { timeoutMs?: number; signal?: AbortSignal } = {},
 ): Promise<ActionResult<{ position: Vec3; distance: number; kind: TerrainKind }>> {
   const started = Date.now();
   const budget = options.timeoutMs ?? 6_000;
-  const before = inspectLocalTerrain(bot);
-  if (!before) return fail("NOT_CONNECTED", "Cannot escape without a body", 0);
-  const start = { ...before.position };
-  if (before.kind === "open" && before.walkableSameY.length >= 2) {
-    return ok(
-      { position: start, distance: 0, kind: before.kind },
-      Date.now() - started,
-    );
-  }
-  if (before.kind === "deep_pit") {
+  const waitTicks: TickWait = async (body, ticks) => {
+    if (!await waitForMovementTicks(body, ticks, options.signal, started + budget)) throw new InterruptedRecovery();
+  };
+  const waitLook: LookWait = async (operation) => {
+    let active = true;
+    const outcome = await movementOperationOutcome(bot, () => operation(() => active), options.signal, started + budget);
+    active = false;
+    if (outcome !== "complete") throw new InterruptedRecovery();
+  };
+  try {
+    if (options.signal?.aborted) throw new InterruptedRecovery();
+    const before = inspectLocalTerrain(bot);
+    if (!before) return fail("NOT_CONNECTED", "Cannot escape without a body", 0);
+    const start = { ...before.position };
+    if (before.kind === "open" && before.walkableSameY.length >= 2) {
+      return ok(
+        { position: start, distance: 0, kind: before.kind },
+        Date.now() - started,
+      );
+    }
+    if (before.kind === "deep_pit") {
+      return fail(
+        "PATH_BLOCKED",
+        `no walkable rim out of pit without mining (${before.reason})`,
+        Date.now() - started,
+        true,
+      );
+    }
+    const cells = localEscapeCells(bot);
+    if (cells.length === 0) {
+      return fail("PATH_BLOCKED", `no local standing cell to escape to (${before.reason})`, Date.now() - started, true);
+    }
+    try {
+      const pf = (bot as unknown as { pathfinder?: { stop?: () => void } }).pathfinder;
+      pf?.stop?.();
+    } catch {
+      // ignore
+    }
+    await waitTicks(bot, 2);
+    for (const cell of cells) {
+      if (options.signal?.aborted) return fail("CANCELLED", "local escape cancelled", Date.now() - started, true);
+      if (Date.now() - started > budget - 400) break;
+      const sameY = cell.y === Math.floor(start.y);
+      for (let hop = 0; hop < 3; hop += 1) {
+        const hopped = sameY
+          ? await walkToward(bot, cell, waitTicks, waitLook)
+          : await jumpToward(bot, cell, hop % 2 === 0 ? 0 : 1, waitTicks, waitLook);
+        const now = bot.entity?.position;
+        if (!now) break;
+        const moved = Math.hypot(now.x - start.x, now.y - start.y, now.z - start.z);
+        if (hopped) {
+          return ok(
+            { position: { x: now.x, y: now.y, z: now.z }, distance: moved, kind: before.kind },
+            Date.now() - started,
+          );
+        }
+      }
+    }
+    const end = bot.entity?.position ?? start;
+    const dist = Math.hypot(end.x - start.x, end.y - start.y, end.z - start.z);
+    const after = inspectLocalTerrain(bot);
+    if (
+      dist >= 0.45 &&
+      isWalkableStanding(bot, { x: Math.floor(end.x), y: Math.floor(end.y), z: Math.floor(end.z) }) &&
+      after &&
+      after.kind === "open"
+    ) {
+      return ok({ position: { x: end.x, y: end.y, z: end.z }, distance: dist, kind: before.kind }, Date.now() - started);
+    }
     return fail(
-      "PATH_BLOCKED",
-      `no walkable rim out of pit without mining (${before.reason})`,
+      "NAV_NO_INITIAL_PROGRESS",
+      `local escape did not leave ${before.kind} (${before.reason})`,
       Date.now() - started,
       true,
     );
+  } catch (error) {
+    if (!(error instanceof InterruptedRecovery)) throw error;
+    return fail(options.signal?.aborted ? "CANCELLED" : "TIMEOUT", "local escape interrupted", Date.now() - started, true);
+  } finally {
+    bot.clearControlStates();
   }
-  const cells = localEscapeCells(bot);
-  if (cells.length === 0) {
-    return fail("PATH_BLOCKED", `no local standing cell to escape to (${before.reason})`, Date.now() - started, true);
-  }
-  try {
-    const pf = (bot as unknown as { pathfinder?: { stop?: () => void } }).pathfinder;
-    pf?.stop?.();
-  } catch {
-    // ignore
-  }
-  await waitTicks(bot, 2);
-  for (const cell of cells) {
-    if (options.signal?.aborted) return fail("CANCELLED", "local escape cancelled", Date.now() - started, true);
-    if (Date.now() - started > budget - 400) break;
-    const sameY = cell.y === Math.floor(start.y);
-    for (let hop = 0; hop < 3; hop += 1) {
-      const hopped = sameY
-        ? await walkToward(bot, cell)
-        : await jumpToward(bot, cell, hop % 2 === 0 ? 0 : 1);
-      const now = bot.entity?.position;
-      if (!now) break;
-      const moved = Math.hypot(now.x - start.x, now.y - start.y, now.z - start.z);
-      if (hopped) {
-        return ok(
-          { position: { x: now.x, y: now.y, z: now.z }, distance: moved, kind: before.kind },
-          Date.now() - started,
-        );
-      }
-    }
-  }
-  const end = bot.entity?.position ?? start;
-  const dist = Math.hypot(end.x - start.x, end.y - start.y, end.z - start.z);
-  const after = inspectLocalTerrain(bot);
-  if (
-    dist >= 0.45 &&
-    isWalkableStanding(bot, { x: Math.floor(end.x), y: Math.floor(end.y), z: Math.floor(end.z) }) &&
-    after &&
-    after.kind === "open"
-  ) {
-    return ok({ position: { x: end.x, y: end.y, z: end.z }, distance: dist, kind: before.kind }, Date.now() - started);
-  }
-  return fail(
-    "NAV_NO_INITIAL_PROGRESS",
-    `local escape did not leave ${before.kind} (${before.reason})`,
-    Date.now() - started,
-    true,
-  );
 }

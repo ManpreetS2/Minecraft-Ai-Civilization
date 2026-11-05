@@ -1,0 +1,54 @@
+name: Filesystem safety
+
+on:
+  push:
+    branches: [agents/codex-off13-off14-integration]
+  pull_request:
+    paths:
+      - .github/workflows/filesystem-safety.yml
+      - apps/**
+      - packages/**
+      - pnpm-lock.yaml
+      - package.json
+      - vitest.config.ts
+      - tsconfig*.json
+
+permissions:
+  contents: read
+
+concurrency:
+  group: filesystem-safety-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  offline-validation:
+    name: Offline validation (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
+        with:
+          version: 10.13.1
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22.17.1
+          cache: pnpm
+      - name: Record actual host and revision
+        run: node -e "console.log({platform:process.platform,arch:process.arch,node:process.version})"
+      - run: git rev-parse HEAD
+      - run: pnpm install --frozen-lockfile
+      - name: Native filesystem regressions
+        run: pnpm exec vitest run apps/orchestrator/src/construction-path-isolation.test.ts apps/orchestrator/src/construction-experiment-guard.test.ts apps/orchestrator/src/construction-live-boundaries.test.ts apps/orchestrator/src/off13-qa39-regressions.test.ts packages/minecraft-adapter/src
+      - run: pnpm test
+      - run: pnpm typecheck
+      - run: pnpm build
+      - run: pnpm lint
+

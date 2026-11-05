@@ -23,7 +23,7 @@ import {
 import { BodyLock, DuplicateBodyError } from "./body-lock.js";
 import { patchMineflayerCrafting } from "./craft-patch.js";
 import { TargetBlacklist } from "./path-recovery.js";
-import { deriveConnectionHealth, emptyTelemetry, keepalivePolicy, armShutdownClient, type ConnectionTelemetry } from "./connection-health.js";
+import { navigationBodyReady, deriveConnectionHealth, emptyTelemetry, keepalivePolicy, armShutdownClient, type ConnectionTelemetry } from "./connection-health.js";
 import { installModernMovement } from "./movement-sync.js";
 import { loadPathfinder } from "./pathing.js";
 import { declaredRootCommands, sanitizeWhisperText, VALID_USERNAME, WHISPER_COMMAND } from "./server-commands.js";
@@ -75,10 +75,14 @@ export class MinecraftBody extends EventEmitter {
   private reconnectTimer: ReturnType<typeof setTimeout> | undefined;
   private spawned = false;
   private lastKick?: string;
+  private cancelConnection: (() => void) | undefined;
+  private connecting = false;
   private connectingPromise: Promise<ActionResult<{ username: string }>> | null = null;
   private awaitingRespawn = false;
   private reconnecting = false;
   private telemetry: ConnectionTelemetry = emptyTelemetry();
+  private readonly telemetryClients = new WeakSet<object>();
+  private readonly telemetryBots = new WeakSet<Bot>();
   private readonly eventLoopLag?: () => number;
   private activeTarget: { id: number; name?: string; username?: string; kind: string } | null = null;
   perceptionEpoch = 0;
@@ -127,7 +131,7 @@ export class MinecraftBody extends EventEmitter {
   }
 
   get connected(): boolean {
-    return Boolean(this.bot?.entity);
+    return Boolean(this.spawned && !this.awaitingRespawn && !this.shuttingDown && !this.deceased && this.bot && navigationBodyReady(this.bot));
   }
 
   getBot(): Bot | null {
@@ -149,11 +153,13 @@ export class MinecraftBody extends EventEmitter {
     if (this.connectingPromise) {
       return this.connectingPromise;
     }
+    this.connecting = true;
     this.connectingPromise = this.connectInternal();
     try {
       return await this.connectingPromise;
     } finally {
       this.connectingPromise = null;
+      this.connecting = false;
     }
   }
 
@@ -166,7 +172,7 @@ export class MinecraftBody extends EventEmitter {
       return fail("CANCELLED", "Body is shutting down", Date.now() - started);
     }
     const existing = activeBodies.get(this.username.toLowerCase());
-    if (existing && existing !== this && existing.connected) {
+    if (existing && existing !== this && (existing.connecting || existing.connected || existing.reconnecting)) {
       return fail("DUPLICATE_BODY", `Body ${this.username} already connected in this process`, Date.now() - started);
     }
     try {
@@ -195,25 +201,35 @@ export class MinecraftBody extends EventEmitter {
 
     return await new Promise((resolve) => {
       let settled = false;
-      const timeout = setTimeout(() => {
-        if (settled) return;
-        settled = true;
-        this.teardownBot("timeout");
-        resolve(fail("TIMEOUT", `Connect timed out for ${this.username}`, Date.now() - started, true));
-      }, 45_000);
-
-      const bot = mineflayer.createBot(options);
-      this.bot = bot;
-      patchMineflayerCrafting(bot);
-      this.bindClientTelemetry(bot);
-      this.bindBot(bot);
-
       const finish = (result: ActionResult<{ username: string }>) => {
         if (settled) return;
         settled = true;
         clearTimeout(timeout);
+        this.cancelConnection = undefined;
         resolve(result);
       };
+      this.cancelConnection = () => finish(fail("CANCELLED", `Connect cancelled for ${this.username}`, Date.now() - started));
+      const timeout = setTimeout(() => {
+        if (settled) return;
+        finish(fail("TIMEOUT", `Connect timed out for ${this.username}`, Date.now() - started, true));
+        this.teardownBot("timeout");
+        this.scheduleReconnect();
+      }, 45_000);
+
+      let bot: Bot;
+      try {
+        bot = mineflayer.createBot(options);
+        this.bot = bot;
+        patchMineflayerCrafting(bot);
+        this.bindClientTelemetry(bot);
+        this.bindBot(bot);
+      } catch (error) {
+        finish(fail("UNKNOWN", error instanceof Error ? error.message : String(error), Date.now() - started, true));
+        this.teardownBot("connect-failed");
+        this.lock.release();
+        if (activeBodies.get(this.username.toLowerCase()) === this) activeBodies.delete(this.username.toLowerCase());
+        return;
+      }
 
       bot.once("spawn", () => {
         if (this.shuttingDown || this.deceased) {
@@ -255,18 +271,22 @@ export class MinecraftBody extends EventEmitter {
 
   async disconnect(reason = "shutdown"): Promise<void> {
     this.shuttingDown = true;
+    this.reconnecting = false;
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = undefined;
     }
     this.teardownBot(reason);
-    this.lock.release();
-    activeBodies.delete(this.username.toLowerCase());
+    if (activeBodies.get(this.username.toLowerCase()) === this) {
+      this.lock.release();
+      activeBodies.delete(this.username.toLowerCase());
+    }
   }
 
   private bindClientTelemetry(bot: Bot): void {
     const client = asRecord((bot as unknown as { _client?: unknown })._client);
-    if (!client) return;
+    if (!client || this.telemetryClients.has(client)) return;
+    this.telemetryClients.add(client);
     const onError = (error: unknown) => {
       const policy = keepalivePolicy({ shuttingDown: this.shuttingDown, error });
       if (policy === "swallow_shutdown") {
@@ -304,9 +324,12 @@ export class MinecraftBody extends EventEmitter {
         this.telemetry.lastKeepaliveAt = Date.now();
       });
     }
-    bot.on("physicsTick", () => {
-      this.telemetry.lastPhysicsAt = Date.now();
-    });
+    if (!this.telemetryBots.has(bot)) {
+      this.telemetryBots.add(bot);
+      bot.on("physicsTick", () => {
+        this.telemetry.lastPhysicsAt = Date.now();
+      });
+    }
   }
 
   stopPathfinding(): void {
@@ -315,11 +338,11 @@ export class MinecraftBody extends EventEmitter {
     const pathfinder = asRecord((bot as unknown as { pathfinder?: unknown }).pathfinder);
     const stop = pathfinder?.["stop"];
     if (typeof stop === "function") {
-      stop.call((bot as unknown as { pathfinder: unknown }).pathfinder);
+      try { stop.call((bot as unknown as { pathfinder: unknown }).pathfinder); } catch { /* release controls even if the plugin retired */ }
     }
     const setGoal = pathfinder?.["setGoal"];
     if (typeof setGoal === "function") {
-      setGoal.call((bot as unknown as { pathfinder: unknown }).pathfinder, null);
+      try { setGoal.call((bot as unknown as { pathfinder: unknown }).pathfinder, null); } catch { /* continue control cleanup */ }
     }
     try {
       bot.clearControlStates();
@@ -632,6 +655,7 @@ export class MinecraftBody extends EventEmitter {
     });
 
     bot.on("end", (reason) => {
+      if (this.bot !== bot) return;
       this.spawned = false;
       this.telemetry.disconnects += 1;
       this.emit("disconnected", String(reason));
@@ -662,8 +686,8 @@ export class MinecraftBody extends EventEmitter {
   }
 
   private teardownBot(reason: string): void {
+    this.cancelConnection?.();
     const bot = this.bot;
-    this.bot = null;
     this.spawned = false;
     if (!bot) return;
     try {
@@ -671,6 +695,9 @@ export class MinecraftBody extends EventEmitter {
     } catch {
       // plugin may already be gone
     }
+    this.bot = null;
+    // Notify navigation scopes before removing their listeners. quit/end may settle later.
+    try { bot.emit("end", reason); } catch { /* continue retiring the transport */ }
     const client = (
       bot as unknown as { _client?: { removeAllListeners?: () => void; on?: (event: string, listener: (error: unknown) => void) => void; end?: (r?: string) => void } }
     )._client;
@@ -685,6 +712,8 @@ export class MinecraftBody extends EventEmitter {
       }
     }
     bot.removeAllListeners();
+    // Retired plugin callbacks may still report errors after their transport is closed.
+    bot.on("error", () => undefined);
   }
 }
 

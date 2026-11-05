@@ -1,4 +1,18 @@
-import type { ConnectionHealth } from "@civ/shared";
+import type { ConnectionHealth, Vec3 } from "@civ/shared";
+import type { Bot } from "mineflayer";
+
+/** A retained entity does not prove that its protocol client or life is usable. */
+export function navigationBodyReady(bot: Bot): boolean {
+  const pos = bot.entity?.position;
+  const client = (bot as unknown as { _client?: { state?: string; ended?: boolean } })._client;
+  return Boolean(pos && [pos.x, pos.y, pos.z].every(Number.isFinite) &&
+    (typeof bot.health !== "number" || bot.health > 0) &&
+    !client?.ended && (!client?.state || client.state === "play"));
+}
+
+export function navigationParametersValid(target: Vec3, range: number, timeoutMs: number): boolean {
+  return [target.x, target.y, target.z, range, timeoutMs].every(Number.isFinite) && range >= 0 && timeoutMs > 0;
+}
 
 export type ConnectionTelemetry = {
   health: ConnectionHealth;
