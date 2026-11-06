@@ -92,12 +92,12 @@ export class CitizenConstruction {
       return this.store.db
         .transaction(() => {
           this.authorized();
+          const nextOwner = (project as SettlementProject & { ownerCitizenId?: string }).ownerCitizenId;
           const prior = this.store.db.prepare("SELECT project_json FROM community_construction_projects WHERE community_id=?").get(this.communityId) as { project_json: string } | undefined;
           if (prior) {
             const owner = (JSON.parse(prior.project_json) as SettlementProject & { ownerCitizenId?: string }).ownerCitizenId;
-            if (owner && owner !== this.citizenId) return false;
+            if (owner && (owner !== this.citizenId || nextOwner !== owner)) return false;
           }
-          const nextOwner = (project as SettlementProject & { ownerCitizenId?: string }).ownerCitizenId;
           if (nextOwner && nextOwner !== this.citizenId) return false;
           const session = project.session;
           this.store.db

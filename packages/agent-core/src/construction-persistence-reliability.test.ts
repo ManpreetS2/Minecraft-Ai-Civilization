@@ -26,6 +26,7 @@ it("restores site claims and refuses owner reassignment at the durable boundary"
     const access = communityConstruction(store);
     expect(access.forCitizen("citizen_atlas").save(result.project)).toBe(true);
     expect(access.forCitizen("other").save({ ...result.project, ownerCitizenId: "other" } as typeof result.project)).toBe(false);
+    expect(access.forCitizen("citizen_atlas").save({ ...result.project, ownerCitizenId: undefined } as typeof result.project)).toBe(false);
     const harness = createProductionHarness(); harness.ctx.citizenId = "other";
     runtime.project = result.project;
     expect(await executeBuildStructurePlan({ ctx: harness.ctx, plan, runtime, cancelled: true })).toMatchObject({ success: false, code: "ACCESS_DENIED" });
