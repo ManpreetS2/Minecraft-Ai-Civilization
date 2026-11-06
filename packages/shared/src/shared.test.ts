@@ -36,6 +36,17 @@ describe("config", () => {
     expect(cfg.DEMO_PROFILE).toBe("none");
     expect(cfg.DEMO_PERSONALITY_SEED).toBe("civ-demo-2026");
   });
+
+  it("uses the isolated construction port when a live construction env leaves the port unset", () => {
+    const cfg = loadConfig({
+      CONSTRUCTION_EXPERIMENT_ENABLED: "true",
+      CONSTRUCTION_EXPERIMENT_ALLOW_LIVE: "true",
+      CONSTRUCTION_EXPERIMENT_ALLOW_WORLD_MUTATION: "true",
+    });
+    expect(cfg.MINECRAFT_PORT).toBe(25568);
+    expect(cfg.MINECRAFT_HOST).toBe("127.0.0.1");
+    expect(loadConfig({ MINECRAFT_PORT: "25570" }).MINECRAFT_PORT).toBe(25570);
+  });
 });
 
 describe("event bus", () => {

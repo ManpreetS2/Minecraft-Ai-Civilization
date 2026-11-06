@@ -175,6 +175,9 @@ async function main(): Promise<void> {
   console.log("=== Construction staged experiment (Mission 006A) ===");
   console.log(`AUTO_START_PAPER pin expected: false (env=${process.env.AUTO_START_PAPER ?? "unset"})`);
   console.log(`Live gate: ${liveGate.allowed ? "ALLOWED" : `DENIED — ${liveGate.allowed === false ? liveGate.error : ""}`}`);
+  if (liveGate.allowed) {
+    console.log(`Approved endpoint: ${liveGate.host}:${liveGate.paperPort} (rcon ${liveGate.rconPort}). Startup uses this gate, not loadConfig()'s live-civilization default.`);
+  }
   console.log(`Original fingerprint: ${JSON.stringify(originalWorldLabFingerprint())}`);
   console.log(`Proposed pad: ${JSON.stringify(PROPOSED_CONSTRUCTION_PAD)} safety=${JSON.stringify(padSafeFromSettlementHomes(PROPOSED_CONSTRUCTION_PAD))}`);
 

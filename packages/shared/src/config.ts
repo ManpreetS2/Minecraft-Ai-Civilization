@@ -118,6 +118,17 @@ export function isMechanicsProbeUsername(name: string | undefined): boolean {
   return RESERVED_MECHANICS_PROBE_NAMES.some((entry) => entry.toLowerCase() === normalized);
 }
 
+/**
+ * Isolated construction Paper port. Keep this equal to ISOLATED_PAPER_PORT in the
+ * construction experiment gate. The live civilization default stays 25565.
+ */
+const ISOLATED_CONSTRUCTION_PAPER_PORT = "25568";
+
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
-  return envSchema.parse(env);
+  const constructionLive = env.CONSTRUCTION_EXPERIMENT_ENABLED === "true"
+    && env.CONSTRUCTION_EXPERIMENT_ALLOW_LIVE === "true"
+    && env.CONSTRUCTION_EXPERIMENT_ALLOW_WORLD_MUTATION === "true";
+  const portUnset = env.MINECRAFT_PORT === undefined || env.MINECRAFT_PORT === "";
+  if (!constructionLive || !portUnset) return envSchema.parse(env);
+  return envSchema.parse({ ...env, MINECRAFT_PORT: ISOLATED_CONSTRUCTION_PAPER_PORT });
 }

@@ -406,6 +406,7 @@ export function padSafeFromSettlementHomes(
 export type ConstructionLiveGate =
   | {
       allowed: true;
+      host: string;
       paperPort: number;
       rconPort: number;
       worldLabDir: string;
@@ -492,6 +493,7 @@ export function evaluateConstructionExperimentLive(env: NodeJS.ProcessEnv = proc
 
   const gate: AllowedConstructionGate = {
     allowed: true,
+    host,
     paperPort,
     rconPort,
     worldLabDir: isolation.worldLabDir,

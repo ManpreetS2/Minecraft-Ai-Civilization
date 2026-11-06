@@ -9,6 +9,7 @@ vi.mock("@civ/shared", async original => {
   const path = await import("node:path");
   return { ...actual, resolveFromRoot: (p: string) => path.resolve(fixture.root, p) };
 });
+import { loadConfig } from "@civ/shared";
 import { evaluateConstructionExperimentLive } from "./construction-experiment-guard.js";
 const approved = (): NodeJS.ProcessEnv => ({
   CONSTRUCTION_EXPERIMENT_ENABLED: "true", CONSTRUCTION_EXPERIMENT_ALLOW_LIVE: "true",
@@ -29,6 +30,18 @@ describe("construction live endpoint and output boundaries (no network)", () => 
   });
   it.each(["mc.example.com", "localhost", "192.0.2.1", "0.0.0.0", "::", "[::1]", "127.0.0.1.example", "127.1", "2130706433", " 127.0.0.1 ", "", "::1%lo0", "fe80::1%1"])("rejects a remote, DNS or ambiguous host %j", host => {
     expect(evaluateConstructionExperimentLive({ ...approved(), MINECRAFT_HOST: host }).allowed).toBe(false);
+  });
+  it("publishes the approved host and the same Paper port loadConfig would use", () => {
+    const env = { ...approved() };
+    delete env.MINECRAFT_PORT;
+    delete env.MINECRAFT_HOST;
+    const gate = evaluateConstructionExperimentLive(env);
+    expect(gate.allowed).toBe(true);
+    if (!gate.allowed) throw new Error(gate.error);
+    expect(gate.host).toBe("127.0.0.1");
+    expect(gate.paperPort).toBe(25568);
+    expect(loadConfig(env).MINECRAFT_PORT).toBe(gate.paperPort);
+    expect(loadConfig(env).MINECRAFT_HOST).toBe(gate.host);
   });
   it("rejects Paper and RCON sharing one port", () => {
     expect(evaluateConstructionExperimentLive({ ...approved(), MINECRAFT_PORT: "25578" }).allowed).toBe(false);
