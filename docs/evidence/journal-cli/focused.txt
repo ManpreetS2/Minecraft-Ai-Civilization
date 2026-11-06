@@ -1,0 +1,10 @@
+
+ RUN  v3.2.7 /Users/manpreetsingh/.t3/worktrees/Minecraft-Ai-Civilization/t3-20852d5c
+
+ ✓ tools/v1-integration/journal-cross-check.test.ts (27 tests) 208ms
+
+ Test Files  1 passed (1)
+      Tests  27 passed (27)
+   Start at  21:57:59
+   Duration  966ms (transform 250ms, setup 89ms, collect 241ms, tests 208ms, environment 0ms, prepare 65ms)
+

@@ -40,6 +40,7 @@
     "test:watch": "vitest",
     "v1:acceptance": "tsx tools/v1-acceptance/cli.ts",
     "v1:branches": "tsx tools/v1-integration/branch-cli.ts",
+    "v1:journal": "tsx tools/v1-integration/journal-cli-main.ts",
     "v1:offline": "tsx tools/v1-integration/cli.ts",
     "v1:validate-offline": "tsx experiments/evidence-validator/src/cli.ts",
     "experiment:preflight": "tsx scripts/experiment-preflight.ts"

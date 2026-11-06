@@ -1,0 +1,4 @@
+
+> minecraft-ai-civilization@0.1.0 typecheck:tools /Users/manpreetsingh/.t3/worktrees/Minecraft-Ai-Civilization/t3-20852d5c
+> tsc -p tools/tsconfig.json
+

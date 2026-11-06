@@ -3,8 +3,13 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createHash } from "node:crypto";
-import { installOfflineNetworkGuard, assertNoBlockedAttempts } from "../../test-support/offline-network-guard.js";
-import { buildManifest, validateBundle, type RunBundle } from "./manifest.js";
+import {
+  installOfflineNetworkGuard,
+  assertNoBlockedAttempts,
+} from "../../test-support/offline-network-guard.js";
+import { buildManifest, type RunBundle } from "./manifest.js";
+import { validateBundleWithJournal } from "./journal-cross-check.js";
+import { relative } from "node:path";
 import { requirePreflight } from "./preflight.js";
 import { charterCatalog } from "../v1-acceptance/catalog.js";
 import { evaluate, markdown, type Artifact, type Evidence } from "../v1-acceptance/engine.js";
@@ -20,7 +25,8 @@ async function main() {
   const git = (args: string[]) => execFileSync("git", args, { encoding: "utf8" }).trim();
   const sourceSha = git(["rev-parse", "HEAD"]);
   const dirty = git(["status", "--porcelain"]);
-  if (dirty) throw new Error("Commit tooling changes before running a provenance-recorded scenario");
+  if (dirty)
+    throw new Error("Commit tooling changes before running a provenance-recorded scenario");
   const output = resolve(process.argv[3] ?? `artifacts/v1/scenario-${count}`);
   mkdirSync(output, { recursive: true });
   const ids = count === 2 ? ["gpt-a", "claude-a"] : ["gpt-a", "gpt-b", "claude-a", "claude-b"];
@@ -191,12 +197,16 @@ async function main() {
     {
       id: "A-ACTIONS",
       name: "wood inventory increases from observed empty start",
-      passed: result.citizens.every((c) => result.inventoryBefore[c.id] === 0 && result.inventoryAfter[c.id]! > 0),
+      passed: result.citizens.every(
+        (c) => result.inventoryBefore[c.id] === 0 && result.inventoryAfter[c.id]! > 0,
+      ),
     },
     {
       id: "A-IDENTITY",
       name: "SQLite reopen preserves usernames and private memory",
-      passed: JSON.stringify(result.citizens) === JSON.stringify(result.restart.citizens) && result.restart.memoryPreserved,
+      passed:
+        JSON.stringify(result.citizens) === JSON.stringify(result.restart.citizens) &&
+        result.restart.memoryPreserved,
     },
     {
       id: "A-EVIDENCE",
@@ -260,7 +270,20 @@ async function main() {
   writeFileSync(resolve(output, "acceptance-input.json"), JSON.stringify(acceptanceInput, null, 2));
   writeFileSync(resolve(output, "acceptance.json"), JSON.stringify(acceptance, null, 2));
   writeFileSync(resolve(output, "acceptance.md"), markdown(acceptance));
-  const verdict = validateBundle(bundle, sourceSha, { evidenceRoot: output });
+  const verdict = validateBundleWithJournal({
+    manifest: bundle,
+    expectedSourceSha: sourceSha,
+    expectedRepository: repository,
+    evidenceRoot: output,
+    operatorJournal: result.evidenceJournalPath
+      ? {
+          reference: relative(output, resolve(result.evidenceJournalPath)),
+          runId,
+          sourceSha,
+          repository,
+        }
+      : undefined,
+  });
   writeFileSync(
     resolve(output, "verdict.json"),
     JSON.stringify({ ...verdict, evidenceJournalSha256: result.evidenceJournalSha256 }, null, 2),
@@ -273,7 +296,10 @@ async function main() {
       result.citizens.map((c) => [c.id, { oak_log: result.inventoryAfter[c.id] ?? 0 }]),
     ),
   });
-  writeFileSync(resolve(output, "gemini-validator-report.json"), JSON.stringify(gemini.report, null, 2));
+  writeFileSync(
+    resolve(output, "gemini-validator-report.json"),
+    JSON.stringify(gemini.report, null, 2),
+  );
   writeFileSync(resolve(output, "gemini-validator-summary.md"), gemini.summary);
   console.log(
     `Offline ${count}-citizen scripted rehearsal at ${sourceSha}. Bundle: ${output}. Journal: ${result.evidenceJournalPath}. Structural verdict: ${verdict.verdict}. Gemini: ${gemini.report.overallStatus}.`,

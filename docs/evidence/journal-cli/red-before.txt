@@ -1,0 +1,145 @@
+
+ RUN  v3.2.7 /Users/manpreetsingh/.t3/worktrees/Minecraft-Ai-Civilization/t3-20852d5c
+
+ ❯ tools/v1-integration/journal-cross-check.test.ts (27 tests | 7 failed) 219ms
+   ✓ rejects a rehashed receipt and manifest claiming 30 logs against the unchanged three-log journal 20ms
+   × compares legitimate gather physical effects 20ms
+     → expected [ 'Journal row source mismatch' ] to deeply equal []
+   × compares legitimate eat physical effects 12ms
+     → expected [ 'Journal row source mismatch' ] to deeply equal []
+   × compares legitimate move physical effects 10ms
+     → expected [ 'Journal row source mismatch' ] to deeply equal []
+   × matches three independent gathers 9ms
+     → expected [ 'Journal row source mismatch' ] to deeply equal []
+   ✓ reports missing journal 7ms
+   ✓ reports unavailable journal 7ms
+   ✓ refuses to read without an explicit evidence root 6ms
+   ✓ reports missing action_attempt as unproven 6ms
+   ✓ reports missing action_observation as unproven 12ms
+   ✓ rejects duplicate attempt IDs 6ms
+   ✓ rejects incorrect citizen 6ms
+   ✓ rejects incorrect receipt row sequence 6ms
+   ✓ rejects replay from another run 7ms
+   ✓ reports a truncated journal without synthesizing shutdown 7ms
+   × keeps older receipts readable but unproven without row references 8ms
+     → expected [ 'Journal row source mismatch' ] to deeply equal []
+   ✓ rejects wrong full source SHA and repository 6ms
+   × cannot authenticate a coordinated replacement of all artifacts 7ms
+     → expected [ 'Journal row source mismatch' ] to deeply equal []
+   ✓ rejects a journal path escaping the explicit root 6ms
+   ✓ rejects a modified receipt without a matching digest 6ms
+   ✓ rejects broken journal sequence and hash chain 6ms
+   ✓ rejects reordered claimed actions 6ms
+   ✓ reports partial final JSON as unproven 6ms
+   ✓ rejects failed journal actions claimed as successful 5ms
+   ✓ rejects altered movement positions even with unchanged inventory 7ms
+   ✓ reports absent journal physical state instead of synthesizing it 6ms
+   × CLI preserves local-only outcomes and missing evidence exit codes 6ms
+     → The "path" argument must be of type string. Received undefined
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 7 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tools/v1-integration/journal-cross-check.test.ts > compares legitimate gather physical effects
+ FAIL  tools/v1-integration/journal-cross-check.test.ts > compares legitimate eat physical effects
+ FAIL  tools/v1-integration/journal-cross-check.test.ts > compares legitimate move physical effects
+AssertionError: expected [ 'Journal row source mismatch' ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   "Journal row source mismatch",
++ ]
+
+ ❯ tools/v1-integration/journal-cross-check.test.ts:170:27
+    168|   const f = fixture(type);
+    169|   const result = f.check();
+    170|   expect(result.failures).toEqual([]);
+       |                           ^
+    171|   expect(result.journalConsistent).toBe(true);
+    172|   expect(result.verdict).toBe("NOT PROVEN");
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/7]⎯
+
+ FAIL  tools/v1-integration/journal-cross-check.test.ts > matches three independent gathers
+AssertionError: expected [ 'Journal row source mismatch' ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   "Journal row source mismatch",
++ ]
+
+ ❯ tools/v1-integration/journal-cross-check.test.ts:177:27
+    175| it("matches three independent gathers", () => {
+    176|   const result = fixture("gather", 3).check();
+    177|   expect(result.failures).toEqual([]);
+       |                           ^
+    178|   expect(result.journalConsistent).toBe(true);
+    179| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/7]⎯
+
+ FAIL  tools/v1-integration/journal-cross-check.test.ts > keeps older receipts readable but unproven without row references
+AssertionError: expected [ 'Journal row source mismatch' ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   "Journal row source mismatch",
++ ]
+
+ ❯ tools/v1-integration/journal-cross-check.test.ts:237:30
+    235|   delete f.receipt.journal;
+    236|   f.save();
+    237|   expect(f.check().failures).toEqual([]);
+       |                              ^
+    238|   expect(f.check().journalConsistent).toBe(false);
+    239| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/7]⎯
+
+ FAIL  tools/v1-integration/journal-cross-check.test.ts > cannot authenticate a coordinated replacement of all artifacts
+AssertionError: expected [ 'Journal row source mismatch' ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   "Journal row source mismatch",
++ ]
+
+ ❯ tools/v1-integration/journal-cross-check.test.ts:264:27
+    262|   f.save();
+    263|   const result = f.check();
+    264|   expect(result.failures).toEqual([]);
+       |                           ^
+    265|   expect(result.journalConsistent).toBe(true);
+    266|   expect(result.verdict).toBe("NOT PROVEN");
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/7]⎯
+
+ FAIL  tools/v1-integration/journal-cross-check.test.ts > CLI preserves local-only outcomes and missing evidence exit codes
+TypeError: The "path" argument must be of type string. Received undefined
+ ❯ tools/v1-integration/journal-cross-check.test.ts:333:16
+    331| it("CLI preserves local-only outcomes and missing evidence exit codes"…
+    332|   const input = fixture();
+    333|   const path = join(input.evidenceRoot!, "manifest.json");
+       |                ^
+    334|   writeFileSync(path, JSON.stringify(input.manifest));
+    335|   const args = [path, input.expectedSourceSha, input.expectedRepositor…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/7]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  7 failed | 20 passed (27)
+   Start at  21:57:03
+   Duration  854ms (transform 189ms, setup 63ms, collect 192ms, tests 219ms, environment 0ms, prepare 62ms)
+

@@ -6,6 +6,7 @@ import { afterEach, expect, it } from "vitest";
 import { ExperimentEvidenceJournal } from "../../packages/agent-core/src/experiment-evidence.js";
 import { bundleFixture } from "./bundle-fixture.js";
 import { type SourceReceipt } from "./manifest.js";
+import { checkJournal } from "./journal-cli.js";
 import { validateBundleWithJournal } from "./journal-cross-check.js";
 
 const roots: string[] = [];
@@ -25,6 +26,7 @@ function fixture(type: "gather" | "eat" | "move" = "gather", count = 1) {
     run.runId,
     new Set(["gpt-a"]),
     "offline",
+    { sourceSha: run.sourceSha, runId: run.runId },
   );
   const actor = journal.forCitizen("gpt-a");
   run.citizens[0]!.initialInventory = type === "eat" ? { apple: count } : {};
@@ -325,4 +327,25 @@ it("reports absent journal physical state instead of synthesizing it", () => {
     }),
   );
   expect(f.check().unproven.join(" ")).toMatch(/beforeInventory evidence missing/);
+});
+
+it("CLI preserves local-only outcomes and missing evidence exit codes", () => {
+  const { input } = fixture();
+  const path = join(input.evidenceRoot!, "manifest.json");
+  writeFileSync(path, JSON.stringify(input.manifest));
+  const args = [
+    path,
+    input.expectedSourceSha,
+    input.expectedRepository,
+    input.evidenceRoot!,
+    "operator.jsonl",
+  ];
+  const result = checkJournal(args);
+  expect(result.status).toBe("JOURNAL CONSISTENT");
+  expect(result.exitCode).toBe(0);
+  expect(result.verdict).toBe("NOT PROVEN");
+  expect(result.authenticatedLiveExecution).toBe(false);
+  expect(checkJournal(args.slice(0, 4)).exitCode).toBe(2);
+  expect(checkJournal(args.slice(0, 3)).exitCode).toBe(2);
+  expect(checkJournal([path, "f".repeat(40), ...args.slice(2)]).exitCode).toBe(1);
 });
