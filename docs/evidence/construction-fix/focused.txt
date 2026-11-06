@@ -1,0 +1,31 @@
+
+ RUN  v3.2.7 /private/tmp/minecraft-construction-fix
+
+(node:20724) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+stderr | packages/agent-core/src/community-construction-runtime.test.ts > per-community construction runtime > reports persisted:false and does not claim success when the SQLite write fails
+[community-construction] write failed: disk I/O error
+
+stderr | packages/agent-core/src/community-construction-runtime.test.ts > per-community construction runtime > reports persisted:false and does not claim success when the SQLite write fails
+[community-construction] write failed: disk I/O error
+
+ ✓ packages/agent-core/src/community-construction-runtime.test.ts (6 tests) 2598ms
+   ✓ per-community construction runtime > lets two communities build simultaneously without sharing or overwriting project state  522ms
+   ✓ per-community construction runtime > restores each community's own project after a SQLite restart  833ms
+   ✓ per-community construction runtime > rejects a stale handle after the citizen leaves its community, and never reads another community's row  412ms
+   ✓ per-community construction runtime > reports persisted:false and does not claim success when the SQLite write fails  413ms
+   ✓ legacy single-settlement persistence honesty > still persists to the settlement row and reports it  410ms
+(node:20868) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ packages/agent-core/src/executor-community-construction.test.ts (2 tests) 954ms
+   ✓ executor construction community scoping > legacy single-settlement mode still persists the project (test sensitivity)  522ms
+   ✓ executor construction community scoping > community mode leaves the shared settlement row untouched  431ms
+(node:20911) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ packages/agent-core/src/construction-persistence-reliability.test.ts (4 tests) 93ms
+
+ Test Files  3 passed (3)
+      Tests  12 passed (12)
+   Start at  22:52:18
+   Duration  7.43s (transform 1.10s, setup 111ms, collect 2.43s, tests 3.64s, environment 0ms, prepare 190ms)
+

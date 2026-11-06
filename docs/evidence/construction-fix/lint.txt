@@ -1,0 +1,4 @@
+
+> minecraft-ai-civilization@0.1.0 lint /private/tmp/minecraft-construction-fix
+> eslint .
+

@@ -1,0 +1,18 @@
+
+ RUN  v3.2.7 /private/tmp/minecraft-construction-fix
+
+(node:20630) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+stdout | qa/construction-persistence/test/persistence.test.ts > completes through real executor placements and reopens SQLite without rebuilding
+completion evidence {"project":{"id":"project_workshop_cabin_v1_citizen_atlas_100_70_100","type":"STRUCTURE_BUILD","ownerCitizenId":"citizen_atlas","status":"COMPLETED","stage":"FINAL_VALIDATION","blueprintId":"workshop_cabin_v1","blueprintVersion":1,"facing":"south","site":{"x":100,"y":70,"z":100},"requiredResources":{"oak_planks":66,"oak_door":1,"torch":1,"chest":1,"crafting_table":1},"reservedResources":{},"blocked":[],"placed":71,"total":70,"verified":70,"startedAt":"2026-11-06T06:52:16.806Z","session":{"instanceId":"build_workshop_cabin_v1_1793947936806","blueprintId":"workshop_cabin_v1","blueprintVersion":1,"structureType":"WORKSHOP","facing":"south","origin":{"x":100,"y":70,"z":100},"materials":{"WALL_MATERIAL":"oak_planks","FLOOR_MATERIAL":"oak_planks","ROOF_MATERIAL":"oak_planks","FOUNDATION_MATERIAL":"oak_planks","DOOR_MATERIAL":"oak_door","LIGHT_MATERIAL":"torch","STORAGE_MATERIAL":"chest","WORKSTATION_MATERIAL":"crafting_table","BED_MATERIAL":"red_bed","FURNACE_MATERIAL":"furnace"},"extras":["chest","lighting","crafting_table"],"stage":"FINAL_VALIDATION","status":"COMPLETE","placed":71,"total":70,"failures":[]},"preflightBlockers":[],"remainingResources":{"crafting_table":1},"materialShortfall":{},"cancelled":false,"lastPersistOk":true,"completedAt":"2026-11-06T06:52:17.206Z"},"requests":70,"inventory":{"oak_planks":934,"oak_door":9,"chest":9,"torch":9,"crafting_table":9},"result":{"success":true,"data":{"complete":true,"persisted":true,"phase":"COMPLETED","projectId":"project_workshop_cabin_v1_citizen_atlas_100_70_100"},"durationMs":0}}
+
+stdout | qa/construction-persistence/test/persistence.test.ts > dispatcher with property observations completes and reloads without duplicate placements
+dispatcher restart evidence {"id":"project_workshop_cabin_v1_citizen_atlas_100_70_100","status":"COMPLETED","placed":71,"requests":70,"inventory":{"oak_planks":934,"oak_door":9,"chest":9,"torch":9,"crafting_table":9}}
+
+ ✓ qa/construction-persistence/test/persistence.test.ts (12 tests) 443ms
+
+ Test Files  1 passed (1)
+      Tests  12 passed (12)
+   Start at  22:52:14
+   Duration  2.74s (transform 1.11s, setup 85ms, collect 1.73s, tests 443ms, environment 0ms, prepare 71ms)
+
