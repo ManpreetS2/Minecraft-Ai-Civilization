@@ -1,0 +1,26 @@
+Red-before on 875ebf707b93a082a6423c9a3aecc7d00ae02e48, before the executor and epoch fixes.
+Command: pnpm exec vitest run packages/agent-core/src/community-container-contents.test.ts tools/v1-integration/scenario.test.ts --maxWorkers=1 --no-file-parallelism
+
+Test Files  2 failed (2)
+Tests  6 failed | 11 passed (17)
+
+FAIL scenario > routes 2 citizens
+  expected 2 to be 6
+  (one reconstructed gather per citizen, not one attempt per execution)
+
+FAIL scenario > routes 4 citizens
+  expected 4 to be 12
+
+FAIL delayed stale withdrawal
+  expected { apple: 2 } to deeply equal { bread: 1, apple: 2 }
+  (VERIFY_FAILED wrote without expectedRevision and erased the newer bread count)
+
+FAIL abandon and recreate
+  expected true to be false
+  recordContainerObservation(..., { expectedRevision: 0 }) succeeded against the new chest
+
+FAIL community change token
+  containerObservationToken is not a function
+
+FAIL concurrent connections
+  containerObservationToken is not a function

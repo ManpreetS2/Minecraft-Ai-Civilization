@@ -94,7 +94,8 @@ async function main() {
   assertNoBlockedAttempts();
   bundle.endedAt = new Date().toISOString();
   bundle.exitCode = 0;
-  bundle.restarted = true;
+  // In-process SQLite reopen is not a process restart. Do not claim restarted for that reopen.
+  bundle.restarted = false;
   bundle.actions = result.actions.map((a) => ({
     sequence: a.sequence,
     citizenId: a.citizenId,
@@ -113,9 +114,11 @@ async function main() {
     sourceEventId: a.sourceEventId,
   }));
   bundle.expectedActionCount = result.actions.length;
-  bundle.startingPositions = Object.fromEntries(
-    result.actions.map((a) => [a.citizenId, a.originPosition!]).filter(([, p]) => p),
-  );
+  const startingPositions: Record<string, { x: number; y: number; z: number }> = {};
+  for (const action of result.actions) {
+    if (!startingPositions[action.citizenId] && action.originPosition) startingPositions[action.citizenId] = action.originPosition;
+  }
+  bundle.startingPositions = startingPositions;
   bundle.interventions = ["operator_stop"];
   bundle.sourceReceipts = result.sourceReceipts;
   bundle.persistentFacts = result.persistentFacts;
@@ -200,8 +203,9 @@ async function main() {
       name: "operator journal and V2 source receipts bound to executed gather attempts",
       passed:
         Boolean(result.evidenceJournalPath) &&
-        result.evidenceSummary.attempted === count &&
-        result.evidenceSummary.verified === count &&
+        result.evidenceSummary.attempted === count * 3 &&
+        result.evidenceSummary.verified === count * 3 &&
+        result.actions.every((a) => a.decisionSource !== "model" && a.expectedDelta.oak_log === 1) &&
         result.actions.every((a) => result.sourceReceipts.some((r) => r.id === a.receiptId)) &&
         result.persistentFacts.every(
           (f) => f.receiptId && result.sourceReceipts.some((r) => r.id === f.receiptId),

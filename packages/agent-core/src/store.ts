@@ -232,6 +232,7 @@ export class CivilizationStore {
     this.knowledge = new KnowledgeProvenance(this.db, this);
     try {
       this.db.pragma("journal_mode = WAL");
+      this.db.pragma("busy_timeout = 5000");
       this.db.exec(SCHEMA);
       this.migrate();
       this.seed();

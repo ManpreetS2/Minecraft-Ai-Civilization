@@ -94,6 +94,18 @@ export function migratePhysicalState(db: Database.Database): void {
     db.prepare(
       "SELECT resource_key,contents_json,observed_by,observed_at,revision FROM physical_asset_contents LIMIT 0",
     ).all();
+    // Monotonic observation token. Not deleted with the asset, so abandon/recreate cannot reuse an old token.
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS physical_asset_observation_epoch (
+        resource_key TEXT PRIMARY KEY,
+        revision INTEGER NOT NULL
+      );
+    `);
+    db.prepare("SELECT resource_key, revision FROM physical_asset_observation_epoch LIMIT 0").all();
+    db.exec(`
+      INSERT OR IGNORE INTO physical_asset_observation_epoch(resource_key, revision)
+      SELECT resource_key, revision FROM physical_asset_contents
+    `);
     db.prepare("INSERT OR IGNORE INTO sim_meta(key,value) VALUES (?,?)").run(MIGRATION, "1");
   }).immediate();
 }
@@ -409,18 +421,50 @@ export class CitizenPhysicalState {
       const row = this.store.db
         .prepare("SELECT contents_json, revision FROM physical_asset_contents WHERE resource_key=?")
         .get(key) as { contents_json: string; revision: number } | undefined;
-      if (options?.expectedRevision !== undefined && options.expectedRevision !== (row?.revision ?? 0)) return false;
+      const current = this.storedObservationToken(key, row?.revision);
+      if (options?.expectedRevision !== undefined && options.expectedRevision !== current) return false;
       const merged = { ...(row ? (JSON.parse(row.contents_json) as Record<string, number>) : {}), ...observed };
       for (const item of Object.keys(merged)) if (merged[item] === 0) delete merged[item];
+      const next = current + 1;
       this.store.db
         .prepare(
           `INSERT INTO physical_asset_contents(resource_key,contents_json,observed_by,observed_at,revision) VALUES (?,?,?,?,?)
         ON CONFLICT(resource_key) DO UPDATE SET contents_json=excluded.contents_json,observed_by=excluded.observed_by,observed_at=excluded.observed_at,revision=excluded.revision`,
         )
-        .run(key, JSON.stringify(merged), this.citizenId, new Date().toISOString(), (row?.revision ?? 0) + 1);
+        .run(key, JSON.stringify(merged), this.citizenId, new Date().toISOString(), next);
+      this.store.db
+        .prepare(
+          `INSERT INTO physical_asset_observation_epoch(resource_key, revision) VALUES (?,?)
+        ON CONFLICT(resource_key) DO UPDATE SET revision=excluded.revision`,
+        )
+        .run(key, next);
       this.audit("observe_container", key);
       return true;
     });
+  }
+
+  /**
+   * Compare-and-swap token for the next observation. Survives abandon so a token issued for a
+   * previous chest at these coordinates never matches the recreated one. Undefined when this
+   * citizen may not use the container; the revision number is not returned to them.
+   */
+  containerObservationToken(key: string): number | undefined {
+    return this.transaction(() => {
+      if (!this.mayUse(key)) return undefined;
+      return this.storedObservationToken(key);
+    });
+  }
+
+  private storedObservationToken(key: string, contentsRevision?: number): number {
+    const epoch = this.store.db
+      .prepare("SELECT revision FROM physical_asset_observation_epoch WHERE resource_key=?")
+      .get(key) as { revision: number } | undefined;
+    if (epoch && Number.isSafeInteger(epoch.revision) && epoch.revision >= 0) return epoch.revision;
+    if (contentsRevision !== undefined && Number.isSafeInteger(contentsRevision) && contentsRevision >= 0) return contentsRevision;
+    const row = this.store.db
+      .prepare("SELECT revision FROM physical_asset_contents WHERE resource_key=?")
+      .get(key) as { revision: number } | undefined;
+    return row?.revision ?? 0;
   }
 
   /**
@@ -472,11 +516,18 @@ export class CitizenPhysicalState {
         .prepare("SELECT kind FROM physical_assets WHERE resource_key=? AND owner_id=?")
         .get(key, this.citizenId) as { kind: PhysicalAssetKind } | undefined;
       if (!asset) return false;
+      const current = this.storedObservationToken(key);
       this.store.db.prepare("DELETE FROM physical_asset_grants WHERE resource_key=?").run(key);
       this.store.db.prepare("DELETE FROM physical_asset_contents WHERE resource_key=?").run(key);
       this.store.db
         .prepare("DELETE FROM physical_assets WHERE resource_key=? AND owner_id=?")
         .run(key, this.citizenId);
+      this.store.db
+        .prepare(
+          `INSERT INTO physical_asset_observation_epoch(resource_key, revision) VALUES (?,?)
+        ON CONFLICT(resource_key) DO UPDATE SET revision=excluded.revision`,
+        )
+        .run(key, current + 1);
       this.audit(`abandon_asset:${asset.kind}`, key);
       return true;
     });

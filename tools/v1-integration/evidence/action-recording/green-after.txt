@@ -1,0 +1,25 @@
+Green-after on the action-recording and chest-epoch fix.
+
+Focused:
+- packages/agent-core/src/community-container-contents.test.ts: 13 passed
+  stale withdrawal keeps the newer observation; abandon/recreate rejects tokens 0 and the old revision;
+  revoke and community change cannot write; two SQLite connections, one winner; reopen keeps the revision
+- packages/agent-core/src/action-evidence.test.ts: 1 passed
+  cancelled gather records the attempt and observation, inventory stays empty, expectedDelta stays { oak_log: 1 }
+- tools/v1-integration/scenario.test.ts: 4 passed
+  2 citizens: 6 attempts, 6 verified; 4 citizens: 12 attempts, 12 verified
+  each gather expectedDelta and inventoryDelta are { oak_log: 1 }; none are decisionSource model
+  first attempt is recorded before the last tick; each observation follows its own attempt id
+
+Gates on this working tree:
+- pnpm typecheck: exit 0
+- pnpm lint: exit 0
+- pnpm build: exit 0
+- pnpm test: 199 files, 2264 passed
+- pnpm test:v1: 9 files, 100 passed
+- pnpm test:evidence-validator: 20 files, 149 passed
+- pnpm test:security: 358 passed
+- pnpm test:ai: 514 passed
+- qa/v1 adv-chest-freshness + adv-chest-access: 12 passed
+
+pnpm v1:offline 2 and 4 are run after the commit, because the CLI refuses a dirty tree.

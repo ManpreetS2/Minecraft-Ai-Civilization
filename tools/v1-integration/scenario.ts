@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { CivilizationStore, ExperimentEvidenceJournal } from "../../packages/agent-core/src/index.js";
+import { CivilizationStore, ExperimentEvidenceJournal, type ExperimentObservation } from "../../packages/agent-core/src/index.js";
 import { createEvent } from "../../packages/shared/src/index.js";
 import { createIndependentOfflineRuntime } from "../../apps/orchestrator/src/independent-offline-runtime.js";
 import { buildFixture } from "./fixtures.js";
@@ -18,10 +18,48 @@ export interface ScenarioInput {
   repository?: string;
 }
 
-function bag(items: Array<{ name: string; count: number }>): Record<string, number> {
-  const out: Record<string, number> = {};
-  for (const item of items) out[item.name] = (out[item.name] ?? 0) + item.count;
-  return out;
+type GatherObservation = {
+  successReported: boolean;
+  beforeInventory: Record<string, number>;
+  afterInventory: Record<string, number>;
+  position?: { x: number; y: number; z: number };
+  hungerBefore?: number;
+  hungerAfter?: number;
+  worldChanges: ExperimentObservation["worldChanges"];
+  failureCode?: string;
+};
+
+type CompletedGather = {
+  attemptId: string;
+  eventId: string;
+  citizenId: string;
+  decisionSource: "scripted" | "planner" | "reflex";
+  expectedDelta: Record<string, number>;
+  originPosition: { x: number; y: number; z: number } | null;
+  observation: GatherObservation;
+};
+
+function journalObservation(input: GatherObservation): ExperimentObservation {
+  const observation: ExperimentObservation = {
+    successReported: input.successReported,
+    beforeInventory: input.beforeInventory,
+    afterInventory: input.afterInventory,
+    worldChanges: input.worldChanges,
+  };
+  if (input.position) observation.position = input.position;
+  if (input.hungerBefore !== undefined) observation.hungerBefore = input.hungerBefore;
+  if (input.hungerAfter !== undefined) observation.hungerAfter = input.hungerAfter;
+  if (input.failureCode) observation.failureCode = input.failureCode;
+  return observation;
+}
+
+function inventoryChange(before: Record<string, number>, after: Record<string, number>): Record<string, number> {
+  const delta: Record<string, number> = {};
+  for (const name of new Set([...Object.keys(before), ...Object.keys(after)])) {
+    const change = (after[name] ?? 0) - (before[name] ?? 0);
+    if (change !== 0) delta[name] = change;
+  }
+  return delta;
 }
 
 /**
@@ -67,6 +105,7 @@ export async function runScenario(input: ScenarioInput) {
     originPosition: { x: number; y: number; z: number } | null;
     actionType: "gather";
     expectedDelta: Record<string, number>;
+    decisionSource: "scripted" | "model" | "planner" | "reflex";
     inventoryScope: "citizen";
     eventId: string;
     attemptId: string;
@@ -102,13 +141,38 @@ export async function runScenario(input: ScenarioInput) {
     // Fact receipts are written after scripted provider ticks once model/session identities exist.
 
     const before = Object.fromEntries([...fixture.bodies].map(([id, body]) => [id, body.count("oak_log")]));
-    const beforeBags = Object.fromEntries([...fixture.bodies].map(([id, body]) => [id, bag(body.items)]));
-    const origins = Object.fromEntries(
-      [...fixture.bodies].map(([id, body]) => {
-        const p = body.bot.entity.position;
-        return [id, { x: p.x, y: p.y, z: p.z }];
-      }),
-    );
+    const completed: CompletedGather[] = [];
+    const pending = new Map<string, Omit<CompletedGather, "observation">>();
+    fixture.manager.setActionEvidence({
+      begin(input) {
+        const decisionSource = input.planSource === "llm" ? "scripted" : input.planSource;
+        const attemptId = journal.forCitizen(input.citizenId).attempt({
+          action: "gather",
+          decisionSource,
+          decisionEventId: input.eventId,
+          ...(input.expectedItem ? { expectedItem: input.expectedItem } : {}),
+          ...(input.originPosition ? { originPosition: input.originPosition } : {}),
+          ...(input.target ? { target: input.target } : {}),
+        });
+        pending.set(attemptId, {
+          attemptId,
+          eventId: input.eventId,
+          citizenId: input.citizenId,
+          decisionSource,
+          expectedDelta: { ...input.expectedDelta },
+          originPosition: input.originPosition ?? null,
+        });
+        return attemptId;
+      },
+      finish(attemptId, observation) {
+        const started = pending.get(attemptId);
+        if (!started) throw new Error(`gather observation has no attempt ${attemptId}`);
+        pending.delete(attemptId);
+        const recorded = journalObservation(observation);
+        journal.forCitizen(started.citizenId).observe(attemptId, recorded);
+        completed.push({ ...started, observation: recorded });
+      },
+    });
 
     for (let step = 0; step < 3; step++) {
       // Offline: no Paper tick — record unavailable provenance with a simulated rehearsal step only.
@@ -121,84 +185,61 @@ export async function runScenario(input: ScenarioInput) {
       }
     }
 
+    if (pending.size > 0) throw new Error("gather attempts finished without an observation");
     let sequence = 0;
-    for (const [id, body] of fixture.bodies) {
-      const afterBag = bag(body.items);
-      const beforeBag = beforeBags[id]!;
-      const origin = origins[id]!;
-      const woodDelta = (afterBag.oak_log ?? 0) - (beforeBag.oak_log ?? 0);
-      const assignment = fixture.assignments.find((a) => a.citizenId === id)!;
-      const evidence = fixture.registry.evidenceLog().filter((e) => e.citizenId === id);
-      const eventId = `scripted-${id}-gather`;
-      const channel = journal.forCitizen(id);
-      const attemptId = channel.attempt({
-        action: "gather",
-        decisionSource: "model",
-        decisionEventId: eventId,
-        expectedItem: "oak_log",
-        originPosition: origin,
-      });
-      const success = woodDelta > 0;
-      const positionAfter = {
-        x: body.bot.entity.position.x,
-        y: body.bot.entity.position.y,
-        z: body.bot.entity.position.z,
-      };
-      channel.observe(attemptId, {
-        successReported: success,
-        beforeInventory: beforeBag,
-        afterInventory: afterBag,
-        position: positionAfter,
-        hungerBefore: 20,
-        hungerAfter: body.bot.food,
-        worldChanges: [],
-        failureCode: success ? undefined : "NOT_OBSERVED",
-      });
-      const receiptId = `receipt-${attemptId}`;
-      const expectedDelta = { oak_log: woodDelta };
+    for (const record of completed) {
+      const assignment = fixture.assignments.find((a) => a.citizenId === record.citizenId)!;
+      const evidence = fixture.registry.evidenceLog().filter((e) => e.citizenId === record.citizenId);
+      const delta = inventoryChange(record.observation.beforeInventory, record.observation.afterInventory);
+      const expectedNames = Object.keys(record.expectedDelta);
+      const observedSuccess =
+        expectedNames.length === 0 ? null : expectedNames.some((name) => (delta[name] ?? 0) > 0);
+      const positionAfter = record.observation.position ?? null;
+      const receiptId = `receipt-${record.attemptId}`;
       sequence += 1;
       actions.push({
         sequence,
-        citizenId: id,
-        reportedSuccess: success,
-        observedSuccess: success,
-        inventoryDelta: expectedDelta,
+        citizenId: record.citizenId,
+        reportedSuccess: record.observation.successReported,
+        observedSuccess,
+        inventoryDelta: Object.keys(delta).length > 0 ? delta : null,
         authorizedKnowledge: true,
         decisionTransport: "scripted-in-process",
-        originPosition: origin,
+        originPosition: record.originPosition,
         actionType: "gather",
-        expectedDelta,
+        expectedDelta: record.expectedDelta,
+        decisionSource: record.decisionSource,
         inventoryScope: "citizen",
-        eventId,
-        attemptId,
+        eventId: record.eventId,
+        attemptId: record.attemptId,
         runId,
         sourceSha,
         receiptId,
-        sourceEventId: eventId,
+        sourceEventId: record.eventId,
       });
       if (input.evidenceDirectory) {
         const model = evidence[0]?.model ?? assignment.model;
         const sessionId = evidence[0]?.sessionId;
         if (!model || !sessionId) {
-          throw new Error(`Source receipt requires observed model/session for ${id}; refusing synthetic identity`);
+          throw new Error(`Source receipt requires observed model/session for ${record.citizenId}; refusing synthetic identity`);
         }
         const receipt: SourceReceipt = {
           id: receiptId,
-          eventId,
-          attemptId,
+          eventId: record.eventId,
+          attemptId: record.attemptId,
           runId,
           sourceSha,
           repository,
-          citizenId: id,
+          citizenId: record.citizenId,
           family: assignment.family,
           model,
           sessionId,
           actionType: "gather",
           inventoryScope: "citizen",
-          observedSuccess: success,
-          inventoryBefore: beforeBag,
-          inventoryAfter: afterBag,
-          positionAfter,
+          observedSuccess: observedSuccess === true,
+          inventoryBefore: record.observation.beforeInventory,
+          inventoryAfter: record.observation.afterInventory,
+          ...(positionAfter ? { positionAfter } : {}),
         };
         const bytes = JSON.stringify(receipt);
         const reference = `receipts/${receiptId}.json`;
@@ -206,12 +247,12 @@ export async function runScenario(input: ScenarioInput) {
         writeFileSync(join(input.evidenceDirectory, reference), bytes);
         sourceReceipts.push({
           id: receiptId,
-          eventId,
-          attemptId,
+          eventId: record.eventId,
+          attemptId: record.attemptId,
           runId,
           sourceSha,
           repository,
-          citizenId: id,
+          citizenId: record.citizenId,
           reference,
           sha256: createHash("sha256").update(bytes).digest("hex"),
         });
@@ -278,6 +319,7 @@ export async function runScenario(input: ScenarioInput) {
       }
     }
 
+    fixture.manager.setActionEvidence(undefined);
     journal.recordIntervention("operator_stop");
     await fixture.manager.stop();
     await fixture.manager.stop();
@@ -333,6 +375,7 @@ export async function runScenario(input: ScenarioInput) {
       }
     }
     if (restarted) await restarted.manager.stop();
+    fixture.manager.setActionEvidence(undefined);
     await fixture.manager.stop();
     if (fixture.store.isOpen()) fixture.store.close();
     if (reopened?.isOpen()) reopened.close();

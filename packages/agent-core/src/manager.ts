@@ -49,6 +49,7 @@ import {
   taskEventType,
 } from "./task-recovery.js";
 import { listDiscoveredSites, visibleShoresFromWorld } from "./discovered-sites.js";
+import { bindActionEvidence, type ActionEvidenceSink } from "./action-evidence.js";
 import { bodyContext, completeVerifiedTransfer, completionMemoryForTask, executePlan } from "./executor.js";
 import { deriveSettlementInventory, type SettlementInventoryView } from "./inventory-view.js";
 import { SettlementRuntime } from "./settlement-runtime.js";
@@ -253,6 +254,11 @@ export class AgentManager {
 
   list(): RuntimeCitizen[] {
     return [...this.citizens.values()];
+  }
+
+  /** Records each physical gather on this manager's event bus as it executes. Pass undefined to detach. */
+  setActionEvidence(sink: ActionEvidenceSink | undefined): void {
+    bindActionEvidence(this.events, sink);
   }
 
   get(name: string): RuntimeCitizen | undefined {

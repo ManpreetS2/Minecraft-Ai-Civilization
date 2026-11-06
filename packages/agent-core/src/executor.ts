@@ -34,6 +34,7 @@ import {
   type SkillContext,
 } from "@civ/skills";
 import { Vec3 as Vec3Class } from "vec3";
+import { actionEvidenceFor, type ActionEvidenceObservation } from "./action-evidence.js";
 import { cellClaimKey } from "./claims.js";
 import { executeBuildStructurePlan } from "./build-structure.js";
 import { buildShelter, emitProjectCreated } from "./construction.js";
@@ -152,6 +153,69 @@ function claimedBed(store: CivilizationStore, citizenId: string | undefined): Ve
   return home.success ? home.data.bed : undefined;
 }
 
+function inventorySnapshot(ctx: SkillContext): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const item of ctx.bot.inventory.items()) {
+    if (!item?.name || !/^[a-z0-9_]+$/.test(item.name) || !Number.isSafeInteger(item.count) || item.count < 0) continue;
+    out[item.name] = (out[item.name] ?? 0) + item.count;
+  }
+  return out;
+}
+
+function hungerSnapshot(ctx: SkillContext): number | undefined {
+  const food = ctx.bot.food;
+  return typeof food === "number" && food >= 0 && food <= 20 ? food : undefined;
+}
+
+function pointSnapshot(pos: { x: number; y: number; z: number } | null | undefined): { x: number; y: number; z: number } | undefined {
+  if (!pos || ![pos.x, pos.y, pos.z].every((value) => Number.isFinite(value))) return undefined;
+  return { x: pos.x, y: pos.y, z: pos.z };
+}
+
+/** Planned log gain, chosen from the plan or the block that will be dug. Not an inventory measurement. */
+async function plannedWoodDelta(
+  ctx: SkillContext,
+  plan: PlannedTask,
+): Promise<{ item?: string; delta: Record<string, number>; target?: { x: number; y: number; z: number } }> {
+  if (plan.item && /^[a-z0-9_]+$/.test(plan.item)) {
+    const count = plan.count && Number.isSafeInteger(plan.count) && plan.count > 0 ? plan.count : 1;
+    return { item: plan.item, delta: { [plan.item]: count }, target: plan.target };
+  }
+  const found = await findBlock(ctx, [...LOG_BLOCK_NAMES], 48);
+  if (!found.success || !/^[a-z0-9_]+$/.test(found.data.name)) return { delta: {} };
+  return { item: found.data.name, delta: { [found.data.name]: 1 }, target: pointSnapshot(found.data.position) };
+}
+
+function worldChangesFrom(result: ActionResult): ActionEvidenceObservation["worldChanges"] {
+  if (!result.success || !result.data || typeof result.data !== "object") return [];
+  const data = result.data as { name?: unknown; position?: { x: number; y: number; z: number } };
+  const position = pointSnapshot(data.position);
+  if (typeof data.name !== "string" || !/^[a-z0-9_]+$/.test(data.name) || !position) return [];
+  return [{ position, before: data.name, after: "air" }];
+}
+
+function finishGatherEvidence(
+  evidence: ReturnType<typeof actionEvidenceFor>,
+  attemptId: string | undefined,
+  ctx: SkillContext,
+  beforeInventory: Record<string, number> | undefined,
+  hungerBefore: number | undefined,
+  result: ActionResult,
+): void {
+  if (!evidence || !attemptId) return;
+  const failureCode = result.success ? undefined : result.code && /^[A-Z0-9_]+$/.test(result.code) ? result.code : "FAILED";
+  evidence.finish(attemptId, {
+    successReported: result.success,
+    beforeInventory: beforeInventory ?? {},
+    afterInventory: inventorySnapshot(ctx),
+    position: pointSnapshot(ctx.body.position()),
+    hungerBefore,
+    hungerAfter: hungerSnapshot(ctx),
+    worldChanges: worldChangesFrom(result),
+    failureCode,
+  });
+}
+
 export async function executePlan(
   ctx: SkillContext,
   plan: PlannedTask,
@@ -173,23 +237,22 @@ export async function executePlan(
   const gated = plan.source === "llm" ? enforceModelOriginatedPlan(plan) : plan;
   const integrity = plan.source === "llm" ? validateModelOriginatedPlan(plan) : { ok: true as const };
 
-  events.emit(
-    createEvent(
-      "ActionStarted",
-      {
-        action: gated.action,
-        task: gated.task,
-        source: gated.source,
-        reason: gated.reason,
-        decisionKind: decisionKind(ctx.citizenId, "intent"),
-        goal: gated.goal,
-        dispatchIntegrity: integrity.ok ? "allowlisted" : "rewritten_fail_closed",
-        ...(integrity.ok ? {} : { integrityReason: integrity.reason }),
-        ...(gated.modelProvenance ? { modelProvenance: gated.modelProvenance } : {}),
-      },
-      ctx.citizenId,
-    ),
+  const started = createEvent(
+    "ActionStarted",
+    {
+      action: gated.action,
+      task: gated.task,
+      source: gated.source,
+      reason: gated.reason,
+      decisionKind: decisionKind(ctx.citizenId, "intent"),
+      goal: gated.goal,
+      dispatchIntegrity: integrity.ok ? "allowlisted" : "rewritten_fail_closed",
+      ...(integrity.ok ? {} : { integrityReason: integrity.reason }),
+      ...(gated.modelProvenance ? { modelProvenance: gated.modelProvenance } : {}),
+    },
+    ctx.citizenId,
   );
+  events.emit(started);
 
   ctx.skipBlock = (position) => {
     if (skipProtectedPropertyCell(store, position)) return true;
@@ -198,7 +261,29 @@ export async function executePlan(
     return Boolean(owner && owner !== ctx.citizenId);
   };
 
+  const evidence = actionEvidenceFor(events);
+  let attemptId: string | undefined;
+  let beforeInventory: Record<string, number> | undefined;
+  let hungerBefore: number | undefined;
+  if (evidence && ctx.citizenId && gated.action === "mineBlock" && gated.task === "gather_wood") {
+    beforeInventory = inventorySnapshot(ctx);
+    hungerBefore = hungerSnapshot(ctx);
+    const planned = await plannedWoodDelta(ctx, gated);
+    attemptId = evidence.begin({
+      citizenId: ctx.citizenId,
+      eventId: started.id,
+      planSource: gated.source,
+      action: "gather",
+      task: gated.task,
+      expectedItem: planned.item,
+      expectedDelta: planned.delta,
+      originPosition: pointSnapshot(ctx.body.position()),
+      target: planned.target,
+    });
+  }
+
   let result: ActionResult;
+  try {
   switch (gated.action) {
     case "eatFood":
       result = await eatFood(ctx);
@@ -471,6 +556,17 @@ export async function executePlan(
       );
       break;
   }
+  } catch (error) {
+    finishGatherEvidence(evidence, attemptId, ctx, beforeInventory, hungerBefore, {
+      success: false,
+      code: ctx.signal?.aborted ? "CANCELLED" : "INTERRUPTED",
+      error: error instanceof Error ? error.message : String(error),
+      durationMs: 0,
+      retryable: true,
+    });
+    throw error;
+  }
+  finishGatherEvidence(evidence, attemptId, ctx, beforeInventory, hungerBefore, result);
 
   const foodMeta = foodResultMeta(result);
   events.emit(
@@ -908,16 +1004,44 @@ function storedContentsFor(ctx: SkillContext, store: CivilizationStore, chest: V
   return communityPhysicalState(store).forCitizen(ctx.citizenId).observedContainerContents(key) ?? {};
 }
 
-/** Persists only counts the adapter just observed, scoped to the container's owner/grantees. */
-function recordObservedContents(ctx: SkillContext, store: CivilizationStore, chest: Vec3, observed: Record<string, number>): void {
+/** Token read before a live chest check. Undefined when this citizen cannot use the container. */
+function containerObservationToken(ctx: SkillContext, store: CivilizationStore, chest: Vec3): number | undefined {
   const dimension = ctx.bot.game?.dimension;
-  if (!ctx.citizenId || typeof dimension !== "string" || !dimension.trim()) return;
+  if (!store.hasCommunities() || !ctx.citizenId || typeof dimension !== "string" || !dimension.trim()) return undefined;
   const key = physicalBlockKey(dimension.replace(/^minecraft:/, ""), chest);
   try {
-    communityPhysicalState(store).forCitizen(ctx.citizenId).recordContainerObservation(key, observed);
+    return communityPhysicalState(store).forCitizen(ctx.citizenId).containerObservationToken(key);
+  } catch (error) {
+    console.error(`[executor] container observation token unavailable: ${error instanceof Error ? error.message : String(error)}`);
+    return undefined;
+  }
+}
+
+/** Persists only counts the adapter just observed, scoped to the container's owner/grantees. */
+function recordObservedContents(
+  ctx: SkillContext,
+  store: CivilizationStore,
+  chest: Vec3,
+  observed: Record<string, number>,
+  expectedRevision: number | undefined,
+): boolean {
+  const dimension = ctx.bot.game?.dimension;
+  if (!ctx.citizenId || typeof dimension !== "string" || !dimension.trim()) return false;
+  if (expectedRevision === undefined) {
+    console.error("[executor] container observation skipped: no revision token from before the live check");
+    return false;
+  }
+  const key = physicalBlockKey(dimension.replace(/^minecraft:/, ""), chest);
+  try {
+    const accepted = communityPhysicalState(store)
+      .forCitizen(ctx.citizenId)
+      .recordContainerObservation(key, observed, { expectedRevision });
+    if (!accepted) console.error("[executor] stale container observation discarded");
+    return accepted;
   } catch (error) {
     // The physical transfer already happened; a lost observation only makes the next withdrawal re-verify live.
     console.error(`[executor] container observation not recorded: ${error instanceof Error ? error.message : String(error)}`);
+    return false;
   }
 }
 
@@ -949,13 +1073,14 @@ async function depositToSettlement(
   if (ctx.citizenId && !runtime.claims.tryClaim("container", cellClaimKey(chest.x, chest.y, chest.z), ctx.citizenId, 30_000)) {
     return { success: false, code: "CONTAINER_BUSY", error: "Chest is in use", durationMs: 0, retryable: true };
   }
+  const expectedRevision = containerObservationToken(ctx, store, chest);
   const result = await depositItems(ctx, undefined, chest);
   runtime.claims.release("container", cellClaimKey(chest.x, chest.y, chest.z), ctx.citizenId);
   if (result.success) {
     // Container contents are restricted to the actual readers, not every community
     // member. Do not publish them to the legacy or community-wide stock snapshots.
     if (store.hasCommunities()) {
-      recordObservedContents(ctx, store, chest, result.data.contents);
+      recordObservedContents(ctx, store, chest, result.data.contents, expectedRevision);
     } else {
       const settlement = store.getSettlement();
       settlement.storage = chest;
@@ -993,10 +1118,11 @@ async function withdrawItemsNamed(
   }
   const access = assertMayUseChest(store, ctx.citizenId, chest, "communal", ctx.bot.game?.dimension);
   if (!access.success) return access;
+  const expectedRevision = containerObservationToken(ctx, store, chest);
   const result = await withdrawItems(ctx, itemName, count, chest);
   if (result.success) {
     if (store.hasCommunities()) {
-      recordObservedContents(ctx, store, chest, result.data.contents);
+      recordObservedContents(ctx, store, chest, result.data.contents, expectedRevision);
     } else {
       const settlement = store.getSettlement();
       settlement.storageContents = result.data.contents;
@@ -1009,8 +1135,8 @@ async function withdrawItemsNamed(
   ) {
     // Live adapter proved this item is absent (or the withdraw did not move it). Clear only that
     // item's last-observed count so planners do not retry a stale positive stock belief. Do not
-    // invent a full inventory snapshot from the failure.
-    recordObservedContents(ctx, store, chest, { [itemName]: 0 });
+    // invent a full inventory snapshot from the failure. The token was read before the live check.
+    recordObservedContents(ctx, store, chest, { [itemName]: 0 }, expectedRevision);
   }
   return result;
 }

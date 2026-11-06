@@ -12,7 +12,7 @@ const point = z
 const attemptSchema = z
   .object({
     action: z.enum(["gather", "craft", "place", "eat", "move", "speech"]),
-    decisionSource: z.enum(["model", "planner", "reflex"]),
+    decisionSource: z.enum(["model", "planner", "reflex", "scripted"]),
     decisionEventId: identifier,
     expectedItem: itemName.optional(),
     target: point.optional(),

@@ -1,9 +1,10 @@
 /** Community-owned container contents: observed (not global stock), readable only by owner and grantees. Offline. */
+import { spawn } from "node:child_process";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { EventBus, ok } from "@civ/shared";
+import { EventBus, fail, ok } from "@civ/shared";
 import { depositItems, withdrawItems, type SkillContext } from "@civ/skills";
 import { CivilizationStore } from "./store.js";
 import { communityPhysicalState, physicalBlockKey } from "./community-physical-state.js";
@@ -138,6 +139,110 @@ describe("executor uses observed contents, not global stock", () => {
     expect(result.success).toBe(false);
     // Only the attempted item is cleared; unrelated last-observed keys remain until a later live observation.
     expect(of("citizen_atlas").observedContainerContents(key)).toEqual({ apple: 1 });
+  });
+
+  it("does not let a delayed stale withdrawal erase a newer observation", async () => {
+    of("citizen_atlas").recordContainerObservation(key, { bread: 4, apple: 2 });
+    of("citizen_atlas").grantAsset(key, "citizen_maya");
+    const seen = of("citizen_atlas").observedContainerDetails(key)!.revision;
+    vi.mocked(withdrawItems).mockImplementation(async () => {
+      expect(of("citizen_maya").recordContainerObservation(key, { bread: 1 }, { expectedRevision: seen })).toBe(true);
+      return fail("VERIFY_FAILED", "chest holds no bread", 1, true);
+    });
+    const result = await executePlan(await ctx("citizen_atlas"), withdrawPlan, store, new EventBus());
+    expect(result.success).toBe(false);
+    expect(of("citizen_atlas").observedContainerContents(key)).toEqual({ bread: 1, apple: 2 });
+    expect(of("citizen_maya").observedContainerContents(key)).toEqual({ bread: 1, apple: 2 });
+  });
+});
+
+describe("chest observation tokens do not revive after abandon", () => {
+  it("rejects an old token after the chest is abandoned and recreated at the same coordinates", () => {
+    const owner = of("citizen_atlas");
+    expect(owner.recordContainerObservation(key, { bread: 4 }, { expectedRevision: 0 })).toBe(true);
+    const oldToken = owner.observedContainerDetails(key)!.revision;
+    expect(owner.abandonAsset(key)).toBe(true);
+    expect(owner.registerAsset("chest", "overworld", pos)).toBe(true);
+    expect(owner.recordContainerObservation(key, { bread: 99 }, { expectedRevision: 0 })).toBe(false);
+    expect(owner.recordContainerObservation(key, { bread: 99 }, { expectedRevision: oldToken })).toBe(false);
+    expect(owner.observedContainerContents(key)).toBeUndefined();
+    const fresh = owner.containerObservationToken(key);
+    expect(fresh).not.toBe(0);
+    expect(fresh).not.toBe(oldToken);
+    expect(owner.recordContainerObservation(key, { bread: 2 }, { expectedRevision: fresh })).toBe(true);
+    expect(owner.observedContainerContents(key)).toEqual({ bread: 2 });
+  });
+
+  it("refuses a revoked grantee and a citizen who changed community", () => {
+    const owner = of("citizen_atlas");
+    owner.recordContainerObservation(key, { bread: 4 });
+    owner.grantAsset(key, "citizen_maya");
+    const token = of("citizen_maya").observedContainerDetails(key)!.revision;
+    expect(of("citizen_maya").recordContainerObservation(key, { bread: 3 }, { expectedRevision: token })).toBe(true);
+    expect(owner.revokeAsset(key, "citizen_maya")).toBe(true);
+    expect(of("citizen_maya").recordContainerObservation(key, { bread: 1 }, { expectedRevision: token + 1 })).toBe(false);
+    expect(of("citizen_maya").observedContainerContents(key)).toBeUndefined();
+    expect(owner.observedContainerContents(key)).toEqual({ bread: 3 });
+
+    owner.grantAsset(key, "citizen_maya");
+    const still = owner.observedContainerDetails(key)!.revision;
+    store.removeCommunityMember("north", "citizen_maya", audit);
+    store.addCommunityMember("south", "citizen_maya", audit);
+    expect(of("citizen_maya").recordContainerObservation(key, { bread: 1 }, { expectedRevision: still })).toBe(false);
+    expect(of("citizen_maya").containerObservationToken(key)).toBeUndefined();
+    expect(owner.observedContainerContents(key)).toEqual({ bread: 3 });
+  });
+});
+
+describe("concurrent chest observers", () => {
+  it("lets exactly one of two database connections win the same token", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "chest-race-"));
+    const path = join(dir, "chest.sqlite");
+    try {
+      const seed = new CivilizationStore(path);
+      seed.upsertCommunity("north", "North", audit);
+      seed.addCommunityMember("north", "citizen_atlas", audit);
+      seed.addCommunityMember("north", "citizen_maya", audit);
+      const owner = communityPhysicalState(seed).forCitizen("citizen_atlas");
+      owner.registerAsset("chest", "overworld", pos);
+      owner.grantAsset(key, "citizen_maya");
+      expect(owner.containerObservationToken(key)).toBe(0);
+      seed.close();
+
+      const tsx = join(process.cwd(), "node_modules/tsx/dist/cli.mjs");
+      const entry = join(process.cwd(), "packages/agent-core/src/chest-observation-race-main.ts");
+      const run = (citizenId: string) =>
+        new Promise<{ ok: boolean; revision: number | null }>((resolve, reject) => {
+          const child = spawn(process.execPath, [tsx, entry, path, citizenId, "0"], { stdio: ["ignore", "pipe", "pipe"] });
+          let stdout = "";
+          let stderr = "";
+          child.stdout.setEncoding("utf8");
+          child.stderr.setEncoding("utf8");
+          child.stdout.on("data", (chunk) => {
+            stdout += chunk;
+          });
+          child.stderr.on("data", (chunk) => {
+            stderr += chunk;
+          });
+          child.on("error", reject);
+          child.on("close", (code) => {
+            if (code !== 0) {
+              reject(new Error(`chest race child ${citizenId} exited ${code}: ${stderr}`));
+              return;
+            }
+            resolve(JSON.parse(stdout.trim()) as { ok: boolean; revision: number | null });
+          });
+        });
+      const [left, right] = await Promise.all([run("citizen_atlas"), run("citizen_maya")]);
+      expect([left.ok, right.ok].filter(Boolean)).toHaveLength(1);
+      const check = new CivilizationStore(path);
+      const after = communityPhysicalState(check).forCitizen("citizen_atlas").observedContainerDetails(key);
+      expect(after?.contents).toEqual({ bread: 1 });
+      expect(after?.revision).toBe(1);
+      check.close();
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
 
