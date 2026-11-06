@@ -358,6 +358,11 @@ export async function dispatchCitizenBuildIntention(args: {
   let project: BuildStructureProject;
   let preflight: BuildStructurePreflight | undefined;
 
+  // A community has one durable project. A new planner task cannot reassign it.
+  if (existing?.ownerCitizenId && existing.ownerCitizenId !== intention.citizenId) {
+    return { phase: "SITE_CLAIM_DENIED", project: existing, shortfall: {}, worldVerifiedComplete: false, reusedExisting: true };
+  }
+
   if (existing?.cancelled && projectsMatchIntention(existing, intention)) {
     return {
       phase: "CANCELLED",
@@ -746,6 +751,11 @@ export async function executeBuildStructurePlan(args: {
     return fail("NOT_CONNECTED", "Cannot build_structure without citizenId", 0, true);
   }
 
+  const owner = (args.runtime.project as BuildStructureProject | undefined)?.ownerCitizenId;
+  if (owner && owner !== citizenId) {
+    return fail("ACCESS_DENIED", "Construction project belongs to another citizen", 0, false, { workComplete: false });
+  }
+
   const physical: Record<string, number> = {};
   for (const item of args.ctx.bot.inventory.items()) {
     physical[item.name] = (physical[item.name] ?? 0) + item.count;
@@ -826,6 +836,11 @@ export async function executeBuildStructurePlan(args: {
         ),
     );
     args.runtime.project = cancelled;
+    const persisted = args.persist?.(cancelled);
+    if (persisted && !persisted.ok) {
+      args.runtime.project = { ...cancelled, lastPersistOk: false, lastPersistReason: persisted.reason ?? "persist_failed" } as BuildStructureProject;
+      return fail("CANCELLED", "Construction cancellation could not be persisted", 0, true, { workComplete: false, persisted: false, phase: "PERSIST_FAILED", reason: persisted.reason });
+    }
     return fail("CANCELLED", "Construction cancelled; no further placement dispatch", 0, false, {
       workComplete: false,
       phase: "CANCELLED",
@@ -843,6 +858,10 @@ export async function executeBuildStructurePlan(args: {
     },
     runtime: args.runtime,
     getBlock,
+    getBlockProperties: (pos) => {
+      const properties = args.ctx.bot.blockAt(new Vec3Class(Math.floor(pos.x), Math.floor(pos.y), Math.floor(pos.z)))?.getProperties?.();
+      return properties ? Object.fromEntries(Object.entries(properties).map(([key, value]) => [key, String(value)])) : undefined;
+    },
     physicalInventory: physical,
     ctx: args.ctx,
     advance: args.advance,

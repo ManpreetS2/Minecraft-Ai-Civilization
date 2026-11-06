@@ -29,8 +29,7 @@ import {
 } from "@civ/minecraft-knowledge";
 import { Vec3 as Vec3Class } from "vec3";
 import type { SkillContext } from "./context.js";
-import { depositItem, pickupDroppedItem } from "./inventory-service.js";
-import { inventoryCount } from "./inventory.js";
+import { pickupDroppedItem } from "./inventory-service.js";
 import { moveTo } from "./movement.js";
 import { openDoor } from "./doors.js";
 import { equipForBlock } from "./tools.js";
@@ -507,13 +506,17 @@ export async function validateBuiltStructure(
   const chest = expanded.workstationLocal.find((entry) => entry.role === "chest");
   if (chest) {
     const chestPos = worldPosition(origin, chest.dx, chest.dy, chest.dz, expanded.blueprint.footprint, session.facing);
-    const have = ["oak_planks", "spruce_planks", "birch_planks"].find((name) => inventoryCount(ctx, name) > 0);
-    if (!have) failures.push("WORKSTATION_UNREACHABLE");
-    else {
-      const deposited = await depositItem(ctx, have, 1, chestPos);
-      if (!deposited.success) failures.push("WORKSTATION_UNREACHABLE");
-      else usedWorkstation = true;
-    }
+    // Probe actual container access without mutating inventory. Re-delivery and
+    // recovery after a failed durable write must not transfer another item.
+    try {
+      const block = ctx.bot.blockAt(new Vec3Class(chestPos.x, chestPos.y, chestPos.z));
+      if (!block || block.name !== "chest") failures.push("WORKSTATION_UNREACHABLE");
+      else {
+        const container = await ctx.bot.openContainer(block);
+        try { container.containerItems(); usedWorkstation = true; }
+        finally { container.close(); }
+      }
+    } catch { failures.push("WORKSTATION_UNREACHABLE"); }
   }
 
   const movedOut = await moveTo(ctx, { x: approach.x + 0.5, y: approach.y, z: approach.z + 0.5 }, 1.6);

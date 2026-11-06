@@ -1,5 +1,5 @@
-import { ClaimBoard, ReservationBook } from "./claims.js";
-import { loadCommunityProject } from "./community-construction.js";
+import { cellClaimKey, ClaimBoard, ReservationBook } from "./claims.js";
+import { loadCommunityProject, migrateCommunityConstruction } from "./community-construction.js";
 import { createShelterProject, type SettlementProject } from "./projects.js";
 import type { CivilizationStore } from "./store.js";
 
@@ -27,7 +27,18 @@ export class SettlementRuntime {
       view = new SettlementRuntime(this.claims, communityId);
       this.communities.set(communityId, view);
     }
-    if (store && !view.project) view.project = loadCommunityProject(store, communityId);
+    if (store?.isOpen() && !view.project) view.project = loadCommunityProject(store, communityId);
+    if (store?.isOpen()) {
+      migrateCommunityConstruction(store);
+      // Rebuild all communities' physical site holds before admitting new work.
+      // Project rows remain the durable authority; leases are refreshed on access.
+      for (const row of store.db.prepare("SELECT project_json FROM community_construction_projects").all() as Array<{ project_json: string }>) {
+        const project = JSON.parse(row.project_json) as SettlementProject & { ownerCitizenId?: string; cancelled?: boolean };
+        if (project.ownerCitizenId && project.site && !project.cancelled && project.status !== "FAILED") {
+          this.claims.tryClaim("construction_site", cellClaimKey(project.site.x, project.site.y, project.site.z), project.ownerCitizenId, 30 * 60_000);
+        }
+      }
+    }
     return view;
   }
 

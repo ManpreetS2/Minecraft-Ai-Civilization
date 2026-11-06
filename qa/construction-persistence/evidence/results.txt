@@ -1,0 +1,130 @@
+
+ RUN  v3.2.7 /private/tmp/minecraft-construction-qa
+
+(node:93740) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+stdout | qa/construction-persistence/test/persistence.test.ts > completes through real executor placements and reopens SQLite without rebuilding
+completion evidence {"project":{"id":"project_workshop_cabin_v1_citizen_atlas_100_70_100","type":"STRUCTURE_BUILD","ownerCitizenId":"citizen_atlas","status":"BUILDING","stage":"SITE_CLEARING","blueprintId":"workshop_cabin_v1","blueprintVersion":1,"facing":"south","site":{"x":100,"y":70,"z":100},"requiredResources":{"oak_planks":66,"oak_door":1,"torch":1,"chest":1,"crafting_table":1},"reservedResources":{},"blocked":[],"placed":69,"total":70,"verified":69,"startedAt":"2026-11-06T06:36:17.641Z","session":{"instanceId":"build_workshop_cabin_v1_1793946977641","blueprintId":"workshop_cabin_v1","blueprintVersion":1,"structureType":"WORKSHOP","facing":"south","origin":{"x":100,"y":70,"z":100},"materials":{"WALL_MATERIAL":"oak_planks","FLOOR_MATERIAL":"oak_planks","ROOF_MATERIAL":"oak_planks","FOUNDATION_MATERIAL":"oak_planks","DOOR_MATERIAL":"oak_door","LIGHT_MATERIAL":"torch","STORAGE_MATERIAL":"chest","WORKSTATION_MATERIAL":"crafting_table","BED_MATERIAL":"red_bed","FURNACE_MATERIAL":"furnace"},"extras":["chest","lighting","crafting_table"],"stage":"FLOOR","status":"IN_PROGRESS","placed":69,"total":70,"failures":[]},"preflightBlockers":[],"remainingResources":{"oak_door":1},"materialShortfall":{},"cancelled":false,"lastPersistOk":true},"requests":70,"inventory":{"oak_planks":703,"oak_door":9,"chest":9,"torch":9,"crafting_table":9},"result":{"success":true,"data":{"session":{"instanceId":"build_workshop_cabin_v1_1793946977641","blueprintId":"workshop_cabin_v1","blueprintVersion":1,"structureType":"WORKSHOP","facing":"south","origin":{"x":100,"y":70,"z":100},"materials":{"WALL_MATERIAL":"oak_planks","FLOOR_MATERIAL":"oak_planks","ROOF_MATERIAL":"oak_planks","FOUNDATION_MATERIAL":"oak_planks","DOOR_MATERIAL":"oak_door","LIGHT_MATERIAL":"torch","STORAGE_MATERIAL":"chest","WORKSTATION_MATERIAL":"crafting_table","BED_MATERIAL":"red_bed","FURNACE_MATERIAL":"furnace"},"extras":["chest","lighting","crafting_table"],"stage":"FLOOR","status":"IN_PROGRESS","placed":69,"total":70,"failures":[]},"stage":"FINAL_VALIDATION","placedThisCall":0},"durationMs":0}}
+
+stdout | qa/construction-persistence/test/persistence.test.ts > dispatcher with property observations completes and reloads without duplicate placements
+dispatcher restart evidence {"id":"project_workshop_cabin_v1_citizen_atlas_100_70_100","status":"COMPLETED","placed":71,"requests":70,"inventory":{"oak_planks":933,"oak_door":9,"chest":9,"torch":9,"crafting_table":9}}
+
+ ❯ qa/construction-persistence/test/persistence.test.ts (12 tests | 5 failed) 455ms
+   × completes through real executor placements and reopens SQLite without rebuilding 271ms
+     → expected 'BUILDING' to be 'COMPLETED' // Object.is equality
+   ✓ partial placements and consumed materials reconcile after SQLite reopen 14ms
+   ✓ failed or missing-material placement cannot complete or consume: {"missing":true} 7ms
+   ✓ failed or missing-material placement cannot complete or consume: {"silent":true} 7ms
+   ✓ an aborted construction cannot add placements and persists the existing progress 9ms
+   ✓ unaffiliated citizen cannot continue or change durable task 8ms
+   ✓ a forged completed row is revalidated against the observed world 9ms
+   × another member cannot replace the task owner after restart 9ms
+     → expected 'other' to be 'citizen_atlas' // Object.is equality
+   × shutdown with a closed store reports no durable completion 14ms
+     → The database connection is not open
+   × replayed completion attempts do not repeatedly consume validation materials 58ms
+     → expected { oak_planks: 921, oak_door: 9, …(3) } to deeply equal { oak_planks: 923, oak_door: 9, …(3) }
+   ✓ dispatcher with property observations completes and reloads without duplicate placements 39ms
+   × explicit cancellation survives SQLite restart 9ms
+     → expected false to be true // Object.is equality
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 5 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  qa/construction-persistence/test/persistence.test.ts > completes through real executor placements and reopens SQLite without rebuilding
+AssertionError: expected 'BUILDING' to be 'COMPLETED' // Object.is equality
+
+Expected: "COMPLETED"
+Received: "BUILDING"
+
+ ❯ qa/construction-persistence/test/persistence.test.ts:51:31
+     49|   for (let n = 0; n < 300; n++) { result = await f.step(); if (f.proje…
+     50|   console.log("completion evidence", JSON.stringify({ project: f.proje…
+     51|   expect(f.project()?.status).toBe("COMPLETED");
+       |                               ^
+     52|   expect(f.harness.placeRequests.length).toBeGreaterThan(0);
+     53|   expect(f.inventory().oak_planks).toBeLessThan(1000);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/5]⎯
+
+ FAIL  qa/construction-persistence/test/persistence.test.ts > another member cannot replace the task owner after restart
+AssertionError: expected 'other' to be 'citizen_atlas' // Object.is equality
+
+Expected: "citizen_atlas"
+Received: "other"
+
+ ❯ qa/construction-persistence/test/persistence.test.ts:103:39
+    101|   f.store().addCommunityMember("north", "other", audit); f.restart(); …
+    102|   const pending = executePlan(f.harness.ctx, f.initial, f.store(), new…
+    103|   expect(f.project()?.ownerCitizenId).toBe(before.ownerCitizenId);
+       |                                       ^
+    104|   expect(f.project()?.id).toBe(before.id);
+    105| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/5]⎯
+
+ FAIL  qa/construction-persistence/test/persistence.test.ts > shutdown with a closed store reports no durable completion
+TypeError: The database connection is not open
+ ❯ Database.prepare node_modules/.pnpm/better-sqlite3@12.11.1/node_modules/better-sqlite3/lib/methods/wrappers.js:5:21
+ ❯ CivilizationStore.hasCommunities packages/agent-core/src/store.ts:711:21
+    709|   /** True once any community exists: the world is then multi-communit…
+    710|   hasCommunities(): boolean {
+    711|     return (this.db.prepare(`SELECT COUNT(*) AS n FROM communities`).g…
+       |                     ^
+    712|   }
+    713| 
+ ❯ executePlan packages/agent-core/src/executor.ts:164:13
+ ❯ Object.step qa/construction-persistence/test/persistence.test.ts:38:21
+ ❯ qa/construction-persistence/test/persistence.test.ts:110:26
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/5]⎯
+
+ FAIL  qa/construction-persistence/test/persistence.test.ts > replayed completion attempts do not repeatedly consume validation materials
+AssertionError: expected { oak_planks: 921, oak_door: 9, …(3) } to deeply equal { oak_planks: 923, oak_door: 9, …(3) }
+
+- Expected
++ Received
+
+  {
+    "chest": 9,
+    "crafting_table": 9,
+    "oak_door": 9,
+-   "oak_planks": 923,
++   "oak_planks": 921,
+    "torch": 9,
+  }
+
+ ❯ qa/construction-persistence/test/persistence.test.ts:120:25
+    118|   await f.step(); await f.step();
+    119|   expect(f.harness.placeRequests).toHaveLength(count);
+    120|   expect(f.inventory()).toEqual(before);
+       |                         ^
+    121| });
+    122| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/5]⎯
+
+ FAIL  qa/construction-persistence/test/persistence.test.ts > explicit cancellation survives SQLite restart
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ qa/construction-persistence/test/persistence.test.ts:146:34
+    144|   expect(await pending).toMatchObject({ success: false, code: "CANCELL…
+    145|   expect(f.project()?.cancelled).toBe(true);
+    146|   expect(f.restart()?.cancelled).toBe(true);
+       |                                  ^
+    147| });
+    148| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/5]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  5 failed | 7 passed (12)
+   Start at  22:36:15
+   Duration  2.58s (transform 1.01s, setup 75ms, collect 1.51s, tests 455ms, environment 0ms, prepare 85ms)
+
