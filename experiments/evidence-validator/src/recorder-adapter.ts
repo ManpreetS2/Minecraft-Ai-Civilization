@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Recorder Adapter (Phase 2)
  *
  * Bridges the gap between records produced by the CODEX 1-owned
@@ -118,10 +118,7 @@ export function adaptRecorderJournal(rawLines: readonly string[]): RecorderAdapt
         });
       }
     } else if (kind === "action_observation") {
-      if (
-        !("toolDurabilityBefore" in parsed) ||
-        parsed.toolDurabilityBefore === undefined
-      ) {
+      if (!("toolDurabilityBefore" in parsed) || parsed.toolDurabilityBefore === undefined) {
         missingToolDurability = true;
       }
       const clean: Record<string, unknown> = {
@@ -164,7 +161,11 @@ export function adaptRecorderJournal(rawLines: readonly string[]): RecorderAdapt
         });
       }
     } else if (kind === "tick") {
-      if (!("serverGameTick" in parsed) || parsed.serverGameTick === undefined) {
+      if (
+        !("serverGameTick" in parsed) ||
+        parsed.serverGameTick === undefined ||
+        parsed.serverGameTick === null
+      ) {
         missingServerGameTick = true;
       }
       const clean: Record<string, unknown> = {
@@ -178,6 +179,8 @@ export function adaptRecorderJournal(rawLines: readonly string[]): RecorderAdapt
       };
       if (parsed.measuredTps !== undefined) clean.measuredTps = parsed.measuredTps;
       if (parsed.serverGameTick !== undefined) clean.serverGameTick = parsed.serverGameTick;
+      if (parsed.simulatedStep !== undefined) clean.simulatedStep = parsed.simulatedStep;
+      if (parsed.tickProvenance !== undefined) clean.tickProvenance = parsed.tickProvenance;
 
       const result = journalRowSchema.safeParse(clean);
       if (result.success) {
@@ -187,6 +190,34 @@ export function adaptRecorderJournal(rawLines: readonly string[]): RecorderAdapt
         notProven.push({
           code: "RECORDER_SCHEMA_MISMATCH_TICK",
           description: `tick row failed validator schema: ${result.error.message.slice(0, 128)}`,
+          missingFields: result.error.issues.map((i) => i.path.join(".")),
+        });
+      }
+    } else if (kind === "start") {
+      const clean: Record<string, unknown> = {
+        kind: "start",
+        experimentId: parsed.experimentId,
+        seq: parsed.seq,
+        at: parsed.at,
+        previousHash: parsed.previousHash,
+        hash: parsed.hash,
+        recordingAudience: parsed.recordingAudience,
+        mode: parsed.mode,
+      };
+      if (parsed.decisionTransport !== undefined)
+        clean.decisionTransport = parsed.decisionTransport;
+      if (parsed.sourceSha !== undefined) clean.sourceSha = parsed.sourceSha;
+      if (parsed.runId !== undefined) clean.runId = parsed.runId;
+      if (parsed.citizens !== undefined) clean.citizens = parsed.citizens;
+
+      const result = journalRowSchema.safeParse(clean);
+      if (result.success) {
+        journalRows.push(result.data);
+        outputLines.push(trimmed); // Preserve original line for hash-chain integrity
+      } else {
+        notProven.push({
+          code: "RECORDER_SCHEMA_MISMATCH_START",
+          description: `start row failed validator schema: ${result.error.message.slice(0, 128)}`,
           missingFields: result.error.issues.map((i) => i.path.join(".")),
         });
       }

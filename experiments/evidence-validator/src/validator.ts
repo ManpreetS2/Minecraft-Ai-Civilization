@@ -24,6 +24,10 @@ import type {
 
 export type ValidatorInput = {
   manifest?: ValidatedManifest;
+  experimentId?: string;
+  sourceSha?: string;
+  runId?: string;
+  citizens?: string[];
   rawJournalLines?: string[];
   journalRows?: JournalRow[];
   events?: EventStreamItem[];
@@ -89,7 +93,6 @@ export function validateExperimentEvidence(input: ValidatorInput): ValidationRep
   // Phase 2: track seen attempt IDs to detect duplicates
   const seenAttemptIds = new Set<string>();
   const actionVerifications: ActionVerificationResult[] = [];
-
 
   for (const row of journalRows) {
     if (row.kind === "action_attempt") {
@@ -159,11 +162,17 @@ export function validateExperimentEvidence(input: ValidatorInput): ValidationRep
       const result = verifySingleAction(attempt, observation);
       actionVerifications.push(result);
 
-      if (result.status === "CORRUPTED" || (result.status === "UNVERIFIED" && observation.successReported)) {
+      if (
+        result.status === "CORRUPTED" ||
+        (result.status === "UNVERIFIED" && observation.successReported)
+      ) {
         violations.push({
-          code: result.status === "CORRUPTED" ? "CORRUPTED_ACTION_EVIDENCE" : "UNVERIFIED_ACTION_CLAIM",
+          code:
+            result.status === "CORRUPTED" ? "CORRUPTED_ACTION_EVIDENCE" : "UNVERIFIED_ACTION_CLAIM",
           citizenId: result.citizenId,
-          description: result.reasons.join("; ") || `Action '${result.action}' claimed success without verified physical evidence`,
+          description:
+            result.reasons.join("; ") ||
+            `Action '${result.action}' claimed success without verified physical evidence`,
           severity: "ERROR",
         });
       }
@@ -207,16 +216,49 @@ export function validateExperimentEvidence(input: ValidatorInput): ValidationRep
     });
   }
 
-  // 4. Duration & Tick Audit
+  // 4. Resolve identity & source SHA from manifest, caller inputs, or journal start row
+  const startRow = journalRows.find((r) => r.kind === "start");
+  const effectiveSourceSha =
+    (input.sourceSha && /^[a-f0-9]{40}$/.test(input.sourceSha) ? input.sourceSha : undefined) ??
+    (input.manifest?.sourceSha && /^[a-f0-9]{40}$/.test(input.manifest.sourceSha)
+      ? input.manifest.sourceSha
+      : undefined) ??
+    (startRow?.sourceSha && /^[a-f0-9]{40}$/.test(startRow.sourceSha)
+      ? startRow.sourceSha
+      : undefined) ??
+    "0000000000000000000000000000000000000000";
+
+  const effectiveExperimentId =
+    (input.experimentId && input.experimentId.trim() ? input.experimentId.trim() : undefined) ??
+    (input.manifest?.experimentId && input.manifest.experimentId.trim()
+      ? input.manifest.experimentId.trim()
+      : undefined) ??
+    (startRow?.experimentId && startRow.experimentId.trim()
+      ? startRow.experimentId.trim()
+      : undefined) ??
+    "unspecified_experiment";
+
+  const effectiveRunId =
+    (input.runId && input.runId.trim() ? input.runId.trim() : undefined) ??
+    (startRow?.runId && startRow.runId.trim() ? startRow.runId.trim() : undefined) ??
+    (input.manifest?.experimentId && input.manifest.experimentId.trim()
+      ? input.manifest.experimentId.trim()
+      : undefined) ??
+    effectiveExperimentId;
+
+  // Duration & Tick Audit
   const claimedMinutes = input.manifest?.durationMinutes ?? 0;
   const durationAudit = auditDurationAndTicks({
     claimedDurationMinutes: claimedMinutes,
     journalRows,
     sourceAttestation: input.sourceAttestation,
-    experimentId: input.manifest?.experimentId,
+    experimentId: effectiveExperimentId,
     trustedAuthorities: input.trustedAuthorities,
     trustedKeys: input.trustedKeys,
-    expectedSourceSha: input.manifest?.sourceSha,
+    expectedSourceSha:
+      effectiveSourceSha !== "0000000000000000000000000000000000000000"
+        ? effectiveSourceSha
+        : undefined,
     rawJournalLines: input.rawJournalLines,
   });
 
@@ -230,7 +272,8 @@ export function validateExperimentEvidence(input: ValidatorInput): ValidationRep
   } else if (input.manifest?.paths.runRoot.includes("live")) {
     notProven.push({
       code: "UNPROVEN_PAPER_AUTHENTICITY",
-      description: "Experiment path or configuration claims live Minecraft execution, but Paper server authenticity and continuous tick progression are not proven",
+      description:
+        "Experiment path or configuration claims live Minecraft execution, but Paper server authenticity and continuous tick progression are not proven",
       missingFields: ["sourceAttestation"],
     });
   }
@@ -318,26 +361,24 @@ export function validateExperimentEvidence(input: ValidatorInput): ValidationRep
   let overallStatus: OverallValidationStatus;
   if (violations.length > 0) {
     overallStatus = "VIOLATIONS_DETECTED";
-  } else if (
-    notProven.length > 0 ||
-    actionVerifications.length === 0 ||
-    !hashChainAudit.valid
-  ) {
+  } else if (notProven.length > 0 || actionVerifications.length === 0 || !hashChainAudit.valid) {
     overallStatus = "NOT_PROVEN";
   } else {
     overallStatus = "VERIFIED";
   }
 
-  const citizenList = input.manifest?.citizens.map((c: { id: string }) => c.id) ?? [
-    ...new Set(actionVerifications.map((v) => v.citizenId)),
-  ];
+  const citizenList = input.manifest?.citizens.map((c: { id: string }) => c.id) ??
+    (input.citizens && input.citizens.length > 0 ? input.citizens : undefined) ??
+    (startRow?.citizens && startRow.citizens.length > 0 ? startRow.citizens : undefined) ?? [
+      ...new Set(actionVerifications.map((v) => v.citizenId)),
+    ];
 
   const report: ValidationReport = {
     version: "1.0.0",
     validatorName: "antigravity-evidence-validator",
     generatedAt: new Date().toISOString(),
-    experimentId: input.manifest?.experimentId ?? "unspecified_experiment",
-    sourceSha: input.manifest?.sourceSha ?? "0000000000000000000000000000000000000000",
+    experimentId: effectiveExperimentId,
+    sourceSha: effectiveSourceSha,
     mode,
     overallStatus,
     summary: {
@@ -364,7 +405,7 @@ export function validateExperimentEvidence(input: ValidatorInput): ValidationRep
     notProven,
     redacted: true,
     attribution: {
-      runId: input.manifest?.experimentId ?? "unknown",
+      runId: effectiveRunId,
       citizens: citizenList,
       communities: communities.map((c) => c.id),
     },

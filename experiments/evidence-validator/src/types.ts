@@ -15,17 +15,10 @@ export type ProvenanceClassification =
   | "successful_action"
   | "unverified_assertion";
 
-export type OverallValidationStatus =
-  | "VERIFIED"
-  | "VIOLATIONS_DETECTED"
-  | "NOT_PROVEN";
+export type OverallValidationStatus = "VERIFIED" | "VIOLATIONS_DETECTED" | "NOT_PROVEN";
 
 export type ActionVerificationStatus =
-  | "VERIFIED"
-  | "UNVERIFIED"
-  | "FAILED"
-  | "INTERRUPTED"
-  | "CORRUPTED";
+  "VERIFIED" | "UNVERIFIED" | "FAILED" | "INTERRUPTED" | "CORRUPTED";
 
 export type Vec3Point = {
   x: number;
@@ -43,7 +36,7 @@ export type ActionAttemptEvidence = {
   citizenId: string;
   attemptId: string;
   action: "gather" | "craft" | "place" | "eat" | "move" | "speech" | string;
-  decisionSource: "model" | "planner" | "reflex";
+  decisionSource: "scripted" | "model" | "planner" | "reflex";
   decisionEventId: string;
   expectedItem?: string;
   target?: Vec3Point;

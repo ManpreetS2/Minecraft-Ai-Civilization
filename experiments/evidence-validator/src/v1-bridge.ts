@@ -76,6 +76,9 @@ export interface V1RunBundle {
 
 export interface V1BridgeResult {
   manifest?: ValidatedManifest;
+  runId?: string;
+  sourceSha?: string;
+  citizens?: string[];
   journalRows: JournalRow[];
   rawJournalLines: string[];
   events: EventStreamItem[];
@@ -475,6 +478,9 @@ export function bridgeV1RunBundle(bundle: V1RunBundle): V1BridgeResult {
 
   return {
     manifest,
+    runId: bundle.runId,
+    sourceSha: bundle.sourceSha,
+    citizens: bundle.citizens.map((c) => c.id),
     journalRows,
     rawJournalLines,
     events,

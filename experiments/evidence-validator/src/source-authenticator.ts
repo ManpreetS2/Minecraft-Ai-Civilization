@@ -64,36 +64,66 @@ const ED25519_SPKI_PREFIX = Buffer.from("302a300506032b6570032100", "hex");
 
 /**
  * Parses an Ed25519 public key from PEM string, raw 32-byte hex, or KeyObject.
+ * Rejects private keys and unsupported key types (RSA, ECDSA).
  */
 export function parseEd25519PublicKey(keyInput: string | KeyObject): KeyObject {
+  let keyObj: KeyObject;
+
   if (keyInput instanceof KeyObject) {
+    if (keyInput.type === "private") {
+      throw new Error("Private key cannot be used as trust root; Ed25519 public key required.");
+    }
+    if (keyInput.type !== "public") {
+      throw new Error("Invalid key type: trust root must be an Ed25519 public key.");
+    }
+    if (keyInput.asymmetricKeyType !== "ed25519") {
+      throw new Error(`Unsupported key type '${keyInput.asymmetricKeyType}'; Ed25519 required.`);
+    }
     return keyInput;
   }
+
   const trimmed = keyInput.trim();
-  if (trimmed.startsWith("-----BEGIN PUBLIC KEY-----")) {
-    return createPublicKey(trimmed);
+  if (trimmed.includes("PRIVATE KEY")) {
+    throw new Error("Private key cannot be used as trust root; Ed25519 public key required.");
   }
-  // Raw 32-byte hex string (64 characters)
-  if (/^[0-9a-fA-F]{64}$/.test(trimmed)) {
+
+  if (trimmed.startsWith("-----BEGIN PUBLIC KEY-----")) {
+    keyObj = createPublicKey(trimmed);
+  } else if (/^[0-9a-fA-F]{64}$/.test(trimmed)) {
+    // Raw 32-byte hex string (64 characters)
     const rawBytes = Buffer.from(trimmed, "hex");
     const spkiDer = Buffer.concat([ED25519_SPKI_PREFIX, rawBytes]);
-    return createPublicKey({ key: spkiDer, format: "der", type: "spki" });
-  }
-  // Raw 32-byte base64 string
-  if (/^[A-Za-z0-9+/]{43}=?$/.test(trimmed)) {
+    keyObj = createPublicKey({ key: spkiDer, format: "der", type: "spki" });
+  } else if (/^[A-Za-z0-9+/]{43}=?$/.test(trimmed)) {
+    // Raw 32-byte base64 string
     const rawBytes = Buffer.from(trimmed, "base64");
     if (rawBytes.length === 32) {
       const spkiDer = Buffer.concat([ED25519_SPKI_PREFIX, rawBytes]);
-      return createPublicKey({ key: spkiDer, format: "der", type: "spki" });
+      keyObj = createPublicKey({ key: spkiDer, format: "der", type: "spki" });
+    } else {
+      keyObj = createPublicKey(keyInput);
     }
+  } else {
+    keyObj = createPublicKey(keyInput);
   }
-  return createPublicKey(keyInput);
+
+  if (keyObj.type !== "public") {
+    throw new Error("Invalid key type: trust root must be an Ed25519 public key.");
+  }
+  if (keyObj.asymmetricKeyType !== "ed25519") {
+    throw new Error(`Unsupported key type '${keyObj.asymmetricKeyType}'; Ed25519 required.`);
+  }
+
+  return keyObj;
 }
 
 /**
  * Parses and validates raw signature bytes for Ed25519.
  */
-export function parseEd25519Signature(sigInput: string): { sigBuffer: Buffer | null; error?: string } {
+export function parseEd25519Signature(sigInput: string): {
+  sigBuffer: Buffer | null;
+  error?: string;
+} {
   let cleaned = sigInput.trim();
   if (cleaned.startsWith("ed25519:")) {
     cleaned = cleaned.slice(8).trim();
@@ -125,7 +155,8 @@ export function parseEd25519Signature(sigInput: string): { sigBuffer: Buffer | n
   } else {
     return {
       sigBuffer: null,
-      error: "Invalid signature encoding: must be valid 64-byte hex (128 chars) or base64 (86-88 chars).",
+      error:
+        "Invalid signature encoding: must be valid 64-byte hex (128 chars) or base64 (86-88 chars).",
     };
   }
 
@@ -155,7 +186,9 @@ export interface VerifySourceAttestationOptions {
 /**
  * Evaluates source attestation against real cryptographic trust roots.
  */
-export function verifySourceAttestation(args: VerifySourceAttestationOptions): SourceAttestationAudit {
+export function verifySourceAttestation(
+  args: VerifySourceAttestationOptions,
+): SourceAttestationAudit {
   const reasons: string[] = [];
 
   if (!args.attestation) {
@@ -250,7 +283,11 @@ export function verifySourceAttestation(args: VerifySourceAttestationOptions): S
   }
 
   // 3. Server Build Verification
-  if (!attestation.serverBuild || attestation.serverBuild <= 0 || !Number.isInteger(attestation.serverBuild)) {
+  if (
+    !attestation.serverBuild ||
+    attestation.serverBuild <= 0 ||
+    !Number.isInteger(attestation.serverBuild)
+  ) {
     reasons.push(
       `Attestation lacks valid Paper server build number: '${attestation.serverBuild ?? "missing"}'.`,
     );
@@ -285,7 +322,10 @@ export function verifySourceAttestation(args: VerifySourceAttestationOptions): S
       "Attestation missing firstServerTick/lastServerTick/totalServerTicks. Caller-supplied tick ranges cannot substitute for signed Paper tick evidence.",
     );
   } else {
-    if (args.firstServerTick !== undefined && attestation.firstServerTick !== args.firstServerTick) {
+    if (
+      args.firstServerTick !== undefined &&
+      attestation.firstServerTick !== args.firstServerTick
+    ) {
       sessionBound = false;
       reasons.push(
         `Attestation first server tick mismatch: observed ${args.firstServerTick}, but attestation binds to ${attestation.firstServerTick}.`,
@@ -297,8 +337,39 @@ export function verifySourceAttestation(args: VerifySourceAttestationOptions): S
         `Attestation last server tick mismatch: observed ${args.lastServerTick}, but attestation binds to ${attestation.lastServerTick}.`,
       );
     }
-    // Attested totalServerTicks must be present (checked above) but is not re-derived from
-    // caller first/last sampling, which can differ by one observation interval.
+    if (attestation.lastServerTick < attestation.firstServerTick) {
+      sessionBound = false;
+      reasons.push(
+        `Attestation tick contradiction: lastServerTick (${attestation.lastServerTick}) precedes firstServerTick (${attestation.firstServerTick}).`,
+      );
+    }
+    const elapsedSampled = attestation.lastServerTick - attestation.firstServerTick;
+    if (attestation.totalServerTicks < elapsedSampled) {
+      sessionBound = false;
+      reasons.push(
+        `Attestation total server ticks contradiction: totalServerTicks (${attestation.totalServerTicks}) is less than sampled tick progression (${elapsedSampled}).`,
+      );
+    }
+    // Allow at most 1 minute (1200 ticks at 20 TPS) tolerance between sample boundary and total server ticks
+    if (Math.abs(attestation.totalServerTicks - elapsedSampled) > 1200) {
+      sessionBound = false;
+      reasons.push(
+        `Attestation total server ticks contradiction: totalServerTicks (${attestation.totalServerTicks}) contradicts sampled span (${elapsedSampled}).`,
+      );
+    }
+    if (args.totalServerTicks !== undefined) {
+      if (attestation.totalServerTicks < args.totalServerTicks) {
+        sessionBound = false;
+        reasons.push(
+          `Attestation total server ticks contradiction: totalServerTicks (${attestation.totalServerTicks}) is less than journal observed ticks (${args.totalServerTicks}).`,
+        );
+      } else if (Math.abs(attestation.totalServerTicks - args.totalServerTicks) > 1200) {
+        sessionBound = false;
+        reasons.push(
+          `Attestation total server ticks mismatch: observed ${args.totalServerTicks}, but attestation binds to ${attestation.totalServerTicks}.`,
+        );
+      }
+    }
   }
 
   // 3d. Signed wall-clock interval required on the attestation itself
@@ -307,6 +378,18 @@ export function verifySourceAttestation(args: VerifySourceAttestationOptions): S
     reasons.push(
       "Attestation missing startedAt/endedAt timestamps. Unsigned or caller-only wall clocks cannot establish continuous Paper capture.",
     );
+  } else {
+    const startTime = new Date(attestation.startedAt).getTime();
+    const endTime = new Date(attestation.endedAt).getTime();
+    if (isNaN(startTime) || isNaN(endTime)) {
+      sessionBound = false;
+      reasons.push("Attestation has invalid startedAt or endedAt timestamp.");
+    } else if (endTime <= startTime) {
+      sessionBound = false;
+      reasons.push(
+        `Attestation timestamp contradiction: endedAt ('${attestation.endedAt}') must be after startedAt ('${attestation.startedAt}').`,
+      );
+    }
   }
 
   // 4. Evidence Digest Verification — journal + attested digest both required for proven
@@ -368,7 +451,9 @@ export function verifySourceAttestation(args: VerifySourceAttestationOptions): S
   const rawSig = attestation.signature ?? attestation.attestationSignature;
   if (!rawSig) {
     signatureValid = false;
-    reasons.push("Missing attestation signature: paper_server_attested claim lacks cryptographic digital signature.");
+    reasons.push(
+      "Missing attestation signature: paper_server_attested claim lacks cryptographic digital signature.",
+    );
   } else {
     const { sigBuffer, error: sigError } = parseEd25519Signature(rawSig);
     if (sigError || !sigBuffer) {
@@ -385,9 +470,11 @@ export function verifySourceAttestation(args: VerifySourceAttestationOptions): S
       if (!attestation.evidenceDigest) incompletePayloadFields.push("evidenceDigest");
       if (!attestation.startedAt) incompletePayloadFields.push("startedAt");
       if (!attestation.endedAt) incompletePayloadFields.push("endedAt");
-      if (attestation.firstServerTick === undefined) incompletePayloadFields.push("firstServerTick");
+      if (attestation.firstServerTick === undefined)
+        incompletePayloadFields.push("firstServerTick");
       if (attestation.lastServerTick === undefined) incompletePayloadFields.push("lastServerTick");
-      if (attestation.totalServerTicks === undefined) incompletePayloadFields.push("totalServerTicks");
+      if (attestation.totalServerTicks === undefined)
+        incompletePayloadFields.push("totalServerTicks");
 
       if (incompletePayloadFields.length > 0) {
         signatureValid = false;
@@ -464,7 +551,10 @@ export function createTestAttestationKeypair(): {
   const { publicKey, privateKey } = generateKeyPairSync("ed25519");
   const publicKeyPem = publicKey.export({ type: "spki", format: "pem" }).toString();
   const privateKeyPem = privateKey.export({ type: "pkcs8", format: "pem" }).toString();
-  const rawPublicKeyHex = publicKey.export({ type: "spki", format: "der" }).subarray(12).toString("hex");
+  const rawPublicKeyHex = publicKey
+    .export({ type: "spki", format: "der" })
+    .subarray(12)
+    .toString("hex");
 
   return {
     publicKeyPem,

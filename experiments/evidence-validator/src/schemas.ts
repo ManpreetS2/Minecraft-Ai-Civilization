@@ -1,4 +1,4 @@
-﻿import { z } from "zod";
+import { z } from "zod";
 
 export const pointSchema = z
   .object({
@@ -31,6 +31,14 @@ export const journalStartSchema = z
     hash: z.string(),
     recordingAudience: z.literal("operator_only"),
     mode: z.enum(["offline", "live"]),
+    decisionTransport: z.enum(["scripted-in-process", "live-provider"]).nullable().optional(),
+    sourceSha: z
+      .string()
+      .regex(/^[a-f0-9]{40}$/)
+      .nullable()
+      .optional(),
+    runId: z.string().nullable().optional(),
+    citizens: z.array(z.string()).optional(),
   })
   .strict();
 
@@ -45,7 +53,7 @@ export const journalAttemptSchema = z
     citizenId: z.string(),
     attemptId: z.string(),
     action: z.enum(["gather", "craft", "place", "eat", "move", "speech"]),
-    decisionSource: z.enum(["model", "planner", "reflex"]),
+    decisionSource: z.enum(["scripted", "model", "planner", "reflex"]),
     decisionEventId: z.string(),
     expectedItem: z.string().optional(),
     target: pointSchema.optional(),
@@ -91,9 +99,10 @@ export const journalTickSchema = z
     previousHash: z.string(),
     hash: z.string(),
     durationMs: z.number().finite().nonnegative(),
-    measuredTps: z.number().finite().min(0).max(20).optional(),
-    // Phase 2: absolute server game tick (absent in current recorder -- required to prove uninterrupted Paper run)
-    serverGameTick: z.number().int().nonnegative().optional(),
+    measuredTps: z.number().finite().min(0).max(20).nullable().optional(),
+    serverGameTick: z.number().int().nonnegative().nullable().optional(),
+    simulatedStep: z.number().int().nonnegative().nullable().optional(),
+    tickProvenance: z.enum(["paper-or-world", "unavailable"]).nullable().optional(),
   })
   .strict();
 
@@ -180,9 +189,7 @@ export const manifestCitizenSchema = z
     model: z.string().min(1).max(128),
     sessionId: z.string().regex(/^[a-zA-Z0-9_-]{1,128}$/),
     inventoryVerified: z.boolean(),
-    inventory: z.array(
-      z.object({ name: z.string(), count: z.number().int().positive() }).strict(),
-    ),
+    inventory: z.array(z.object({ name: z.string(), count: z.number().int().positive() }).strict()),
     shelterVerifiedAbsent: z.boolean(),
   })
   .strict();

@@ -1,10 +1,7 @@
 import type { DurationTickAudit } from "./types.js";
 import type { JournalRow } from "./schemas.js";
 import type { KeyObject } from "node:crypto";
-import {
-  verifySourceAttestation,
-  type SourceAttestation,
-} from "./source-authenticator.js";
+import { verifySourceAttestation, type SourceAttestation } from "./source-authenticator.js";
 
 /**
  * Expected server game ticks for a 60-minute real Paper run.
@@ -61,12 +58,16 @@ export function auditDurationAndTicks(args: {
       totalDurationMs += row.durationMs;
       tickCount++;
 
-      if (row.measuredTps !== undefined) {
+      if (row.measuredTps !== undefined && row.measuredTps !== null) {
         tpsSum += row.measuredTps;
         tpsCount++;
       }
 
-      if ("serverGameTick" in row && row.serverGameTick !== undefined) {
+      if (
+        "serverGameTick" in row &&
+        row.serverGameTick !== undefined &&
+        row.serverGameTick !== null
+      ) {
         const tick = row.serverGameTick;
         if (firstServerGameTick === undefined) {
           firstServerGameTick = tick;
@@ -149,7 +150,10 @@ export function auditDurationAndTicks(args: {
       reasons.push(
         `Insufficient server tick samples: only ${serverTickCount} serverGameTick observation(s) provided. Continuous server progression cannot be proven from isolated samples.`,
       );
-    } else if (args.claimedDurationMinutes >= 60 && elapsedServerTicks < MINIMUM_PAPER_TICKS_FOR_60MIN) {
+    } else if (
+      args.claimedDurationMinutes >= 60 &&
+      elapsedServerTicks < MINIMUM_PAPER_TICKS_FOR_60MIN
+    ) {
       reasons.push(
         `Insufficient Paper tick progression: elapsed server game ticks (${elapsedServerTicks}) deficit for 60-minute requirement (expected ~72,000, minimum allowed: ${MINIMUM_PAPER_TICKS_FOR_60MIN})`,
       );
@@ -243,7 +247,8 @@ export function auditDurationAndTicks(args: {
     tpsEvidencePresent,
     serverTickProven,
     serverTickCount,
-    durationComplete: durationComplete && reasons.filter((r) => !r.includes("appears simulated")).length === 0,
+    durationComplete:
+      durationComplete && reasons.filter((r) => !r.includes("appears simulated")).length === 0,
     gapsDetected,
     sourceAttestationAudit: attestationAudit,
     reasons,

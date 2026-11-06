@@ -24,6 +24,10 @@ export function writeOfflineValidatorReport(input: {
   // Filtered adapter lines alone would break contiguous seq/hash linkage (Mission 006 wiring).
   const report = validateExperimentEvidence({
     manifest: bridged.manifest,
+    experimentId: input.bundle.runId,
+    sourceSha: input.bundle.sourceSha,
+    runId: input.bundle.runId,
+    citizens: input.bundle.citizens.map((c) => c.id),
     rawJournalLines: rawLines,
     journalRows: adapted.journalRows.length > 0 ? adapted.journalRows : bridged.journalRows,
     events: bridged.events,
@@ -55,5 +59,6 @@ export function writeOfflineValidatorReport(input: {
   if (report.overallStatus === "VERIFIED" && report.notProven.length > 0) {
     report.overallStatus = "NOT_PROVEN";
   }
+  report.summary.notProvenChecksCount = report.notProven.length;
   return { report, summary: formatHumanReport(report) };
 }
