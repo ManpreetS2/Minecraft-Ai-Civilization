@@ -1,4 +1,4 @@
-import { waitForMovementTicks } from "./movement-wait.js";
+import { movementOperationOutcome, waitForMovementTicks } from "./movement-wait.js";
 import type { Bot } from "mineflayer";
 import { Vec3 as Vec3Class } from "vec3";
 import { fail, ok, type ActionResult, type Vec3 } from "@civ/shared";
@@ -526,6 +526,10 @@ export async function attemptHazardBridge(
   } catch (error) {
     return fail("EQUIP_FAILED", error instanceof Error ? error.message : String(error), 0, true);
   }
+  if (options.signal?.aborted) {
+    releaseMovementControls(bot);
+    return fail("CANCELLED", "hazard bridge cancelled", 0, true);
+  }
   const against = bot.blockAt(new Vec3Class(plan.against.x, plan.against.y, plan.against.z));
   if (!against || against.boundingBox !== "block") {
     return fail("PLACE_FAILED", "support block missing or not solid", 0, true);
@@ -536,7 +540,16 @@ export async function attemptHazardBridge(
     plan.placeAt.z - plan.against.z,
   );
   try {
-    await bot.lookAt(against.position.offset(0.5, 0.5, 0.5), true);
+    const facing = await movementOperationOutcome(
+      bot,
+      () => bot.lookAt(against.position.offset(0.5, 0.5, 0.5), true),
+      options.signal,
+    );
+    if (facing !== "complete" || options.signal?.aborted) {
+      releaseMovementControls(bot);
+      const code = options.signal?.aborted || facing === "cancelled" ? "CANCELLED" : facing === "unavailable" ? "NOT_CONNECTED" : "TIMEOUT";
+      return fail(code, "hazard bridge interrupted before placement", 0, code !== "NOT_CONNECTED");
+    }
     await bot.placeBlock(against, face);
   } catch (error) {
     return fail("PLACE_FAILED", error instanceof Error ? error.message : String(error), 0, true);

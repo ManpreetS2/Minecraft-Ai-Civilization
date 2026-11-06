@@ -180,6 +180,104 @@ describe("path request lifecycle", () => {
     expect(f.bot.lookAt).toHaveBeenCalledOnce();
   });
 
+  function twoBlockWall() {
+    const f = fixture();
+    f.raw.blockAt = (p) => {
+      const solid = p.y < 64 || (Math.floor(p.x) === 1 && Math.floor(p.z) === 0 && (Math.floor(p.y) === 64 || Math.floor(p.y) === 65));
+      return { name: solid ? "stone" : "air", boundingBox: solid ? "block" : "empty" };
+    };
+    f.bot.waitForTicks = async () => undefined;
+    f.pathfinder.goto.mockRejectedValue(new Error("STUCK"));
+    return f;
+  }
+  it("settles a hanging detour lookAt inside the caller's deadline", async () => {
+    const f = twoBlockWall();
+    f.bot.lookAt = () => new Promise<void>(() => undefined);
+    let settled = false;
+    const pending = moveToPosition(f.bot, { x: 10, y: 64, z: 0 }, { timeoutMs: 8000 });
+    void pending.then(() => { settled = true; });
+    await vi.advanceTimersByTimeAsync(9000);
+    expect(settled).toBe(true);
+    const result = await pending;
+    if (result.success) throw new Error("hanging lookAt arrived");
+    expect(result.code === "TIMEOUT" || result.code === "PATH_BLOCKED" || result.code === "STUCK").toBe(true);
+    expect(f.clear).toHaveBeenCalled();
+  });
+  it("releases a hanging detour when the caller cancels, and a late lookAt does not resume it", async () => {
+    const f = twoBlockWall();
+    const setControl = vi.fn();
+    f.raw.setControlState = setControl;
+    let finishLook!: () => void;
+    f.bot.lookAt = () => new Promise<void>(resolve => { finishLook = resolve; });
+    const controller = new AbortController();
+    let settled = false;
+    const pending = moveToPosition(f.bot, { x: 10, y: 64, z: 0 }, { timeoutMs: 8000, signal: controller.signal });
+    void pending.then(() => { settled = true; });
+    await vi.advanceTimersByTimeAsync(300);
+    controller.abort();
+    await vi.advanceTimersByTimeAsync(50);
+    expect(settled).toBe(true);
+    const result = await pending;
+    if (result.success) throw new Error("cancelled detour arrived");
+    expect(result.code).toBe("CANCELLED");
+    const gotoCalls = f.pathfinder.goto.mock.calls.length;
+    finishLook();
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(f.pathfinder.goto.mock.calls.length).toBe(gotoCalls);
+    expect(setControl.mock.calls.some(([name, on]) => name === "forward" && on === true)).toBe(false);
+  });
+  it.each(["death", "end"])("releases a hanging detour on %s", async (event) => {
+    const f = twoBlockWall();
+    f.bot.lookAt = () => new Promise<void>(() => undefined);
+    let settled = false;
+    const pending = moveToPosition(f.bot, { x: 10, y: 64, z: 0 }, { timeoutMs: 8000 });
+    void pending.then(() => { settled = true; });
+    await vi.advanceTimersByTimeAsync(300);
+    if (event === "death") f.raw.health = 0;
+    f.events.emit(event);
+    await vi.advanceTimersByTimeAsync(50);
+    expect(settled).toBe(true);
+    const result = await pending;
+    if (result.success) throw new Error("interrupted detour arrived");
+    expect(result.code).toBe("NOT_CONNECTED");
+  });
+  it("clears the recovery lock so a later detour can still look", async () => {
+    const f = twoBlockWall();
+    f.bot.lookAt = () => new Promise<void>(() => undefined);
+    const controller = new AbortController();
+    const first = moveToPosition(f.bot, { x: 10, y: 64, z: 0 }, { timeoutMs: 8000, signal: controller.signal });
+    await vi.advanceTimersByTimeAsync(300);
+    controller.abort();
+    await vi.advanceTimersByTimeAsync(50);
+    const cancelled = await first;
+    if (cancelled.success) throw new Error("first detour arrived");
+    expect(cancelled.code).toBe("CANCELLED");
+    f.bot.lookAt = vi.fn(async () => undefined);
+    const second = moveToPosition(f.bot, { x: 10, y: 64, z: 0 }, { timeoutMs: 8000 });
+    await vi.advanceTimersByTimeAsync(2000);
+    const again = await second;
+    if (again.success) throw new Error("blocked detour arrived");
+    expect(f.bot.lookAt).toHaveBeenCalled();
+  });
+  it("still reports arrival when the body physically reaches the target", async () => {
+    const f = fixture();
+    f.pathfinder.goto.mockImplementation(async () => {
+      Object.assign(f.bot.entity.position, { x: 10.1, y: 64, z: 0.1 });
+    });
+    const pending = moveToGetToBlock(f.bot, { x: 10, y: 64, z: 0 }, { timeoutMs: 2000 });
+    await vi.advanceTimersByTimeAsync(300);
+    const result = await pending;
+    expect(result.success).toBe(true);
+    if (!result.success) throw new Error("arrival was not recorded");
+    expect(result.data.position.x).toBeCloseTo(10.1);
+  });
+  it("returns INVALID_ARGUMENT for a null target instead of throwing", async () => {
+    const f = fixture();
+    const result = await moveToPosition(f.bot, null as never, { timeoutMs: 1000 });
+    expect(result).toMatchObject({ success: false, code: "INVALID_ARGUMENT" });
+    expect(f.pathfinder.goto).not.toHaveBeenCalled();
+  });
+
   it("does not return a replaced pathfinder from the movement cache", () => {
     const f = fixture();
     expect(configureMovements(f.bot)).toBe(f.pathfinder);

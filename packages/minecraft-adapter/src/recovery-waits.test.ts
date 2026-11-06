@@ -4,6 +4,7 @@ import { Vec3 as Vec3Class } from "vec3";
 import type { Bot } from "mineflayer";
 import { installModernMovement } from "./movement-sync.js";
 import { waitForMovementTicks } from "./movement-wait.js";
+import { stepToStandingCell } from "./obstacle-detour.js";
 import { attemptStepJump, tryOpenAdjacentDoor, walkForward } from "./step-jump.js";
 import { retreatFromHazard } from "./hazard-nav.js";
 import { localEscape } from "./local-escape.js";
@@ -221,6 +222,49 @@ describe("recovery with a frozen physics loop", () => {
     await vi.advanceTimersByTimeAsync(0);
     expect(activate).toHaveBeenCalledTimes(phase === "activation" ? 1 : 0);
     expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("ends a hanging detour lookAt when the caller aborts", async () => {
+    const f = fixture();
+    let finishLook!: () => void;
+    f.bot.lookAt = () => new Promise<void>(resolve => { finishLook = resolve; });
+    const controller = new AbortController();
+    let settled = false;
+    const pending = stepToStandingCell(f.bot, { x: 6, y: 64, z: 5 }, controller.signal);
+    void pending.then(() => { settled = true; });
+    await vi.advanceTimersByTimeAsync(50);
+    expect(settled).toBe(false);
+    controller.abort();
+    await vi.advanceTimersByTimeAsync(50);
+    expect(settled).toBe(true);
+    expect(await pending).toMatchObject({ moved: false });
+    finishLook();
+    await vi.advanceTimersByTimeAsync(200);
+    expect(f.controls.forward).not.toBe(true);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+  it("ends a hanging detour lookAt when the movement deadline expires", async () => {
+    const f = fixture();
+    f.bot.lookAt = () => new Promise<void>(() => undefined);
+    const pending = stepToStandingCell(f.bot, { x: 6, y: 64, z: 5 }, undefined, { deadline: Date.now() + 400 });
+    await vi.advanceTimersByTimeAsync(500);
+    expect(await pending).toMatchObject({ moved: false });
+    expect(f.controls.forward).not.toBe(true);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+  it("ends a hanging detour lookAt when the body dies", async () => {
+    const f = fixture();
+    f.bot.lookAt = () => new Promise<void>(() => undefined);
+    let settled = false;
+    const pending = stepToStandingCell(f.bot, { x: 6, y: 64, z: 5 });
+    void pending.then(() => { settled = true; });
+    await vi.advanceTimersByTimeAsync(40);
+    f.raw.health = 0;
+    f.events.emit("death");
+    await vi.advanceTimersByTimeAsync(40);
+    expect(settled).toBe(true);
+    expect(await pending).toMatchObject({ moved: false });
+    expect(f.controls.forward).not.toBe(true);
   });
 
 });

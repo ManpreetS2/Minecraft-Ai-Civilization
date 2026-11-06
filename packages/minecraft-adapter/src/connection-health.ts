@@ -11,6 +11,7 @@ export function navigationBodyReady(bot: Bot): boolean {
 }
 
 export function navigationParametersValid(target: Vec3, range: number, timeoutMs: number): boolean {
+  if (target === null || typeof target !== "object") return false;
   return [target.x, target.y, target.z, range, timeoutMs].every(Number.isFinite) && range >= 0 && timeoutMs > 0;
 }
 

@@ -401,23 +401,46 @@ async function runGoto(
   const started = Date.now();
   if (options.signal?.aborted) return abortedResult(0);
   const controller = new AbortController();
-  let reason: "timeout" | "lost" | undefined;
-  const abort = () => controller.abort();
-  const lost = () => { reason ??= "lost"; controller.abort(); };
+  let reason: "CANCELLED" | "NOT_CONNECTED" | "TIMEOUT" | undefined;
+  let settle!: (result: ActionResult<{ position: Vec3; distance: number }>) => void;
+  const interrupted = new Promise<ActionResult<{ position: Vec3; distance: number }>>((resolve) => { settle = resolve; });
+  const release = () => {
+    recoveryLock.delete(bot);
+    haltPathfinder(bot, configureMovements(bot));
+  };
+  const interrupt = (code: NonNullable<typeof reason>) => {
+    if (reason) return;
+    reason = code;
+    controller.abort();
+    release();
+    const message = code === "NOT_CONNECTED"
+      ? "Navigation life ended during recovery"
+      : code === "TIMEOUT"
+        ? "Navigation budget exhausted"
+        : "Navigation cancelled";
+    settle(fail(code, message, Date.now() - started, code === "TIMEOUT"));
+  };
+  const aborted = () => interrupt("CANCELLED");
+  const lost = () => interrupt("NOT_CONNECTED");
   const events = ["end", "kicked", "death", "respawn"] as const;
-  const timer = setTimeout(() => { reason ??= "timeout"; controller.abort(); }, options.timeoutMs);
-  options.signal?.addEventListener("abort", abort, { once: true });
+  const timer = setTimeout(() => interrupt("TIMEOUT"), options.timeoutMs);
+  options.signal?.addEventListener("abort", aborted, { once: true });
   for (const event of events) bot.on(event, lost);
   try {
-    const result = await runGotoWithinScope(bot, goal, target, { ...options, signal: controller.signal });
-    if (options.signal?.aborted) return abortedResult(Date.now() - started);
-    if (reason) return fail(reason === "lost" ? "NOT_CONNECTED" : "TIMEOUT", reason === "lost" ? "Navigation life ended during recovery" : "Navigation budget exhausted", Date.now() - started, reason === "timeout");
+    // Race the scope the way runNavigationScope does. A primitive that ignores its signal
+    // cannot leave this caller pending, and release() drops the recovery lock on the way out.
+    const result = await Promise.race([
+      runGotoWithinScope(bot, goal, target, { ...options, signal: controller.signal }),
+      interrupted,
+    ]);
+    if (options.signal?.aborted || reason === "CANCELLED") return abortedResult(Date.now() - started);
+    if (reason) return fail(reason, reason === "NOT_CONNECTED" ? "Navigation life ended during recovery" : "Navigation budget exhausted", Date.now() - started, reason === "TIMEOUT");
     return result;
   } finally {
     clearTimeout(timer);
-    options.signal?.removeEventListener("abort", abort);
+    options.signal?.removeEventListener("abort", aborted);
     for (const event of events) bot.removeListener(event, lost);
-    if (controller.signal.aborted) haltPathfinder(bot, configureMovements(bot));
+    if (controller.signal.aborted) release();
   }
 }
 
@@ -505,6 +528,7 @@ async function runGotoWithinScope(
             }
             const stepped = await stepToStandingCell(bot, cell, options.signal, {
               maxDrop: recovery.drop > 0 ? SAFE_FALL_MAX_DROP : 0,
+              deadline: started + options.timeoutMs,
             });
             if (options.signal?.aborted) {
               haltPathfinder(bot, configureMovements(bot));
@@ -574,7 +598,9 @@ async function runGotoWithinScope(
       } else {
         const detour = twoBlockRecovery(bot, target, memory);
         if (detour.action === "detour") {
-          const stepped = await stepToStandingCell(bot, detour.side, options.signal);
+          const stepped = await stepToStandingCell(bot, detour.side, options.signal, {
+            deadline: started + options.timeoutMs,
+          });
           if (options.signal?.aborted) {
             haltPathfinder(bot, configureMovements(bot));
             return abortedResult(Date.now() - started);

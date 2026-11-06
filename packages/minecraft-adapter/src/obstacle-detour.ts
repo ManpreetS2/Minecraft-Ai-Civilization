@@ -3,6 +3,7 @@ import { Vec3 as Vec3Class } from "vec3";
 import type { Vec3 } from "@civ/shared";
 import { isVerifiedStanding } from "./interaction.js";
 import { headingToward, isSafeDetour } from "./hazard-nav.js";
+import { movementOperationOutcome } from "./movement-wait.js";
 import { evaluateStepJump, isTwoBlockObstruction, walkForward } from "./step-jump.js";
 import { isTreePart, LocalTerrainMemory, terrainMemory } from "./terrain-memory.js";
 
@@ -126,23 +127,25 @@ export async function stepToStandingCell(
   bot: Bot,
   dest: Vec3,
   signal?: AbortSignal,
-  options: { maxDrop?: number } = {},
+  options: { maxDrop?: number; deadline?: number } = {},
 ): Promise<{ moved: boolean; position: Vec3 | undefined }> {
   const start = bot.entity?.position;
   if (!start) return { moved: false, position: undefined };
-  if (signal?.aborted) {
-    return { moved: false, position: { x: start.x, y: start.y, z: start.z } };
-  }
+  const here = { x: start.x, y: start.y, z: start.z };
+  if (signal?.aborted) return { moved: false, position: here };
   const maxDrop = options.maxDrop ?? 0;
   if (!isVerifiedStanding(bot, dest, { fromY: start.y, maxDrop })) {
-    return { moved: false, position: { x: start.x, y: start.y, z: start.z } };
+    return { moved: false, position: here };
   }
   const tx = Math.floor(dest.x) + 0.5;
   const tz = Math.floor(dest.z) + 0.5;
-  try {
-    await bot.lookAt(new Vec3Class(tx, start.y + 1, tz), true);
-  } catch {
-    // yaw already set
+  const deadline = options.deadline ?? Infinity;
+  // A thrown lookAt only means yaw was already set. A hang, abort, death, or expired deadline is not completion.
+  const facing = await movementOperationOutcome(bot, async () => {
+    try { await bot.lookAt(new Vec3Class(tx, start.y + 1, tz), true); } catch { /* yaw already set */ }
+  }, signal, deadline);
+  if (facing !== "complete" || signal?.aborted || Date.now() >= deadline) {
+    return { moved: false, position: here };
   }
   const end = await walkForward(bot, 8, signal);
   const pos = end ?? (bot.entity?.position ? { x: bot.entity.position.x, y: bot.entity.position.y, z: bot.entity.position.z } : undefined);
