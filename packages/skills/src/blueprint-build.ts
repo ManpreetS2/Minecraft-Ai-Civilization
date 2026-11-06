@@ -28,6 +28,7 @@ import {
   type StructureValidationCode,
 } from "@civ/minecraft-knowledge";
 import { Vec3 as Vec3Class } from "vec3";
+import { navigationBackend } from "@civ/minecraft-adapter";
 import type { SkillContext } from "./context.js";
 import { pickupDroppedItem } from "./inventory-service.js";
 import { moveTo } from "./movement.js";
@@ -509,8 +510,9 @@ export async function validateBuiltStructure(
     // Probe actual container access without mutating inventory. Re-delivery and
     // recovery after a failed durable write must not transfer another item.
     try {
+      const reachable = await navigationBackend().navigateToInteractWithBlock(ctx.bot, chestPos, { timeoutMs: ctx.timeoutMs ?? 12_000, signal: ctx.signal });
       const block = ctx.bot.blockAt(new Vec3Class(chestPos.x, chestPos.y, chestPos.z));
-      if (!block || block.name !== "chest") failures.push("WORKSTATION_UNREACHABLE");
+      if (!reachable.success || !block || block.name !== "chest") failures.push("WORKSTATION_UNREACHABLE");
       else {
         const container = await ctx.bot.openContainer(block);
         try { container.containerItems(); usedWorkstation = true; }
