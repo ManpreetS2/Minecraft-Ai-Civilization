@@ -176,6 +176,11 @@ export function pathsAliasSameTree(a: string, b: string): boolean {
   return na.value === nb.value || na.value.startsWith(nb.value + na.separator) || nb.value.startsWith(na.value + na.separator);
 }
 
+/** Portable isolation policy is stricter than POSIX lexical identity. */
+export function pathsCollideForIsolation(a: string, b: string): boolean {
+  return pathsAliasSameTree(a, b) || pathsAliasSameTree(a.toLowerCase(), b.toLowerCase());
+}
+
 /** Walk a path and its ancestors; missing components are skipped, other errors refuse. */
 function ancestorSharesIdentity(path: string, protectedIds: Set<string>): boolean {
   let current = path;
@@ -230,7 +235,7 @@ function checkIsolationPaths(args: {
     }
     for (const isolated of [isoWl, isoDb]) {
       for (const original of [originalWl, originalDb, originalData, originalDbDirectory]) {
-        if (pathsAliasSameTree(isolated.real, original.real)) {
+        if (pathsCollideForIsolation(isolated.real, original.real)) {
           return { ok: false, error: `Isolated path aliases original: ${isolated.resolved}` };
         }
         const a = statSync(isolated.real, { bigint: true });
@@ -240,7 +245,7 @@ function checkIsolationPaths(args: {
         }
       }
     }
-    if (evidence?.ok && [originalWl, originalDb, originalData, originalDbDirectory].some((original) => pathsAliasSameTree(evidence.real, original.real))) {
+    if (evidence?.ok && [originalWl, originalDb, originalData, originalDbDirectory].some((original) => pathsCollideForIsolation(evidence.real, original.real))) {
       return { ok: false, error: "Evidence path aliases original" };
     }
     // Spelling cannot prove containment on case-insensitive filesystems (a DATA alias
