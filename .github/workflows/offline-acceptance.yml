@@ -1,0 +1,189 @@
+name: Offline Acceptance Verification
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/offline-acceptance.yml
+      - apps/**
+      - packages/**
+      - experiments/**
+      - tools/**
+      - pnpm-lock.yaml
+      - package.json
+      - pnpm-workspace.yaml
+      - vitest.config.ts
+      - tsconfig*.json
+  push:
+    branches:
+      - infra/offline-acceptance-ci
+      - "work/*"
+      - "fix/*"
+      - "agents/*"
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: offline-acceptance-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  CI: "true"
+  OPENAI_API_KEY: ""
+  ANTHROPIC_API_KEY: ""
+  GEMINI_API_KEY: ""
+  LLM_PROVIDER: "none"
+  NODE_ENV: "test"
+
+jobs:
+  cross-platform-matrix:
+    name: Cross-platform smoke (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.2.2
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4.1.0
+        with:
+          version: 10.16.0
+
+      - name: Setup Node.js 22.17.1
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.2.0
+        with:
+          node-version: 22.17.1
+          cache: pnpm
+
+      - name: Record host and revision
+        run: |
+          node -e "console.log({ platform: process.platform, arch: process.arch, node: process.version })"
+          git rev-parse HEAD
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: |
+          pnpm typecheck
+          pnpm typecheck:tools
+          pnpm typecheck:evidence-validator
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Build
+        run: pnpm build
+
+      - name: Fast test suites
+        run: |
+          pnpm test:evidence-validator
+          pnpm test:v1
+
+      - name: Run offline 1v1 scenario (2 citizens)
+        run: |
+          rm -rf artifacts/v1/scenario-2
+          pnpm v1:offline 2 artifacts/v1/scenario-2
+
+      - name: Run offline 2v2 scenario (4 citizens)
+        run: |
+          rm -rf artifacts/v1/scenario-4
+          pnpm v1:offline 4 artifacts/v1/scenario-4
+
+      - name: Verify offline acceptance artifacts
+        run: |
+          pnpm exec tsx tools/ci/verify-offline-acceptance.ts \
+            --scenario2 artifacts/v1/scenario-2 \
+            --scenario4 artifacts/v1/scenario-4 \
+            --sha $(git rev-parse HEAD)
+
+      - name: Upload sanitized verification reports
+        uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # v4.6.1
+        if: always()
+        with:
+          name: offline-acceptance-reports-${{ matrix.os }}
+          path: |
+            artifacts/v1/ci-summary.md
+            artifacts/v1/ci-summary.json
+            artifacts/v1/scenario-*/acceptance.md
+            artifacts/v1/scenario-*/gemini-validator-summary.md
+            artifacts/v1/scenario-*/verdict.json
+          if-no-files-found: warn
+
+  full-test-suite:
+    name: Full test verification (ubuntu-latest)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.2.2
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4.1.0
+        with:
+          version: 10.16.0
+
+      - name: Setup Node.js 22.17.1
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.2.0
+        with:
+          node-version: 22.17.1
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Full workspace tests (2260+ tests)
+        run: pnpm test
+
+      - name: Security tests
+        run: pnpm test:security
+
+      - name: AI and cognitive provider routing tests
+        run: pnpm test:ai
+
+      - name: Evidence validator tests
+        run: pnpm test:evidence-validator
+
+      - name: V1 integration tests
+        run: pnpm test:v1
+
+      - name: Execute and verify offline scenarios
+        run: |
+          rm -rf artifacts/v1/scenario-2 artifacts/v1/scenario-4
+          pnpm v1:offline 2 artifacts/v1/scenario-2
+          pnpm v1:offline 4 artifacts/v1/scenario-4
+          pnpm exec tsx tools/ci/verify-offline-acceptance.ts \
+            --scenario2 artifacts/v1/scenario-2 \
+            --scenario4 artifacts/v1/scenario-4 \
+            --sha $(git rev-parse HEAD)
+
+      - name: Upload full verification reports
+        uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # v4.6.1
+        if: always()
+        with:
+          name: full-acceptance-reports-ubuntu
+          path: |
+            artifacts/v1/ci-summary.md
+            artifacts/v1/ci-summary.json
+            artifacts/v1/scenario-*/acceptance.md
+            artifacts/v1/scenario-*/gemini-validator-summary.md
+            artifacts/v1/scenario-*/verdict.json
+          if-no-files-found: warn
