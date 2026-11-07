@@ -1,0 +1,111 @@
+
+> minecraft-ai-civilization@0.1.0 test:evidence-validator /private/tmp/minecraft-offline-v2
+> vitest run --config experiments/evidence-validator/vitest.config.mjs --maxWorkers=1 --no-file-parallelism
+
+
+ RUN  v3.2.7 /private/tmp/minecraft-offline-v2
+
+ ✓ experiments/evidence-validator/test/phase2-crypto-verification.test.ts (15 tests) 91ms
+ ✓ experiments/evidence-validator/test/phase2-tampering-matrix.test.ts (21 tests) 37ms
+ ✓ experiments/evidence-validator/test/phase2-partial-histories.test.ts (10 tests) 19ms
+ ✓ experiments/evidence-validator/test/phase2-paper-tick.test.ts (8 tests) 44ms
+ ✓ experiments/evidence-validator/test/phase2-adversarial.test.ts (8 tests) 21ms
+ ✓ experiments/evidence-validator/test/negative-cases.test.ts (11 tests) 20ms
+ ✓ experiments/evidence-validator/test/phase2-adversarial-regressions.test.ts (14 tests) 15ms
+ ✓ experiments/evidence-validator/test/phase2-recorder-adapter.test.ts (10 tests) 26ms
+ ✓ experiments/evidence-validator/test/scripted-evidence-validation.test.ts (12 tests) 174ms
+ ✓ experiments/evidence-validator/test/phase2-adversarial-authenticity.test.ts (9 tests) 14ms
+ ✓ experiments/evidence-validator/test/action-verifier.test.ts (8 tests) 8ms
+ ✓ experiments/evidence-validator/test/v1-integration-bridge.test.ts (6 tests) 13ms
+ ✓ experiments/evidence-validator/test/phase2-v1-bridge-scenario.test.ts (3 tests) 11ms
+ ✓ experiments/evidence-validator/test/information-verifier.test.ts (5 tests) 11ms
+ ✓ experiments/evidence-validator/test/validator.test.ts (2 tests) 17ms
+ ✓ experiments/evidence-validator/test/phase2-incomplete-attestation.test.ts (7 tests) 13ms
+ ✓ experiments/evidence-validator/test/inventory-verifier.test.ts (3 tests) 3ms
+ ✓ experiments/evidence-validator/test/phase2-runtime-recorder-integration.test.ts (2 tests) 40ms
+ ✓ experiments/evidence-validator/test/duration-verifier.test.ts (3 tests) 6ms
+stdout | experiments/evidence-validator/test/cli.test.ts > Evidence Validator CLI > prints help and exits with code 0 on --help
+
+Antigravity Experiment Evidence Validator CLI
+
+Usage:
+  pnpm exec tsx experiments/evidence-validator/src/cli.ts [options]
+
+Options:
+  --manifest <path>      Path to experiment manifest JSON
+  --journal <path>       Path to operator evidence journal JSONL
+  --events <path>        Path to events stream JSON or JSONL
+  --facts <path>         Path to citizen persistent facts JSON
+  --deliveries <path>    Path to citizen event deliveries JSON
+  --inventories <path>   Path to final inventories JSON
+  --output <path>        Output file for machine-readable JSON report
+  --summary <path>       Output file for human-readable Markdown summary
+  --strict               Exit with code 2 if overall status is NOT_PROVEN or VIOLATIONS_DETECTED
+  --help                 Show this help message
+
+
+stdout | experiments/evidence-validator/test/cli.test.ts > Evidence Validator CLI > processes manifest and journal files and outputs JSON and Markdown reports
+[validator] JSON report written to: /var/folders/b9/cn4lvm9s7hl781fnd0dgknkm0000gn/T/validator-cli-test-lgx91J/report.json
+[validator] Markdown summary written to: /var/folders/b9/cn4lvm9s7hl781fnd0dgknkm0000gn/T/validator-cli-test-lgx91J/summary.md
+[validator] Result: VERIFIED (Verified: 4, Violations: 0)
+
+stdout | experiments/evidence-validator/test/cli.test.ts > Evidence Validator CLI > exits with code 2 on --strict when violations exist
+# Experiment Evidence Validation Report: exp-2v2-demo-001
+
+**Overall Status:** 🔴 VIOLATIONS DETECTED | **Environment:** 🔬 Offline Simulated Fixture (Not a live Minecraft demo claim)
+**Generated At:** 2026-11-07T02:57:01.567Z
+**Source SHA:** `9945f02f38e14a7d63b3eed66279d191ad06ad3d`
+**Citizens:** gpt_atlas, gpt_maya, claude_theo, claude_ava
+**Communities:** north_cove, south_vale
+
+> [!NOTE]
+> This report evaluates an **offline simulated test fixture**. Passing checks demonstrate verification capability and negative regression defense; they do **not** claim a successful live Minecraft demonstration on a Paper server.
+
+## Summary Metrics
+
+| Metric | Value |
+| :--- | :--- |
+| **Total Attempted Actions** | 0 |
+| **Physically Verified Actions** | 0 |
+| **Unverified Action Claims** | 0 |
+| **Failed Actions** | 0 |
+| **Interrupted Actions** | 0 |
+| **Observed Facts** | 0 |
+| **Communicated Claims** | 0 |
+| **Privacy Violations** | 0 |
+| **Inventory Discrepancies** | 0 |
+| **Hash Chain Integrity** | INVALID / TAMPERED |
+| **Duration & Tick Proof** | DEFICIT / UNPROVEN |
+
+## ⚠️ Detected Violations
+
+| Code | Citizen | Description | Severity |
+| :--- | :--- | :--- | :--- |
+| `DURATION_EVIDENCE_DEFICIT` | global | Simulation duration deficit: claimed 60 minutes, but evidence only proves 0 minutes (0 ms vs required 3600000 ms). A 58.8-minute run cannot be accepted as a completed 60-minute demonstration.; Missing tick evidence: no tick events recorded in evidence log; Absent TPS metrics: no server performance / TPS observations documented | **ERROR** |
+
+## ❓ Unproven Checks (Missing Evidence)
+
+| Code | Description | Missing Fields |
+| :--- | :--- | :--- |
+| `NO_HASH_CHAIN_EVIDENCE` | Cryptographic operator journal hash chain not supplied | `rawJournalLines` |
+
+## Duration & Performance Audit
+
+- **Claimed Duration:** 60 minutes
+- **Proven Duration:** 0 minutes (0 ms)
+- **Recorded Ticks:** 0
+- **Average Tick Duration:** 0 ms
+- **Average Measured TPS:** none recorded
+- **Duration Deficit Details:** Simulation duration deficit: claimed 60 minutes, but evidence only proves 0 minutes (0 ms vs required 3600000 ms). A 58.8-minute run cannot be accepted as a completed 60-minute demonstration.; Missing tick evidence: no tick events recorded in evidence log; Absent TPS metrics: no server performance / TPS observations documented
+
+---
+*Report generated by Google Antigravity Evidence Validator (redacted, offline verification).*
+
+ ✓ experiments/evidence-validator/test/cli.test.ts (3 tests) 34ms
+ ✓ experiments/evidence-validator/test/smoke.test.ts (1 test) 10ms
+
+ Test Files  21 passed (21)
+      Tests  161 passed (161)
+   Start at  18:56:51
+   Duration  10.90s (transform 434ms, setup 295ms, collect 968ms, tests 630ms, environment 2ms, prepare 1.33s)
+

@@ -1,0 +1,17 @@
+
+> minecraft-ai-civilization@0.1.0 v1:journal /private/tmp/minecraft-offline-v2
+> tsx tools/v1-integration/journal-cli-main.ts artifacts/v1/v2-2v2/manifest.json e83444cc8dbfb376f59c59f8d8c6989363e5d7b9 ManpreetS2/Minecraft-Ai-Civilization-windows-backup artifacts/v1/v2-2v2 operator.jsonl off4
+
+{
+  "verdict": "NOT PROVEN",
+  "failures": [],
+  "unproven": [
+    "Independent evidence validator pending",
+    "External authenticity NOT PROVEN: all artifacts can be replaced consistently without an independently verified external anchor; journal matching does not authenticate Paper execution",
+    "Original journal lacks embedded source/repository attribution; caller descriptor is a binding declaration, not an independent source anchor"
+  ],
+  "journalConsistent": true,
+  "status": "JOURNAL CONSISTENT",
+  "authenticatedLiveExecution": false,
+  "exitCode": 0
+}

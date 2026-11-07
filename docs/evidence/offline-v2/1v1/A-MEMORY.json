@@ -1,0 +1,15 @@
+{
+  "criterionId": "A-MEMORY",
+  "repository": "ManpreetS2/Minecraft-Ai-Civilization-windows-backup",
+  "sourceSha": "e83444cc8dbfb376f59c59f8d8c6989363e5d7b9",
+  "command": "pnpm v1:offline 2",
+  "exitCode": 0,
+  "mode": "offline-fixture",
+  "outcome": "PASS",
+  "assertions": [
+    {
+      "name": "private memories reach only their citizen prompts",
+      "passed": true
+    }
+  ]
+}

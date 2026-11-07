@@ -1,0 +1,21 @@
+
+ RUN  v3.2.7 /private/tmp/minecraft-offline-v2/qa/v57
+
+ ✓ test/adv57-movement.test.ts (51 tests) 270ms
+stderr | test/adv57-construction.test.ts > [ADV57-C3] defect 3: evidence directory isolation and protected paths > evidence dir INSIDE the isolated world-lab or equal to it: policy probe (INFO)
+QA57-INFO evidence==isolated world dir -> ALLOWED
+
+ ✓ test/adv57-construction.test.ts (114 tests) 221ms
+ ✓ test/adv57-primitives.test.ts (18 tests) 64ms
+ ✓ test/adv57-body-lifecycle.test.ts (7 tests) 48ms
+ ✓ test/adv57-construction-real.test.ts (10 tests) 53ms
+stderr | test/adv57-recovery-hang.test.ts > [ADV57-M1 end-to-end] a hung lookAt in detour recovery escapes the whole-action deadline > control: with a resolving lookAt, moveToPosition returns before its budget
+QA57 control: lookAt resolves -> settled=true, goto calls=1
+
+ ✓ test/adv57-recovery-hang.test.ts (4 tests) 38ms
+
+ Test Files  6 passed (6)
+      Tests  204 passed (204)
+   Start at  18:57:07
+   Duration  6.43s (transform 1.44s, setup 160ms, collect 3.02s, tests 695ms, environment 1ms, prepare 391ms)
+

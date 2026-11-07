@@ -1,0 +1,49 @@
+
+ RUN  v3.2.7 /private/tmp/minecraft-offline-v2
+
+ ❯ tools/ci/offline-acceptance.test.ts (16 tests | 1 failed) 78ms
+   ✓ Offline Acceptance Artifact Verifier > computes journal row hash consistently without the hash property 3ms
+   ✓ Offline Acceptance Artifact Verifier > accepts a valid 1v1 (2-citizen) offline artifact bundle 11ms
+   ✓ Offline Acceptance Artifact Verifier > accepts a valid 2v2 (4-citizen) offline artifact bundle 7ms
+   ✓ Offline Acceptance Artifact Verifier > rejects wrong source SHA 4ms
+   ✓ Offline Acceptance Artifact Verifier > rejects incorrect citizen count 2ms
+   ✓ Offline Acceptance Artifact Verifier > rejects duplicate attempts 3ms
+   ✓ Offline Acceptance Artifact Verifier > rejects missing observations 3ms
+   ✓ Offline Acceptance Artifact Verifier > rejects artificially increased inventory 3ms
+   ✓ Offline Acceptance Artifact Verifier > rejects scripted decisions disguised as genuine model decisions 3ms
+   ✓ Offline Acceptance Artifact Verifier > rejects a simulated report promoted to authenticated Paper evidence (verdict PASS) 3ms
+   ✓ Offline Acceptance Artifact Verifier > rejects a simulated report promoted to authenticated Paper evidence (validator report VERIFIED) 4ms
+   ✓ Offline Acceptance Artifact Verifier > rejects journal hash tampering 3ms
+   ✓ Offline Acceptance Artifact Verifier > rejects cross-citizen identity confusion in observations 4ms
+   ✓ Offline Acceptance Artifact Verifier > rejects out-of-order execution (observation seq precedes attempt seq) 2ms
+   × Offline Acceptance Artifact Verifier > reports Codex journal CLI check as NOT_RUN when command is absent on this branch 17ms
+     → expected 'READY' to be 'NOT_RUN' // Object.is equality
+   ✓ Offline Acceptance Artifact Verifier > formats Markdown summary with all required sections and fail-closed notice 4ms
+ ✓ tools/ci/journal-execution.test.ts (2 tests) 3146ms
+   ✓ executes the real journal CLI and its forged/missing controls without mutating original artifacts  1737ms
+   ✓ refuses to report verification success when the real journal CLI rejects the input  1409ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tools/ci/offline-acceptance.test.ts > Offline Acceptance Artifact Verifier > reports Codex journal CLI check as NOT_RUN when command is absent on this branch
+AssertionError: expected 'READY' to be 'NOT_RUN' // Object.is equality
+
+Expected: "NOT_RUN"
+Received: "READY"
+
+ ❯ tools/ci/offline-acceptance.test.ts:557:33
+    555|   it("reports Codex journal CLI check as NOT_RUN when command is absen…
+    556|     const journalCheck = checkJournalCliIntegration(process.cwd());
+    557|     expect(journalCheck.status).toBe("NOT_RUN");
+       |                                 ^
+    558|     expect(journalCheck.details).toContain("PR #58");
+    559|     expect(journalCheck.details).toContain("not available on this bran…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed | 1 passed (2)
+      Tests  1 failed | 17 passed (18)
+   Start at  18:45:35
+   Duration  4.19s (transform 242ms, setup 166ms, collect 284ms, tests 3.22s, environment 0ms, prepare 159ms)
+

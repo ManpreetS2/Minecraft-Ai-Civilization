@@ -1,0 +1,13 @@
+{
+  "status": "READY",
+  "executed": true,
+  "command": "node --import tsx tools/v1-integration/journal-cli-main.ts",
+  "exitCodes": {
+    "consistent": 0,
+    "missingRoot": 2,
+    "missingJournal": 2,
+    "forged": 1
+  },
+  "forgedReceiptTestPassed": true,
+  "details": "Executed consistent, missing-root, missing-journal and rehashed forged-receipt cases: {\"consistent\":0,\"missingRoot\":2,\"missingJournal\":2,\"forged\":1}. Local consistency is not live authenticity."
+}

@@ -1,0 +1,4 @@
+
+> minecraft-ai-civilization@0.1.0 typecheck:evidence-validator /private/tmp/minecraft-offline-v2
+> tsc -p experiments/evidence-validator/tsconfig.json --noEmit
+

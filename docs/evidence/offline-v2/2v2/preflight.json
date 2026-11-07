@@ -1,0 +1,9 @@
+{
+  "passed": true,
+  "sourceSha": "e83444cc8dbfb376f59c59f8d8c6989363e5d7b9",
+  "versions": {
+    "node": "v22.12.0",
+    "git": "git version 2.39.3 (Apple Git-145)"
+  },
+  "failures": []
+}

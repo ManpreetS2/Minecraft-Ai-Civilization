@@ -1,0 +1,21 @@
+
+ RUN  v3.2.7 /private/tmp/minecraft-offline-v2
+
+(node:51456) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+stderr | tools/v1-integration/combined-cancellation.test.ts > discards actual delayed provider replies after citizen death and manager shutdown while preserving memory
+[shutdown] drain incomplete: attempted=4 remaining=2 timedOut=true
+
+ ✓ tools/v1-integration/combined-cancellation.test.ts (2 tests) 11671ms
+   ✓ reopens partial construction after cancellation during delayed navigation without late placement  503ms
+   ✓ discards actual delayed provider replies after citizen death and manager shutdown while preserving memory  11168ms
+ ✓ tools/ci/journal-execution.test.ts (2 tests) 3231ms
+   ✓ executes the real journal CLI and its forged/missing controls without mutating original artifacts  1737ms
+   ✓ refuses to report verification success when the real journal CLI rejects the input  1493ms
+ ✓ tools/ci/offline-acceptance.test.ts (16 tests) 52ms
+
+ Test Files  3 passed (3)
+      Tests  20 passed (20)
+   Start at  18:49:05
+   Duration  17.98s (transform 1.23s, setup 88ms, collect 1.87s, tests 14.95s, environment 0ms, prepare 147ms)
+

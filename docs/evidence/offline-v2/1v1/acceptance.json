@@ -1,0 +1,1187 @@
+{
+  "repository": "ManpreetS2/Minecraft-Ai-Civilization-windows-backup",
+  "candidateSha": "e83444cc8dbfb376f59c59f8d8c6989363e5d7b9",
+  "catalogValid": true,
+  "offline": {
+    "passed": 0,
+    "total": 30,
+    "percentage": null,
+    "measurement": "NOT MEASURABLE"
+  },
+  "live": {
+    "passed": 0,
+    "total": 37,
+    "percentage": null,
+    "measurement": "NOT MEASURABLE"
+  },
+  "milestones": [
+    {
+      "gate": "Gate A",
+      "passed": 0,
+      "total": 13,
+      "accepted": false
+    },
+    {
+      "gate": "Gate B",
+      "passed": 0,
+      "total": 24,
+      "accepted": false
+    }
+  ],
+  "milestoneCount": {
+    "passed": 0,
+    "total": 2
+  },
+  "results": [
+    {
+      "criterion": {
+        "id": "A-CONNECT",
+        "milestone": "Gate A",
+        "sourceSection": "project.md / Gate A",
+        "description": "Citizen connects to an isolated engine",
+        "verification": "both",
+        "procedure": "Independently review executable evidence for: Citizen connects to an isolated engine",
+        "status": "NOT_IMPLEMENTED",
+        "testedRepository": null,
+        "sourceSha": null,
+        "evidenceReference": null,
+        "testCommand": null,
+        "exitResult": null,
+        "review": null,
+        "blocker": "Evidence not supplied"
+      },
+      "offline": {
+        "verdict": "NOT PROVEN",
+        "evidenceReference": null,
+        "reasons": [
+          "evidence missing"
+        ]
+      },
+      "live": {
+        "verdict": "NOT PROVEN",
+        "evidenceReference": null,
+        "reasons": [
+          "evidence missing"
+        ]
+      }
+    },
+    {
+      "criterion": {
+        "id": "A-FOOD",
+        "milestone": "Gate A",
+        "sourceSection": "project.md / Gate A",
+        "description": "Citizen gathers food with verified physical results",
+        "verification": "both",
+        "procedure": "Independently review executable evidence for: Citizen gathers food with verified physical results",
+        "status": "NOT_IMPLEMENTED",
+        "testedRepository": null,
+        "sourceSha": null,
+        "evidenceReference": null,
+        "testCommand": null,
+        "exitResult": null,
+        "review": null,
+        "blocker": "Evidence not supplied"
+      },
+      "offline": {
+        "verdict": "NOT PROVEN",
+        "evidenceReference": null,
+        "reasons": [
+          "evidence missing"
+        ]
+      },
+      "live": {
+        "verdict": "NOT PROVEN",
+        "evidenceReference": null,
+        "reasons": [
+          "evidence missing"
+        ]
+      }
+    },
+    {
+      "criterion": {
+        "id": "A-NAVIGATION",
+        "milestone": "Gate A",
+        "sourceSection": "project.md / Gate A",
+        "description": "Citizen navigates and avoids drowning",
+        "verification": "both",
+        "procedure": "Independently review executable evidence for: Citizen navigates and avoids drowning",
+        "status": "NOT_IMPLEMENTED",
+        "testedRepository": null,
+        "sourceSha": null,
+        "evidenceReference": null,
+        "testCommand": null,
+        "exitResult": null,
+        "review": null,
+        "blocker": "Evidence not supplied"
+      },
+      "offline": {
+        "verdict": "NOT PROVEN",
+        "evidenceReference": null,
+        "reasons": [
+          "evidence missing"
+        ]
+      },
+      "live": {
+        "verdict": "NOT PROVEN",
+        "evidenceReference": null,
+        "reasons": [
+          "evidence missing"
+        ]
+      }
+    },
+    {
+      "criterion": {
+        "id": "A-SHELTER",
+        "milestone": "Gate A",
+        "sourceSection": "project.md / Gate A",
+        "description": "Citizen finds and uses shelter or bed when possible",
+        "verification": "both",
+        "procedure": "Independently review executable evidence for: Citizen finds and uses shelter or bed when possible",
+        "status": "NOT_IMPLEMENTED",
+        "testedRepository": null,
+        "sourceSha": null,
+        "evidenceReference": null,
+        "testCommand": null,
+        "exitResult": null,
+        "review": null,
+        "blocker": "Evidence not supplied"
+      },
+      "offline": {
+        "verdict": "NOT PROVEN",
+        "evidenceReference": null,
+        "reasons": [
+          "evidence missing"
+        ]
+      },
+      "live": {
+        "verdict": "NOT PROVEN",
+        "evidenceReference": null,
+        "reasons": [
+          "evidence missing"
+        ]
+      }
+    },
+    {
+      "criterion": {
+        "id": "A-IDENTITY",
+        "milestone": "Gate A",
+        "sourceSection": "project.md / Gate A",
+        "description": "Identity and memory persist through reconnect",
+        "verification": "both",
+        "procedure": "Independently review executable evidence for: Identity and memory persist through reconnect",
+        "status": "NOT_IMPLEMENTED",
+        "testedRepository": null,
+        "sourceSha": null,
+        "evidenceReference": null,
+        "testCommand": null,
+        "exitResult": null,
+        "review": null,
+        "blocker": "Evidence not supplied"
+      },
+      "offline": {
+        "verdict": "FAIL",
+        "evidenceReference": null,
+        "reasons": [
+          "trusted independent review missing"
+        ]
+      },
+      "live": {
+        "verdict": "FAIL",
+        "evidenceReference": null,
+        "reasons": [
+          "simulation or unknown mode cannot establish live acceptance",
+          "trusted independent review missing",
+          "independently reviewed live validator artifact missing or invalid"
+        ]
+      }
+    },
+    {
+      "criterion": {
+        "id": "A-RESPAWN",
+        "milestone": "Gate A",
+        "sourceSection": "project.md / Gate A",
+        "description": "Identity and memory persist through respawn",
+        "verification": "both",
+        "procedure": "Independently review executable evidence for: Identity and memory persist through respawn",
+        "status": "NOT_IMPLEMENTED",
+        "testedRepository": null,
+        "sourceSha": null,
+        "evidenceReference": null,
+        "testCommand": null,
+        "exitResult": null,
+        "review": null,
+        "blocker": "Evidence not supplied"
+      },
+      "offline": {
+        "verdict": "NOT PROVEN",
+        "evidenceReference": null,
+        "reasons": [
+          "evidence missing"
+        ]
+      },
+      "live": {
+        "verdict": "NOT PROVEN",
+        "evidenceReference": null,
+        "reasons": [
+          "evidence missing"
+        ]
+      }
+    },
+    {
+      "criterion": {
+        "id": "A-STOP",
+        "milestone": "Gate A",
+        "sourceSection": "project.md / Gate A",
+        "description": "Citizen stops safely",
+        "verification": "both",
+        "procedure": "Independently review executable evidence for: Citizen stops safely",
+        "status": "NOT_IMPLEMENTED",
+        "testedRepository": null,
+        "sourceSha": null,
+        "evidenceReference": null,
+        "testCommand": null,
+        "exitResult": null,
+        "review": null,
+        "blocker": "Evidence not supplied"
+      },
+      "offline": {
+        "verdict": "NOT PROVEN",
+        "evidenceReference": null,
+        "reasons": [
+          "evidence missing"
+        ]
+      },
+      "live": {
+        "verdict": "NOT PROVEN",
+        "evidenceReference": null,
+        "reasons": [
+          "evidence missing"
+        ]
+      }
+    },
+    {
+      "criterion": {
+        "id": "A-ROSTER",
+        "milestone": "Gate A",
+        "sourceSection": "project.md / Gate A",
+        "description": "One GPT and one Claude citizen operate independently",
+        "verification": "both",
+        "procedure": "Independently review executable evidence for: One GPT and one Claude citizen operate independently",
+        "status": "NOT_IMPLEMENTED",
+        "testedRepository": null,
+        "sourceSha": null,
+        "evidenceReference": null,
+        "testCommand": null,
+        "exitResult": null,
+        "review": null,
+        "blocker": "Evidence not supplied"
+      },
+      "offline": {
+        "verdict": "NOT PROVEN",
+        "evidenceReference": null,
+        "reasons": [
+          "evidence missing"
+        ]
+      },
+      "live": {
+        "verdict": "NOT PROVEN",
+        "evidenceReference": null,
+        "reasons": [
+          "evidence missing"
+        ]
+      }
+    },
+    {
+      "criterion": {
+        "id": "A-SESSION",
+        "milestone": "Gate A",
+        "sourceSection": "project.md / Gate A",
+        "description": "Model sessions are independent",
+        "verification": "both",
+        "procedure": "Independently review executable evidence for: Model sessions are independent",
+        "status": "NOT_IMPLEMENTED",
+        "testedRepository": null,
+        "sourceSha": null,
+        "evidenceReference": null,
+        "testCommand": null,
+        "exitResult": null,
+        "review": null,
+        "blocker": "Evidence not supplied"
+      },
+      "offline": {
+        "verdict": "FAIL",
+        "evidenceReference": null,
+        "reasons": [
+          "trusted independent review missing"
+        ]
+      },
+      "live": {
+        "verdict": "FAIL",
+        "evidenceReference": null,
+        "reasons": [
+          "simulation or unknown mode cannot establish live acceptance",
+          "trusted independent review missing",
+          "independently reviewed live validator artifact missing or invalid"
+        ]
+      }
+    },
+    {
+      "criterion": {
+        "id": "A-MEMORY",
+        "milestone": "Gate A",
+        "sourceSection": "project.md / Gate A",
+        "description": "Citizen memories are independent",
+        "verification": "both",
+        "procedure": "Independently review executable evidence for: Citizen memories are independent",
+        "status": "NOT_IMPLEMENTED",
+        "testedRepository": null,
+        "sourceSha": null,
+        "evidenceReference": null,
+        "testCommand": null,
+        "exitResult": null,
+        "review": null,
+        "blocker": "Evidence not supplied"
+      },
+      "offline": {
+        "verdict": "FAIL",
+        "evidenceReference": null,
+        "reasons": [
+          "trusted independent review missing"
+        ]
+      },
+      "live": {
+        "verdict": "FAIL",
+        "evidenceReference": null,
+        "reasons": [
+          "simulation or unknown mode cannot establish live acceptance",
+          "trusted independent review missing",
+          "independently reviewed live validator artifact missing or invalid"
+        ]
+      }
+    },
+    {
+      "criterion": {
+        "id": "A-VISIBILITY",
+        "milestone": "Gate A",
+        "sourceSection": "project.md / Gate A",
+        "description": "Visibility respects citizen boundaries",
+        "verification": "both",
+        "procedure": "Independently review executable evidence for: Visibility respects citizen boundaries",
+        "status": "NOT_IMPLEMENTED",
+        "testedRepository": null,
+        "sourceSha": null,
+        "evidenceReference": null,
+        "testCommand": null,
+        "exitResult": null,
+        "review": null,
+        "blocker": "Evidence not supplied"
+      },
+      "offline": {
+        "verdict": "NOT PROVEN",
+        "evidenceReference": null,
+        "reasons": [
+          "evidence missing"
+        ]
+      },
+      "live": {
+        "verdict": "NOT PROVEN",
+        "evidenceReference": null,
+        "reasons": [
+          "evidence missing"
+        ]
+      }
+    },
+    {
+      "criterion": {
+        "id": "A-ACTIONS",
+        "milestone": "Gate A",
+        "sourceSection": "project.md / Gate A",
+        "description": "Actions execute and their outcomes are recorded accurately",
+        "verification": "both",
+        "procedure": "Independently review executable evidence for: Actions execute and their outcomes are recorded accurately",
+        "status": "NOT_IMPLEMENTED",
+        "testedRepository": null,
+        "sourceSha": null,
+        "evidenceReference": null,
+        "testCommand": null,
+        "exitResult": null,
+        "review": null,
+        "blocker": "Evidence not supplied"
+      },
+      "offline": {
+        "verdict": "FAIL",
+        "evidenceReference": null,
+        "reasons": [
+          "trusted independent review missing"
+        ]
+      },
+      "live": {
+        "verdict": "FAIL",
+        "evidenceReference": null,
+        "reasons": [
+          "simulation or unknown mode cannot establish live acceptance",
+          "trusted independent review missing",
+          "independently reviewed live validator artifact missing or invalid"
+        ]
+      }
+    },
+    {
+      "criterion": {
+        "id": "A-USAGE",
+        "milestone": "Gate A",
+        "sourceSection": "project.md / Gate A",
+        "description": "Subscription allowance usage or metered API costs are accurately recorded",
+        "verification": "both",
+        "procedure": "Independently review executable evidence for: Subscription allowance usage or metered API costs are accurately recorded",
+        "status": "NOT_IMPLEMENTED",
+        "testedRepository": null,
+        "sourceSha": null,
+        "evidenceReference": null,
+        "testCommand": null,
+        "exitResult": null,
+        "review": null,
+        "blocker": "Evidence not supplied"
+      },
+      "offline": {
+        "verdict": "NOT PROVEN",
+        "evidenceReference": null,
+        "reasons": [
+          "evidence missing"
+        ]
+      },
+      "live": {
+        "verdict": "NOT PROVEN",
+        "evidenceReference": null,
+        "reasons": [
+          "evidence missing"
+        ]
+      }
+    },
+    {
+      "criterion": {
+        "id": "B-ROSTER",
+        "milestone": "Gate B",
+        "sourceSection": "project.md / Gate B",
+        "description": "Two GPT and two Claude independent citizens participate",
+        "verification": "both",
+        "procedure": "Independently review executable evidence for: Two GPT and two Claude independent citizens participate",
+        "status": "NOT_IMPLEMENTED",
+        "testedRepository": null,
+        "sourceSha": null,
+        "evidenceReference": null,
+        "testCommand": null,
+        "exitResult": null,
+        "review": null,
+        "blocker": "Evidence not supplied"
+      },
+      "offline": {
+        "verdict": "NOT PROVEN",
+        "evidenceReference": null,
+        "reasons": [
+          "evidence missing"
+        ]
+      },
+      "live": {
+        "verdict": "NOT PROVEN",
+        "evidenceReference": null,
+        "reasons": [
+          "evidence missing"
+        ]
+      }
+    },
+    {
+      "criterion": {
+        "id": "B-WORLD",
+        "milestone": "Gate B",
+        "sourceSection": "project.md / Gate B",
+        "description": "Citizens share one Minecraft survival world",
+        "verification": "live",
+        "procedure": "Independently review executable evidence for: Citizens share one Minecraft survival world",
+        "status": "NOT_IMPLEMENTED",
+        "testedRepository": null,
+        "sourceSha": null,
+        "evidenceReference": null,
+        "testCommand": null,
+        "exitResult": null,
+        "review": null,
+        "blocker": "Evidence not supplied"
+      },
+      "offline": null,
+      "live": {
+        "verdict": "NOT PROVEN",
+        "evidenceReference": null,
+        "reasons": [
+          "evidence missing"
+        ]
+      }
+    },
+    {
+      "criterion": {
+        "id": "B-START",
+        "milestone": "Gate B",
+        "sourceSection": "project.md / Gate B",
+        "description": "Separate natural starting sites have recorded comparable conditions",
+        "verification": "live",
+        "procedure": "Independently review executable evidence for: Separate natural starting sites have recorded comparable conditions",
+        "status": "NOT_IMPLEMENTED",
+        "testedRepository": null,
+        "sourceSha": null,
+        "evidenceReference": null,
+        "testCommand": null,
+        "exitResult": null,
+        "review": null,
+        "blocker": "Evidence not supplied"
+      },
+      "offline": null,
+      "live": {
+        "verdict": "NOT PROVEN",
+        "evidenceReference": null,
+        "reasons": [
+          "evidence missing"
+        ]
+      }
+    },
+    {
+      "criterion": {
+        "id": "B-INVENTORY",
+        "milestone": "Gate B",
+        "sourceSection": "project.md / Gate B",
+        "description": "Every citizen starts with empty inventory and no gifted equipment",
+        "verification": "both",
+        "procedure": "Independently review executable evidence for: Every citizen starts with empty inventory and no gifted equipment",
+        "status": "NOT_IMPLEMENTED",
+        "testedRepository": null,
+        "sourceSha": null,
+        "evidenceReference": null,
+        "testCommand": null,
+        "exitResult": null,
+        "review": null,
+        "blocker": "Evidence not supplied"
+      },
+      "offline": {
+        "verdict": "NOT PROVEN",
+        "evidenceReference": null,
+        "reasons": [
+          "evidence missing"
+        ]
+      },
+      "live": {
+        "verdict": "NOT PROVEN",
+        "evidenceReference": null,
+        "reasons": [
+          "evidence missing"
+        ]
+      }
+    },
+    {
+      "criterion": {
+        "id": "B-PRESSURE",
+        "milestone": "Gate B",
+        "sourceSection": "project.md / Gate B",
+        "description": "Normal physical food and shelter pressures apply",
+        "verification": "live",
+        "procedure": "Independently review executable evidence for: Normal physical food and shelter pressures apply",
+        "status": "NOT_IMPLEMENTED",
+        "testedRepository": null,
+        "sourceSha": null,
+        "evidenceReference": null,
+        "testCommand": null,
+        "exitResult": null,
+        "review": null,
+        "blocker": "Evidence not supplied"
+      },
+      "offline": null,
+      "live": {
+        "verdict": "NOT PROVEN",
+        "evidenceReference": null,
+        "reasons": [
+          "evidence missing"
+        ]
+      }
+    },
+    {
+      "criterion": {
+        "id": "B-AUTONOMY",
+        "milestone": "Gate B",
+        "sourceSection": "project.md / Gate B",
+        "description": "Equivalent neutral prompts preserve independently chosen priorities",
+        "verification": "both",
+        "procedure": "Independently review executable evidence for: Equivalent neutral prompts preserve independently chosen priorities",
+        "status": "NOT_IMPLEMENTED",
+        "testedRepository": null,
+        "sourceSha": null,
+        "evidenceReference": null,
+        "testCommand": null,
+        "exitResult": null,
+        "review": null,
+        "blocker": "Evidence not supplied"
+      },
+      "offline": {
+        "verdict": "NOT PROVEN",
+        "evidenceReference": null,
+        "reasons": [
+          "evidence missing"
+        ]
+      },
+      "live": {
+        "verdict": "NOT PROVEN",
+        "evidenceReference": null,
+        "reasons": [
+          "evidence missing"
+        ]
+      }
+    },
+    {
+      "criterion": {
+        "id": "B-OUTCOMES",
+        "milestone": "Gate B",
+        "sourceSection": "project.md / Gate B",
+        "description": "No forced contact, leader, role, war, rivalry or outcome",
+        "verification": "both",
+        "procedure": "Independently review executable evidence for: No forced contact, leader, role, war, rivalry or outcome",
+        "status": "NOT_IMPLEMENTED",
+        "testedRepository": null,
+        "sourceSha": null,
+        "evidenceReference": null,
+        "testCommand": null,
+        "exitResult": null,
+        "review": null,
+        "blocker": "Evidence not supplied"
+      },
+      "offline": {
+        "verdict": "NOT PROVEN",
+        "evidenceReference": null,
+        "reasons": [
+          "evidence missing"
+        ]
+      },
+      "live": {
+        "verdict": "NOT PROVEN",
+        "evidenceReference": null,
+        "reasons": [
+          "evidence missing"
+        ]
+      }
+    },
+    {
+      "criterion": {
+        "id": "B-PRIVACY",
+        "milestone": "Gate B",
+        "sourceSection": "project.md / Gate B",
+        "description": "No initial disclosure of rival coordinates or private history",
+        "verification": "both",
+        "procedure": "Independently review executable evidence for: No initial disclosure of rival coordinates or private history",
+        "status": "NOT_IMPLEMENTED",
+        "testedRepository": null,
+        "sourceSha": null,
+        "evidenceReference": null,
+        "testCommand": null,
+        "exitResult": null,
+        "review": null,
+        "blocker": "Evidence not supplied"
+      },
+      "offline": {
+        "verdict": "NOT PROVEN",
+        "evidenceReference": null,
+        "reasons": [
+          "evidence missing"
+        ]
+      },
+      "live": {
+        "verdict": "NOT PROVEN",
+        "evidenceReference": null,
+        "reasons": [
+          "evidence missing"
+        ]
+      }
+    },
+    {
+      "criterion": {
+        "id": "B-SPEECH",
+        "milestone": "Gate B",
+        "sourceSection": "project.md / Gate B",
+        "description": "Speech respects hearing limits and private messages respect recipients",
+        "verification": "both",
+        "procedure": "Independently review executable evidence for: Speech respects hearing limits and private messages respect recipients",
+        "status": "NOT_IMPLEMENTED",
+        "testedRepository": null,
+        "sourceSha": null,
+        "evidenceReference": null,
+        "testCommand": null,
+        "exitResult": null,
+        "review": null,
+        "blocker": "Evidence not supplied"
+      },
+      "offline": {
+        "verdict": "NOT PROVEN",
+        "evidenceReference": null,
+        "reasons": [
+          "evidence missing"
+        ]
+      },
+      "live": {
+        "verdict": "NOT PROVEN",
+        "evidenceReference": null,
+        "reasons": [
+          "evidence missing"
+        ]
+      }
+    },
+    {
+      "criterion": {
+        "id": "B-OBSERVER",
+        "milestone": "Gate B",
+        "sourceSection": "project.md / Gate B",
+        "description": "Observer-only truth and unauthorized chest events do not enter citizen knowledge",
+        "verification": "both",
+        "procedure": "Independently review executable evidence for: Observer-only truth and unauthorized chest events do not enter citizen knowledge",
+        "status": "NOT_IMPLEMENTED",
+        "testedRepository": null,
+        "sourceSha": null,
+        "evidenceReference": null,
+        "testCommand": null,
+        "exitResult": null,
+        "review": null,
+        "blocker": "Evidence not supplied"
+      },
+      "offline": {
+        "verdict": "NOT PROVEN",
+        "evidenceReference": null,
+        "reasons": [
+          "evidence missing"
+        ]
+      },
+      "live": {
+        "verdict": "NOT PROVEN",
+        "evidenceReference": null,
+        "reasons": [
+          "evidence missing"
+        ]
+      }
+    },
+    {
+      "criterion": {
+        "id": "B-MIGRATION",
+        "milestone": "Gate B",
+        "sourceSection": "project.md / Gate B",
+        "description": "Affiliation changes preserve underlying model identity and memory",
+        "verification": "both",
+        "procedure": "Independently review executable evidence for: Affiliation changes preserve underlying model identity and memory",
+        "status": "NOT_IMPLEMENTED",
+        "testedRepository": null,
+        "sourceSha": null,
+        "evidenceReference": null,
+        "testCommand": null,
+        "exitResult": null,
+        "review": null,
+        "blocker": "Evidence not supplied"
+      },
+      "offline": {
+        "verdict": "NOT PROVEN",
+        "evidenceReference": null,
+        "reasons": [
+          "evidence missing"
+        ]
+      },
+      "live": {
+        "verdict": "NOT PROVEN",
+        "evidenceReference": null,
+        "reasons": [
+          "evidence missing"
+        ]
+      }
+    },
+    {
+      "criterion": {
+        "id": "B-CHOICES",
+        "milestone": "Gate B",
+        "sourceSection": "project.md / Gate B",
+        "description": "Independent choices and communication or measured non-contact are recorded",
+        "verification": "both",
+        "procedure": "Independently review executable evidence for: Independent choices and communication or measured non-contact are recorded",
+        "status": "NOT_IMPLEMENTED",
+        "testedRepository": null,
+        "sourceSha": null,
+        "evidenceReference": null,
+        "testCommand": null,
+        "exitResult": null,
+        "review": null,
+        "blocker": "Evidence not supplied"
+      },
+      "offline": {
+        "verdict": "NOT PROVEN",
+        "evidenceReference": null,
+        "reasons": [
+          "evidence missing"
+        ]
+      },
+      "live": {
+        "verdict": "NOT PROVEN",
+        "evidenceReference": null,
+        "reasons": [
+          "evidence missing"
+        ]
+      }
+    },
+    {
+      "criterion": {
+        "id": "B-INVENTORY-LOG",
+        "milestone": "Gate B",
+        "sourceSection": "project.md / Gate B",
+        "description": "Actual inventory changes are recorded without invented transfers",
+        "verification": "both",
+        "procedure": "Independently review executable evidence for: Actual inventory changes are recorded without invented transfers",
+        "status": "NOT_IMPLEMENTED",
+        "testedRepository": null,
+        "sourceSha": null,
+        "evidenceReference": null,
+        "testCommand": null,
+        "exitResult": null,
+        "review": null,
+        "blocker": "Evidence not supplied"
+      },
+      "offline": {
+        "verdict": "NOT PROVEN",
+        "evidenceReference": null,
+        "reasons": [
+          "evidence missing"
+        ]
+      },
+      "live": {
+        "verdict": "NOT PROVEN",
+        "evidenceReference": null,
+        "reasons": [
+          "evidence missing"
+        ]
+      }
+    },
+    {
+      "criterion": {
+        "id": "B-BLOCK-LOG",
+        "milestone": "Gate B",
+        "sourceSection": "project.md / Gate B",
+        "description": "Actual block changes distinguish attempted and verified construction",
+        "verification": "both",
+        "procedure": "Independently review executable evidence for: Actual block changes distinguish attempted and verified construction",
+        "status": "NOT_IMPLEMENTED",
+        "testedRepository": null,
+        "sourceSha": null,
+        "evidenceReference": null,
+        "testCommand": null,
+        "exitResult": null,
+        "review": null,
+        "blocker": "Evidence not supplied"
+      },
+      "offline": {
+        "verdict": "NOT PROVEN",
+        "evidenceReference": null,
+        "reasons": [
+          "evidence missing"
+        ]
+      },
+      "live": {
+        "verdict": "NOT PROVEN",
+        "evidenceReference": null,
+        "reasons": [
+          "evidence missing"
+        ]
+      }
+    },
+    {
+      "criterion": {
+        "id": "B-HEALTH-LOG",
+        "milestone": "Gate B",
+        "sourceSection": "project.md / Gate B",
+        "description": "Actual health, death and failed actions are recorded",
+        "verification": "both",
+        "procedure": "Independently review executable evidence for: Actual health, death and failed actions are recorded",
+        "status": "NOT_IMPLEMENTED",
+        "testedRepository": null,
+        "sourceSha": null,
+        "evidenceReference": null,
+        "testCommand": null,
+        "exitResult": null,
+        "review": null,
+        "blocker": "Evidence not supplied"
+      },
+      "offline": {
+        "verdict": "NOT PROVEN",
+        "evidenceReference": null,
+        "reasons": [
+          "evidence missing"
+        ]
+      },
+      "live": {
+        "verdict": "NOT PROVEN",
+        "evidenceReference": null,
+        "reasons": [
+          "evidence missing"
+        ]
+      }
+    },
+    {
+      "criterion": {
+        "id": "B-MODELS",
+        "milestone": "Gate B",
+        "sourceSection": "project.md / Gate B",
+        "description": "Configured and served exact model IDs are recorded when known",
+        "verification": "both",
+        "procedure": "Independently review executable evidence for: Configured and served exact model IDs are recorded when known",
+        "status": "NOT_IMPLEMENTED",
+        "testedRepository": null,
+        "sourceSha": null,
+        "evidenceReference": null,
+        "testCommand": null,
+        "exitResult": null,
+        "review": null,
+        "blocker": "Evidence not supplied"
+      },
+      "offline": {
+        "verdict": "NOT PROVEN",
+        "evidenceReference": null,
+        "reasons": [
+          "evidence missing"
+        ]
+      },
+      "live": {
+        "verdict": "NOT PROVEN",
+        "evidenceReference": null,
+        "reasons": [
+          "evidence missing"
+        ]
+      }
+    },
+    {
+      "criterion": {
+        "id": "B-AUTH",
+        "milestone": "Gate B",
+        "sourceSection": "project.md / Gate B",
+        "description": "Authenticated access mode is recorded without secrets",
+        "verification": "both",
+        "procedure": "Independently review executable evidence for: Authenticated access mode is recorded without secrets",
+        "status": "NOT_IMPLEMENTED",
+        "testedRepository": null,
+        "sourceSha": null,
+        "evidenceReference": null,
+        "testCommand": null,
+        "exitResult": null,
+        "review": null,
+        "blocker": "Evidence not supplied"
+      },
+      "offline": {
+        "verdict": "NOT PROVEN",
+        "evidenceReference": null,
+        "reasons": [
+          "evidence missing"
+        ]
+      },
+      "live": {
+        "verdict": "NOT PROVEN",
+        "evidenceReference": null,
+        "reasons": [
+          "evidence missing"
+        ]
+      }
+    },
+    {
+      "criterion": {
+        "id": "B-COST",
+        "milestone": "Gate B",
+        "sourceSection": "project.md / Gate B",
+        "description": "Subscription allowance and/or metered API usage and costs are evidenced",
+        "verification": "both",
+        "procedure": "Independently review executable evidence for: Subscription allowance and/or metered API usage and costs are evidenced",
+        "status": "NOT_IMPLEMENTED",
+        "testedRepository": null,
+        "sourceSha": null,
+        "evidenceReference": null,
+        "testCommand": null,
+        "exitResult": null,
+        "review": null,
+        "blocker": "Evidence not supplied"
+      },
+      "offline": {
+        "verdict": "NOT PROVEN",
+        "evidenceReference": null,
+        "reasons": [
+          "evidence missing"
+        ]
+      },
+      "live": {
+        "verdict": "NOT PROVEN",
+        "evidenceReference": null,
+        "reasons": [
+          "evidence missing"
+        ]
+      }
+    },
+    {
+      "criterion": {
+        "id": "B-DURATION",
+        "milestone": "Gate B",
+        "sourceSection": "project.md / Gate B",
+        "description": "Sixty continuous real-world minutes run at normal speed with actual TPS and ticks",
+        "verification": "live",
+        "procedure": "Independently review executable evidence for: Sixty continuous real-world minutes run at normal speed with actual TPS and ticks",
+        "status": "NOT_IMPLEMENTED",
+        "testedRepository": null,
+        "sourceSha": null,
+        "evidenceReference": null,
+        "testCommand": null,
+        "exitResult": null,
+        "review": null,
+        "blocker": "Evidence not supplied"
+      },
+      "offline": null,
+      "live": {
+        "verdict": "NOT PROVEN",
+        "evidenceReference": null,
+        "reasons": [
+          "evidence missing"
+        ]
+      }
+    },
+    {
+      "criterion": {
+        "id": "B-TICKS",
+        "milestone": "Gate B",
+        "sourceSection": "project.md / Gate B",
+        "description": "Actual Paper ticks and TPS are recorded at normal day/night speed",
+        "verification": "live",
+        "procedure": "Independently review executable evidence for: Actual Paper ticks and TPS are recorded at normal day/night speed",
+        "status": "NOT_IMPLEMENTED",
+        "testedRepository": null,
+        "sourceSha": null,
+        "evidenceReference": null,
+        "testCommand": null,
+        "exitResult": null,
+        "review": null,
+        "blocker": "Evidence not supplied"
+      },
+      "offline": null,
+      "live": {
+        "verdict": "NOT PROVEN",
+        "evidenceReference": null,
+        "reasons": [
+          "evidence missing"
+        ]
+      }
+    },
+    {
+      "criterion": {
+        "id": "B-RESPAWN",
+        "milestone": "Gate B",
+        "sourceSection": "project.md / Gate B",
+        "description": "Normal respawn preserves citizen identity and memory",
+        "verification": "both",
+        "procedure": "Independently review executable evidence for: Normal respawn preserves citizen identity and memory",
+        "status": "NOT_IMPLEMENTED",
+        "testedRepository": null,
+        "sourceSha": null,
+        "evidenceReference": null,
+        "testCommand": null,
+        "exitResult": null,
+        "review": null,
+        "blocker": "Evidence not supplied"
+      },
+      "offline": {
+        "verdict": "NOT PROVEN",
+        "evidenceReference": null,
+        "reasons": [
+          "evidence missing"
+        ]
+      },
+      "live": {
+        "verdict": "NOT PROVEN",
+        "evidenceReference": null,
+        "reasons": [
+          "evidence missing"
+        ]
+      }
+    },
+    {
+      "criterion": {
+        "id": "B-KEEP-INVENTORY",
+        "milestone": "Gate B",
+        "sourceSection": "project.md / Gate B",
+        "description": "keepInventory is false",
+        "verification": "live",
+        "procedure": "Independently review executable evidence for: keepInventory is false",
+        "status": "NOT_IMPLEMENTED",
+        "testedRepository": null,
+        "sourceSha": null,
+        "evidenceReference": null,
+        "testCommand": null,
+        "exitResult": null,
+        "review": null,
+        "blocker": "Evidence not supplied"
+      },
+      "offline": null,
+      "live": {
+        "verdict": "NOT PROVEN",
+        "evidenceReference": null,
+        "reasons": [
+          "evidence missing"
+        ]
+      }
+    },
+    {
+      "criterion": {
+        "id": "B-INTERVENTION",
+        "milestone": "Gate B",
+        "sourceSection": "project.md / Gate B",
+        "description": "No human rescue, construction, teleporting or creative supplies during timed run",
+        "verification": "live",
+        "procedure": "Independently review executable evidence for: No human rescue, construction, teleporting or creative supplies during timed run",
+        "status": "NOT_IMPLEMENTED",
+        "testedRepository": null,
+        "sourceSha": null,
+        "evidenceReference": null,
+        "testCommand": null,
+        "exitResult": null,
+        "review": null,
+        "blocker": "Evidence not supplied"
+      },
+      "offline": null,
+      "live": {
+        "verdict": "NOT PROVEN",
+        "evidenceReference": null,
+        "reasons": [
+          "evidence missing"
+        ]
+      }
+    },
+    {
+      "criterion": {
+        "id": "B-INTERVENTION-LOG",
+        "milestone": "Gate B",
+        "sourceSection": "project.md / Gate B",
+        "description": "Preparation decisions, seed, sites and all interventions are disclosed",
+        "verification": "both",
+        "procedure": "Independently review executable evidence for: Preparation decisions, seed, sites and all interventions are disclosed",
+        "status": "NOT_IMPLEMENTED",
+        "testedRepository": null,
+        "sourceSha": null,
+        "evidenceReference": null,
+        "testCommand": null,
+        "exitResult": null,
+        "review": null,
+        "blocker": "Evidence not supplied"
+      },
+      "offline": {
+        "verdict": "NOT PROVEN",
+        "evidenceReference": null,
+        "reasons": [
+          "evidence missing"
+        ]
+      },
+      "live": {
+        "verdict": "NOT PROVEN",
+        "evidenceReference": null,
+        "reasons": [
+          "evidence missing"
+        ]
+      }
+    }
+  ]
+}
