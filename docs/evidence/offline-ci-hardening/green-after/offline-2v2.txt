@@ -1,0 +1,7 @@
+
+> minecraft-ai-civilization@0.1.0 v1:offline <scratch>/wt/impl
+> tsx tools/v1-integration/cli.ts 4 artifacts/v1/scenario-4
+
+(node:63393) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+Offline 4-citizen scripted rehearsal at bdd454d04cb14a37db052d685ebc791ab20461db. Bundle: <scratch>/wt/impl/artifacts/v1/scenario-4. Journal: <scratch>/wt/impl/artifacts/v1/scenario-4/operator.jsonl. Journal: JOURNAL CONSISTENT. Live authenticity: NOT PROVEN. Gemini: NOT_PROVEN.

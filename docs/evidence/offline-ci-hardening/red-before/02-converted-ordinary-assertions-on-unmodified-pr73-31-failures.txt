@@ -1,0 +1,488 @@
+
+ RUN  v3.2.7 <scratch>/wt/impl/qa/verify-ci-verifier
+
+ ✓ test/integration-and-honesty.test.ts > journal CLI integration: independent real-subprocess controls PER scenario > [CLI behaviour] calling PR #68's CLI without the experimentId still rejects an untouched bundle (the bug PR #73 fixed in the caller) 937ms
+ × test/integration-and-honesty.test.ts > journal CLI integration: independent real-subprocess controls PER scenario > 1v1 (2 citizens, 6 original attempts and observations) > positive, missing-evidence and forged-evidence controls all execute and behave on an untouched real bundle 1625ms
+   → expected undefined to be 1 // Object.is equality
+ ✓ test/integration-and-honesty.test.ts > journal CLI integration: independent real-subprocess controls PER scenario > 1v1 (2 citizens, 6 original attempts and observations) > a forged receipt makes the helper report FAILED (never READY) 1484ms
+ × test/integration-and-honesty.test.ts > journal CLI integration: independent real-subprocess controls PER scenario > 1v1 (2 citizens, 6 original attempts and observations) > the control result records the citizen and original attempt/observation counts read from the journal itself 1678ms
+   → expected undefined to deeply equal { citizens: 2, attempts: 6, …(1) }
+ ✓ test/integration-and-honesty.test.ts > journal CLI integration: independent real-subprocess controls PER scenario > 1v1 (2 citizens, 6 original attempts and observations) > a journal with the wrong original attempt count makes the helper report FAILED 1409ms
+ × test/integration-and-honesty.test.ts > journal CLI integration: independent real-subprocess controls PER scenario > 2v2 (4 citizens, 12 original attempts and observations) > positive, missing-evidence and forged-evidence controls all execute and behave on an untouched real bundle 1442ms
+   → expected undefined to be 1 // Object.is equality
+ ✓ test/integration-and-honesty.test.ts > journal CLI integration: independent real-subprocess controls PER scenario > 2v2 (4 citizens, 12 original attempts and observations) > a forged receipt makes the helper report FAILED (never READY) 1662ms
+ × test/integration-and-honesty.test.ts > journal CLI integration: independent real-subprocess controls PER scenario > 2v2 (4 citizens, 12 original attempts and observations) > the control result records the citizen and original attempt/observation counts read from the journal itself 1515ms
+   → expected undefined to deeply equal { citizens: 4, attempts: 12, …(1) }
+ ✓ test/integration-and-honesty.test.ts > journal CLI integration: independent real-subprocess controls PER scenario > 2v2 (4 citizens, 12 original attempts and observations) > a journal with the wrong original attempt count makes the helper report FAILED 1636ms
+ × test/integration-and-honesty.test.ts > journal CLI integration: independent real-subprocess controls PER scenario > both scenarios are cross-checked independently by the wrapper and both are recorded 2245ms
+   → Cannot read properties of undefined (reading 'scenario-2')
+ × test/integration-and-honesty.test.ts > journal CLI integration: independent real-subprocess controls PER scenario > a failed required check produces a NONZERO exit: forged 1v1 only (2v2 stays READY, independently) 2088ms
+   → Cannot read properties of undefined (reading 'scenario-2')
+ × test/integration-and-honesty.test.ts > journal CLI integration: independent real-subprocess controls PER scenario > a failed required check produces a NONZERO exit: forged 2v2 only (1v1 stays READY, independently) 2072ms
+   → expected +0 not to be +0 // Object.is equality
+ ✓ test/integration-and-honesty.test.ts > journal CLI integration: independent real-subprocess controls PER scenario > a stub CLI that always says 'consistent' (exit 0) can never earn the forgery claim 1377ms
+ ✓ test/integration-and-honesty.test.ts > journal CLI integration: independent real-subprocess controls PER scenario > the helper no longer depends on a shell-resolved `pnpm` binary (Windows .cmd shim problem) 1ms
+ × test/integration-and-honesty.test.ts > process exit codes and honest top-level status > untouched real bundles: exit 0, status OFFLINE_STRUCTURAL_PASS, Paper execution NOT PROVEN 2103ms
+   → expected undefined to be 'OFFLINE_STRUCTURAL_PASS' // Object.is equality
+ × test/integration-and-honesty.test.ts > process exit codes and honest top-level status > the headline never reads as live acceptance for synthetic evidence 2072ms
+   → expected '# ✅ Offline Acceptance Verification R…' to match /Offline structural checks PASSED/
+ × test/integration-and-honesty.test.ts > process exit codes and honest top-level status > the report separates the four states explicitly 2065ms
+   → expected '# ✅ Offline Acceptance Verification R…' to match /Offline structural checks:\s*PASSED/
+ × test/integration-and-honesty.test.ts > process exit codes and honest top-level status > criteria that remain NOT MEASURABLE are reported, with the failing criteria named 2141ms
+   → expected '# ✅ Offline Acceptance Verification R…' to match /NOT MEASURABLE/
+ × test/integration-and-honesty.test.ts > process exit codes and honest top-level status > contradictory evidence is REJECTED with its own status, headline and nonzero exit (acceptance.json claims live 37/37) 2144ms
+   → expected +0 not to be +0 // Object.is equality
+ × test/integration-and-honesty.test.ts > process exit codes and honest top-level status > an unprovable/incomplete verification is reported as INCOMPLETE with a nonzero exit (2v2 evidence missing) 2072ms
+   → expected undefined to be 'VERIFICATION_INCOMPLETE' // Object.is equality
+ × test/integration-and-honesty.test.ts > process exit codes and honest top-level status > an ordinary structural failure (action removed) is VERIFICATION_FAILED, nonzero, and not called contradictory 2094ms
+   → expected undefined to be 'VERIFICATION_FAILED' // Object.is equality
+ ✓ test/integration-and-honesty.test.ts > process exit codes and honest top-level status > the Paper / live-model gaps are listed as NOT PROVEN and live execution is never claimed 2079ms
+ ✓ test/tamper-matrix.test.ts > control > an untouched real 2-citizen bundle passes the PR #70 verifier 16ms
+ ✓ test/tamper-matrix.test.ts > control > an untouched real 2-citizen bundle is JOURNAL CONSISTENT under PR #68's CLI when called with its experimentId 913ms
+ ✓ test/tamper-matrix.test.ts > control > an untouched real 4-citizen bundle passes the PR #70 verifier 9ms
+ ✓ test/tamper-matrix.test.ts > control > an untouched real 4-citizen bundle is JOURNAL CONSISTENT under PR #68's CLI when called with its experimentId 909ms
+ × test/tamper-matrix.test.ts > T01 [2v] rehashed journal: observation worldChanges position moved > L1: PR #70 verifier rejects it 16ms
+   → expected true to be false // Object.is equality
+ ✓ test/tamper-matrix.test.ts > T01 [2v] rehashed journal: observation worldChanges position moved > L2: PR #68's journal cross-check rejects it 899ms
+ × test/tamper-matrix.test.ts > T01 [4v] rehashed journal: observation worldChanges position moved > L1: PR #70 verifier rejects it 10ms
+   → expected true to be false // Object.is equality
+ ✓ test/tamper-matrix.test.ts > T01 [4v] rehashed journal: observation worldChanges position moved > L2: PR #68's journal cross-check rejects it 910ms
+ × test/tamper-matrix.test.ts > T02 rehashed journal: attempt target changed > L1: PR #70 verifier rejects it 7ms
+   → expected true to be false // Object.is equality
+ ✓ test/tamper-matrix.test.ts > T02 rehashed journal: attempt target changed > L2: PR #68's journal cross-check rejects it 908ms
+ × test/tamper-matrix.test.ts > T03 rehashed journal: observation flipped to successReported=false, verified=false > L1: PR #70 verifier rejects it 7ms
+   → expected true to be false // Object.is equality
+ ✓ test/tamper-matrix.test.ts > T03 rehashed journal: observation flipped to successReported=false, verified=false > L2: PR #68's journal cross-check rejects it 928ms
+ × test/tamper-matrix.test.ts > T04 [2v] rehashed journal: citizen identities swapped between gpt-a#1 and claude-a#1 (attempt and observation) > L1: PR #70 verifier rejects it 10ms
+   → expected true to be false // Object.is equality
+ ✓ test/tamper-matrix.test.ts > T04 [2v] rehashed journal: citizen identities swapped between gpt-a#1 and claude-a#1 (attempt and observation) > L2: PR #68's journal cross-check rejects it 904ms
+ × test/tamper-matrix.test.ts > T04 [4v] rehashed journal: citizen identities swapped between gpt-a#1 and claude-a#1 (attempt and observation) > L1: PR #70 verifier rejects it 8ms
+   → expected true to be false // Object.is equality
+ ✓ test/tamper-matrix.test.ts > T04 [4v] rehashed journal: citizen identities swapped between gpt-a#1 and claude-a#1 (attempt and observation) > L2: PR #68's journal cross-check rejects it 905ms
+ × test/tamper-matrix.test.ts > T05 [2v] manifest + receipt citizenIds swapped between two actions (journal untouched) > L1: PR #70 verifier rejects it 7ms
+   → expected true to be false // Object.is equality
+ ✓ test/tamper-matrix.test.ts > T05 [2v] manifest + receipt citizenIds swapped between two actions (journal untouched) > L2: PR #68's journal cross-check rejects it 902ms
+ × test/tamper-matrix.test.ts > T05 [4v] manifest + receipt citizenIds swapped between two actions (journal untouched) > L1: PR #70 verifier rejects it 8ms
+   → expected true to be false // Object.is equality
+ ✓ test/tamper-matrix.test.ts > T05 [4v] manifest + receipt citizenIds swapped between two actions (journal untouched) > L2: PR #68's journal cross-check rejects it 917ms
+ ✓ test/tamper-matrix.test.ts > T06 receipt reference replaced with another existing receipt > L1: PR #70 verifier rejects it 6ms
+ ✓ test/tamper-matrix.test.ts > T06 receipt reference replaced with another existing receipt > L2: PR #68's journal cross-check rejects it 897ms
+ × test/tamper-matrix.test.ts > T07 [2v] receipt CONTENT forged (ids kept; inventoryAfter=9, worldChanges emptied) > L1: PR #70 verifier rejects it 7ms
+   → expected true to be false // Object.is equality
+ ✓ test/tamper-matrix.test.ts > T07 [2v] receipt CONTENT forged (ids kept; inventoryAfter=9, worldChanges emptied) > L2: PR #68's journal cross-check rejects it 908ms
+ × test/tamper-matrix.test.ts > T07 [4v] receipt CONTENT forged (ids kept; inventoryAfter=9, worldChanges emptied) > L1: PR #70 verifier rejects it 8ms
+   → expected true to be false // Object.is equality
+ ✓ test/tamper-matrix.test.ts > T07 [4v] receipt CONTENT forged (ids kept; inventoryAfter=9, worldChanges emptied) > L2: PR #68's journal cross-check rejects it 911ms
+ ✓ test/tamper-matrix.test.ts > T08 receipt sourceSha changed to a different SHA > L2: PR #68's journal cross-check rejects it 930ms
+ ✓ test/tamper-matrix.test.ts > T09 referenced receipt file deleted > L1: PR #70 verifier rejects it 6ms
+ × test/tamper-matrix.test.ts > T08 receipt sourceSha changed to a different SHA > L1: PR #70 verifier rejects it 6ms
+   → expected true to be false // Object.is equality
+ ✓ test/tamper-matrix.test.ts > T09 referenced receipt file deleted > L2: PR #68's journal cross-check rejects it 992ms
+ ✓ test/tamper-matrix.test.ts > T10 manifest.sourceReceipts[0].sha256 altered > L2: PR #68's journal cross-check rejects it 904ms
+ ✓ test/tamper-matrix.test.ts > T11 manifest action duplicated over another (new attemptId, same receipt) > L1: PR #70 verifier rejects it 6ms
+ × test/tamper-matrix.test.ts > T10 manifest.sourceReceipts[0].sha256 altered > L1: PR #70 verifier rejects it 7ms
+   → expected true to be false // Object.is equality
+ ✓ test/tamper-matrix.test.ts > T11 manifest action duplicated over another (new attemptId, same receipt) > L2: PR #68's journal cross-check rejects it 896ms
+ ✓ test/tamper-matrix.test.ts > T12 rehashed journal: gpt-a#3 replaced by a clone of #1 (fresh attemptId, inventory 0->1) > L2: PR #68's journal cross-check rejects it 909ms
+ ✓ test/tamper-matrix.test.ts > T13 [2v] one action removed everywhere (manifest + journal pair) > L1: PR #70 verifier rejects it 6ms
+ × test/tamper-matrix.test.ts > T12 rehashed journal: gpt-a#3 replaced by a clone of #1 (fresh attemptId, inventory 0->1) > L1: PR #70 verifier rejects it 6ms
+   → expected true to be false // Object.is equality
+ ✓ test/tamper-matrix.test.ts > T13 [2v] one action removed everywhere (manifest + journal pair) > L2: PR #68's journal cross-check rejects it 909ms
+ ✓ test/tamper-matrix.test.ts > T13 [4v] one action removed everywhere (manifest + journal pair) > L1: PR #70 verifier rejects it 8ms
+ ✓ test/tamper-matrix.test.ts > T13 [4v] one action removed everywhere (manifest + journal pair) > L2: PR #68's journal cross-check rejects it 921ms
+ × test/tamper-matrix.test.ts > T14 evidence sources disagree: manifest says delta=9, observedSuccess=false; journal says otherwise > L1: PR #70 verifier rejects it 6ms
+   → expected true to be false // Object.is equality
+ ✓ test/tamper-matrix.test.ts > T14 evidence sources disagree: manifest says delta=9, observedSuccess=false; journal says otherwise > L2: PR #68's journal cross-check rejects it 921ms
+ ✓ test/tamper-matrix.test.ts > T15 [2v] source SHA differs: manifest only > L2: PR #68's journal cross-check rejects it 912ms
+ ✓ test/tamper-matrix.test.ts > T15 [2v] source SHA differs: manifest only > L1: PR #70 verifier rejects it 15ms
+ ✓ test/tamper-matrix.test.ts > T15 [4v] source SHA differs: manifest only > L1: PR #70 verifier rejects it 8ms
+ ✓ test/tamper-matrix.test.ts > T15 [4v] source SHA differs: manifest only > L2: PR #68's journal cross-check rejects it 911ms
+ ✓ test/tamper-matrix.test.ts > T16 source SHA differs: original journal start row (rehashed) vs manifest > L1: PR #70 verifier rejects it 7ms
+ ✓ test/tamper-matrix.test.ts > T16 source SHA differs: original journal start row (rehashed) vs manifest > L2: PR #68's journal cross-check rejects it 904ms
+ ✓ test/tamper-matrix.test.ts > T17 source SHA differs: validator report only > L1: PR #70 verifier rejects it 6ms
+ ✓ test/tamper-matrix.test.ts > T18 [2v] simulated presented as authenticated: verdict.json = PASS > L1: PR #70 verifier rejects it 5ms
+ ✓ test/tamper-matrix.test.ts > T18 [4v] simulated presented as authenticated: verdict.json = PASS > L1: PR #70 verifier rejects it 10ms
+ ✓ test/tamper-matrix.test.ts > T19 simulated presented as authenticated: validator overallStatus = VERIFIED > L1: PR #70 verifier rejects it 6ms
+ ✓ test/tamper-matrix.test.ts > T20 simulated presented as authenticated: manifest.mode = paper-live > L1: PR #70 verifier rejects it 6ms
+ ✓ test/tamper-matrix.test.ts > T20 simulated presented as authenticated: manifest.mode = paper-live > L2: PR #68's journal cross-check rejects it 903ms
+ ✓ test/tamper-matrix.test.ts > T21 simulated presented as authenticated: citizen authentication = microsoft > L1: PR #70 verifier rejects it 6ms
+ × test/tamper-matrix.test.ts > T22 simulated presented as authenticated: acceptance.json claims live 37/37 VERIFIED (a published artifact) > L1: PR #70 verifier rejects it 8ms
+   → expected true to be false // Object.is equality
+ × test/tamper-matrix.test.ts > T23 simulated presented as authenticated: validator environment = 'Authenticated Paper live server' > L1: PR #70 verifier rejects it 6ms
+   → expected true to be false // Object.is equality
+ × test/tamper-matrix.test.ts > T24 UNPROVEN_PAPER_AUTHENTICITY gap code silently removed from the validator report > L1: PR #70 verifier rejects it 6ms
+   → expected true to be false // Object.is equality
+ ✓ test/tamper-matrix.test.ts > T25 [2v] journal row tampered WITHOUT recomputing the hash chain > L1: PR #70 verifier rejects it 5ms
+ ✓ test/tamper-matrix.test.ts > T25 [2v] journal row tampered WITHOUT recomputing the hash chain > L2: PR #68's journal cross-check rejects it 914ms
+ ✓ test/tamper-matrix.test.ts > T25 [4v] journal row tampered WITHOUT recomputing the hash chain > L2: PR #68's journal cross-check rejects it 925ms
+ ✓ test/tamper-matrix.test.ts > T25 [4v] journal row tampered WITHOUT recomputing the hash chain > L1: PR #70 verifier rejects it 7ms
+ ✓ test/tamper-matrix.test.ts > T26 COHERENT forgery: journal + receipt worldChanges edited, journal rehashed, receipt sha256 re-pinned > [LIMITATION BY DESIGN] a coherent forgery passes the PR #70 verifier (nothing offline can tell it from a real run) 7ms
+ ✓ test/tamper-matrix.test.ts > T26 COHERENT forgery: journal + receipt worldChanges edited, journal rehashed, receipt sha256 re-pinned > [LIMITATION BY DESIGN] PR #68's journal check also reports a coherent forgery as consistent 907ms
+ ✓ test/workflow-facts.test.ts > offline-acceptance.yml: secrets, privacy and trigger safety > uses pull_request, never pull_request_target (fork code gets no secrets and no write token) 1ms
+ ✓ test/workflow-facts.test.ts > offline-acceptance.yml: secrets, privacy and trigger safety > grants the token read-only contents permission and nothing else 1ms
+ ✓ test/workflow-facts.test.ts > offline-acceptance.yml: secrets, privacy and trigger safety > never references the secrets context and blanks every provider key 1ms
+ ✓ test/workflow-facts.test.ts > offline-acceptance.yml: secrets, privacy and trigger safety > every checkout disables persisted credentials 1ms
+ ✓ test/workflow-facts.test.ts > offline-acceptance.yml: secrets, privacy and trigger safety > every third-party action is pinned to a full 40-hex SHA 1ms
+ ✓ test/workflow-facts.test.ts > offline-acceptance.yml: secrets, privacy and trigger safety > no step masks failure with continue-on-error or '|| true' 1ms
+ ✓ test/workflow-facts.test.ts > offline-acceptance.yml: secrets, privacy and trigger safety > uploads only sanitized summaries: never the raw journal, receipts, manifest or provider usage 1ms
+ ✓ test/workflow-facts.test.ts > offline-acceptance.yml: SHA binding > checks out the PR head commit explicitly (not the synthetic merge commit) 1ms
+ ✓ test/workflow-facts.test.ts > offline-acceptance.yml: SHA binding > [GAP-LOW] the SHA handed to the verifier comes from the same checkout it verifies (`git rev-parse HEAD`), not from the event that triggered the run 6ms
+ ✓ test/workflow-facts.test.ts > offline-acceptance.yml: SHA binding > step labels do not overclaim: the 'Full workspace tests (2260+ tests)' label is a count claim, not a gate 1ms
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 31 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/integration-and-honesty.test.ts > journal CLI integration: independent real-subprocess controls PER scenario > 1v1 (2 citizens, 6 original attempts and observations) > positive, missing-evidence and forged-evidence controls all execute and behave on an untouched real bundle
+ FAIL  test/integration-and-honesty.test.ts > journal CLI integration: independent real-subprocess controls PER scenario > 2v2 (4 citizens, 12 original attempts and observations) > positive, missing-evidence and forged-evidence controls all execute and behave on an untouched real bundle
+AssertionError: expected undefined to be 1 // Object.is equality
+
+- Expected: 
+1
+
++ Received: 
+undefined
+
+ ❯ test/integration-and-honesty.test.ts:53:44
+     51|         expect(r.exitCodes?.missingJournal).toBe(2);
+     52|         expect(r.exitCodes?.missingReceipt).not.toBe(0);
+     53|         expect(r.exitCodes?.forgedReceipt).toBe(1);
+       |                                            ^
+     54|         expect(r.exitCodes?.forgedJournal).toBe(1);
+     55|         expect(r.forgedReceiptTestPassed).toBe(true);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/31]⎯
+
+ FAIL  test/integration-and-honesty.test.ts > journal CLI integration: independent real-subprocess controls PER scenario > 1v1 (2 citizens, 6 original attempts and observations) > the control result records the citizen and original attempt/observation counts read from the journal itself
+AssertionError: expected undefined to deeply equal { citizens: 2, attempts: 6, …(1) }
+
+- Expected: 
+{
+  "attempts": 6,
+  "citizens": 2,
+  "observations": 6,
+}
+
++ Received: 
+undefined
+
+ ❯ test/integration-and-honesty.test.ts:60:28
+     58|       it.skipIf(!CLI_PRESENT)("the control result records the citizen …
+     59|         const r = checkJournalCliIntegration(REPO_ROOT, fresh(count), …
+     60|         expect(r.scenario).toEqual({ citizens: EXPECT[count].citizens,…
+       |                            ^
+     61|       });
+     62|       it.skipIf(!CLI_PRESENT)("a forged receipt makes the helper repor…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/31]⎯
+
+ FAIL  test/integration-and-honesty.test.ts > journal CLI integration: independent real-subprocess controls PER scenario > 2v2 (4 citizens, 12 original attempts and observations) > the control result records the citizen and original attempt/observation counts read from the journal itself
+AssertionError: expected undefined to deeply equal { citizens: 4, attempts: 12, …(1) }
+
+- Expected: 
+{
+  "attempts": 12,
+  "citizens": 4,
+  "observations": 12,
+}
+
++ Received: 
+undefined
+
+ ❯ test/integration-and-honesty.test.ts:60:28
+     58|       it.skipIf(!CLI_PRESENT)("the control result records the citizen …
+     59|         const r = checkJournalCliIntegration(REPO_ROOT, fresh(count), …
+     60|         expect(r.scenario).toEqual({ citizens: EXPECT[count].citizens,…
+       |                            ^
+     61|       });
+     62|       it.skipIf(!CLI_PRESENT)("a forged receipt makes the helper repor…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/31]⎯
+
+ FAIL  test/integration-and-honesty.test.ts > journal CLI integration: independent real-subprocess controls PER scenario > both scenarios are cross-checked independently by the wrapper and both are recorded
+TypeError: Cannot read properties of undefined (reading 'scenario-2')
+ ❯ test/integration-and-honesty.test.ts:77:27
+     75|     expect(r.exit).toBe(0);
+     76|     for (const key of ["scenario-2", "scenario-4"]) {
+     77|       const c = r.summary.journalCliChecks[key]!;
+       |                           ^
+     78|       expect(c.status).toBe("READY"); expect(c.executed).toBe(true);
+     79|       expect(c.forgedReceiptTestPassed).toBe(true); expect(c.forgedJou…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/31]⎯
+
+ FAIL  test/integration-and-honesty.test.ts > journal CLI integration: independent real-subprocess controls PER scenario > a failed required check produces a NONZERO exit: forged 1v1 only (2v2 stays READY, independently)
+TypeError: Cannot read properties of undefined (reading 'scenario-2')
+ ❯ test/integration-and-honesty.test.ts:88:22
+     86|     const r = runWrapper(forged(2, "T07"), fresh(4));
+     87|     expect(r.exit).not.toBe(0); expect(r.summary.passed).toBe(false);
+     88|     expect(r.summary.journalCliChecks["scenario-2"]!.status).toBe("FAI…
+       |                      ^
+     89|     expect(r.summary.journalCliChecks["scenario-4"]!.status).toBe("REA…
+     90|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/31]⎯
+
+ FAIL  test/integration-and-honesty.test.ts > journal CLI integration: independent real-subprocess controls PER scenario > a failed required check produces a NONZERO exit: forged 2v2 only (1v1 stays READY, independently)
+AssertionError: expected +0 not to be +0 // Object.is equality
+ ❯ test/integration-and-honesty.test.ts:94:24
+     92|   it.skipIf(!CLI_PRESENT)("a failed required check produces a NONZERO …
+     93|     const r = runWrapper(fresh(2), forged(4, "T07"));
+     94|     expect(r.exit).not.toBe(0); expect(r.summary.passed).toBe(false);
+       |                        ^
+     95|     expect(r.summary.journalCliChecks["scenario-2"]!.status).toBe("REA…
+     96|     expect(r.summary.journalCliChecks["scenario-4"]!.status).toBe("FAI…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/31]⎯
+
+ FAIL  test/integration-and-honesty.test.ts > process exit codes and honest top-level status > untouched real bundles: exit 0, status OFFLINE_STRUCTURAL_PASS, Paper execution NOT PROVEN
+AssertionError: expected undefined to be 'OFFLINE_STRUCTURAL_PASS' // Object.is equality
+
+- Expected: 
+"OFFLINE_STRUCTURAL_PASS"
+
++ Received: 
+undefined
+
+ ❯ test/integration-and-honesty.test.ts:120:30
+    118|     const r = runWrapper(fresh(2), fresh(4));
+    119|     expect(r.exit).toBe(0);
+    120|     expect(r.summary.status).toBe("OFFLINE_STRUCTURAL_PASS");
+       |                              ^
+    121|     expect(r.summary.paperExecution).toBe("NOT PROVEN");
+    122|     expect(r.summary.contradictions).toEqual([]); expect(r.summary.inc…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/31]⎯
+
+ FAIL  test/integration-and-honesty.test.ts > process exit codes and honest top-level status > the headline never reads as live acceptance for synthetic evidence
+AssertionError: expected '# ✅ Offline Acceptance Verification R…' to match /Offline structural checks PASSED/
+
+- Expected: 
+/Offline structural checks PASSED/
+
++ Received: 
+"# ✅ Offline Acceptance Verification Report: PASSED"
+
+ ❯ test/integration-and-honesty.test.ts:128:18
+    126|     const r = runWrapper(fresh(2), fresh(4));
+    127|     const head = r.md.split("\n")[0]!;
+    128|     expect(head).toMatch(/Offline structural checks PASSED/);
+       |                  ^
+    129|     expect(head).toMatch(/Paper execution NOT PROVEN/i);
+    130|     expect(r.md).not.toMatch(/^#\s*✅\s*Offline Acceptance Verification…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/31]⎯
+
+ FAIL  test/integration-and-honesty.test.ts > process exit codes and honest top-level status > the report separates the four states explicitly
+AssertionError: expected '# ✅ Offline Acceptance Verification R…' to match /Offline structural checks:\s*PASSED/
+
+- Expected: 
+/Offline structural checks:\s*PASSED/
+
++ Received: 
+"# ✅ Offline Acceptance Verification Report: PASSED
+
+**Tested Commit SHA:** `764436cb6a62882e1d631ed46cf31918e8d0fd92`  
+**Host Environment:** `darwin (x64)` | Node.js `v22.12.0` | pnpm `10.16.0`  
+**Overall Verdict:** **PASSED**  
+
+> OFFLINE ONLY: known PR #67 live-authenticity vulnerabilities are not fixed or accepted by this verification. No live gate may rely on this result.
+
+## Scenario Summary Matrix
+
+| Scenario | Citizens | Attempts | Observations | Verified | Hash Chain | Verdict | Paper Proven | Result |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| **1v1 (2 Citizens)** | gpt-a, claude-a | 6 | 6 | 6 | VALID | NOT PROVEN | NO (Honest) | ✅ PASS |
+| **2v2 (4 Citizens)** | gpt-a, gpt-b, claude-a, claude-b | 12 | 12 | 12 | VALID | NOT PROVEN | NO (Honest) | ✅ PASS |
+
+## Codex Journal CLI Integration (PR #58 / Release Candidate)
+
+- **Status:** ✅ READY & VERIFIED
+- **Details:** Executed consistent, missing-root, missing-journal and rehashed forged-receipt cases: {\"consistent\":0,\"missingRoot\":2,\"missingJournal\":2,\"forged\":1}. Local consistency is not live authenticity.
+- **Forged-Receipt Negative Test:** PASSED
+
+## Documented Missing Evidence / Gaps (Fail-Closed Policy)
+
+> [!NOTE]
+> These checks are truthfully documented as NOT PROVEN. Offline simulated fixtures cannot fabricate live Paper server metrics or genuine LLM cognition.
+
+- `RECORDER_GAP_TOOL_DURABILITY`
+- `RECORDER_GAP_SERVER_GAME_TICK`
+- `MISSING_CITIZEN_COMMUNITY`
+- `MISSING_CITIZEN_PERSONALITY_SEED`
+- `MISSING_SITE_BIOME`
+- `MISSING_SERVER_CONFIG`
+- `MISSING_GAMERULE_CONFIG`
+- `UNVERIFIED_SHELTER_ABSENCE`
+- `MISSING_BUDGET_CEILING`
+- `MISSING_OPERATIONAL_PATHS`
+- `MISSING_RECORDING_CONFIG`
+- `MISSING_PRIVACY_REPLAY_EVIDENCE`
+- `NO_TICK_EVIDENCE`
+- `RECORDER_OR_BRIDGE_GAP`
+- `UNPROVEN_PAPER_AUTHENTICITY`
+
+---
+*Generated by Minecraft AI Civilization Offline Acceptance CI Verifier.*"
+
+ ❯ test/integration-and-honesty.test.ts:136:18
+    134|   it("the report separates the four states explicitly", () => {
+    135|     const r = runWrapper(fresh(2), fresh(4));
+    136|     expect(r.md).toMatch(/Offline structural checks:\s*PASSED/);
+       |                  ^
+    137|     expect(r.md).toMatch(/Required verification:\s*COMPLETE/);
+    138|     expect(r.md).toMatch(/Contradictory evidence:\s*none detected/);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/31]⎯
+
+ FAIL  test/integration-and-honesty.test.ts > process exit codes and honest top-level status > criteria that remain NOT MEASURABLE are reported, with the failing criteria named
+AssertionError: expected '# ✅ Offline Acceptance Verification R…' to match /NOT MEASURABLE/
+
+- Expected: 
+/NOT MEASURABLE/
+
++ Received: 
+"# ✅ Offline Acceptance Verification Report: PASSED
+
+**Tested Commit SHA:** `764436cb6a62882e1d631ed46cf31918e8d0fd92`  
+**Host Environment:** `darwin (x64)` | Node.js `v22.12.0` | pnpm `10.16.0`  
+**Overall Verdict:** **PASSED**  
+
+> OFFLINE ONLY: known PR #67 live-authenticity vulnerabilities are not fixed or accepted by this verification. No live gate may rely on this result.
+
+## Scenario Summary Matrix
+
+| Scenario | Citizens | Attempts | Observations | Verified | Hash Chain | Verdict | Paper Proven | Result |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| **1v1 (2 Citizens)** | gpt-a, claude-a | 6 | 6 | 6 | VALID | NOT PROVEN | NO (Honest) | ✅ PASS |
+| **2v2 (4 Citizens)** | gpt-a, gpt-b, claude-a, claude-b | 12 | 12 | 12 | VALID | NOT PROVEN | NO (Honest) | ✅ PASS |
+
+## Codex Journal CLI Integration (PR #58 / Release Candidate)
+
+- **Status:** ✅ READY & VERIFIED
+- **Details:** Executed consistent, missing-root, missing-journal and rehashed forged-receipt cases: {\"consistent\":0,\"missingRoot\":2,\"missingJournal\":2,\"forged\":1}. Local consistency is not live authenticity.
+- **Forged-Receipt Negative Test:** PASSED
+
+## Documented Missing Evidence / Gaps (Fail-Closed Policy)
+
+> [!NOTE]
+> These checks are truthfully documented as NOT PROVEN. Offline simulated fixtures cannot fabricate live Paper server metrics or genuine LLM cognition.
+
+- `RECORDER_GAP_TOOL_DURABILITY`
+- `RECORDER_GAP_SERVER_GAME_TICK`
+- `MISSING_CITIZEN_COMMUNITY`
+- `MISSING_CITIZEN_PERSONALITY_SEED`
+- `MISSING_SITE_BIOME`
+- `MISSING_SERVER_CONFIG`
+- `MISSING_GAMERULE_CONFIG`
+- `UNVERIFIED_SHELTER_ABSENCE`
+- `MISSING_BUDGET_CEILING`
+- `MISSING_OPERATIONAL_PATHS`
+- `MISSING_RECORDING_CONFIG`
+- `MISSING_PRIVACY_REPLAY_EVIDENCE`
+- `NO_TICK_EVIDENCE`
+- `RECORDER_OR_BRIDGE_GAP`
+- `UNPROVEN_PAPER_AUTHENTICITY`
+
+---
+*Generated by Minecraft AI Civilization Offline Acceptance CI Verifier.*"
+
+ ❯ test/integration-and-honesty.test.ts:144:18
+    142|   it("criteria that remain NOT MEASURABLE are reported, with the faili…
+    143|     const r = runWrapper(fresh(2), fresh(4));
+    144|     expect(r.md).toMatch(/NOT MEASURABLE/);
+       |                  ^
+    145|     expect(r.md).toMatch(/0\/30/); expect(r.md).toMatch(/0\/37/);
+    146|     for (const key of ["scenario-2", "scenario-4"]) {
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/31]⎯
+
+ FAIL  test/integration-and-honesty.test.ts > process exit codes and honest top-level status > contradictory evidence is REJECTED with its own status, headline and nonzero exit (acceptance.json claims live 37/37)
+AssertionError: expected +0 not to be +0 // Object.is equality
+ ❯ test/integration-and-honesty.test.ts:156:24
+    154|   it("contradictory evidence is REJECTED with its own status, headline…
+    155|     const r = runWrapper(forged(2, "T22"), fresh(4));
+    156|     expect(r.exit).not.toBe(0);
+       |                        ^
+    157|     expect(r.summary.status).toBe("CONTRADICTORY_EVIDENCE_REJECTED");
+    158|     expect(r.summary.contradictions.length).toBeGreaterThan(0);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[11/31]⎯
+
+ FAIL  test/integration-and-honesty.test.ts > process exit codes and honest top-level status > an unprovable/incomplete verification is reported as INCOMPLETE with a nonzero exit (2v2 evidence missing)
+AssertionError: expected undefined to be 'VERIFICATION_INCOMPLETE' // Object.is equality
+
+- Expected: 
+"VERIFICATION_INCOMPLETE"
+
++ Received: 
+undefined
+
+ ❯ test/integration-and-honesty.test.ts:166:30
+    164|     const r = runWrapper(fresh(2), join(tmp("ciqa-empty-"), "does-not-…
+    165|     expect(r.exit).not.toBe(0);
+    166|     expect(r.summary.status).toBe("VERIFICATION_INCOMPLETE");
+       |                              ^
+    167|     expect(r.summary.incomplete.length).toBeGreaterThan(0);
+    168|     expect(r.md.split("\n")[0]).toMatch(/Required verification incompl…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[12/31]⎯
+
+ FAIL  test/integration-and-honesty.test.ts > process exit codes and honest top-level status > an ordinary structural failure (action removed) is VERIFICATION_FAILED, nonzero, and not called contradictory
+AssertionError: expected undefined to be 'VERIFICATION_FAILED' // Object.is equality
+
+- Expected: 
+"VERIFICATION_FAILED"
+
++ Received: 
+undefined
+
+ ❯ test/integration-and-honesty.test.ts:175:30
+    173|     const r = runWrapper(forged(2, "T13"), fresh(4));
+    174|     expect(r.exit).not.toBe(0);
+    175|     expect(r.summary.status).toBe("VERIFICATION_FAILED");
+       |                              ^
+    176|   });
+    177| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[13/31]⎯
+
+ FAIL  test/tamper-matrix.test.ts > T01 [2v] rehashed journal: observation worldChanges position moved > L1: PR #70 verifier rejects it
+ FAIL  test/tamper-matrix.test.ts > T01 [4v] rehashed journal: observation worldChanges position moved > L1: PR #70 verifier rejects it
+ FAIL  test/tamper-matrix.test.ts > T02 rehashed journal: attempt target changed > L1: PR #70 verifier rejects it
+ FAIL  test/tamper-matrix.test.ts > T03 rehashed journal: observation flipped to successReported=false, verified=false > L1: PR #70 verifier rejects it
+ FAIL  test/tamper-matrix.test.ts > T04 [2v] rehashed journal: citizen identities swapped between gpt-a#1 and claude-a#1 (attempt and observation) > L1: PR #70 verifier rejects it
+ FAIL  test/tamper-matrix.test.ts > T04 [4v] rehashed journal: citizen identities swapped between gpt-a#1 and claude-a#1 (attempt and observation) > L1: PR #70 verifier rejects it
+ FAIL  test/tamper-matrix.test.ts > T05 [2v] manifest + receipt citizenIds swapped between two actions (journal untouched) > L1: PR #70 verifier rejects it
+ FAIL  test/tamper-matrix.test.ts > T05 [4v] manifest + receipt citizenIds swapped between two actions (journal untouched) > L1: PR #70 verifier rejects it
+ FAIL  test/tamper-matrix.test.ts > T07 [2v] receipt CONTENT forged (ids kept; inventoryAfter=9, worldChanges emptied) > L1: PR #70 verifier rejects it
+ FAIL  test/tamper-matrix.test.ts > T07 [4v] receipt CONTENT forged (ids kept; inventoryAfter=9, worldChanges emptied) > L1: PR #70 verifier rejects it
+ FAIL  test/tamper-matrix.test.ts > T08 receipt sourceSha changed to a different SHA > L1: PR #70 verifier rejects it
+ FAIL  test/tamper-matrix.test.ts > T10 manifest.sourceReceipts[0].sha256 altered > L1: PR #70 verifier rejects it
+ FAIL  test/tamper-matrix.test.ts > T12 rehashed journal: gpt-a#3 replaced by a clone of #1 (fresh attemptId, inventory 0->1) > L1: PR #70 verifier rejects it
+ FAIL  test/tamper-matrix.test.ts > T14 evidence sources disagree: manifest says delta=9, observedSuccess=false; journal says otherwise > L1: PR #70 verifier rejects it
+ FAIL  test/tamper-matrix.test.ts > T22 simulated presented as authenticated: acceptance.json claims live 37/37 VERIFIED (a published artifact) > L1: PR #70 verifier rejects it
+ FAIL  test/tamper-matrix.test.ts > T23 simulated presented as authenticated: validator environment = 'Authenticated Paper live server' > L1: PR #70 verifier rejects it
+ FAIL  test/tamper-matrix.test.ts > T24 UNPROVEN_PAPER_AUTHENTICITY gap code silently removed from the validator report > L1: PR #70 verifier rejects it
+AssertionError: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ test/tamper-matrix.test.ts:44:28
+     42|           const d = fresh(count); c.apply(d, count);
+     43|           const r = l1(d, count);
+     44|           expect(r.passed).toBe(false);
+       |                            ^
+     45|           expect(r.errors.length).toBeGreaterThan(0);
+     46|         });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[14/31]⎯
+
+
+ Test Files  2 failed | 1 passed (3)
+      Tests  31 failed | 65 passed (96)
+   Start at  19:13:18
+   Duration  65.21s (transform 204ms, setup 85ms, collect 220ms, tests 63.81s, environment 0ms, prepare 181ms)
+

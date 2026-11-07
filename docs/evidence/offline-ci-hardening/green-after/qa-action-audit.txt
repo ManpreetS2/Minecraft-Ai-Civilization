@@ -1,0 +1,50 @@
+
+ RUN  v3.2.7 <scratch>/wt/impl
+
+ ✓ qa/action-audit/test/source-facts.test.ts (12 tests) 21ms
+stdout | qa/action-audit/test/coverage.test.ts > coverage table matches the source > summary (printed for the report)
+COVERAGE {"protected":{"files":9,"calls":47},"hypothetical":{"files":5,"calls":14},"partial":{"files":3,"calls":21},"not-a-bot":{"files":1,"calls":1},"body-owned":{"files":1,"calls":4},"operator":{"files":8,"calls":19}} total_calls=106
+
+ ✓ qa/action-audit/test/coverage.test.ts (3 tests) 7ms
+(node:62961) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:62962) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+stdout | qa/action-audit/test/defects.test.ts > AUD-F1 smeltItem keeps working after cancellation > characterisation: measured behaviour after abort
+AUD-F1 smelt: abort at t0; skill returned after 0 ms with success=false; mutations after abort: none
+
+stdout | qa/action-audit/test/defects.test.ts > AUD-C1 chest transfer ignores cancellation after navigation > characterisation: the deposit still lands after the abort
+AUD-C1 deposit: abort during openContainer; result success=false; mutations after abort: none
+
+stdout | qa/action-audit/test/defects.test.ts > AUD-C2 openContainer has no timeout, so a window that never opens hangs the skill forever > characterisation: still pending after abort and a generous wait
+AUD-C2 deposit: window never opens; settled after abort + 900 ms (ctx.timeoutMs=300): true
+
+stdout | qa/action-audit/test/defects.test.ts > AUD-P1 placeBlock only checks the signal during navigation > characterisation: the block is placed after the abort
+AUD-P1 placeBlock: abort during equip (150 ms); result success=false; mutations after abort: equip@+90ms
+
+stdout | qa/action-audit/test/defects.test.ts > AUD-P2 a cancelled placement is reported as BUILD_BLOCKED by executeStructure > characterisation: aborted before the first block
+AUD-P2 executeStructure(aborted): success=false code=CANCELLED
+
+stdout | qa/action-audit/test/defects.test.ts > AUD-H1 huntAnimal never checks the signal > characterisation: attacks continue until the skill's own deadline
+AUD-H1 huntAnimal: abort at +500 ms; skill returned after 4 ms; attacks after abort: 0
+
+ ✓ qa/action-audit/test/native-boundary.test.ts (11 tests) 4308ms
+   ✓ native boundary vs the confirmed defects (real skills) > AUD-F1: no furnace operation after abort, and the call returns promptly  1032ms
+   ✓ native boundary vs the confirmed defects (real skills) > AUD-C1: no chest mutation after abort  367ms
+   ✓ native boundary vs the confirmed defects (real skills) > AUD-C2: a window that opens after the deadline is not used, and the next action can run  1009ms
+   ✓ native boundary vs the confirmed defects (real skills) > AUD-P1: no block is placed after abort  410ms
+   ✓ native boundary vs the confirmed defects (real skills) > AUD-H1: no attack after abort  1209ms
+ ✓ qa/action-audit/test/defects.test.ts (22 tests) 8228ms
+   ✓ AUD-C2 openContainer has no timeout, so a window that never opens hangs the skill forever > characterisation: still pending after abort and a generous wait  967ms
+   ✓ AUD-C2 openContainer has no timeout, so a window that never opens hangs the skill forever > the skill settles within its own timeoutMs when the window never opens  902ms
+   ✓ AUD-H1 huntAnimal never checks the signal > characterisation: attacks continue until the skill's own deadline  508ms
+   ✓ AUD-H1 huntAnimal never checks the signal > no attack is issued after the signal aborts  504ms
+   ✓ successful actions and late resolutions > smelts when the furnace is not cancelled  305ms
+   ✓ successful actions and late resolutions > reports the ingot when cancellation arrives after takeOutput has already moved it  307ms
+   ✓ successful actions and late resolutions > hunts successfully when the animal is removed by the attack  3411ms
+
+ Test Files  4 passed (4)
+      Tests  48 passed (48)
+   Start at  19:58:57
+   Duration  9.85s (transform 844ms, setup 245ms, collect 2.14s, tests 12.56s, environment 1ms, prepare 403ms)
+

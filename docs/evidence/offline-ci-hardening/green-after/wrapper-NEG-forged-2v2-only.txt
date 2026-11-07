@@ -1,0 +1,85 @@
+[CI-Verifier] Verifying offline acceptance artifacts for commit bdd454d04cb14a37db052d685ebc791ab20461db...
+[CI-Verifier] System: darwin (x64), Node: v22.12.0
+[CI-Verifier] Inspecting 1v1 artifacts at: artifacts/v1/neg/good-2
+[CI-Verifier] Inspecting 2v2 artifacts at: artifacts/v1/neg/forge-4
+[CI-Verifier] Running the real journal CLI controls for 1v1...
+[CI-Verifier] Running the real journal CLI controls for 2v2...
+[CI-Verifier] Wrote sanitized summary reports to: <scratch>/wt/impl/artifacts/v1/out-neg4
+
+# ❌ Contradictory evidence rejected — genuine Paper execution NOT PROVEN
+
+**Tested Commit SHA:** `bdd454d04cb14a37db052d685ebc791ab20461db`  
+**Host Environment:** `darwin (x64)` | Node.js `v22.12.0` | pnpm `10.16.0`  
+
+## Verification status
+
+- **Offline structural checks:** FAILED
+- **Required verification:** COMPLETE
+- **Contradictory evidence:** REJECTED (3)
+- **Genuine Paper execution:** NOT PROVEN
+
+> OFFLINE ONLY: this checks that locally generated, scripted artifacts agree with each other and do not claim live success. It cannot authenticate them: a forger who coherently regenerates every local artifact is indistinguishable offline. Known PR #67 live-authenticity vulnerabilities are not fixed or accepted by this verification. No live gate may rely on this result.
+
+## Scenario Summary Matrix
+
+| Scenario | Citizens | Attempts | Observations | Verified | Hash Chain | Verdict | Paper Proven | Result |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| **1v1 (2 Citizens)** | gpt-a, claude-a | 6 | 6 | 6 | VALID | NOT PROVEN | NO (Honest) | ✅ PASS |
+| **2v2 (4 Citizens)** | gpt-a, gpt-b, claude-a, claude-b | 12 | 12 | 12 | VALID | NOT PROVEN | NO (Honest) | ❌ FAIL |
+
+## Codex Journal CLI Integration (PR #58 / Release Candidate)
+
+### 1v1 (2 citizens, 6 attempts/observations)
+- **Status:** ✅ READY & VERIFIED
+- **Details:** Executed consistent, missing-root, missing-journal, missing-receipt, rehashed forged-receipt and rehashed forged-journal cases for 2 citizens / 6 attempts / 6 observations: {"consistent":0,"missingRoot":2,"missingJournal":2,"missingReceipt":2,"forged":1,"forgedReceipt":1,"forgedJournal":1}. Local consistency is not live authenticity.
+- **Forged-Receipt Negative Test:** PASSED
+- **Rehashed Forged-Journal Negative Test:** PASSED
+
+### 2v2 (4 citizens, 12 attempts/observations)
+- **Status:** ❌ FAILED
+- **Details:** Executed consistent, missing-root, missing-journal, missing-receipt, rehashed forged-receipt and rehashed forged-journal cases for 4 citizens / 12 attempts / 12 observations: {"consistent":1,"missingRoot":1,"missingJournal":1,"missingReceipt":1,"forged":1,"forgedReceipt":1,"forgedJournal":1}. Local consistency is not live authenticity.
+
+## Acceptance criteria (NOT MEASURABLE offline)
+
+> `acceptance.json` is not an acceptance verdict here. Scripted offline evidence cannot satisfy live criteria.
+
+- **1v1:** offline 0/30 (NOT MEASURABLE), live 0/37 (NOT MEASURABLE); 33 criteria NOT PROVEN; FAIL: A-IDENTITY, A-SESSION, A-MEMORY, A-ACTIONS
+- **2v2:** offline 0/30 (NOT MEASURABLE), live 0/37 (NOT MEASURABLE); 33 criteria NOT PROVEN; FAIL: A-IDENTITY, A-SESSION, A-MEMORY, A-ACTIONS
+
+## Documented Missing Evidence / Gaps (Fail-Closed Policy)
+
+> [!NOTE]
+> These checks are truthfully documented as NOT PROVEN. Offline simulated fixtures cannot fabricate live Paper server metrics or genuine LLM cognition.
+
+- `RECORDER_GAP_TOOL_DURABILITY`
+- `RECORDER_GAP_SERVER_GAME_TICK`
+- `MISSING_CITIZEN_COMMUNITY`
+- `MISSING_CITIZEN_PERSONALITY_SEED`
+- `MISSING_SITE_BIOME`
+- `MISSING_SERVER_CONFIG`
+- `MISSING_GAMERULE_CONFIG`
+- `UNVERIFIED_SHELTER_ABSENCE`
+- `MISSING_BUDGET_CEILING`
+- `MISSING_OPERATIONAL_PATHS`
+- `MISSING_RECORDING_CONFIG`
+- `MISSING_PRIVACY_REPLAY_EVIDENCE`
+- `NO_TICK_EVIDENCE`
+- `RECORDER_OR_BRIDGE_GAP`
+- `UNPROVEN_PAPER_AUTHENTICITY`
+
+## ❌ Contradictory Evidence Rejected
+
+- [Scenario-4] Manifest action 6851021b-9e51-47b9-b56f-5c88abc535fb (gpt-a): inventoryDelta {"oak_log":9} disagrees with journal before/after delta {"oak_log":1}
+- [Scenario-4] Receipt receipt-6851021b-9e51-47b9-b56f-5c88abc535fb: inventoryAfter {"oak_log":9} disagrees with the original journal observation
+- [Scenario-4] the real journal cross-check rejected the bundle: Action 1: inventory delta contradicts expected effects; Action 5: inventory receipt contradicts prior stock; Action 9: inventory receipt contradicts prior stock
+
+## ❌ Verification Failures & Errors
+
+- [Scenario-4] Manifest action 6851021b-9e51-47b9-b56f-5c88abc535fb (gpt-a): inventoryDelta {"oak_log":9} disagrees with journal before/after delta {"oak_log":1}
+- [Scenario-4] Receipt receipt-6851021b-9e51-47b9-b56f-5c88abc535fb: inventoryAfter {"oak_log":9} disagrees with the original journal observation
+- [Scenario-4] journal CLI was not successfully exercised: Executed consistent, missing-root, missing-journal, missing-receipt, rehashed forged-receipt and rehashed forged-journal cases for 4 citizens / 12 attempts / 12 observations: {"consistent":1,"missingRoot":1,"missingJournal":1,"missingReceipt":1,"forged":1,"forgedReceipt":1,"forgedJournal":1}. Local consistency is not live authenticity.
+
+---
+*Generated by Minecraft AI Civilization Offline Acceptance CI Verifier.*
+
+[CI-Verifier] ❌ CONTRADICTORY_EVIDENCE_REJECTED: offline verification did NOT pass (genuine Paper execution is NOT PROVEN regardless).

@@ -1,0 +1,109 @@
+
+ RUN  v3.2.7 <scratch>/wt/impl/qa/verify-ci-verifier
+
+ ✓ test/integration-and-honesty.test.ts > journal CLI integration: independent real-subprocess controls PER scenario > [CLI behaviour] calling PR #68's CLI without the experimentId still rejects an untouched bundle (the bug PR #73 fixed in the caller) 366ms
+ ✓ test/integration-and-honesty.test.ts > journal CLI integration: independent real-subprocess controls PER scenario > 1v1 (2 citizens, 6 original attempts and observations) > positive, missing-evidence and forged-evidence controls all execute and behave on an untouched real bundle 2108ms
+ ✓ test/integration-and-honesty.test.ts > journal CLI integration: independent real-subprocess controls PER scenario > 1v1 (2 citizens, 6 original attempts and observations) > the control result records the citizen and original attempt/observation counts read from the journal itself 2095ms
+ ✓ test/integration-and-honesty.test.ts > journal CLI integration: independent real-subprocess controls PER scenario > 1v1 (2 citizens, 6 original attempts and observations) > a forged receipt makes the helper report FAILED (never READY) 2099ms
+ ✓ test/integration-and-honesty.test.ts > journal CLI integration: independent real-subprocess controls PER scenario > 1v1 (2 citizens, 6 original attempts and observations) > a journal with the wrong original attempt count makes the helper report FAILED 2099ms
+ ✓ test/integration-and-honesty.test.ts > journal CLI integration: independent real-subprocess controls PER scenario > 2v2 (4 citizens, 12 original attempts and observations) > positive, missing-evidence and forged-evidence controls all execute and behave on an untouched real bundle 2136ms
+ ✓ test/integration-and-honesty.test.ts > journal CLI integration: independent real-subprocess controls PER scenario > 2v2 (4 citizens, 12 original attempts and observations) > the control result records the citizen and original attempt/observation counts read from the journal itself 2116ms
+ ✓ test/integration-and-honesty.test.ts > journal CLI integration: independent real-subprocess controls PER scenario > 2v2 (4 citizens, 12 original attempts and observations) > a forged receipt makes the helper report FAILED (never READY) 2124ms
+ ✓ test/integration-and-honesty.test.ts > journal CLI integration: independent real-subprocess controls PER scenario > 2v2 (4 citizens, 12 original attempts and observations) > a journal with the wrong original attempt count makes the helper report FAILED 2119ms
+ ✓ test/integration-and-honesty.test.ts > journal CLI integration: independent real-subprocess controls PER scenario > both scenarios are cross-checked independently by the wrapper and both are recorded 4880ms
+ ✓ test/integration-and-honesty.test.ts > journal CLI integration: independent real-subprocess controls PER scenario > a failed required check produces a NONZERO exit: forged 1v1 only (2v2 stays READY, independently) 4895ms
+ ✓ test/integration-and-honesty.test.ts > journal CLI integration: independent real-subprocess controls PER scenario > a failed required check produces a NONZERO exit: forged 2v2 only (1v1 stays READY, independently) 4891ms
+ ✓ test/integration-and-honesty.test.ts > journal CLI integration: independent real-subprocess controls PER scenario > a stub CLI that always says 'consistent' (exit 0) can never earn the forgery claim 2031ms
+ ✓ test/integration-and-honesty.test.ts > journal CLI integration: independent real-subprocess controls PER scenario > the helper no longer depends on a shell-resolved `pnpm` binary (Windows .cmd shim problem) 1ms
+ ✓ test/integration-and-honesty.test.ts > process exit codes and honest top-level status > untouched real bundles: exit 0, status OFFLINE_STRUCTURAL_PASS, Paper execution NOT PROVEN 4894ms
+ ✓ test/integration-and-honesty.test.ts > process exit codes and honest top-level status > the headline never reads as live acceptance for synthetic evidence 4955ms
+ ✓ test/integration-and-honesty.test.ts > process exit codes and honest top-level status > the report separates the four states explicitly 4964ms
+ ✓ test/integration-and-honesty.test.ts > process exit codes and honest top-level status > criteria that remain NOT MEASURABLE are reported, with the failing criteria named 4917ms
+ ✓ test/integration-and-honesty.test.ts > process exit codes and honest top-level status > contradictory evidence is REJECTED with its own status, headline and nonzero exit (acceptance.json claims live 37/37) 4885ms
+ ✓ test/integration-and-honesty.test.ts > process exit codes and honest top-level status > an unprovable/incomplete verification is reported as INCOMPLETE with a nonzero exit (2v2 evidence missing) 2771ms
+ ✓ test/integration-and-honesty.test.ts > process exit codes and honest top-level status > removing an action everywhere is rejected as CONTRADICTORY: the unedited validator report still lists it 4902ms
+ ✓ test/integration-and-honesty.test.ts > process exit codes and honest top-level status > a pinned receipt file that is missing is an ordinary structural VERIFICATION_FAILED, nonzero (not called contradictory) 3836ms
+ ✓ test/integration-and-honesty.test.ts > process exit codes and honest top-level status > a journal edited without recomputing its hash chain is rejected, nonzero (the real CLI also rejects it, so it is CONTRADICTORY) 4898ms
+ ✓ test/integration-and-honesty.test.ts > process exit codes and honest top-level status > the Paper / live-model gaps are listed as NOT PROVEN and live execution is never claimed 4915ms
+ ✓ test/tamper-matrix.test.ts > control > an untouched real 2-citizen bundle passes the PR #70 verifier 21ms
+ ✓ test/tamper-matrix.test.ts > control > an untouched real 2-citizen bundle is JOURNAL CONSISTENT under PR #68's CLI when called with its experimentId 365ms
+ ✓ test/tamper-matrix.test.ts > control > an untouched real 4-citizen bundle passes the PR #70 verifier 12ms
+ ✓ test/tamper-matrix.test.ts > control > an untouched real 4-citizen bundle is JOURNAL CONSISTENT under PR #68's CLI when called with its experimentId 360ms
+ ✓ test/tamper-matrix.test.ts > T01 [2v] rehashed journal: observation worldChanges position moved > L1: PR #70 verifier rejects it 12ms
+ ✓ test/tamper-matrix.test.ts > T01 [2v] rehashed journal: observation worldChanges position moved > L2: PR #68's journal cross-check rejects it 357ms
+ ✓ test/tamper-matrix.test.ts > T01 [4v] rehashed journal: observation worldChanges position moved > L1: PR #70 verifier rejects it 9ms
+ ✓ test/tamper-matrix.test.ts > T01 [4v] rehashed journal: observation worldChanges position moved > L2: PR #68's journal cross-check rejects it 358ms
+ ✓ test/tamper-matrix.test.ts > T02 rehashed journal: attempt target changed > L1: PR #70 verifier rejects it 8ms
+ ✓ test/tamper-matrix.test.ts > T02 rehashed journal: attempt target changed > L2: PR #68's journal cross-check rejects it 356ms
+ ✓ test/tamper-matrix.test.ts > T03 rehashed journal: observation flipped to successReported=false, verified=false > L1: PR #70 verifier rejects it 7ms
+ ✓ test/tamper-matrix.test.ts > T03 rehashed journal: observation flipped to successReported=false, verified=false > L2: PR #68's journal cross-check rejects it 353ms
+ ✓ test/tamper-matrix.test.ts > T04 [2v] rehashed journal: citizen identities swapped between gpt-a#1 and claude-a#1 (attempt and observation) > L1: PR #70 verifier rejects it 6ms
+ ✓ test/tamper-matrix.test.ts > T04 [2v] rehashed journal: citizen identities swapped between gpt-a#1 and claude-a#1 (attempt and observation) > L2: PR #68's journal cross-check rejects it 354ms
+ ✓ test/tamper-matrix.test.ts > T04 [4v] rehashed journal: citizen identities swapped between gpt-a#1 and claude-a#1 (attempt and observation) > L1: PR #70 verifier rejects it 9ms
+ ✓ test/tamper-matrix.test.ts > T04 [4v] rehashed journal: citizen identities swapped between gpt-a#1 and claude-a#1 (attempt and observation) > L2: PR #68's journal cross-check rejects it 358ms
+ ✓ test/tamper-matrix.test.ts > T05 [2v] manifest + receipt citizenIds swapped between two actions (journal untouched) > L1: PR #70 verifier rejects it 7ms
+ ✓ test/tamper-matrix.test.ts > T05 [2v] manifest + receipt citizenIds swapped between two actions (journal untouched) > L2: PR #68's journal cross-check rejects it 356ms
+ ✓ test/tamper-matrix.test.ts > T05 [4v] manifest + receipt citizenIds swapped between two actions (journal untouched) > L1: PR #70 verifier rejects it 8ms
+ ✓ test/tamper-matrix.test.ts > T05 [4v] manifest + receipt citizenIds swapped between two actions (journal untouched) > L2: PR #68's journal cross-check rejects it 357ms
+ ✓ test/tamper-matrix.test.ts > T06 receipt reference replaced with another existing receipt > L1: PR #70 verifier rejects it 8ms
+ ✓ test/tamper-matrix.test.ts > T06 receipt reference replaced with another existing receipt > L2: PR #68's journal cross-check rejects it 351ms
+ ✓ test/tamper-matrix.test.ts > T07 [2v] receipt CONTENT forged (ids kept; inventoryAfter=9, worldChanges emptied) > L1: PR #70 verifier rejects it 6ms
+ ✓ test/tamper-matrix.test.ts > T07 [2v] receipt CONTENT forged (ids kept; inventoryAfter=9, worldChanges emptied) > L2: PR #68's journal cross-check rejects it 355ms
+ ✓ test/tamper-matrix.test.ts > T07 [4v] receipt CONTENT forged (ids kept; inventoryAfter=9, worldChanges emptied) > L1: PR #70 verifier rejects it 8ms
+ ✓ test/tamper-matrix.test.ts > T07 [4v] receipt CONTENT forged (ids kept; inventoryAfter=9, worldChanges emptied) > L2: PR #68's journal cross-check rejects it 356ms
+ ✓ test/tamper-matrix.test.ts > T08 receipt sourceSha changed to a different SHA > L1: PR #70 verifier rejects it 6ms
+ ✓ test/tamper-matrix.test.ts > T08 receipt sourceSha changed to a different SHA > L2: PR #68's journal cross-check rejects it 353ms
+ ✓ test/tamper-matrix.test.ts > T09 referenced receipt file deleted > L1: PR #70 verifier rejects it 6ms
+ ✓ test/tamper-matrix.test.ts > T09 referenced receipt file deleted > L2: PR #68's journal cross-check rejects it 354ms
+ ✓ test/tamper-matrix.test.ts > T10 manifest.sourceReceipts[0].sha256 altered > L1: PR #70 verifier rejects it 7ms
+ ✓ test/tamper-matrix.test.ts > T10 manifest.sourceReceipts[0].sha256 altered > L2: PR #68's journal cross-check rejects it 353ms
+ ✓ test/tamper-matrix.test.ts > T11 manifest action duplicated over another (new attemptId, same receipt) > L1: PR #70 verifier rejects it 7ms
+ ✓ test/tamper-matrix.test.ts > T11 manifest action duplicated over another (new attemptId, same receipt) > L2: PR #68's journal cross-check rejects it 354ms
+ ✓ test/tamper-matrix.test.ts > T12 rehashed journal: gpt-a#3 replaced by a clone of #1 (fresh attemptId, inventory 0->1) > L1: PR #70 verifier rejects it 7ms
+ ✓ test/tamper-matrix.test.ts > T12 rehashed journal: gpt-a#3 replaced by a clone of #1 (fresh attemptId, inventory 0->1) > L2: PR #68's journal cross-check rejects it 350ms
+ ✓ test/tamper-matrix.test.ts > T13 [2v] one action removed everywhere (manifest + journal pair) > L1: PR #70 verifier rejects it 7ms
+ ✓ test/tamper-matrix.test.ts > T13 [2v] one action removed everywhere (manifest + journal pair) > L2: PR #68's journal cross-check rejects it 353ms
+ ✓ test/tamper-matrix.test.ts > T13 [4v] one action removed everywhere (manifest + journal pair) > L1: PR #70 verifier rejects it 8ms
+ ✓ test/tamper-matrix.test.ts > T13 [4v] one action removed everywhere (manifest + journal pair) > L2: PR #68's journal cross-check rejects it 354ms
+ ✓ test/tamper-matrix.test.ts > T14 evidence sources disagree: manifest says delta=9, observedSuccess=false; journal says otherwise > L1: PR #70 verifier rejects it 6ms
+ ✓ test/tamper-matrix.test.ts > T14 evidence sources disagree: manifest says delta=9, observedSuccess=false; journal says otherwise > L2: PR #68's journal cross-check rejects it 349ms
+ ✓ test/tamper-matrix.test.ts > T15 [2v] source SHA differs: manifest only > L1: PR #70 verifier rejects it 6ms
+ ✓ test/tamper-matrix.test.ts > T15 [2v] source SHA differs: manifest only > L2: PR #68's journal cross-check rejects it 353ms
+ ✓ test/tamper-matrix.test.ts > T15 [4v] source SHA differs: manifest only > L1: PR #70 verifier rejects it 8ms
+ ✓ test/tamper-matrix.test.ts > T15 [4v] source SHA differs: manifest only > L2: PR #68's journal cross-check rejects it 355ms
+ ✓ test/tamper-matrix.test.ts > T16 source SHA differs: original journal start row (rehashed) vs manifest > L1: PR #70 verifier rejects it 6ms
+ ✓ test/tamper-matrix.test.ts > T16 source SHA differs: original journal start row (rehashed) vs manifest > L2: PR #68's journal cross-check rejects it 351ms
+ ✓ test/tamper-matrix.test.ts > T17 source SHA differs: validator report only > L1: PR #70 verifier rejects it 6ms
+ ✓ test/tamper-matrix.test.ts > T18 [2v] simulated presented as authenticated: verdict.json = PASS > L1: PR #70 verifier rejects it 6ms
+ ✓ test/tamper-matrix.test.ts > T18 [4v] simulated presented as authenticated: verdict.json = PASS > L1: PR #70 verifier rejects it 8ms
+ ✓ test/tamper-matrix.test.ts > T19 simulated presented as authenticated: validator overallStatus = VERIFIED > L1: PR #70 verifier rejects it 8ms
+ ✓ test/tamper-matrix.test.ts > T20 simulated presented as authenticated: manifest.mode = paper-live > L1: PR #70 verifier rejects it 7ms
+ ✓ test/tamper-matrix.test.ts > T20 simulated presented as authenticated: manifest.mode = paper-live > L2: PR #68's journal cross-check rejects it 360ms
+ ✓ test/tamper-matrix.test.ts > T21 simulated presented as authenticated: citizen authentication = microsoft > L1: PR #70 verifier rejects it 6ms
+ ✓ test/tamper-matrix.test.ts > T22 simulated presented as authenticated: acceptance.json claims live 37/37 VERIFIED (a published artifact) > L1: PR #70 verifier rejects it 6ms
+ ✓ test/tamper-matrix.test.ts > T23 simulated presented as authenticated: validator environment = 'Authenticated Paper live server' > L1: PR #70 verifier rejects it 6ms
+ ✓ test/tamper-matrix.test.ts > T24 UNPROVEN_PAPER_AUTHENTICITY gap code silently removed from the validator report > L1: PR #70 verifier rejects it 6ms
+ ✓ test/tamper-matrix.test.ts > T25 [2v] journal row tampered WITHOUT recomputing the hash chain > L1: PR #70 verifier rejects it 6ms
+ ✓ test/tamper-matrix.test.ts > T25 [2v] journal row tampered WITHOUT recomputing the hash chain > L2: PR #68's journal cross-check rejects it 354ms
+ ✓ test/tamper-matrix.test.ts > T25 [4v] journal row tampered WITHOUT recomputing the hash chain > L1: PR #70 verifier rejects it 7ms
+ ✓ test/tamper-matrix.test.ts > T25 [4v] journal row tampered WITHOUT recomputing the hash chain > L2: PR #68's journal cross-check rejects it 365ms
+ ✓ test/tamper-matrix.test.ts > T26 COHERENT forgery: journal + receipt worldChanges edited, journal rehashed, receipt sha256 re-pinned > [LIMITATION BY DESIGN] a coherent forgery passes the PR #70 verifier (nothing offline can tell it from a real run) 7ms
+ ✓ test/tamper-matrix.test.ts > T26 COHERENT forgery: journal + receipt worldChanges edited, journal rehashed, receipt sha256 re-pinned > [LIMITATION BY DESIGN] PR #68's journal check also reports a coherent forgery as consistent 354ms
+ ✓ test/workflow-facts.test.ts > offline-acceptance.yml: secrets, privacy and trigger safety > uses pull_request, never pull_request_target (fork code gets no secrets and no write token) 3ms
+ ✓ test/workflow-facts.test.ts > offline-acceptance.yml: secrets, privacy and trigger safety > grants the token read-only contents permission and nothing else 1ms
+ ✓ test/workflow-facts.test.ts > offline-acceptance.yml: secrets, privacy and trigger safety > never references the secrets context and blanks every provider key 1ms
+ ✓ test/workflow-facts.test.ts > offline-acceptance.yml: secrets, privacy and trigger safety > every checkout disables persisted credentials 1ms
+ ✓ test/workflow-facts.test.ts > offline-acceptance.yml: secrets, privacy and trigger safety > every third-party action is pinned to a full 40-hex SHA 1ms
+ ✓ test/workflow-facts.test.ts > offline-acceptance.yml: secrets, privacy and trigger safety > no step masks failure with continue-on-error or '|| true' 1ms
+ ✓ test/workflow-facts.test.ts > offline-acceptance.yml: secrets, privacy and trigger safety > uploads only sanitized summaries: never the raw journal, receipts, manifest or provider usage 1ms
+ ✓ test/workflow-facts.test.ts > offline-acceptance.yml: SHA binding > checks out the PR head commit explicitly (not the synthetic merge commit) 0ms
+ ✓ test/workflow-facts.test.ts > offline-acceptance.yml: SHA binding > [GAP-LOW] the SHA handed to the verifier comes from the same checkout it verifies (`git rev-parse HEAD`), not from the event that triggered the run 6ms
+ ✓ test/workflow-facts.test.ts > offline-acceptance.yml: SHA binding > step labels do not overclaim: the 'Full workspace tests (2260+ tests)' label is a count claim, not a gate 1ms
+ ✓ test/workflow-facts.test.ts > offline-acceptance.yml: SHA binding > both jobs run the independent adversarial suite on the freshly generated real bundles, after the verifier, without masking failure 1ms
+ ✓ test/workflow-facts.test.ts > offline-acceptance.yml: SHA binding > the workflow also triggers when the committed real evidence fixtures change 0ms
+
+ Test Files  3 passed (3)
+      Tests  100 passed (100)
+   Start at  20:03:00
+   Duration  91.56s (transform 219ms, setup 91ms, collect 244ms, tests 90.15s, environment 0ms, prepare 178ms)
+

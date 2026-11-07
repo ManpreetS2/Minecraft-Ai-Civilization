@@ -1,0 +1,26 @@
+typecheck exit 0
+typecheck-tools exit 0
+typecheck-validator exit 0
+lint exit 0
+build exit 0
+focused-tools-ci exit 0
+test-v1 exit 0
+test-evidence-validator exit 0
+test-workspace exit 0
+test-security exit 0
+test-ai exit 0
+qa-construction exit 0
+qa-v57 exit 0
+qa-provider exit 0
+qa-action-audit exit 0
+offline-1v1 exit 0
+offline-2v2 exit 0
+wrapper-GOOD exit 0
+wrapper-NEG-forged-1v1-only exit 1
+wrapper-NEG-forged-2v2-only exit 1
+wrapper-NEG-2v2-evidence-missing exit 1
+qa-suite-run1 exit 0
+qa-suite-run2 exit 0
+qa-suite-run3 exit 0
+outcome-table exit 0
+DONE bdd454d04cb14a37db052d685ebc791ab20461db

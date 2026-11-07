@@ -1,0 +1,443 @@
+{
+  "passed": false,
+  "status": "CONTRADICTORY_EVIDENCE_REJECTED",
+  "paperExecution": "NOT PROVEN",
+  "testedSha": "bdd454d04cb14a37db052d685ebc791ab20461db",
+  "system": {
+    "platform": "darwin",
+    "arch": "x64",
+    "nodeVersion": "v22.12.0",
+    "pnpmVersion": "10.16.0"
+  },
+  "scenarios": {
+    "scenario-2": {
+      "passed": true,
+      "scenario": 2,
+      "artifactDir": "<scratch>/wt/impl/artifacts/v1/neg/good-2",
+      "runId": "fixture-2-bdd454d04cb1",
+      "testedSha": "bdd454d04cb14a37db052d685ebc791ab20461db",
+      "citizens": [
+        "gpt-a",
+        "claude-a"
+      ],
+      "actionAttemptsCount": 6,
+      "actionObservationsCount": 6,
+      "physicallyVerifiedCount": 6,
+      "hashChainTotalRows": 18,
+      "validatorVerdict": "NOT PROVEN",
+      "paperAttestationProven": false,
+      "unprovenReasons": [
+        "RECORDER_GAP_TOOL_DURABILITY",
+        "RECORDER_GAP_SERVER_GAME_TICK",
+        "MISSING_CITIZEN_COMMUNITY",
+        "MISSING_CITIZEN_PERSONALITY_SEED",
+        "MISSING_CITIZEN_COMMUNITY",
+        "MISSING_CITIZEN_PERSONALITY_SEED",
+        "MISSING_SITE_BIOME",
+        "MISSING_SITE_BIOME",
+        "MISSING_SERVER_CONFIG",
+        "MISSING_GAMERULE_CONFIG",
+        "UNVERIFIED_SHELTER_ABSENCE",
+        "MISSING_BUDGET_CEILING",
+        "MISSING_OPERATIONAL_PATHS",
+        "MISSING_RECORDING_CONFIG",
+        "MISSING_PRIVACY_REPLAY_EVIDENCE",
+        "NO_TICK_EVIDENCE",
+        "RECORDER_OR_BRIDGE_GAP",
+        "RECORDER_OR_BRIDGE_GAP",
+        "RECORDER_OR_BRIDGE_GAP",
+        "UNPROVEN_PAPER_AUTHENTICITY"
+      ],
+      "errors": [],
+      "contradictions": [],
+      "warnings": [],
+      "details": {
+        "citizensMatch": true,
+        "countsMatch": true,
+        "observationsMatch": true,
+        "orderingValid": true,
+        "inventoriesValid": true,
+        "decisionSourcesHonest": true,
+        "receiptReferencesValid": true,
+        "authenticityHonest": true,
+        "hashChainValid": true
+      },
+      "acceptance": {
+        "offline": {
+          "passed": 0,
+          "total": 30,
+          "measurement": "NOT MEASURABLE"
+        },
+        "live": {
+          "passed": 0,
+          "total": 37,
+          "measurement": "NOT MEASURABLE"
+        },
+        "notMeasurable": true,
+        "failingCriteria": [
+          "A-IDENTITY",
+          "A-SESSION",
+          "A-MEMORY",
+          "A-ACTIONS"
+        ],
+        "notProvenCriteria": [
+          "A-CONNECT",
+          "A-FOOD",
+          "A-NAVIGATION",
+          "A-SHELTER",
+          "A-RESPAWN",
+          "A-STOP",
+          "A-ROSTER",
+          "A-VISIBILITY",
+          "A-USAGE",
+          "B-ROSTER",
+          "B-WORLD",
+          "B-START",
+          "B-INVENTORY",
+          "B-PRESSURE",
+          "B-AUTONOMY",
+          "B-OUTCOMES",
+          "B-PRIVACY",
+          "B-SPEECH",
+          "B-OBSERVER",
+          "B-MIGRATION",
+          "B-CHOICES",
+          "B-INVENTORY-LOG",
+          "B-BLOCK-LOG",
+          "B-HEALTH-LOG",
+          "B-MODELS",
+          "B-AUTH",
+          "B-COST",
+          "B-DURATION",
+          "B-TICKS",
+          "B-RESPAWN",
+          "B-KEEP-INVENTORY",
+          "B-INTERVENTION",
+          "B-INTERVENTION-LOG"
+        ]
+      }
+    },
+    "scenario-4": {
+      "passed": false,
+      "scenario": 4,
+      "artifactDir": "<scratch>/wt/impl/artifacts/v1/neg/forge-4",
+      "runId": "fixture-4-bdd454d04cb1",
+      "testedSha": "bdd454d04cb14a37db052d685ebc791ab20461db",
+      "citizens": [
+        "gpt-a",
+        "gpt-b",
+        "claude-a",
+        "claude-b"
+      ],
+      "actionAttemptsCount": 12,
+      "actionObservationsCount": 12,
+      "physicallyVerifiedCount": 12,
+      "hashChainTotalRows": 30,
+      "validatorVerdict": "NOT PROVEN",
+      "paperAttestationProven": false,
+      "unprovenReasons": [
+        "RECORDER_GAP_TOOL_DURABILITY",
+        "RECORDER_GAP_SERVER_GAME_TICK",
+        "MISSING_CITIZEN_COMMUNITY",
+        "MISSING_CITIZEN_PERSONALITY_SEED",
+        "MISSING_CITIZEN_COMMUNITY",
+        "MISSING_CITIZEN_PERSONALITY_SEED",
+        "MISSING_CITIZEN_COMMUNITY",
+        "MISSING_CITIZEN_PERSONALITY_SEED",
+        "MISSING_CITIZEN_COMMUNITY",
+        "MISSING_CITIZEN_PERSONALITY_SEED",
+        "MISSING_SITE_BIOME",
+        "MISSING_SITE_BIOME",
+        "MISSING_SITE_BIOME",
+        "MISSING_SITE_BIOME",
+        "MISSING_SERVER_CONFIG",
+        "MISSING_GAMERULE_CONFIG",
+        "UNVERIFIED_SHELTER_ABSENCE",
+        "MISSING_BUDGET_CEILING",
+        "MISSING_OPERATIONAL_PATHS",
+        "MISSING_RECORDING_CONFIG",
+        "MISSING_PRIVACY_REPLAY_EVIDENCE",
+        "NO_TICK_EVIDENCE",
+        "RECORDER_OR_BRIDGE_GAP",
+        "RECORDER_OR_BRIDGE_GAP",
+        "RECORDER_OR_BRIDGE_GAP",
+        "UNPROVEN_PAPER_AUTHENTICITY"
+      ],
+      "errors": [
+        "Manifest action 6851021b-9e51-47b9-b56f-5c88abc535fb (gpt-a): inventoryDelta {\"oak_log\":9} disagrees with journal before/after delta {\"oak_log\":1}",
+        "Receipt receipt-6851021b-9e51-47b9-b56f-5c88abc535fb: inventoryAfter {\"oak_log\":9} disagrees with the original journal observation"
+      ],
+      "contradictions": [
+        "Manifest action 6851021b-9e51-47b9-b56f-5c88abc535fb (gpt-a): inventoryDelta {\"oak_log\":9} disagrees with journal before/after delta {\"oak_log\":1}",
+        "Receipt receipt-6851021b-9e51-47b9-b56f-5c88abc535fb: inventoryAfter {\"oak_log\":9} disagrees with the original journal observation"
+      ],
+      "warnings": [],
+      "details": {
+        "citizensMatch": true,
+        "countsMatch": true,
+        "observationsMatch": true,
+        "orderingValid": true,
+        "inventoriesValid": true,
+        "decisionSourcesHonest": true,
+        "receiptReferencesValid": true,
+        "authenticityHonest": true,
+        "hashChainValid": true
+      },
+      "acceptance": {
+        "offline": {
+          "passed": 0,
+          "total": 30,
+          "measurement": "NOT MEASURABLE"
+        },
+        "live": {
+          "passed": 0,
+          "total": 37,
+          "measurement": "NOT MEASURABLE"
+        },
+        "notMeasurable": true,
+        "failingCriteria": [
+          "A-IDENTITY",
+          "A-SESSION",
+          "A-MEMORY",
+          "A-ACTIONS"
+        ],
+        "notProvenCriteria": [
+          "A-CONNECT",
+          "A-FOOD",
+          "A-NAVIGATION",
+          "A-SHELTER",
+          "A-RESPAWN",
+          "A-STOP",
+          "A-ROSTER",
+          "A-VISIBILITY",
+          "A-USAGE",
+          "B-ROSTER",
+          "B-WORLD",
+          "B-START",
+          "B-INVENTORY",
+          "B-PRESSURE",
+          "B-AUTONOMY",
+          "B-OUTCOMES",
+          "B-PRIVACY",
+          "B-SPEECH",
+          "B-OBSERVER",
+          "B-MIGRATION",
+          "B-CHOICES",
+          "B-INVENTORY-LOG",
+          "B-BLOCK-LOG",
+          "B-HEALTH-LOG",
+          "B-MODELS",
+          "B-AUTH",
+          "B-COST",
+          "B-DURATION",
+          "B-TICKS",
+          "B-RESPAWN",
+          "B-KEEP-INVENTORY",
+          "B-INTERVENTION",
+          "B-INTERVENTION-LOG"
+        ]
+      }
+    }
+  },
+  "journalCliCheck": {
+    "status": "READY",
+    "executed": true,
+    "command": "node --import tsx tools/v1-integration/journal-cli-main.ts",
+    "exitCodes": {
+      "consistent": 0,
+      "missingRoot": 2,
+      "missingJournal": 2,
+      "missingReceipt": 2,
+      "forged": 1,
+      "forgedReceipt": 1,
+      "forgedJournal": 1
+    },
+    "forgedReceiptTestPassed": true,
+    "forgedJournalTestPassed": true,
+    "consistentStatus": "JOURNAL CONSISTENT",
+    "failures": [],
+    "scenario": {
+      "citizens": 2,
+      "attempts": 6,
+      "observations": 6
+    },
+    "details": "Executed consistent, missing-root, missing-journal, missing-receipt, rehashed forged-receipt and rehashed forged-journal cases for 2 citizens / 6 attempts / 6 observations: {\"consistent\":0,\"missingRoot\":2,\"missingJournal\":2,\"missingReceipt\":2,\"forged\":1,\"forgedReceipt\":1,\"forgedJournal\":1}. Local consistency is not live authenticity."
+  },
+  "journalCliChecks": {
+    "scenario-2": {
+      "status": "READY",
+      "executed": true,
+      "command": "node --import tsx tools/v1-integration/journal-cli-main.ts",
+      "exitCodes": {
+        "consistent": 0,
+        "missingRoot": 2,
+        "missingJournal": 2,
+        "missingReceipt": 2,
+        "forged": 1,
+        "forgedReceipt": 1,
+        "forgedJournal": 1
+      },
+      "forgedReceiptTestPassed": true,
+      "forgedJournalTestPassed": true,
+      "consistentStatus": "JOURNAL CONSISTENT",
+      "failures": [],
+      "scenario": {
+        "citizens": 2,
+        "attempts": 6,
+        "observations": 6
+      },
+      "details": "Executed consistent, missing-root, missing-journal, missing-receipt, rehashed forged-receipt and rehashed forged-journal cases for 2 citizens / 6 attempts / 6 observations: {\"consistent\":0,\"missingRoot\":2,\"missingJournal\":2,\"missingReceipt\":2,\"forged\":1,\"forgedReceipt\":1,\"forgedJournal\":1}. Local consistency is not live authenticity."
+    },
+    "scenario-4": {
+      "status": "FAILED",
+      "executed": true,
+      "command": "node --import tsx tools/v1-integration/journal-cli-main.ts",
+      "exitCodes": {
+        "consistent": 1,
+        "missingRoot": 1,
+        "missingJournal": 1,
+        "missingReceipt": 1,
+        "forged": 1,
+        "forgedReceipt": 1,
+        "forgedJournal": 1
+      },
+      "forgedReceiptTestPassed": true,
+      "forgedJournalTestPassed": true,
+      "consistentStatus": "FAIL",
+      "failures": [
+        "Action 1: inventory delta contradicts expected effects",
+        "Action 5: inventory receipt contradicts prior stock",
+        "Action 9: inventory receipt contradicts prior stock",
+        "Journal action 1: journal afterInventory contradicts receipt",
+        "Journal action 1: journal inventory delta contradicts manifest"
+      ],
+      "scenario": {
+        "citizens": 4,
+        "attempts": 12,
+        "observations": 12
+      },
+      "details": "Executed consistent, missing-root, missing-journal, missing-receipt, rehashed forged-receipt and rehashed forged-journal cases for 4 citizens / 12 attempts / 12 observations: {\"consistent\":1,\"missingRoot\":1,\"missingJournal\":1,\"missingReceipt\":1,\"forged\":1,\"forgedReceipt\":1,\"forgedJournal\":1}. Local consistency is not live authenticity."
+    }
+  },
+  "contradictions": [
+    "[Scenario-4] Manifest action 6851021b-9e51-47b9-b56f-5c88abc535fb (gpt-a): inventoryDelta {\"oak_log\":9} disagrees with journal before/after delta {\"oak_log\":1}",
+    "[Scenario-4] Receipt receipt-6851021b-9e51-47b9-b56f-5c88abc535fb: inventoryAfter {\"oak_log\":9} disagrees with the original journal observation",
+    "[Scenario-4] the real journal cross-check rejected the bundle: Action 1: inventory delta contradicts expected effects; Action 5: inventory receipt contradicts prior stock; Action 9: inventory receipt contradicts prior stock"
+  ],
+  "incomplete": [],
+  "acceptance": {
+    "scenario-2": {
+      "offline": {
+        "passed": 0,
+        "total": 30,
+        "measurement": "NOT MEASURABLE"
+      },
+      "live": {
+        "passed": 0,
+        "total": 37,
+        "measurement": "NOT MEASURABLE"
+      },
+      "notMeasurable": true,
+      "failingCriteria": [
+        "A-IDENTITY",
+        "A-SESSION",
+        "A-MEMORY",
+        "A-ACTIONS"
+      ],
+      "notProvenCriteria": [
+        "A-CONNECT",
+        "A-FOOD",
+        "A-NAVIGATION",
+        "A-SHELTER",
+        "A-RESPAWN",
+        "A-STOP",
+        "A-ROSTER",
+        "A-VISIBILITY",
+        "A-USAGE",
+        "B-ROSTER",
+        "B-WORLD",
+        "B-START",
+        "B-INVENTORY",
+        "B-PRESSURE",
+        "B-AUTONOMY",
+        "B-OUTCOMES",
+        "B-PRIVACY",
+        "B-SPEECH",
+        "B-OBSERVER",
+        "B-MIGRATION",
+        "B-CHOICES",
+        "B-INVENTORY-LOG",
+        "B-BLOCK-LOG",
+        "B-HEALTH-LOG",
+        "B-MODELS",
+        "B-AUTH",
+        "B-COST",
+        "B-DURATION",
+        "B-TICKS",
+        "B-RESPAWN",
+        "B-KEEP-INVENTORY",
+        "B-INTERVENTION",
+        "B-INTERVENTION-LOG"
+      ]
+    },
+    "scenario-4": {
+      "offline": {
+        "passed": 0,
+        "total": 30,
+        "measurement": "NOT MEASURABLE"
+      },
+      "live": {
+        "passed": 0,
+        "total": 37,
+        "measurement": "NOT MEASURABLE"
+      },
+      "notMeasurable": true,
+      "failingCriteria": [
+        "A-IDENTITY",
+        "A-SESSION",
+        "A-MEMORY",
+        "A-ACTIONS"
+      ],
+      "notProvenCriteria": [
+        "A-CONNECT",
+        "A-FOOD",
+        "A-NAVIGATION",
+        "A-SHELTER",
+        "A-RESPAWN",
+        "A-STOP",
+        "A-ROSTER",
+        "A-VISIBILITY",
+        "A-USAGE",
+        "B-ROSTER",
+        "B-WORLD",
+        "B-START",
+        "B-INVENTORY",
+        "B-PRESSURE",
+        "B-AUTONOMY",
+        "B-OUTCOMES",
+        "B-PRIVACY",
+        "B-SPEECH",
+        "B-OBSERVER",
+        "B-MIGRATION",
+        "B-CHOICES",
+        "B-INVENTORY-LOG",
+        "B-BLOCK-LOG",
+        "B-HEALTH-LOG",
+        "B-MODELS",
+        "B-AUTH",
+        "B-COST",
+        "B-DURATION",
+        "B-TICKS",
+        "B-RESPAWN",
+        "B-KEEP-INVENTORY",
+        "B-INTERVENTION",
+        "B-INTERVENTION-LOG"
+      ]
+    }
+  },
+  "allErrors": [
+    "[Scenario-4] Manifest action 6851021b-9e51-47b9-b56f-5c88abc535fb (gpt-a): inventoryDelta {\"oak_log\":9} disagrees with journal before/after delta {\"oak_log\":1}",
+    "[Scenario-4] Receipt receipt-6851021b-9e51-47b9-b56f-5c88abc535fb: inventoryAfter {\"oak_log\":9} disagrees with the original journal observation",
+    "[Scenario-4] journal CLI was not successfully exercised: Executed consistent, missing-root, missing-journal, missing-receipt, rehashed forged-receipt and rehashed forged-journal cases for 4 citizens / 12 attempts / 12 observations: {\"consistent\":1,\"missingRoot\":1,\"missingJournal\":1,\"missingReceipt\":1,\"forged\":1,\"forgedReceipt\":1,\"forgedJournal\":1}. Local consistency is not live authenticity."
+  ]
+}

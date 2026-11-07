@@ -1,0 +1,91 @@
+
+ RUN  v3.2.7 <scratch>/wt/impl
+
+ ✓ tools/ci/offline-acceptance.test.ts > Offline Acceptance Artifact Verifier > computes journal row hash consistently without the hash property 3ms
+ ✓ tools/ci/offline-acceptance.test.ts > Offline Acceptance Artifact Verifier > accepts a valid 1v1 (2-citizen) offline artifact bundle 20ms
+ ✓ tools/ci/offline-acceptance.test.ts > Offline Acceptance Artifact Verifier > accepts a valid 2v2 (4-citizen) offline artifact bundle 13ms
+ ✓ tools/ci/offline-acceptance.test.ts > Offline Acceptance Artifact Verifier > rejects wrong source SHA 6ms
+ ✓ tools/ci/offline-acceptance.test.ts > Offline Acceptance Artifact Verifier > rejects incorrect citizen count 4ms
+ ✓ tools/ci/offline-acceptance.test.ts > Offline Acceptance Artifact Verifier > rejects duplicate attempts 4ms
+ ✓ tools/ci/offline-acceptance.test.ts > Offline Acceptance Artifact Verifier > rejects missing observations 4ms
+ ✓ tools/ci/offline-acceptance.test.ts > Offline Acceptance Artifact Verifier > rejects artificially increased inventory 7ms
+ ✓ tools/ci/offline-acceptance.test.ts > Offline Acceptance Artifact Verifier > rejects scripted decisions disguised as genuine model decisions 4ms
+ ✓ tools/ci/offline-acceptance.test.ts > Offline Acceptance Artifact Verifier > rejects a simulated report promoted to authenticated Paper evidence (verdict PASS) 4ms
+ ✓ tools/ci/offline-acceptance.test.ts > Offline Acceptance Artifact Verifier > rejects a simulated report promoted to authenticated Paper evidence (validator report VERIFIED) 4ms
+ ✓ tools/ci/offline-acceptance.test.ts > Offline Acceptance Artifact Verifier > rejects journal hash tampering 5ms
+ ✓ tools/ci/offline-acceptance.test.ts > Offline Acceptance Artifact Verifier > rejects cross-citizen identity confusion in observations 5ms
+ ✓ tools/ci/offline-acceptance.test.ts > Offline Acceptance Artifact Verifier > rejects out-of-order execution (observation seq precedes attempt seq) 7ms
+ ✓ tools/ci/offline-acceptance.test.ts > Offline Acceptance Artifact Verifier > reports Codex journal CLI check as NOT_RUN when command is absent on this branch 2ms
+ ✓ tools/ci/offline-acceptance.test.ts > Offline Acceptance Artifact Verifier > formats Markdown summary with all required sections and fail-closed notice 6ms
+ ✓ tools/ci/evidence-hardening.test.ts > untouched real bundles are accepted (no false positives) > real 1v1 recorder output passes with zero errors and zero contradictions 30ms
+ ✓ tools/ci/evidence-hardening.test.ts > untouched real bundles are accepted (no false positives) > real 2v2 recorder output passes with zero errors and zero contradictions 22ms
+ ✓ tools/ci/evidence-hardening.test.ts > PR #72 tamper matrix on real bundles > T01 [1v1] rehashed journal: observation worldChanges position moved: rejected 12ms
+ ✓ tools/ci/evidence-hardening.test.ts > PR #72 tamper matrix on real bundles > T01 [2v2] rehashed journal: observation worldChanges position moved: rejected 13ms
+ ✓ tools/ci/evidence-hardening.test.ts > PR #72 tamper matrix on real bundles > T02 rehashed journal: attempt target changed: rejected 12ms
+ ✓ tools/ci/evidence-hardening.test.ts > PR #72 tamper matrix on real bundles > T03 rehashed journal: observation flipped to successReported=false, verified=false: rejected 11ms
+ ✓ tools/ci/journal-execution.test.ts > executes the real journal CLI and its forged/missing controls without mutating original artifacts 2295ms
+ ✓ tools/ci/journal-execution.test.ts > refuses to report verification success when the real journal CLI rejects the input 2192ms
+ ✓ tools/ci/evidence-hardening.test.ts > PR #72 tamper matrix on real bundles > T04 [1v1] rehashed journal: citizen identities swapped between gpt-a#1 and claude-a#1 (attempt and observation): rejected 9ms
+ ✓ tools/ci/evidence-hardening.test.ts > PR #72 tamper matrix on real bundles > T04 [2v2] rehashed journal: citizen identities swapped between gpt-a#1 and claude-a#1 (attempt and observation): rejected 10ms
+ ✓ tools/ci/evidence-hardening.test.ts > PR #72 tamper matrix on real bundles > T05 [1v1] manifest + receipt citizenIds swapped between two actions (journal untouched): rejected 13ms
+ ✓ tools/ci/evidence-hardening.test.ts > PR #72 tamper matrix on real bundles > T05 [2v2] manifest + receipt citizenIds swapped between two actions (journal untouched): rejected 11ms
+ ✓ tools/ci/evidence-hardening.test.ts > PR #72 tamper matrix on real bundles > T06 receipt reference replaced with another existing receipt: rejected 8ms
+ ✓ tools/ci/evidence-hardening.test.ts > PR #72 tamper matrix on real bundles > T07 [1v1] receipt CONTENT forged (ids kept; inventoryAfter=9, worldChanges emptied): rejected 10ms
+ ✓ tools/ci/evidence-hardening.test.ts > PR #72 tamper matrix on real bundles > T07 [2v2] receipt CONTENT forged (ids kept; inventoryAfter=9, worldChanges emptied): rejected 16ms
+ ✓ tools/ci/evidence-hardening.test.ts > PR #72 tamper matrix on real bundles > T08 receipt sourceSha changed to a different SHA: rejected 9ms
+ ✓ tools/ci/evidence-hardening.test.ts > PR #72 tamper matrix on real bundles > T09 referenced receipt file deleted: rejected 7ms
+ ✓ tools/ci/evidence-hardening.test.ts > PR #72 tamper matrix on real bundles > T10 manifest.sourceReceipts[0].sha256 altered: rejected 9ms
+ ✓ tools/ci/evidence-hardening.test.ts > PR #72 tamper matrix on real bundles > T11 manifest action duplicated over another (new attemptId, same receipt): rejected 8ms
+ ✓ tools/ci/evidence-hardening.test.ts > PR #72 tamper matrix on real bundles > T12 rehashed journal: gpt-a#3 replaced by a clone of #1 (fresh attemptId, inventory 0->1): rejected 8ms
+ ✓ tools/ci/evidence-hardening.test.ts > PR #72 tamper matrix on real bundles > T13 [1v1] one action removed everywhere (manifest + journal pair): rejected 8ms
+ ✓ tools/ci/evidence-hardening.test.ts > PR #72 tamper matrix on real bundles > T13 [2v2] one action removed everywhere (manifest + journal pair): rejected 12ms
+ ✓ tools/ci/evidence-hardening.test.ts > PR #72 tamper matrix on real bundles > T14 evidence sources disagree: manifest says delta=9, observedSuccess=false; journal says otherwise: rejected 8ms
+ ✓ tools/ci/evidence-hardening.test.ts > PR #72 tamper matrix on real bundles > T15 [1v1] source SHA differs: manifest only: rejected 7ms
+ ✓ tools/ci/evidence-hardening.test.ts > PR #72 tamper matrix on real bundles > T15 [2v2] source SHA differs: manifest only: rejected 9ms
+ ✓ tools/ci/evidence-hardening.test.ts > PR #72 tamper matrix on real bundles > T16 source SHA differs: original journal start row (rehashed) vs manifest: rejected 8ms
+ ✓ tools/ci/evidence-hardening.test.ts > PR #72 tamper matrix on real bundles > T17 source SHA differs: validator report only: rejected 7ms
+ ✓ tools/ci/evidence-hardening.test.ts > PR #72 tamper matrix on real bundles > T18 [1v1] simulated presented as authenticated: verdict.json = PASS: rejected 9ms
+ ✓ tools/ci/evidence-hardening.test.ts > PR #72 tamper matrix on real bundles > T18 [2v2] simulated presented as authenticated: verdict.json = PASS: rejected 10ms
+ ✓ tools/ci/evidence-hardening.test.ts > PR #72 tamper matrix on real bundles > T19 simulated presented as authenticated: validator overallStatus = VERIFIED: rejected 8ms
+ ✓ tools/ci/evidence-hardening.test.ts > PR #72 tamper matrix on real bundles > T20 simulated presented as authenticated: manifest.mode = paper-live: rejected 11ms
+ ✓ tools/ci/evidence-hardening.test.ts > PR #72 tamper matrix on real bundles > T21 simulated presented as authenticated: citizen authentication = microsoft: rejected 7ms
+ ✓ tools/ci/evidence-hardening.test.ts > PR #72 tamper matrix on real bundles > T22 simulated presented as authenticated: acceptance.json claims live 37/37 VERIFIED (a published artifact): rejected 7ms
+ ✓ tools/ci/evidence-hardening.test.ts > PR #72 tamper matrix on real bundles > T23 simulated presented as authenticated: validator environment = 'Authenticated Paper live server': rejected 7ms
+ ✓ tools/ci/evidence-hardening.test.ts > PR #72 tamper matrix on real bundles > T24 UNPROVEN_PAPER_AUTHENTICITY gap code silently removed from the validator report: rejected 7ms
+ ✓ tools/ci/evidence-hardening.test.ts > PR #72 tamper matrix on real bundles > T25 [1v1] journal row tampered WITHOUT recomputing the hash chain: rejected 7ms
+ ✓ tools/ci/evidence-hardening.test.ts > PR #72 tamper matrix on real bundles > T25 [2v2] journal row tampered WITHOUT recomputing the hash chain: rejected 9ms
+ ✓ tools/ci/evidence-hardening.test.ts > PR #72 tamper matrix on real bundles > [LIMITATION BY DESIGN] T26 COHERENT forgery: journal + receipt worldChanges edited, journal rehashed, receipt sha256 re-pinned: a coherent forgery of every local artifact is accepted (not authenticated) 11ms
+ ✓ tools/ci/evidence-hardening.test.ts > PR #72 tamper matrix on real bundles > every class the original audit found accepted (13 of 26) is now rejected on both real bundles 138ms
+ ✓ tools/ci/evidence-hardening.test.ts > PR #72 tamper matrix on real bundles > a rehashed journal is NOT accepted merely because its hash chain and verdict digest are valid 8ms
+ ✓ tools/ci/evidence-hardening.test.ts > a forger who re-pins forged receipts is still caught (the pin is not the only check) > 1v1: forged inventory in a re-pinned receipt disagrees with the original journal 8ms
+ ✓ tools/ci/evidence-hardening.test.ts > a forger who re-pins forged receipts is still caught (the pin is not the only check) > 1v1: a re-pinned receipt with a different sourceSha disagrees with the manifest 7ms
+ ✓ tools/ci/evidence-hardening.test.ts > a forger who re-pins forged receipts is still caught (the pin is not the only check) > 1v1: a re-pinned receipt credited to another citizen disagrees with the manifest and journal 7ms
+ ✓ tools/ci/evidence-hardening.test.ts > a forger who re-pins forged receipts is still caught (the pin is not the only check) > 1v1: receipt journal coordinates pointing at the wrong original rows are rejected 7ms
+ ✓ tools/ci/evidence-hardening.test.ts > a forger who re-pins forged receipts is still caught (the pin is not the only check) > 2v2: forged inventory in a re-pinned receipt disagrees with the original journal 9ms
+ ✓ tools/ci/evidence-hardening.test.ts > a forger who re-pins forged receipts is still caught (the pin is not the only check) > 2v2: a re-pinned receipt with a different sourceSha disagrees with the manifest 9ms
+ ✓ tools/ci/evidence-hardening.test.ts > a forger who re-pins forged receipts is still caught (the pin is not the only check) > 2v2: a re-pinned receipt credited to another citizen disagrees with the manifest and journal 9ms
+ ✓ tools/ci/evidence-hardening.test.ts > a forger who re-pins forged receipts is still caught (the pin is not the only check) > 2v2: receipt journal coordinates pointing at the wrong original rows are rejected 10ms
+ ✓ tools/ci/evidence-hardening.test.ts > per-scenario journal CLI controls on the committed real bundles (real subprocesses) > 1v1: 2 citizens / 6 attempts / 6 observations: positive, missing-evidence and forged-evidence controls 2198ms
+ ✓ tools/ci/evidence-hardening.test.ts > authenticity claims from scripted offline fixtures are contradictions > T18 simulated presented as authenticated: verdict.json = PASS: reported as a contradiction, not just an error 7ms
+ ✓ tools/ci/evidence-hardening.test.ts > authenticity claims from scripted offline fixtures are contradictions > T19 simulated presented as authenticated: validator overallStatus = VERIFIED: reported as a contradiction, not just an error 7ms
+ ✓ tools/ci/evidence-hardening.test.ts > authenticity claims from scripted offline fixtures are contradictions > T20 simulated presented as authenticated: manifest.mode = paper-live: reported as a contradiction, not just an error 7ms
+ ✓ tools/ci/evidence-hardening.test.ts > authenticity claims from scripted offline fixtures are contradictions > T21 simulated presented as authenticated: citizen authentication = microsoft: reported as a contradiction, not just an error 7ms
+ ✓ tools/ci/evidence-hardening.test.ts > authenticity claims from scripted offline fixtures are contradictions > T22 simulated presented as authenticated: acceptance.json claims live 37/37 VERIFIED (a published artifact): reported as a contradiction, not just an error 7ms
+ ✓ tools/ci/evidence-hardening.test.ts > authenticity claims from scripted offline fixtures are contradictions > T23 simulated presented as authenticated: validator environment = 'Authenticated Paper live server': reported as a contradiction, not just an error 7ms
+ ✓ tools/ci/evidence-hardening.test.ts > authenticity claims from scripted offline fixtures are contradictions > T24 UNPROVEN_PAPER_AUTHENTICITY gap code silently removed from the validator report: reported as a contradiction, not just an error 7ms
+ ✓ tools/ci/evidence-hardening.test.ts > authenticity claims from scripted offline fixtures are contradictions > a missing UNPROVEN_PAPER_AUTHENTICITY gap code is rejected, never read as proof of authenticity 6ms
+ ✓ tools/ci/evidence-hardening.test.ts > authenticity claims from scripted offline fixtures are contradictions > criteria that remain NOT MEASURABLE are returned, with the failing ones named 9ms
+ ✓ tools/ci/evidence-hardening.test.ts > outcome classification and the headline > all scenarios clean and both journal checks READY -> OFFLINE_STRUCTURAL_PASS 0ms
+ ✓ tools/ci/evidence-hardening.test.ts > outcome classification and the headline > a contradiction outranks incompleteness, which outranks an ordinary failure 1ms
+ ✓ tools/ci/evidence-hardening.test.ts > outcome classification and the headline > each scenario's journal check is judged independently: 1v1 READY cannot excuse a failed 2v2 0ms
+ ✓ tools/ci/evidence-hardening.test.ts > outcome classification and the headline > a journal check that skipped the forged-journal control is not 'done' even if READY 0ms
+ ✓ tools/ci/evidence-hardening.test.ts > outcome classification and the headline > the headline never reads as live acceptance, in any of the four states 2ms
+ ✓ tools/ci/evidence-hardening.test.ts > outcome classification and the headline > legacy error texts are classified: identity / authenticity claims are contradictions, counts and absences are not 0ms
+ ✓ tools/ci/evidence-hardening.test.ts > per-scenario journal CLI controls on the committed real bundles (real subprocesses) > 2v2: 4 citizens / 12 attempts / 12 observations: positive, missing-evidence and forged-evidence controls 2205ms
+ ✓ tools/ci/evidence-hardening.test.ts > per-scenario journal CLI controls on the committed real bundles (real subprocesses) > a verified scenario that has the wrong shape is not accepted even if the CLI is happy 7ms
+
+ Test Files  3 passed (3)
+      Tests  82 passed (82)
+   Start at  19:56:11
+   Duration  5.98s (transform 352ms, setup 192ms, collect 483ms, tests 9.65s, environment 1ms, prepare 342ms)
+

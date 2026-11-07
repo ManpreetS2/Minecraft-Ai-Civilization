@@ -1,0 +1,50 @@
+
+> minecraft-ai-civilization@0.1.0 test:security <scratch>/wt/impl
+> vitest run sec001 knowledge-provenance downstream-prompt-isolation persistent-fact-provenance citizen-context-2v2 bulletin-2v2 visibility-2v2 untrusted-model-output pr16-review http-server-origin workstations-community storage-community-access
+
+
+ RUN  v3.2.7 <scratch>/wt/impl
+
+(node:61851) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:61847) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ packages/agent-core/src/sec001-quarantine-durability-qa.test.ts (8 tests) 373ms
+ ✓ packages/agent-core/src/sec001-migration-recovery-qa.test.ts (7 tests) 381ms
+ ✓ packages/agent-core/src/sec001-migration-qa.test.ts (12 tests) 532ms
+(node:61850) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:61848) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:61849) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:61846) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ packages/agent-core/src/sec001-round2.test.ts (20 tests) 314ms
+ ✓ packages/agent-core/src/sec001-audience.test.ts (8 tests) 214ms
+ ✓ packages/agent-core/src/sec001-round3.test.ts (14 tests) 364ms
+ ✓ packages/agent-core/src/sec001-migration-manager-qa.test.ts (5 tests) 719ms
+   ✓ Independent migrated SQLite -> actual manager cognition QA > migrated flagged fact and exact-derived memory cannot reach manager cognition, including after restart  352ms
+ ✓ packages/agent-core/src/pr16-review.test.ts (5 tests) 782ms
+   ✓ deferred bulletin delivery > a share names the line the model was shown, even if an earlier line was withdrawn while it was thinking  301ms
+ ✓ packages/agent-core/src/persistent-fact-provenance.test.ts (12 tests) 111ms
+ ✓ apps/orchestrator/src/http-server-origin.test.ts (4 tests) 89ms
+ ✓ packages/agent-core/src/knowledge-provenance.test.ts (19 tests) 172ms
+ ✓ packages/agent-core/src/downstream-prompt-isolation.test.ts (13 tests) 1316ms
+ ✓ packages/agent-core/src/storage-community-access.test.ts (8 tests) 64ms
+ ✓ packages/shared/src/bulletin-2v2-contract.test.ts (9 tests) 22ms
+ ✓ packages/agent-core/src/citizen-context-2v2.test.ts (27 tests) 72ms
+ ✓ packages/agent-core/src/workstations-community.test.ts (9 tests) 105ms
+ ✓ packages/agent-core/src/t3-sec001-boundaries.test.ts (10 tests) 127ms
+ ✓ packages/shared/src/visibility-2v2-contract.test.ts (19 tests) 17ms
+ ✓ packages/agent-core/src/sec001-manager.test.ts (38 tests) 3436ms
+   ✓ same-community announcements (criterion 2) > a citizen's own choice reaches every member of its community through the real manager path, and no one else  472ms
+ ✓ packages/agent-core/src/untrusted-model-output.test.ts (37 tests) 4231ms
+ ✓ packages/agent-core/src/sec001-independent-review.test.ts (74 tests) 4947ms
+   ✓ community membership timing reaches the model-facing context > a citizen who joins after an announcement never receives it  390ms
+
+ Test Files  21 passed (21)
+      Tests  358 passed (358)
+   Start at  19:57:53
+   Duration  7.93s (transform 3.46s, setup 836ms, collect 15.29s, tests 18.39s, environment 5ms, prepare 2.94s)
+

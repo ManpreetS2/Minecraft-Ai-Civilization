@@ -1,0 +1,4 @@
+
+> minecraft-ai-civilization@0.1.0 lint <scratch>/wt/impl
+> eslint .
+

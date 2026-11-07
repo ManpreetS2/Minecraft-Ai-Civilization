@@ -1,0 +1,4 @@
+
+> minecraft-ai-civilization@0.1.0 typecheck:tools <scratch>/wt/impl
+> tsc -p tools/tsconfig.json
+

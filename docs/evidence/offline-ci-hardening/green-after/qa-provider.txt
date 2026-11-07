@@ -1,0 +1,12 @@
+
+ RUN  v3.2.7 <scratch>/wt/impl
+
+(node:62893) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ qa/provider-safety/test/boundaries.test.ts (10 tests) 59ms
+
+ Test Files  1 passed (1)
+      Tests  10 passed (10)
+   Start at  19:58:54
+   Duration  2.08s (transform 923ms, setup 68ms, collect 1.34s, tests 59ms, environment 0ms, prepare 79ms)
+
