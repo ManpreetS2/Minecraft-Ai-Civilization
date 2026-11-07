@@ -13,7 +13,6 @@ import { CASES } from "./support/cases.js";
  * and the hardening branch fixed the rest; every formerly expected-failure assertion is now an ordinary passing test.
  * Journal-CLI claims are checked against PR #68's real CLI (it exists in this tree).
  */
-const posix = process.platform !== "win32";
 const temps: string[] = [];
 afterEach(() => { cleanup(); for (const t of temps.splice(0)) rmSync(t, { recursive: true, force: true }); });
 const tmp = (p: string, inRepo = false) => { const d = inRepo ? (mkdirSync(join(REPO_ROOT, "artifacts"), { recursive: true }), mkdtempSync(join(REPO_ROOT, "artifacts", p))) : mkdtempSync(join(tmpdir(), p)); temps.push(d); return d; };

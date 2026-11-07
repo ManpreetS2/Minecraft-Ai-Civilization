@@ -36,7 +36,10 @@ export function fresh(count: Count): string {
   shaByDir.set(dir, sha);
   return dir;
 }
-export const readJson = <T = Record<string, any>>(dir: string, file: string): T => JSON.parse(readFileSync(join(dir, file), "utf8")) as T;
+/** Untyped JSON document. The tamper tests deliberately edit arbitrary fields of recorder output, so this is intentionally loose. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type Doc = any;
+export const readJson = <T = Doc>(dir: string, file: string): T => JSON.parse(readFileSync(join(dir, file), "utf8")) as T;
 export const writeJson = (dir: string, file: string, value: unknown): void => writeFileSync(join(dir, file), JSON.stringify(value, null, 2));
 export const readRows = (dir: string): Row[] => readFileSync(join(dir, "operator.jsonl"), "utf8").split(/\r?\n/).filter((l) => l.trim()).map((l) => JSON.parse(l) as Row);
 export const receiptPath = (dir: string, id: string): string => join(dir, "receipts", `${id}.json`);

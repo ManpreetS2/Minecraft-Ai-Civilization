@@ -11,7 +11,7 @@ const path = join(REPO_ROOT, ".github/workflows/offline-acceptance.yml");
 const have = existsSync(path);
 const yml = have ? readFileSync(path, "utf8").replace(/\r\n/g, "\n") : ""; // CRLF-safe: a Windows checkout may apply autocrlf
 /** Workflow steps, split on the "      - " list marker. */
-const steps = (): string[] => yml.split(/\n      - (?=name:|uses:|run:)/).slice(1);
+const steps = (): string[] => yml.split(/\n {6}- (?=name:|uses:|run:)/).slice(1);
 const stepsUsing = (action: string): string[] => steps().filter((s) => s.includes(`${action}@`));
 
 describe.skipIf(!have)("offline-acceptance.yml: secrets, privacy and trigger safety", () => {
