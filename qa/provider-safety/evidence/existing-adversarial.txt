@@ -1,0 +1,18 @@
+
+ RUN  v3.2.7 /private/tmp/minecraft-provider-safety-qa
+
+(node:51723) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ qa/v1/test/adv-provider-faults.test.ts (16 tests) 560ms
+(node:51841) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+stdout | qa/v1/test/adv-offline-boundary.test.ts > trust boundary: what the offline root does and does not prevent (evidence for an independent reviewer) > [ADV-09] createBody is a trusted dependency: the root hands it options and neither restricts them nor wraps what it returns
+QA-evidence createBody option keys: ["username","config","events","citizenId","reconnect","allowRespawn","eventLoopLag"]
+
+ ✓ qa/v1/test/adv-offline-boundary.test.ts (11 tests) 164ms
+
+ Test Files  2 passed (2)
+      Tests  27 passed (27)
+   Start at  22:08:02
+   Duration  7.06s (transform 2.43s, setup 243ms, collect 4.70s, tests 724ms, environment 0ms, prepare 287ms)
+

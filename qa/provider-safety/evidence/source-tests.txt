@@ -1,0 +1,32 @@
+
+ RUN  v3.2.7 /private/tmp/minecraft-provider-safety-qa
+
+(node:51253) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+stderr | apps/orchestrator/src/independent-offline-runtime.test.ts > scripted 1 GPT vs 1 Claude integrated offline 1v1 > starts identities, verifies survival, keeps secrets, restarts, and shuts down with no network
+[store] skipped write after close: appendEvent
+
+stderr | apps/orchestrator/src/independent-offline-runtime.test.ts > scripted 1 GPT vs 1 Claude integrated offline 1v1 > a late cognition callback after shutdown cannot write closed SQLite or throw
+[store] skipped write after close: late-llm
+
+ ✓ apps/orchestrator/src/independent-offline-runtime.test.ts (11 tests) 41157ms
+   ✓ independent offline composition and normal manager startup > normal start creates 2 bodies and real planning executes routed survival choices  9691ms
+   ✓ independent offline composition and normal manager startup > normal start creates 4 bodies and real planning executes routed survival choices  12007ms
+   ✓ scripted 1 GPT vs 1 Claude integrated offline 1v1 > starts identities, verifies survival, keeps secrets, restarts, and shuts down with no network  16356ms
+   ✓ scripted 1 GPT vs 1 Claude integrated offline 1v1 > a late cognition callback after shutdown cannot write closed SQLite or throw  3053ms
+ ✓ packages/cognition/src/openai-retry.test.ts (44 tests) 292ms
+(node:52589) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ apps/orchestrator/src/independent-offline-default-deny.test.ts (19 tests) 27937ms
+   ✓ offline composition is default-deny for model transports > a refused call leaves nothing running: a valid call afterwards still starts normally  3020ms
+   ✓ valid scripted runtimes still work > 2 citizens: GPT and Claude are answered from the script and nothing else is touched  9126ms
+   ✓ valid scripted runtimes still work > 4 citizens: GPT and Claude are answered from the script and nothing else is touched  11937ms
+   ✓ valid scripted runtimes still work > a scripted failure is reported as that citizen's failure, not retried onto a network  3345ms
+ ✓ packages/cognition/src/openai-usage-regression.test.ts (16 tests) 183ms
+ ✓ packages/cognition/src/routing/mixed-provider-faults.test.ts (7 tests) 401ms
+
+ Test Files  5 passed (5)
+      Tests  97 passed (97)
+   Start at  22:07:54
+   Duration  78.93s (transform 1.80s, setup 190ms, collect 4.81s, tests 69.97s, environment 1ms, prepare 856ms)
+
