@@ -30,6 +30,79 @@ interface Owner {
 const owners = new AsyncLocalStorage<Owner>();
 const guarded = new WeakSet<object>();
 const boundaries = new WeakMap<object, ActionBoundary>();
+const emitterGeneration = new WeakMap<object, number>();
+
+type Listener = (...args: unknown[]) => void;
+
+interface MutableEmitter {
+  on(event: string, listener: Listener): unknown;
+  once?(event: string, listener: Listener): unknown;
+  addListener?(event: string, listener: Listener): unknown;
+  off?(event: string, listener: Listener): unknown;
+  removeListener?(event: string, listener: Listener): unknown;
+}
+
+interface SavedEmitter {
+  on: MutableEmitter["on"];
+  once?: MutableEmitter["once"];
+  addListener?: MutableEmitter["addListener"];
+  off?: MutableEmitter["off"];
+  removeListener?: MutableEmitter["removeListener"];
+}
+
+const emitterOriginals = new WeakMap<object, SavedEmitter>();
+
+/**
+ * Listeners registered while an action is running keep that action's owner, even when a packet or physics tick
+ * emits them later with no AsyncLocalStorage frame. Listeners registered before the action stay unowned, so
+ * pathfinder and other plugin hooks keep working. Restoring on/once only affects later registrations.
+ */
+function bindEmitter(emitter: object, owner: Owner): () => void {
+  const target = emitter as MutableEmitter;
+  if (typeof target.on !== "function") return () => undefined;
+  let saved = emitterOriginals.get(emitter);
+  if (!saved) {
+    saved = {
+      on: target.on,
+      once: target.once,
+      addListener: target.addListener,
+      off: target.off,
+      removeListener: target.removeListener,
+    };
+    emitterOriginals.set(emitter, saved);
+  }
+  const generation = (emitterGeneration.get(emitter) ?? 0) + 1;
+  emitterGeneration.set(emitter, generation);
+  const wrapped = new Map<Listener, Listener>();
+  const wrap = (listener: Listener): Listener => {
+    const existing = wrapped.get(listener);
+    if (existing) return existing;
+    const bound: Listener = (...args) => {
+      owners.run(owner, () => {
+        listener(...args);
+      });
+    };
+    wrapped.set(listener, bound);
+    return bound;
+  };
+  const unwrap = (listener: Listener) => wrapped.get(listener) ?? listener;
+  target.on = (event, listener) => saved.on.call(target, event, wrap(listener));
+  if (saved.once) target.once = (event, listener) => saved.once?.call(target, event, wrap(listener));
+  if (saved.addListener) target.addListener = (event, listener) => saved.addListener?.call(target, event, wrap(listener));
+  if (saved.off) target.off = (event, listener) => saved.off?.call(target, event, unwrap(listener));
+  if (saved.removeListener) {
+    target.removeListener = (event, listener) => saved.removeListener?.call(target, event, unwrap(listener));
+  }
+  return () => {
+    if (emitterGeneration.get(emitter) !== generation) return;
+    target.on = saved.on;
+    if (saved.once) target.once = saved.once;
+    if (saved.addListener) target.addListener = saved.addListener;
+    if (saved.off) target.off = saved.off;
+    if (saved.removeListener) target.removeListener = saved.removeListener;
+    emitterGeneration.delete(emitter);
+  };
+}
 
 export interface ClientLike {
   write(name: string, data?: Record<string, unknown>): void;
@@ -65,7 +138,10 @@ export interface ActionBoundary {
   readonly orphans: () => number;
 }
 
-export function createActionBoundary(clientOf: () => ClientLike | undefined): ActionBoundary {
+export function createActionBoundary(
+  clientOf: () => ClientLike | undefined,
+  emittersOf?: () => ReadonlyArray<object | undefined>,
+): ActionBoundary {
   let tail: Promise<unknown> = Promise.resolve();
   let orphans = 0;
 
@@ -76,9 +152,12 @@ export function createActionBoundary(clientOf: () => ClientLike | undefined): Ac
   ): Promise<ActionResult<T>> {
     const client = clientOf();
     if (client) installPacketGuard(client);
+    const owner: Owner = { active: true, name };
+    const restoreEmitters = (emittersOf?.() ?? [])
+      .filter((emitter): emitter is object => emitter != null && typeof (emitter as { on?: unknown }).on === "function")
+      .map((emitter) => bindEmitter(emitter, owner));
     const started = Date.now();
     const controller = new AbortController();
-    const owner: Owner = { active: true, name };
     const forward = () => controller.abort(options.signal?.reason);
     if (options.signal?.aborted) forward();
     else options.signal?.addEventListener("abort", forward, { once: true });
@@ -132,6 +211,7 @@ export function createActionBoundary(clientOf: () => ClientLike | undefined): Ac
       clearTimeout(timer);
       options.signal?.removeEventListener("abort", forward);
       owner.active = false;
+      for (const restore of restoreEmitters) restore();
     }
   }
 
@@ -153,11 +233,20 @@ function clientOf(body: MinecraftBody): ClientLike | undefined {
   return bot?._client;
 }
 
+function emittersOf(body: MinecraftBody): object[] {
+  const bot = body.getBot() as { _client?: object } | null;
+  if (!bot) return [];
+  return bot._client ? [bot, bot._client] : [bot];
+}
+
 /** One boundary per body, so a reconnect can guard the new client without losing the serialization queue. */
 export function actionBoundaryFor(body: MinecraftBody): ActionBoundary {
   const existing = boundaries.get(body);
   if (existing) return existing;
-  const created = createActionBoundary(() => clientOf(body));
+  const created = createActionBoundary(
+    () => clientOf(body),
+    () => emittersOf(body),
+  );
   boundaries.set(body, created);
   return created;
 }

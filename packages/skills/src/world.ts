@@ -5,7 +5,7 @@ import { Vec3 as Vec3Class } from "vec3";
 import type { SkillContext } from "./context.js";
 import { findBlock } from "./observe.js";
 import { lookAtPosition } from "./look.js";
-import { cancelledResult } from "./window-open.js";
+import { cancelledResult, waitForSignal } from "./window-open.js";
 import {
   evaluateFunctionalPlacement,
   isFunctionalItem,
@@ -34,6 +34,28 @@ const BED_NAMES = [
 
 function isBedBlock(block: { name: string } | null | undefined): boolean {
   return Boolean(block?.name.endsWith("_bed"));
+}
+
+async function wakeIfSleeping(bot: SkillContext["bot"]): Promise<void> {
+  if (!bot.isSleeping) return;
+  try {
+    await bot.wake();
+  } catch {
+    // already awake is fine
+  }
+}
+
+function sleepFailure(message: string, started: number): ActionResult<never> {
+  const lower = message.toLowerCase();
+  if (lower.includes("occupied")) return fail("BED_OCCUPIED", message, Date.now() - started, true);
+  if (lower.includes("night") || lower.includes("thunder") || lower.includes("day")) {
+    return fail("NOT_SLEEP_TIME", message, Date.now() - started, true);
+  }
+  if (lower.includes("monster") || lower.includes("hostile")) return fail("HOSTILE_NEARBY", message, Date.now() - started, true);
+  if (lower.includes("not sleeping") || lower.includes("too far") || lower.includes("can't sleep") || lower.includes("cannot sleep")) {
+    return fail("INTERACTION_FAILED", message, Date.now() - started, true);
+  }
+  return fail("SLEEP_FAILED", message, Date.now() - started, true);
 }
 
 export async function sleep(
@@ -131,34 +153,45 @@ export async function sleep(
     );
   }
   await lookAtPosition(ctx, target.position);
-  try {
-    await bot.sleep(bed);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    const lower = message.toLowerCase();
-    if (lower.includes("occupied")) {
-      return fail("BED_OCCUPIED", message, Date.now() - started, true);
+  if (ctx.signal?.aborted) return cancelledResult(started, "Sleep cancelled before entering the bed");
+  const budget = Math.max(0, (ctx.timeoutMs ?? 12_000) - (Date.now() - started));
+  const sleepPromise = Promise.resolve().then(() => bot.sleep(bed));
+  const raced = await Promise.race([
+    sleepPromise.then(
+      () => "slept" as const,
+      (error: unknown) => ({ error }),
+    ),
+    waitForSignal(ctx.signal, budget).then(() => (ctx.signal?.aborted ? ("aborted" as const) : ("timeout" as const))),
+  ]);
+  if (raced === "slept") {
+    if (!bot.isSleeping) {
+      return fail("INTERACTION_FAILED", "Mineflayer sleep returned but bot is not sleeping", Date.now() - started, true);
     }
-    if (lower.includes("night") || lower.includes("thunder") || lower.includes("day")) {
-      return fail("NOT_SLEEP_TIME", message, Date.now() - started, true);
-    }
-    if (lower.includes("monster") || lower.includes("hostile")) {
-      return fail("HOSTILE_NEARBY", message, Date.now() - started, true);
-    }
-    if (lower.includes("not sleeping") || lower.includes("too far") || lower.includes("can't sleep") || lower.includes("cannot sleep")) {
-      return fail("INTERACTION_FAILED", message, Date.now() - started, true);
-    }
-    return fail("SLEEP_FAILED", message, Date.now() - started, true);
+    await wakeIfSleeping(bot);
+    return ok({ rested: true, designated, position: target.position, name: bed.name }, Date.now() - started);
   }
-  if (!bot.isSleeping) {
-    return fail("INTERACTION_FAILED", "Mineflayer sleep returned but bot is not sleeping", Date.now() - started, true);
+  if (bot.isSleeping) {
+    await wakeIfSleeping(bot);
+    return fail("INTERRUPTED", "Sleep had already started and was stopped", Date.now() - started, false, {
+      designated,
+      position: target.position,
+    });
   }
-  try {
-    await bot.wake();
-  } catch {
-    // already awake is fine
+  void sleepPromise.then(
+    () => {
+      void wakeIfSleeping(bot);
+    },
+    () => undefined,
+  );
+  if (typeof raced === "object") {
+    const message = raced.error instanceof Error ? raced.error.message : String(raced.error);
+    return sleepFailure(message, started);
   }
-  return ok({ rested: true, designated, position: target.position, name: bed.name }, Date.now() - started);
+  if (raced === "aborted" || ctx.signal?.aborted) return cancelledResult(started, "Sleep cancelled before entering the bed");
+  return fail("TIMEOUT", "Sleep was not confirmed before the deadline", Date.now() - started, true, {
+    designated,
+    position: target.position,
+  });
 }
 
 export async function attack(

@@ -5,6 +5,7 @@ import { Vec3 as Vec3Class } from "vec3";
 import { collectResource } from "./collect.js";
 import { craftItem, inventoryCount } from "./inventory.js";
 import { lookAtPosition } from "./look.js";
+import { cancelledResult } from "./window-open.js";
 import { findBlock } from "./observe.js";
 import {
   evaluateFunctionalPlacement,
@@ -257,23 +258,29 @@ async function ensureCraftingTable(
   if (!pos) return fail("NOT_CONNECTED", "No position to place a crafting table", 0, true, { item: "crafting_table" });
   const placed = await placeAdjacentCraftingTable(ctx);
   if (placed.success) return placed;
+  if (placed.code === "CANCELLED" || placed.code === "INTERRUPTED") return placed;
   return fail("PLACE_FAILED", "Could not place a crafting table nearby", 0, true, { item: "crafting_table" });
 }
 
-async function placeAdjacentCraftingTable(ctx: SkillContext) {
+async function placeAdjacentCraftingTable(
+  ctx: SkillContext,
+): Promise<ActionResult<{ name: string; position: { x: number; y: number; z: number } }>> {
   const started = Date.now();
   const bot = ctx.bot;
   const pos = ctx.body.position();
   if (!pos) return fail("NOT_CONNECTED", "No position to place a crafting table", 0, true, { item: "crafting_table" });
   const item = bot.inventory.items().find((entry) => entry.name === "crafting_table");
   if (!item) return fail("ITEM_NOT_FOUND", "No crafting table item to place", 0, true, { item: "crafting_table" });
+  if (ctx.signal?.aborted) return cancelledResult<never>(started, "Crafting-table placement cancelled");
   try {
     await bot.equip(item, "hand");
   } catch (error) {
+    if (ctx.signal?.aborted) return cancelledResult<never>(started, "Crafting-table placement cancelled");
     return fail("EQUIP_FAILED", error instanceof Error ? error.message : String(error), Date.now() - started, true, {
       item: "crafting_table",
     });
   }
+  if (ctx.signal?.aborted) return cancelledResult<never>(started, "Crafting-table placement cancelled");
   const originX = Math.floor(pos.x);
   const originY = Math.floor(pos.y);
   const originZ = Math.floor(pos.z);
@@ -292,8 +299,27 @@ async function placeAdjacentCraftingTable(ctx: SkillContext) {
     { x: -1, z: 1 },
   ];
   const replaceable = new Set(["air", "cave_air", "short_grass", "grass", "tall_grass", "snow", "fern"]);
+  const reportPlaced = (dest: Vec3Class) => {
+    const after = bot.blockAt(dest);
+    if (after?.name !== "crafting_table") return undefined;
+    ctx.events?.emit(
+      createEvent(
+        "WorkstationCreated",
+        {
+          kind: "crafting_table",
+          temporary: true,
+          purpose: "temporary_worksite",
+          cleanupPolicy: "pickup_when_idle",
+          position: { x: dest.x, y: dest.y, z: dest.z },
+        },
+        ctx.citizenId,
+      ),
+    );
+    return ok({ name: "crafting_table", position: { x: dest.x, y: dest.y, z: dest.z } }, Date.now() - started);
+  };
   for (const y of [originY, originY + 1, originY - 1]) {
     for (const offset of offsets) {
+      if (ctx.signal?.aborted) return cancelledResult<never>(started, "Crafting-table placement cancelled");
       const dest = new Vec3Class(originX + offset.x, y, originZ + offset.z);
       const feet = bot.blockAt(dest);
       const below = bot.blockAt(dest.offset(0, -1, 0));
@@ -308,28 +334,17 @@ async function placeAdjacentCraftingTable(ctx: SkillContext) {
       });
       if (!allowed.ok) continue;
       await lookAtPosition(ctx, { x: dest.x, y: dest.y, z: dest.z });
+      if (ctx.signal?.aborted) return cancelledResult<never>(started, "Crafting-table placement cancelled");
       try {
         await bot.placeBlock(below, new Vec3Class(0, 1, 0));
       } catch {
+        const placed = reportPlaced(dest);
+        if (placed) return placed;
+        if (ctx.signal?.aborted) return cancelledResult<never>(started, "Crafting-table placement cancelled");
         continue;
       }
-      const after = bot.blockAt(dest);
-      if (after?.name === "crafting_table") {
-        ctx.events?.emit(
-          createEvent(
-            "WorkstationCreated",
-            {
-              kind: "crafting_table",
-              temporary: true,
-              purpose: "temporary_worksite",
-              cleanupPolicy: "pickup_when_idle",
-              position: { x: dest.x, y: dest.y, z: dest.z },
-            },
-            ctx.citizenId,
-          ),
-        );
-        return ok({ name: "crafting_table", position: { x: dest.x, y: dest.y, z: dest.z } }, Date.now() - started);
-      }
+      const placed = reportPlaced(dest);
+      if (placed) return placed;
     }
   }
   return fail("PLACE_FAILED", "No adjacent air cell to place a crafting table", Date.now() - started, true, {

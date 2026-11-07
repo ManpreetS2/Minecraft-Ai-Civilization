@@ -524,6 +524,7 @@ export async function attemptHazardBridge(
   try {
     await bot.equip(item, "hand");
   } catch (error) {
+    if (options.signal?.aborted) return fail("CANCELLED", "hazard bridge cancelled", 0, true);
     return fail("EQUIP_FAILED", error instanceof Error ? error.message : String(error), 0, true);
   }
   if (options.signal?.aborted) {
@@ -552,6 +553,16 @@ export async function attemptHazardBridge(
     }
     await bot.placeBlock(against, face);
   } catch (error) {
+    const afterAttempt = sample(bot, plan.placeAt.x, plan.placeAt.y, plan.placeAt.z);
+    if (
+      afterAttempt &&
+      afterAttempt.name !== "air" &&
+      afterAttempt.name !== "cave_air" &&
+      classifyHazardName(afterAttempt.name) !== "lava"
+    ) {
+      return ok({ placed: plan.placeAt, item: afterAttempt.name }, 0);
+    }
+    if (options.signal?.aborted) return fail("CANCELLED", "hazard bridge cancelled", 0, true);
     return fail("PLACE_FAILED", error instanceof Error ? error.message : String(error), 0, true);
   }
   const after = sample(bot, plan.placeAt.x, plan.placeAt.y, plan.placeAt.z);
@@ -584,6 +595,10 @@ export async function retreatFromHazard(
     const faceZ = start.z + heading.dz;
     bot.entity.yaw = Math.atan2(-(faceX - start.x), -(faceZ - start.z));
     bot.entity.pitch = 0;
+  }
+  if (signal?.aborted) {
+    releaseMovementControls(bot);
+    return fail("CANCELLED", "hazard retreat cancelled", 0, true);
   }
   bot.setControlState("back", true);
   const completed = await waitForMovementTicks(bot, 8, signal);

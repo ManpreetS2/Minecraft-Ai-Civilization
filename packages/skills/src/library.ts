@@ -78,13 +78,26 @@ export async function closeDoor(ctx: SkillContext, position?: Vec3): Promise<Act
   const started = Date.now();
   const opened = await openDoor(ctx, position);
   if (!opened.success) return opened;
+  if (ctx.signal?.aborted) {
+    return fail("INTERRUPTED", "Door already changed; close was not attempted", Date.now() - started, false, {
+      position: opened.data.position,
+      opened: opened.data.opened,
+    });
+  }
   const block = ctx.bot.blockAt(
     new Vec3Class(Math.floor(opened.data.position.x), Math.floor(opened.data.position.y), Math.floor(opened.data.position.z)),
   );
   if (!block) return opened;
   try {
     const props = (block as { getProperties?: () => { open?: boolean } }).getProperties?.();
-    if (props?.open) await ctx.bot.activateBlock(block);
+    if (!props?.open) return ok({ position: opened.data.position, opened: false }, Date.now() - started);
+    if (ctx.signal?.aborted) {
+      return fail("INTERRUPTED", "Door already changed; close was not attempted", Date.now() - started, false, {
+        position: opened.data.position,
+        opened: true,
+      });
+    }
+    await ctx.bot.activateBlock(block);
   } catch {
     return fail("PLACE_FAILED", "Could not close door", Date.now() - started, true);
   }

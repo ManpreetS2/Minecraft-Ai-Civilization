@@ -79,11 +79,24 @@ async function activateBarrier(
     return fail("BLOCK_NOT_FOUND", `Expected a wooden ${kind}, found ${block.name}`, Date.now() - started, true);
   }
   await lookAtPosition(ctx, target.data.position);
+  if (ctx.signal?.aborted) return fail("CANCELLED", `${kind} toggle cancelled`, Date.now() - started, false);
   try {
     const props = (block as { getProperties?: () => { open?: boolean } }).getProperties?.();
     if (props?.open) return ok({ position: target.data.position, opened: true, kind: block.name }, Date.now() - started);
+    if (ctx.signal?.aborted) return fail("CANCELLED", `${kind} toggle cancelled`, Date.now() - started, false);
     await ctx.bot.activateBlock(block);
   } catch (error) {
+    const after = ctx.bot.blockAt(
+      new Vec3Class(Math.floor(target.data.position.x), Math.floor(target.data.position.y), Math.floor(target.data.position.z)),
+    );
+    const opened = (after as { getProperties?: () => { open?: boolean } } | null)?.getProperties?.()?.open;
+    if (opened) {
+      return fail("INTERRUPTED", `${kind} changed before cancellation finished`, Date.now() - started, false, {
+        position: target.data.position,
+        opened: true,
+      });
+    }
+    if (ctx.signal?.aborted) return fail("CANCELLED", `${kind} toggle cancelled`, Date.now() - started, false);
     return fail("PLACE_FAILED", error instanceof Error ? error.message : String(error), Date.now() - started, true);
   }
   const after = ctx.bot.blockAt(

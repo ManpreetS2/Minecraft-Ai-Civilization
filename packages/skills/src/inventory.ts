@@ -5,6 +5,7 @@ import { Vec3 as Vec3Class } from "vec3";
 import type { SkillContext } from "./context.js";
 import { findBlock } from "./observe.js";
 import { lookAtPosition } from "./look.js";
+import { waitForSignal } from "./window-open.js";
 import {
   availableUnreservedCount,
   countItem,
@@ -354,18 +355,43 @@ function faceTowardBlock(bot: SkillContext["bot"], block: { position: { x: numbe
   return new Vec3Class(0, 0, dz > 0 ? -1 : 1);
 }
 
-async function withDelayedActivate<T>(bot: SkillContext["bot"], fn: () => Promise<T>): Promise<T> {
+const craftActivateGeneration = new WeakMap<object, number>();
+
+/** Keeps the crafting click delayed, and refuses it after this attempt is cancelled, timed out, or replaced. */
+function installCraftActivateGuard(bot: SkillContext["bot"], signal?: AbortSignal): { abandon(): void; release(): void } {
   const original = bot.activateBlock.bind(bot);
+  const generation = (craftActivateGeneration.get(bot) ?? 0) + 1;
+  craftActivateGeneration.set(bot, generation);
+  let abandoned = false;
+  const refused = () =>
+    Object.assign(new Error("craft activate refused after this attempt was cancelled or timed out"), { code: "CANCELLED" });
   bot.activateBlock = async (block, direction, cursorPos) => {
-    await wait(80);
-    const face = direction ?? faceTowardBlock(bot, block);
+    if (craftActivateGeneration.get(bot) !== generation || abandoned || signal?.aborted) throw refused();
+    await waitForSignal(signal, 80);
+    if (craftActivateGeneration.get(bot) !== generation || abandoned || signal?.aborted) throw refused();
+    const positioned = block as { position?: { x: number; y: number; z: number } } | undefined;
+    if (!positioned?.position) throw new Error("craft activate missing block");
+    const face = direction ?? faceTowardBlock(bot, positioned as { position: { x: number; y: number; z: number } });
     return original(block, face, cursorPos);
   };
-  try {
-    return await fn();
-  } finally {
-    bot.activateBlock = original;
-  }
+  return {
+    abandon() {
+      abandoned = true;
+    },
+    release() {
+      if (craftActivateGeneration.get(bot) !== generation) return;
+      bot.activateBlock = original;
+      craftActivateGeneration.delete(bot);
+    },
+  };
+}
+
+function craftingCancelled(started: number, item: string) {
+  return fail("CANCELLED", "Crafting cancelled for this citizen", Date.now() - started, false, {
+    item,
+    inventoryPreserved: true,
+    workComplete: false,
+  });
 }
 
 async function syncInventory(bot: SkillContext["bot"]): Promise<void> {
@@ -529,13 +555,16 @@ export async function craftItem(
   }
 
   await closeCraftWindow(bot);
+  if (ctx.signal?.aborted) return craftingCancelled(started, name);
   await emptyHand(bot);
+  if (ctx.signal?.aborted) return craftingCancelled(started, name);
   if (tableContext) {
     await lookAtPosition(ctx, {
       x: tableContext.position.x,
       y: tableContext.position.y,
       z: tableContext.position.z,
     });
+    if (ctx.signal?.aborted) return craftingCancelled(started, name);
   }
 
   const owned = craftable.filter((recipe) => recipeIngredientsOwned(bot, recipe)).sort((a, b) => scoreOwnedRecipe(bot, b) - scoreOwnedRecipe(bot, a));
@@ -554,13 +583,7 @@ export async function craftItem(
   const pool = owned.slice(0, 6);
   let lastError = "no recipe attempted";
   for (const recipe of pool) {
-    if (ctx.signal?.aborted) {
-      return fail("CANCELLED", "Crafting cancelled for this citizen", Date.now() - started, false, {
-        item: name,
-        inventoryPreserved: true,
-        workComplete: false,
-      });
-    }
+    if (ctx.signal?.aborted) return craftingCancelled(started, name);
     const resultCount = Math.max(1, recipe.result?.count ?? (knowledge.getRecipeOutputCount(name) || 1));
     const crafts = Math.max(1, Math.ceil(count / resultCount));
     for (const [id, amount] of recipeIngredientIds(recipe)) {
@@ -578,33 +601,52 @@ export async function craftItem(
       }
     }
     const beforeNow = countItem(ctx, name);
-    try {
-      await withDelayedActivate(bot, () =>
-        Promise.race([
-          api.craft(recipe, crafts, tableContext ?? undefined),
-          wait(6_000).then(() => Promise.reject(new Error("craft timed out waiting for the crafting window"))),
-        ]),
-      );
-    } catch (error) {
-      lastError = error instanceof Error ? error.message : String(error);
+    const guard = installCraftActivateGuard(bot, ctx.signal);
+    const craftPromise = api.craft(recipe, crafts, tableContext ?? undefined);
+    void craftPromise.finally(() => guard.release()).catch(() => undefined);
+    const raced = await Promise.race([
+      craftPromise.then(
+        () => "done" as const,
+        (error: unknown) => ({ error }),
+      ),
+      waitForSignal(ctx.signal, 6_000).then(() => (ctx.signal?.aborted ? ("aborted" as const) : ("timeout" as const))),
+    ]);
+    if (raced === "done") {
+      await closeCraftWindow(bot);
+      await waitForSignal(ctx.signal, 600);
+      const afterNow = countItem(ctx, name);
+      if (afterNow > beforeNow) return ok({ item: name, count: afterNow - beforeNow }, Date.now() - started);
+      await syncInventory(bot);
+      await waitForSignal(ctx.signal, 250);
+      const synced = countItem(ctx, name);
+      if (synced > beforeNow) return ok({ item: name, count: synced - beforeNow }, Date.now() - started);
+      if (ctx.signal?.aborted) return craftingCancelled(started, name);
+      lastError = "inventory did not increase";
+      const used = [...recipeIngredientIds(recipe).keys()].map((id) => bot.registry.items[id]?.name ?? String(id));
+      console.warn(`craft ${name} recipe ${used.join("+")} did not increase inventory`);
+      continue;
+    }
+    if (typeof raced === "object") {
+      lastError = raced.error instanceof Error ? raced.error.message : String(raced.error);
       await closeCraftWindow(bot);
       await syncInventory(bot);
-      await wait(250);
+      await waitForSignal(ctx.signal, 250);
       const gained = countItem(ctx, name) - beforeNow;
       if (gained > 0) return ok({ item: name, count: gained }, Date.now() - started);
+      if (ctx.signal?.aborted) return craftingCancelled(started, name);
       continue;
     }
     await closeCraftWindow(bot);
-    await wait(600);
-    const afterNow = countItem(ctx, name);
-    if (afterNow > beforeNow) return ok({ item: name, count: afterNow - beforeNow }, Date.now() - started);
     await syncInventory(bot);
-    await wait(250);
-    const synced = countItem(ctx, name);
-    if (synced > beforeNow) return ok({ item: name, count: synced - beforeNow }, Date.now() - started);
-    lastError = "inventory did not increase";
-    const used = [...recipeIngredientIds(recipe).keys()].map((id) => bot.registry.items[id]?.name ?? String(id));
-    console.warn(`craft ${name} recipe ${used.join("+")} did not increase inventory`);
+    const gained = countItem(ctx, name) - beforeNow;
+    if (gained > 0) return ok({ item: name, count: gained }, Date.now() - started);
+    guard.abandon();
+    if (raced === "aborted" || ctx.signal?.aborted) return craftingCancelled(started, name);
+    return fail("TIMEOUT", "Crafting timed out before the recipe finished", Date.now() - started, true, {
+      item: name,
+      inventoryPreserved: true,
+      workComplete: false,
+    });
   }
   return fail(
     "VERIFY_FAILED",

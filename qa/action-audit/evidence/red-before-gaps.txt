@@ -1,0 +1,228 @@
+
+ RUN  v3.2.7 /Users/manpreetsingh/.t3/worktrees/Minecraft-Ai-Civilization/fix-remaining-action-lifecycle
+
+(node:67357) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ❯ qa/action-audit/test/remaining-gaps.test.ts (19 tests | 10 failed) 23164ms
+   × AUD-X1 craft retry can run a second recipe while the first is still crafting > does not start a second craft when the first recipe times out 12860ms
+     → expected [ 1794020348183, 1794020354438 ] to have a length of 1 but got 2
+   × AUD-X1 craft retry can run a second recipe while the first is still crafting > returns promptly on cancellation and does not let the in-flight craft mutate afterwards 6259ms
+     → expected 6213 to be less than 250
+   ✓ AUD-X1 craft retry can run a second recipe while the first is still crafting > reports sticks that were already crafted when cancellation arrives  806ms
+   ✓ AUD-X1 craft retry can run a second recipe while the first is still crafting > crafts once when the recipe finishes and nobody cancels  684ms
+   × AUD-X2 crafting-table placement continues after cancellation > does not place a table after the signal aborts during look 217ms
+     → expected [ { kind: 'placeBlock', …(2) } ] to deeply equal []
+   ✓ AUD-X2 crafting-table placement continues after cancellation > places the table when the citizen is not interrupted 90ms
+   × AUD-X3 a door toggle can happen after cancellation > does not activate the door after the signal aborts 222ms
+     → expected true to be false // Object.is equality
+   ✓ AUD-X3 a door toggle can happen after cancellation > opens the door when nobody cancels 3ms
+   × AUD-X3 a door toggle can happen after cancellation > does not toggle the door shut after cancellation 6ms
+     → expected 2 to be 1 // Object.is equality
+   × AUD-X4 hazard-bridge placement continues after cancellation > does not place the bridge after the signal aborts during equip 236ms
+     → expected true to be false // Object.is equality
+   ✓ AUD-X4 hazard-bridge placement continues after cancellation > places the bridge when the citizen is not interrupted 52ms
+   ✓ AUD-X4 hazard-bridge placement continues after cancellation > reports a bridge that was already placed when cancellation arrives inside placeBlock 53ms
+   × sleep is bounded and honours cancellation > does not enter the bed after cancellation, and returns promptly 405ms
+     → expected 382 to be less than 250
+   × sleep is bounded and honours cancellation > settles when the server never confirms sleep 804ms
+     → expected false to be true // Object.is equality
+   ✓ sleep is bounded and honours cancellation > sleeps and wakes when nobody cancels 3ms
+   × sleep is bounded and honours cancellation > reports a sleep that already began when the deadline hits 403ms
+     → expected true to be false // Object.is equality
+   × listeners armed by an action cannot write after that action is over > refuses a packet emitted from outside the action after cancellation 56ms
+     → expected [ 'window_click' ] to deeply equal []
+   ✓ listeners armed by an action cannot write after that action is over > still allows a listener that was registered outside any action 1ms
+   ✓ listeners armed by an action cannot write after that action is over > allows a listener while its action is still active 1ms
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 10 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  qa/action-audit/test/remaining-gaps.test.ts > AUD-X1 craft retry can run a second recipe while the first is still crafting > does not start a second craft when the first recipe times out
+AssertionError: expected [ 1794020348183, 1794020354438 ] to have a length of 1 but got 2
+
+- Expected
++ Received
+
+- 1
++ 2
+
+ ❯ qa/action-audit/test/remaining-gaps.test.ts:85:23
+     83|     const rig = craftBot();
+     84|     const result = await craftItem(skillContext(rig.body, { timeoutMs:…
+     85|     expect(rig.calls).toHaveLength(1);
+       |                       ^
+     86|     expect(result.success).toBe(false);
+     87|     if (!result.success) expect(result.code).toBe("TIMEOUT");
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/10]⎯
+
+ FAIL  qa/action-audit/test/remaining-gaps.test.ts > AUD-X1 craft retry can run a second recipe while the first is still crafting > returns promptly on cancellation and does not let the in-flight craft mutate afterwards
+AssertionError: expected 6213 to be less than 250
+ ❯ qa/action-audit/test/remaining-gaps.test.ts:101:36
+     99|     abort.abort();
+    100|     const result = await pending;
+    101|     expect(Date.now() - abortedAt).toBeLessThan(250);
+       |                                    ^
+    102|     expect(result.success).toBe(false);
+    103|     if (!result.success) expect(result.code).toBe("CANCELLED");
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/10]⎯
+
+ FAIL  qa/action-audit/test/remaining-gaps.test.ts > AUD-X2 crafting-table placement continues after cancellation > does not place a table after the signal aborts during look
+AssertionError: expected [ { kind: 'placeBlock', …(2) } ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   {
++     "at": 1794020368662,
++     "detail": "1,64,0",
++     "kind": "placeBlock",
++   },
++ ]
+
+ ❯ qa/action-audit/test/remaining-gaps.test.ts:169:96
+    167|     expect(result.success).toBe(false);
+    168|     if (!result.success) expect(["CANCELLED", "INTERRUPTED"]).toContai…
+    169|     expect(bot.mutationsAfter(abortedAt).filter((mutation) => mutation…
+       |                                                                                                ^
+    170|   });
+    171| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/10]⎯
+
+ FAIL  qa/action-audit/test/remaining-gaps.test.ts > AUD-X3 a door toggle can happen after cancellation > does not activate the door after the signal aborts
+AssertionError: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ qa/action-audit/test/remaining-gaps.test.ts:213:28
+    211|     const result = await pending;
+    212|     expect(Date.now() - abortedAt).toBeLessThan(250);
+    213|     expect(result.success).toBe(false);
+       |                            ^
+    214|     if (!result.success) expect(result.code).toBe("CANCELLED");
+    215|     expect(bot.mutationsAfter(abortedAt).filter((mutation) => mutation…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/10]⎯
+
+ FAIL  qa/action-audit/test/remaining-gaps.test.ts > AUD-X3 a door toggle can happen after cancellation > does not toggle the door shut after cancellation
+AssertionError: expected 2 to be 1 // Object.is equality
+
+- Expected
++ Received
+
+- 1
++ 2
+
+ ❯ qa/action-audit/test/remaining-gaps.test.ts:253:21
+    251|     };
+    252|     const result = await closeDoor(skillContext(body, { signal: abort.…
+    253|     expect(toggles).toBe(1);
+       |                     ^
+    254|     expect(open).toBe(true);
+    255|     expect(result.success).toBe(false);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/10]⎯
+
+ FAIL  qa/action-audit/test/remaining-gaps.test.ts > AUD-X4 hazard-bridge placement continues after cancellation > does not place the bridge after the signal aborts during equip
+AssertionError: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ qa/action-audit/test/remaining-gaps.test.ts:322:28
+    320|     const result = await pending;
+    321|     expect(Date.now() - abortedAt).toBeLessThan(250);
+    322|     expect(result.success).toBe(false);
+       |                            ^
+    323|     if (!result.success) expect(result.code).toBe("CANCELLED");
+    324|     expect(rig.placed.filter((at) => at > abortedAt)).toEqual([]);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/10]⎯
+
+ FAIL  qa/action-audit/test/remaining-gaps.test.ts > sleep is bounded and honours cancellation > does not enter the bed after cancellation, and returns promptly
+AssertionError: expected 382 to be less than 250
+ ❯ qa/action-audit/test/remaining-gaps.test.ts:370:36
+    368|     abort.abort();
+    369|     const result = await pending;
+    370|     expect(Date.now() - abortedAt).toBeLessThan(250);
+       |                                    ^
+    371|     expect(result.success).toBe(false);
+    372|     if (!result.success) expect(result.code).toBe("CANCELLED");
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/10]⎯
+
+ FAIL  qa/action-audit/test/remaining-gaps.test.ts > sleep is bounded and honours cancellation > settles when the server never confirms sleep
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ qa/action-audit/test/remaining-gaps.test.ts:388:28
+    386|       pause(800).then(() => ({ settled: false as const, result: undefi…
+    387|     ]);
+    388|     expect(winner.settled).toBe(true);
+       |                            ^
+    389|     if (winner.settled) {
+    390|       expect(winner.result.success).toBe(false);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/10]⎯
+
+ FAIL  qa/action-audit/test/remaining-gaps.test.ts > sleep is bounded and honours cancellation > reports a sleep that already began when the deadline hits
+AssertionError: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ qa/action-audit/test/remaining-gaps.test.ts:420:28
+    418|     };
+    419|     const result = await sleep(skillContext(body, { timeoutMs: 150 }),…
+    420|     expect(result.success).toBe(false);
+       |                            ^
+    421|     if (!result.success) expect(result.code).toBe("INTERRUPTED");
+    422|     expect(body.fake.isSleeping).toBe(false);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/10]⎯
+
+ FAIL  qa/action-audit/test/remaining-gaps.test.ts > listeners armed by an action cannot write after that action is over > refuses a packet emitted from outside the action after cancellation
+AssertionError: expected [ 'window_click' ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   "window_click",
++ ]
+
+ ❯ qa/action-audit/test/remaining-gaps.test.ts:453:20
+    451|     await pending;
+    452|     bot.emit("windowOpen");
+    453|     expect(writes).toEqual([]);
+       |                    ^
+    454|   });
+    455| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/10]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  10 failed | 9 passed (19)
+   Start at  18:59:05
+   Duration  25.25s (transform 722ms, setup 67ms, collect 1.22s, tests 23.16s, environment 0ms, prepare 97ms)
+

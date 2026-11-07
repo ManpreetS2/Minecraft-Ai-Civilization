@@ -40,9 +40,9 @@ export const COVERAGE: readonly CoverageRow[] = [
     calls: 6,
     reachedFrom: "executePlan eatFood / craftItem",
     cancellation:
-      "eatFood checks signal before equip and before consume and uses waitAbortable; consume is bounded by mineflayer's CONSUME_TIMEOUT. craft checks per recipe, races api.craft with a 6 s timer; emptyHand has no check (single call)",
-    verdict: "hypothetical",
-    finding: "AUD-X1 (craft timeout then next recipe while the first craft may still complete)",
+      "eatFood checks signal before equip and before consume and uses waitAbortable; consume is bounded by mineflayer's CONSUME_TIMEOUT. craft checks before emptyHand and lookAt, races each recipe against abort and a 6 s deadline, and does not start another recipe while the first is in flight. A late activateBlock is refused after cancel or timeout. An inventory increase is reported.",
+    verdict: "protected",
+    finding: "AUD-X1 fixed",
   },
   {
     file: "packages/skills/src/inventory-service.ts",
@@ -67,9 +67,9 @@ export const COVERAGE: readonly CoverageRow[] = [
     calls: 5,
     reachedFrom: "executePlan sleep / attack / buildShelter / buildStructure / workstation",
     cancellation:
-      "placeBlock checks the signal after equip and lookAt and immediately before each place. sleep: navigation only, bot.sleep unguarded. attack: single hit, no check",
+      "placeBlock checks the signal after equip and lookAt and immediately before each place. sleep races bot.sleep against the signal and the remaining deadline; a bot already in bed is woken and reported as INTERRUPTED. attack: single hit, no check",
     verdict: "partial",
-    finding: "AUD-P1 fixed. sleep and the single attack remain unguarded",
+    finding: "AUD-P1 fixed. sleep is bounded. the single attack remains unguarded",
   },
   {
     file: "packages/skills/src/combat.ts",
@@ -85,9 +85,9 @@ export const COVERAGE: readonly CoverageRow[] = [
     calls: 2,
     reachedFrom: "executePlan obtainItem",
     cancellation:
-      "signal checked at entry and between steps (lines 110-177); crafting-table placement loop (equip, lookAt, placeBlock over up to 36 cells) has no check",
-    verdict: "hypothetical",
-    finding: "AUD-X2 (placement loop without signal check)",
+      "signal checked at entry, between steps, and before each crafting-table equip, look, and place. A place that already produced a crafting table is reported.",
+    verdict: "protected",
+    finding: "AUD-X2 fixed",
   },
   {
     file: "packages/skills/src/farm.ts",
@@ -101,17 +101,19 @@ export const COVERAGE: readonly CoverageRow[] = [
     file: "packages/skills/src/doors.ts",
     calls: 1,
     reachedFrom: "executePlan returnHome / enter-home path",
-    cancellation: "navigation takes the signal; no check before activateBlock",
-    verdict: "hypothetical",
-    finding: "AUD-X3 (one unguarded toggle after navigation)",
+    cancellation:
+      "navigation takes the signal; the signal is checked again after lookAt and immediately before activateBlock. A toggle that already changed the door is reported.",
+    verdict: "protected",
+    finding: "AUD-X3 fixed",
   },
   {
     file: "packages/skills/src/library.ts",
     calls: 1,
     reachedFrom: "skills library openDoor",
-    cancellation: "same pattern as doors.ts",
-    verdict: "hypothetical",
-    finding: "AUD-X3",
+    cancellation:
+      "closeDoor does not toggle the door a second time after cancellation. If openDoor already changed the door, the result is INTERRUPTED with the observed open state.",
+    verdict: "protected",
+    finding: "AUD-X3 fixed",
   },
   {
     file: "packages/skills/src/mineflayer-fish-cycle.ts",
@@ -171,9 +173,9 @@ export const COVERAGE: readonly CoverageRow[] = [
     calls: 4,
     reachedFrom: "pathing hazard bridge",
     cancellation:
-      "signal checked at entry only; equip, lookAt (raw, same class as QA57-M1) and placeBlock follow",
-    verdict: "hypothetical",
-    finding: "AUD-X4 (hazard bridge placement after an unguarded await)",
+      "signal checked at entry, after equip, and immediately before placeBlock. lookAt is raced against the signal and a 1 s deadline. A placeBlock that already returned is verified and reported. retreat checks the signal before its bounded 8-tick walk; the walk itself still runs to completion.",
+    verdict: "protected",
+    finding: "AUD-X4 fixed",
   },
   {
     file: "packages/minecraft-adapter/src/minecraft-body.ts",

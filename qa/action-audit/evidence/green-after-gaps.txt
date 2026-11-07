@@ -1,0 +1,58 @@
+
+ RUN  v3.2.7 /Users/manpreetsingh/.t3/worktrees/Minecraft-Ai-Civilization/fix-remaining-action-lifecycle
+
+ ✓ qa/action-audit/test/source-facts.test.ts (12 tests) 41ms
+stdout | qa/action-audit/test/coverage.test.ts > coverage table matches the source > summary (printed for the report)
+COVERAGE {"protected":{"files":14,"calls":61},"partial":{"files":3,"calls":21},"not-a-bot":{"files":1,"calls":1},"body-owned":{"files":1,"calls":4},"operator":{"files":8,"calls":19}} total_calls=106
+
+ ✓ qa/action-audit/test/coverage.test.ts (3 tests) 9ms
+(node:75651) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:75652) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:75650) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+stdout | qa/action-audit/test/defects.test.ts > AUD-F1 smeltItem keeps working after cancellation > characterisation: measured behaviour after abort
+AUD-F1 smelt: abort at t0; skill returned after 2 ms with success=false; mutations after abort: none
+
+stdout | qa/action-audit/test/defects.test.ts > AUD-C1 chest transfer ignores cancellation after navigation > characterisation: the deposit still lands after the abort
+AUD-C1 deposit: abort during openContainer; result success=false; mutations after abort: none
+
+stdout | qa/action-audit/test/defects.test.ts > AUD-C2 openContainer has no timeout, so a window that never opens hangs the skill forever > characterisation: still pending after abort and a generous wait
+AUD-C2 deposit: window never opens; settled after abort + 900 ms (ctx.timeoutMs=300): true
+
+stdout | qa/action-audit/test/defects.test.ts > AUD-P1 placeBlock only checks the signal during navigation > characterisation: the block is placed after the abort
+AUD-P1 placeBlock: abort during equip (150 ms); result success=false; mutations after abort: equip@+90ms
+
+stdout | qa/action-audit/test/defects.test.ts > AUD-P2 a cancelled placement is reported as BUILD_BLOCKED by executeStructure > characterisation: aborted before the first block
+AUD-P2 executeStructure(aborted): success=false code=CANCELLED
+
+stdout | qa/action-audit/test/defects.test.ts > AUD-H1 huntAnimal never checks the signal > characterisation: attacks continue until the skill's own deadline
+AUD-H1 huntAnimal: abort at +500 ms; skill returned after 2 ms; attacks after abort: 0
+
+ ✓ qa/action-audit/test/native-boundary.test.ts (11 tests) 4328ms
+   ✓ native boundary vs the confirmed defects (real skills) > AUD-F1: no furnace operation after abort, and the call returns promptly  1073ms
+   ✓ native boundary vs the confirmed defects (real skills) > AUD-C1: no chest mutation after abort  371ms
+   ✓ native boundary vs the confirmed defects (real skills) > AUD-C2: a window that opens after the deadline is not used, and the next action can run  1008ms
+   ✓ native boundary vs the confirmed defects (real skills) > AUD-P1: no block is placed after abort  404ms
+   ✓ native boundary vs the confirmed defects (real skills) > AUD-H1: no attack after abort  1207ms
+ ✓ qa/action-audit/test/defects.test.ts (22 tests) 8343ms
+   ✓ AUD-C2 openContainer has no timeout, so a window that never opens hangs the skill forever > characterisation: still pending after abort and a generous wait  966ms
+   ✓ AUD-C2 openContainer has no timeout, so a window that never opens hangs the skill forever > the skill settles within its own timeoutMs when the window never opens  903ms
+   ✓ AUD-H1 huntAnimal never checks the signal > characterisation: attacks continue until the skill's own deadline  505ms
+   ✓ AUD-H1 huntAnimal never checks the signal > no attack is issued after the signal aborts  502ms
+   ✓ successful actions and late resolutions > smelts when the furnace is not cancelled  305ms
+   ✓ successful actions and late resolutions > reports the ingot when cancellation arrives after takeOutput has already moved it  306ms
+   ✓ successful actions and late resolutions > hunts successfully when the animal is removed by the attack  3411ms
+ ✓ qa/action-audit/test/remaining-gaps.test.ts (19 tests) 16537ms
+   ✓ AUD-X1 craft retry can run a second recipe while the first is still crafting > does not start a second craft when the first recipe times out  6942ms
+   ✓ AUD-X1 craft retry can run a second recipe while the first is still crafting > returns promptly on cancellation and does not let the in-flight craft mutate afterwards  7051ms
+   ✓ AUD-X1 craft retry can run a second recipe while the first is still crafting > crafts once when the recipe finishes and nobody cancels  686ms
+   ✓ sleep is bounded and honours cancellation > does not enter the bed after cancellation, and returns promptly  523ms
+   ✓ sleep is bounded and honours cancellation > settles when the server never confirms sleep  303ms
+
+ Test Files  5 passed (5)
+      Tests  67 passed (67)
+   Start at  19:05:23
+   Duration  20.02s (transform 2.37s, setup 452ms, collect 7.54s, tests 29.26s, environment 1ms, prepare 756ms)
+
