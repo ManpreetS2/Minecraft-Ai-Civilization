@@ -1,5 +1,5 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
-import { join } from "node:path";
+import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
 /**
@@ -244,6 +244,11 @@ export const COVERAGE: readonly CoverageRow[] = [
 const PATTERN =
   /\.(dig|placeBlock|activateBlock|activateEntity|activateItem|deactivateItem|useOn|consume|craft|equip|unequip|toss|tossStack|openContainer|openChest|openFurnace|openBlock|clickWindow|putSelectedItemRange|moveSlotItem|transfer|deposit|withdraw|putInput|putFuel|takeInput|takeFuel|takeOutput|attack|sleep|wake|fish|setQuickBarSlot|respawn|chat|whisper|collectBlock|goto|setGoal|stopDigging|setControlState)\(/;
 
+/** Canonical repository spelling for both Windows and POSIX audit paths. */
+export function normalizeAuditPath(path: string): string {
+  return path.replaceAll("\\", "/");
+}
+
 /** Scans production TypeScript (tests and `testing/` helpers excluded; comment lines excluded). Keys are repo-relative. */
 export function scanMutatingCallSites(
   repoRoot = fileURLToPath(new URL("../../../", import.meta.url)),
@@ -253,15 +258,16 @@ export function scanMutatingCallSites(
     for (const name of readdirSync(dir)) {
       if (name === "node_modules" || name === "dist") continue;
       const path = join(dir, name);
+      const repositoryPath = normalizeAuditPath(relative(repoRoot, path));
       if (statSync(path).isDirectory()) walk(path);
-      else if (path.endsWith(".ts") && !path.endsWith(".test.ts") && !path.includes("/testing/")) {
+      else if (path.endsWith(".ts") && !path.endsWith(".test.ts") && !repositoryPath.includes("/testing/")) {
         let n = 0;
         for (const line of readFileSync(path, "utf8").split("\n")) {
           const t = line.trim();
           if (t.startsWith("*") || t.startsWith("//") || t.startsWith("/*")) continue;
           if (PATTERN.test(line)) n += 1;
         }
-        if (n > 0) counts[path.slice(repoRoot.length)] = n;
+        if (n > 0) counts[repositoryPath] = n;
       }
     }
   };
