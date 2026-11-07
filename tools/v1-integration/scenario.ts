@@ -186,8 +186,19 @@ export async function runScenario(input: ScenarioInput) {
     }
 
     if (pending.size > 0) throw new Error("gather attempts finished without an observation");
+    // Link the recorder's actual rows, not action-order-derived sequence numbers.
+    const originalRows = readFileSync(journalPath, "utf8").trim().split("\n").map(line => JSON.parse(line) as { kind: string; attemptId?: string; seq: number; decisionEventId?: string; target?: { x: number; y: number; z: number } });
+    const original = (kind: string, attemptId: string) => {
+      const rows = originalRows.filter(row => row.kind === kind && row.attemptId === attemptId);
+      if (rows.length !== 1) throw new Error(`Missing or duplicate original ${kind} for ${attemptId}`);
+      return rows[0]!;
+    };
+    completed.sort((a, b) => original("action_attempt", a.attemptId).seq - original("action_attempt", b.attemptId).seq);
     let sequence = 0;
     for (const record of completed) {
+      const attempt = original("action_attempt", record.attemptId);
+      const observation = original("action_observation", record.attemptId);
+      if (attempt.decisionEventId !== record.eventId) throw new Error("Original action event ID mismatch");
       const assignment = fixture.assignments.find((a) => a.citizenId === record.citizenId)!;
       const evidence = fixture.registry.evidenceLog().filter((e) => e.citizenId === record.citizenId);
       const delta = inventoryChange(record.observation.beforeInventory, record.observation.afterInventory);
@@ -237,6 +248,11 @@ export async function runScenario(input: ScenarioInput) {
           actionType: "gather",
           inventoryScope: "citizen",
           observedSuccess: observedSuccess === true,
+          journal: { attemptSequence: attempt.seq, observationSequence: observation.seq },
+          worldChanges: record.observation.worldChanges,
+          ...(record.observation.hungerBefore !== undefined ? { hungerBefore: record.observation.hungerBefore } : {}),
+          ...(record.observation.hungerAfter !== undefined ? { hungerAfter: record.observation.hungerAfter } : {}),
+          ...(attempt.target ? { targetPosition: attempt.target } : {}),
           inventoryBefore: record.observation.beforeInventory,
           inventoryAfter: record.observation.afterInventory,
           ...(positionAfter ? { positionAfter } : {}),

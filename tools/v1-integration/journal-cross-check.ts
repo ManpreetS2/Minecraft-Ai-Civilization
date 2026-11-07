@@ -8,7 +8,13 @@ export interface JournalValidationInput {
   expectedRepository: string;
   evidenceRoot?: string;
   /** Caller-selected original journal, not a path supplied by a receipt. */
-  operatorJournal?: { reference: string; runId: string; sourceSha: string; repository: string };
+  operatorJournal?: {
+    reference: string;
+    runId: string;
+    sourceSha: string;
+    repository: string;
+    experimentId?: string;
+  };
   manifest: RunBundle;
 }
 type Row = Record<string, unknown>;
@@ -111,7 +117,12 @@ export function validateBundleWithJournal(input: JournalValidationInput) {
       break;
     }
     if (row.seq !== rows.length + 1) failures.push("Incorrect journal sequence");
-    if (row.experimentId !== run.runId) failures.push("Foreign run journal event replay");
+    const start = rows[0] ?? row;
+    if (
+      row.experimentId !== (descriptor.experimentId ?? run.runId) ||
+      (start.runId ?? run.runId) !== run.runId
+    )
+      failures.push("Foreign run journal event replay");
     if (row.sourceSha !== undefined && row.sourceSha !== input.expectedSourceSha)
       failures.push("Journal row source mismatch");
     if (row.repository !== undefined && row.repository !== input.expectedRepository)
@@ -174,7 +185,12 @@ export function validateBundleWithJournal(input: JournalValidationInput) {
       failures.push(`${label}: action type contradiction`);
     if ((observation.seq as number) <= (attempt.seq as number))
       failures.push(`${label}: observation sequence precedes attempt`);
-    if (action.eventId !== (observation.eventId ?? observation.hash))
+    // Current recorder binds the executed action's event ID on the attempt.
+    // Legacy receipts may instead bind the original observation event/hash.
+    if (
+      action.eventId !== (observation.eventId ?? observation.hash) &&
+      !(typeof attempt.decisionEventId === "string" && action.eventId === attempt.decisionEventId)
+    )
       failures.push(`${label}: event ID contradiction`);
     if (
       typeof observation.successReported !== "boolean" ||

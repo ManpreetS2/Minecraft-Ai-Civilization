@@ -30,6 +30,7 @@ export interface ActionEvidence {
   observedSuccess: boolean | null;
   inventoryDelta: Record<string, number> | null;
   authorizedKnowledge: boolean | null;
+  decisionSource?: "scripted" | "model" | "planner" | "reflex";
   actionType?: ActionType;
   expectedDelta?: Record<string, number> | null;
   inventoryScope?: "citizen" | "container";
@@ -217,6 +218,7 @@ export function buildManifest(input: RunBundle): RunBundle {
       sourceSha: a.sourceSha,
       receiptId: a.receiptId,
       sourceEventId: a.sourceEventId,
+      decisionSource: a.decisionSource,
     })),
     expectedActionCount: input.expectedActionCount,
     persistenceArtifact: input.persistenceArtifact,

@@ -4,10 +4,11 @@ import type { RunBundle } from "./manifest.js";
 
 // Positional arguments deliberately keep the operator's original separate from receipt paths.
 export function checkJournal(args: string[]) {
-  const [manifestPath, expectedSourceSha, expectedRepository, evidenceRoot, journal] = args;
-  if (!manifestPath || !expectedSourceSha || !expectedRepository || args.length > 5)
+  const [manifestPath, expectedSourceSha, expectedRepository, evidenceRoot, journal, experimentId] =
+    args;
+  if (!manifestPath || !expectedSourceSha || !expectedRepository || args.length > 6)
     throw new Error(
-      "Usage: pnpm v1:journal <manifest.json> <full-source-sha> <repository> [evidence-root] [original-journal-relative-to-root]",
+      "Usage: pnpm v1:journal <manifest.json> <full-source-sha> <repository> [evidence-root] [original-journal-relative-to-root] [expected-experiment-id]",
     );
   const manifest = JSON.parse(readFileSync(manifestPath, "utf8")) as RunBundle;
   const result = validateBundleWithJournal({
@@ -18,6 +19,7 @@ export function checkJournal(args: string[]) {
     operatorJournal: journal
       ? {
           reference: journal,
+          experimentId,
           runId: manifest.runId,
           sourceSha: expectedSourceSha,
           repository: expectedRepository,

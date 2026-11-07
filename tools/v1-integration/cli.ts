@@ -50,6 +50,7 @@ async function main() {
     startingPositions: null,
     configuration: {
       count,
+      experimentId: `off${count}`,
       body: "controlled-fixture",
       database: ":temporary-fixture:",
       decisionTransport: "scripted-in-process",
@@ -104,6 +105,7 @@ async function main() {
   bundle.restarted = false;
   bundle.actions = result.actions.map((a) => ({
     sequence: a.sequence,
+    decisionSource: a.decisionSource,
     citizenId: a.citizenId,
     reportedSuccess: a.reportedSuccess,
     observedSuccess: a.observedSuccess,
@@ -122,7 +124,8 @@ async function main() {
   bundle.expectedActionCount = result.actions.length;
   const startingPositions: Record<string, { x: number; y: number; z: number }> = {};
   for (const action of result.actions) {
-    if (!startingPositions[action.citizenId] && action.originPosition) startingPositions[action.citizenId] = action.originPosition;
+    if (!startingPositions[action.citizenId] && action.originPosition)
+      startingPositions[action.citizenId] = action.originPosition;
   }
   bundle.startingPositions = startingPositions;
   bundle.interventions = ["operator_stop"];
@@ -215,7 +218,9 @@ async function main() {
         Boolean(result.evidenceJournalPath) &&
         result.evidenceSummary.attempted === count * 3 &&
         result.evidenceSummary.verified === count * 3 &&
-        result.actions.every((a) => a.decisionSource !== "model" && a.expectedDelta.oak_log === 1) &&
+        result.actions.every(
+          (a) => a.decisionSource !== "model" && a.expectedDelta.oak_log === 1,
+        ) &&
         result.actions.every((a) => result.sourceReceipts.some((r) => r.id === a.receiptId)) &&
         result.persistentFacts.every(
           (f) => f.receiptId && result.sourceReceipts.some((r) => r.id === f.receiptId),
@@ -278,6 +283,7 @@ async function main() {
     operatorJournal: result.evidenceJournalPath
       ? {
           reference: relative(output, resolve(result.evidenceJournalPath)),
+          experimentId: `off${count}`,
           runId,
           sourceSha,
           repository,
@@ -302,7 +308,7 @@ async function main() {
   );
   writeFileSync(resolve(output, "gemini-validator-summary.md"), gemini.summary);
   console.log(
-    `Offline ${count}-citizen scripted rehearsal at ${sourceSha}. Bundle: ${output}. Journal: ${result.evidenceJournalPath}. Structural verdict: ${verdict.verdict}. Gemini: ${gemini.report.overallStatus}.`,
+    `Offline ${count}-citizen scripted rehearsal at ${sourceSha}. Bundle: ${output}. Journal: ${result.evidenceJournalPath}. Journal: ${verdict.journalConsistent ? "JOURNAL CONSISTENT" : verdict.verdict}. Live authenticity: NOT PROVEN. Gemini: ${gemini.report.overallStatus}.`,
   );
   if (checks.some((check) => !check.passed) || verdict.verdict === "FAIL") process.exitCode = 1;
 }
