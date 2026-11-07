@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 // NO module mocks: real @civ/shared workspaceRoot()/resolveFromRoot() discovering pnpm-workspace.yaml from process.cwd(),
@@ -29,7 +29,10 @@ describe("[ADV57-R] unmocked, default-path, real workspace discovery", () => {
   it("defect 3 (evidence beside protected DB) refused in the real environment", () => {
     const g = run({ CONSTRUCTION_EXPERIMENT_EVIDENCE_DIR: "data/evidence" }); expect(g.allowed).toBe(false);
     expect(run({ CONSTRUCTION_EXPERIMENT_EVIDENCE_DIR: join(ws, "data", "evidence") }).allowed).toBe(false); // absolute spelling
-    expect(run({ CONSTRUCTION_EXPERIMENT_EVIDENCE_DIR: join(ws, "DATA", "evidence") }).allowed).toBe(false); // mixed case (case-insens. host)
+    // Mixed case is an alias only on a case-insensitive host (macOS, Windows); on Linux it is a different path.
+    const probe = mkdtempSync(join(tmpdir(), "qa57-ci1-"));
+    const caseInsensitive = (() => { try { writeFileSync(join(probe, "a"), "x"); return existsSync(join(probe, "A")); } finally { rmSync(probe, { recursive: true, force: true }); } })();
+    if (caseInsensitive) expect(run({ CONSTRUCTION_EXPERIMENT_EVIDENCE_DIR: join(ws, "DATA", "evidence") }).allowed).toBe(false);
   });
   it("workspace reached through a symlinked path (cwd = alias of root) still protects the originals", () => {
     const alias = join(tmpdir(), `qa57-alias-${process.pid}`); try { symlinkSync(ws, alias, "dir"); } catch { return; }

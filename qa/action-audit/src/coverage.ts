@@ -1,5 +1,5 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
-import { join } from "node:path";
+import { join, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 /**
@@ -253,15 +253,17 @@ export function scanMutatingCallSites(
     for (const name of readdirSync(dir)) {
       if (name === "node_modules" || name === "dist") continue;
       const path = join(dir, name);
+      // Keys and exclusions use forward slashes on every platform (Windows paths use backslashes).
+      const posix = path.split(sep).join("/");
       if (statSync(path).isDirectory()) walk(path);
-      else if (path.endsWith(".ts") && !path.endsWith(".test.ts") && !path.includes("/testing/")) {
+      else if (posix.endsWith(".ts") && !posix.endsWith(".test.ts") && !posix.includes("/testing/")) {
         let n = 0;
         for (const line of readFileSync(path, "utf8").split("\n")) {
           const t = line.trim();
           if (t.startsWith("*") || t.startsWith("//") || t.startsWith("/*")) continue;
           if (PATTERN.test(line)) n += 1;
         }
-        if (n > 0) counts[path.slice(repoRoot.length)] = n;
+        if (n > 0) counts[posix.slice(repoRoot.split(sep).join("/").length)] = n;
       }
     }
   };
