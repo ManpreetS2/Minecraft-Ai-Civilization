@@ -8,6 +8,8 @@ on:
       - packages/**
       - experiments/**
       - tools/**
+      - qa/**
+      - test-support/**
       - pnpm-lock.yaml
       - package.json
       - pnpm-workspace.yaml
@@ -91,6 +93,13 @@ jobs:
         run: |
           pnpm test:evidence-validator
           pnpm test:v1
+
+      - name: Construction, movement, provider and cancellation QA
+        run: |
+          pnpm exec vitest run --config qa/construction-persistence/vitest.config.ts
+          pnpm exec vitest run --config qa/v57/vitest.config.ts
+          pnpm exec vitest run --config qa/provider-safety/vitest.config.ts
+          pnpm exec vitest run --config qa/action-audit/vitest.config.ts
 
       - name: Run offline 1v1 scenario (2 citizens)
         run: |

@@ -8,12 +8,13 @@ const root = new URL("../../../", import.meta.url);
 const read = (path: string) => readFileSync(new URL(path, root), "utf8");
 
 describe("facts about the audited tree", () => {
-  it("QA57-M1 is still present at this SHA: stepToStandingCell awaits a raw bot.lookAt (cross-reference, not a new finding)", () => {
+  it("the combined candidate retains the QA57-M1 bounded lookAt recovery fix", () => {
     const src = read("packages/minecraft-adapter/src/obstacle-detour.ts");
     expect(src).toMatch(
       /try \{\s*await bot\.lookAt\(new Vec3Class\(tx, start\.y \+ 1, tz\), true\);\s*\} catch/,
     );
-    expect(src).not.toMatch(/movementOperationOutcome/);
+    expect(src).toMatch(/const facing = await movementOperationOutcome/);
+    expect(src).toContain('if (facing !== "complete" || signal?.aborted || Date.now() >= deadline)');
   });
 
   it("mineflayer@4.39.0 openBlock/openContainer waits on windowOpen with no timeout", () => {

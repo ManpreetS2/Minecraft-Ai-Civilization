@@ -553,7 +553,7 @@ describe("Offline Acceptance Artifact Verifier", () => {
   });
 
   it("reports Codex journal CLI check as NOT_RUN when command is absent on this branch", () => {
-    const journalCheck = checkJournalCliIntegration(process.cwd());
+    const journalCheck = checkJournalCliIntegration(tempDir);
     expect(journalCheck.status).toBe("NOT_RUN");
     expect(journalCheck.details).toContain("PR #58");
     expect(journalCheck.details).toContain("not available on this branch");

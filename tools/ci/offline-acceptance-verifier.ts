@@ -1,5 +1,14 @@
-import { existsSync, readFileSync, statSync } from "node:fs";
-import { resolve, join } from "node:path";
+import {
+  cpSync,
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
+import { resolve, join, relative, isAbsolute } from "node:path";
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
 
@@ -46,6 +55,8 @@ export interface JournalCliCheckResult {
   command: string;
   details: string;
   forgedReceiptTestPassed?: boolean;
+  executed?: boolean;
+  exitCodes?: Record<string, number>;
 }
 
 export interface SystemInfo {
@@ -81,7 +92,9 @@ export function auditJournalHashChain(lines: readonly string[]): {
   error?: string;
   rows: Record<string, unknown>[];
 } {
-  const nonEmptyLines = lines.map((l) => l.trim()).filter((l) => l.length > 0 && !l.startsWith("#"));
+  const nonEmptyLines = lines
+    .map((l) => l.trim())
+    .filter((l) => l.length > 0 && !l.startsWith("#"));
   if (nonEmptyLines.length === 0) {
     return { valid: false, totalRows: 0, error: "Journal is empty (no records found)", rows: [] };
   }
@@ -165,8 +178,10 @@ export function verifyOfflineScenario(options: VerifyScenarioOptions): ScenarioV
   const artifactDir = resolve(options.artifactDir);
   const count = options.expectedCount;
   const expectedActionsCount = count * 3;
-  const expectedCitizenIds = count === 2 ? ["gpt-a", "claude-a"] : ["gpt-a", "gpt-b", "claude-a", "claude-b"];
-  const expectedRepo = options.expectedRepository ?? "ManpreetS2/Minecraft-Ai-Civilization-windows-backup";
+  const expectedCitizenIds =
+    count === 2 ? ["gpt-a", "claude-a"] : ["gpt-a", "gpt-b", "claude-a", "claude-b"];
+  const expectedRepo =
+    options.expectedRepository ?? "ManpreetS2/Minecraft-Ai-Civilization-windows-backup";
 
   let runId = "unknown";
   let testedSha = "unknown";
@@ -224,13 +239,18 @@ export function verifyOfflineScenario(options: VerifyScenarioOptions): ScenarioV
   // 2. Validate manifest.json
   let manifest: Record<string, unknown> = {};
   try {
-    manifest = JSON.parse(readFileSync(join(artifactDir, "manifest.json"), "utf8")) as Record<string, unknown>;
+    manifest = JSON.parse(readFileSync(join(artifactDir, "manifest.json"), "utf8")) as Record<
+      string,
+      unknown
+    >;
   } catch (err) {
     errors.push(`Failed to parse manifest.json: ${String(err)}`);
   }
 
   if (manifest.schemaVersion !== 1) {
-    errors.push(`manifest schemaVersion mismatch: expected 1, got ${String(manifest.schemaVersion)}`);
+    errors.push(
+      `manifest schemaVersion mismatch: expected 1, got ${String(manifest.schemaVersion)}`,
+    );
   }
 
   if (manifest.mode !== "offline-fixture") {
@@ -238,7 +258,9 @@ export function verifyOfflineScenario(options: VerifyScenarioOptions): ScenarioV
   }
 
   if (manifest.repository && manifest.repository !== expectedRepo) {
-    errors.push(`manifest repository mismatch: expected '${expectedRepo}', got '${String(manifest.repository)}'`);
+    errors.push(
+      `manifest repository mismatch: expected '${expectedRepo}', got '${String(manifest.repository)}'`,
+    );
   }
 
   runId = String(manifest.runId ?? "unknown");
@@ -264,14 +286,18 @@ export function verifyOfflineScenario(options: VerifyScenarioOptions): ScenarioV
       observedCitizens.push(citizen.id);
 
       if (citizen.authentication !== "synthetic") {
-        errors.push(`Citizen ${citizen.id} authentication must be 'synthetic', got '${String(citizen.authentication)}'`);
+        errors.push(
+          `Citizen ${citizen.id} authentication must be 'synthetic', got '${String(citizen.authentication)}'`,
+        );
       }
     }
   }
 
   const distinctManifestIds = new Set(manifestCitizenIds);
   if (distinctManifestIds.size !== count) {
-    errors.push(`Citizen IDs in manifest contain duplicates: found ${distinctManifestIds.size} distinct out of ${count}`);
+    errors.push(
+      `Citizen IDs in manifest contain duplicates: found ${distinctManifestIds.size} distinct out of ${count}`,
+    );
   }
 
   const citizensMatch =
@@ -280,13 +306,17 @@ export function verifyOfflineScenario(options: VerifyScenarioOptions): ScenarioV
     manifestCitizenIds.length === count;
   details.citizensMatch = citizensMatch;
   if (!citizensMatch) {
-    errors.push(`Citizen IDs mismatch: expected [${expectedCitizenIds.join(", ")}], got [${manifestCitizenIds.join(", ")}]`);
+    errors.push(
+      `Citizen IDs mismatch: expected [${expectedCitizenIds.join(", ")}], got [${manifestCitizenIds.join(", ")}]`,
+    );
   }
 
   // Verify actions in manifest
   const rawActions = Array.isArray(manifest.actions) ? manifest.actions : [];
   if (rawActions.length !== expectedActionsCount) {
-    errors.push(`Manifest actions count mismatch: expected ${expectedActionsCount}, got ${rawActions.length}`);
+    errors.push(
+      `Manifest actions count mismatch: expected ${expectedActionsCount}, got ${rawActions.length}`,
+    );
   }
 
   const seenActionAttempts = new Set<string>();
@@ -312,7 +342,9 @@ export function verifyOfflineScenario(options: VerifyScenarioOptions): ScenarioV
     seenActionAttempts.add(a.attemptId);
 
     if (a.actionType !== "gather") {
-      errors.push(`Action type mismatch for attempt ${a.attemptId}: expected 'gather', got '${a.actionType}'`);
+      errors.push(
+        `Action type mismatch for attempt ${a.attemptId}: expected 'gather', got '${a.actionType}'`,
+      );
     }
 
     if (!a.receiptId) {
@@ -331,11 +363,15 @@ export function verifyOfflineScenario(options: VerifyScenarioOptions): ScenarioV
             sourceSha?: string;
           };
           if (receipt.attemptId !== a.attemptId) {
-            errors.push(`Receipt ${a.receiptId} attemptId mismatch: expected '${a.attemptId}', got '${String(receipt.attemptId)}'`);
+            errors.push(
+              `Receipt ${a.receiptId} attemptId mismatch: expected '${a.attemptId}', got '${String(receipt.attemptId)}'`,
+            );
             allReceiptsValid = false;
           }
           if (receipt.citizenId !== a.citizenId) {
-            errors.push(`Receipt ${a.receiptId} citizenId mismatch: expected '${a.citizenId}', got '${String(receipt.citizenId)}'`);
+            errors.push(
+              `Receipt ${a.receiptId} citizenId mismatch: expected '${a.citizenId}', got '${String(receipt.citizenId)}'`,
+            );
             allReceiptsValid = false;
           }
         } catch (err) {
@@ -356,7 +392,9 @@ export function verifyOfflineScenario(options: VerifyScenarioOptions): ScenarioV
   details.hashChainValid = hashChainAudit.valid;
 
   if (!hashChainAudit.valid) {
-    errors.push(`Journal hash chain error: ${hashChainAudit.error ?? "unknown verification failure"}`);
+    errors.push(
+      `Journal hash chain error: ${hashChainAudit.error ?? "unknown verification failure"}`,
+    );
   }
 
   const rows = hashChainAudit.rows;
@@ -366,13 +404,19 @@ export function verifyOfflineScenario(options: VerifyScenarioOptions): ScenarioV
       errors.push(`First journal row kind must be 'start', got '${String(startRow.kind)}'`);
     } else {
       if (startRow.sourceSha !== testedSha) {
-        errors.push(`Journal start row sourceSha mismatch: expected '${testedSha}', got '${String(startRow.sourceSha)}'`);
+        errors.push(
+          `Journal start row sourceSha mismatch: expected '${testedSha}', got '${String(startRow.sourceSha)}'`,
+        );
       }
       if (startRow.runId !== runId) {
-        errors.push(`Journal start row runId mismatch: expected '${runId}', got '${String(startRow.runId)}'`);
+        errors.push(
+          `Journal start row runId mismatch: expected '${runId}', got '${String(startRow.runId)}'`,
+        );
       }
       if (startRow.decisionTransport !== "scripted-in-process") {
-        errors.push(`Journal start row decisionTransport must be 'scripted-in-process', got '${String(startRow.decisionTransport)}'`);
+        errors.push(
+          `Journal start row decisionTransport must be 'scripted-in-process', got '${String(startRow.decisionTransport)}'`,
+        );
       }
       if (startRow.mode !== "offline") {
         errors.push(`Journal start row mode must be 'offline', got '${String(startRow.mode)}'`);
@@ -387,10 +431,14 @@ export function verifyOfflineScenario(options: VerifyScenarioOptions): ScenarioV
     actionObservationsCount = observations.length;
 
     if (actionAttemptsCount !== expectedActionsCount) {
-      errors.push(`Incorrect attempt count: expected ${expectedActionsCount}, got ${actionAttemptsCount}`);
+      errors.push(
+        `Incorrect attempt count: expected ${expectedActionsCount}, got ${actionAttemptsCount}`,
+      );
     }
     if (actionObservationsCount !== expectedActionsCount) {
-      errors.push(`Incorrect observation count: expected ${expectedActionsCount}, got ${actionObservationsCount}`);
+      errors.push(
+        `Incorrect observation count: expected ${expectedActionsCount}, got ${actionObservationsCount}`,
+      );
     }
 
     const attemptsById = new Map<string, Record<string, unknown>>();
@@ -416,7 +464,9 @@ export function verifyOfflineScenario(options: VerifyScenarioOptions): ScenarioV
 
       // Decision Source Contract
       if (decisionSource === "model") {
-        errors.push(`Scripted decisions disguised as genuine model decisions: attempt ${attemptId} claimed decisionSource 'model'`);
+        errors.push(
+          `Scripted decisions disguised as genuine model decisions: attempt ${attemptId} claimed decisionSource 'model'`,
+        );
         honestDecisionSources = false;
       } else if (!["scripted", "planner", "reflex"].includes(decisionSource)) {
         errors.push(`Invalid decisionSource in attempt ${attemptId}: '${decisionSource}'`);
@@ -429,7 +479,9 @@ export function verifyOfflineScenario(options: VerifyScenarioOptions): ScenarioV
     for (const citizenId of expectedCitizenIds) {
       const countForCitizen = citizenAttemptCounts[citizenId] ?? 0;
       if (countForCitizen !== 3) {
-        errors.push(`Citizen ${citizenId} has ${countForCitizen} attempts in journal, expected exactly 3`);
+        errors.push(
+          `Citizen ${citizenId} has ${countForCitizen} attempts in journal, expected exactly 3`,
+        );
       }
     }
 
@@ -464,13 +516,17 @@ export function verifyOfflineScenario(options: VerifyScenarioOptions): ScenarioV
 
       // Ordering check
       if (obsSeq <= attemptSeq) {
-        errors.push(`Out-of-order execution: observation seq ${obsSeq} precedes or equals attempt seq ${attemptSeq} for attempt ${attemptId}`);
+        errors.push(
+          `Out-of-order execution: observation seq ${obsSeq} precedes or equals attempt seq ${attemptSeq} for attempt ${attemptId}`,
+        );
         allOrderingValid = false;
       }
 
       // Cross-citizen identity check
       if (obsCitizenId !== attemptCitizenId) {
-        errors.push(`Cross-citizen identity confusion: attempt citizen '${attemptCitizenId}' != observation citizen '${obsCitizenId}' for attempt ${attemptId}`);
+        errors.push(
+          `Cross-citizen identity confusion: attempt citizen '${attemptCitizenId}' != observation citizen '${obsCitizenId}' for attempt ${attemptId}`,
+        );
       }
 
       // Inventory check
@@ -480,10 +536,14 @@ export function verifyOfflineScenario(options: VerifyScenarioOptions): ScenarioV
       const afterOak = afterInv.oak_log ?? 0;
 
       if (afterOak > beforeOak + 1) {
-        errors.push(`Artificially increased inventory: citizen ${obsCitizenId} gained more logs than observed (before=${beforeOak}, after=${afterOak}) in attempt ${attemptId}`);
+        errors.push(
+          `Artificially increased inventory: citizen ${obsCitizenId} gained more logs than observed (before=${beforeOak}, after=${afterOak}) in attempt ${attemptId}`,
+        );
         allInventoriesValid = false;
       } else if (afterOak !== beforeOak + 1) {
-        errors.push(`Inventory accounting discrepancy for citizen ${obsCitizenId}: expected ${beforeOak + 1} oak_logs, got ${afterOak} in attempt ${attemptId}`);
+        errors.push(
+          `Inventory accounting discrepancy for citizen ${obsCitizenId}: expected ${beforeOak + 1} oak_logs, got ${afterOak} in attempt ${attemptId}`,
+        );
         allInventoriesValid = false;
       }
 
@@ -492,7 +552,9 @@ export function verifyOfflineScenario(options: VerifyScenarioOptions): ScenarioV
         if (item === "oak_log") continue;
         const countBefore = beforeInv[item] ?? 0;
         if (countAfter > countBefore) {
-          errors.push(`Spontaneous inventory gain detected: item '${item}' increased from ${countBefore} to ${countAfter} without corresponding gather`);
+          errors.push(
+            `Spontaneous inventory gain detected: item '${item}' increased from ${countBefore} to ${countAfter} without corresponding gather`,
+          );
           allInventoriesValid = false;
         }
       }
@@ -507,25 +569,36 @@ export function verifyOfflineScenario(options: VerifyScenarioOptions): ScenarioV
 
     details.orderingValid = allOrderingValid;
     details.inventoriesValid = allInventoriesValid;
-    details.observationsMatch = seenObservedAttempts.size === expectedActionsCount && errors.filter((e) => e.includes("observation")).length === 0;
+    details.observationsMatch =
+      seenObservedAttempts.size === expectedActionsCount &&
+      errors.filter((e) => e.includes("observation")).length === 0;
   }
 
   // 4. Validate verdict.json
   let verdictObj: Record<string, unknown> = {};
   try {
-    verdictObj = JSON.parse(readFileSync(join(artifactDir, "verdict.json"), "utf8")) as Record<string, unknown>;
+    verdictObj = JSON.parse(readFileSync(join(artifactDir, "verdict.json"), "utf8")) as Record<
+      string,
+      unknown
+    >;
     validatorVerdict = String(verdictObj.verdict ?? "UNKNOWN");
 
     if (validatorVerdict === "PASS" || validatorVerdict === "VERIFIED") {
-      errors.push(`Simulated report promoted to authenticated Paper evidence: verdict is '${validatorVerdict}', must remain 'NOT PROVEN' for offline simulated run`);
+      errors.push(
+        `Simulated report promoted to authenticated Paper evidence: verdict is '${validatorVerdict}', must remain 'NOT PROVEN' for offline simulated run`,
+      );
     } else if (validatorVerdict !== "NOT PROVEN") {
-      errors.push(`Unexpected verdict in verdict.json: '${validatorVerdict}' (expected 'NOT PROVEN')`);
+      errors.push(
+        `Unexpected verdict in verdict.json: '${validatorVerdict}' (expected 'NOT PROVEN')`,
+      );
     }
 
     const recordedJournalSha = String(verdictObj.evidenceJournalSha256 ?? "");
     const computedJournalSha = createHash("sha256").update(journalRawBytes).digest("hex");
     if (recordedJournalSha !== computedJournalSha) {
-      errors.push(`verdict.json evidenceJournalSha256 mismatch: recorded '${recordedJournalSha}' != actual '${computedJournalSha}'`);
+      errors.push(
+        `verdict.json evidenceJournalSha256 mismatch: recorded '${recordedJournalSha}' != actual '${computedJournalSha}'`,
+      );
     }
   } catch (err) {
     errors.push(`Failed to parse verdict.json: ${String(err)}`);
@@ -533,7 +606,9 @@ export function verifyOfflineScenario(options: VerifyScenarioOptions): ScenarioV
 
   // 5. Validate gemini-validator-report.json
   try {
-    const report = JSON.parse(readFileSync(join(artifactDir, "gemini-validator-report.json"), "utf8")) as {
+    const report = JSON.parse(
+      readFileSync(join(artifactDir, "gemini-validator-report.json"), "utf8"),
+    ) as {
       overallStatus?: string;
       environment?: string;
       sourceSha?: string;
@@ -561,38 +636,55 @@ export function verifyOfflineScenario(options: VerifyScenarioOptions): ScenarioV
     };
 
     if (report.overallStatus === "VERIFIED") {
-      errors.push("Simulated report promoted to authenticated Paper evidence: overallStatus is 'VERIFIED'");
+      errors.push(
+        "Simulated report promoted to authenticated Paper evidence: overallStatus is 'VERIFIED'",
+      );
     } else if (report.overallStatus !== "NOT_PROVEN") {
-      errors.push(`gemini-validator-report overallStatus is '${String(report.overallStatus)}', expected 'NOT_PROVEN'`);
+      errors.push(
+        `gemini-validator-report overallStatus is '${String(report.overallStatus)}', expected 'NOT_PROVEN'`,
+      );
     }
 
     if (report.sourceSha !== testedSha) {
-      errors.push(`gemini-validator-report sourceSha mismatch: expected '${testedSha}', got '${String(report.sourceSha)}'`);
+      errors.push(
+        `gemini-validator-report sourceSha mismatch: expected '${testedSha}', got '${String(report.sourceSha)}'`,
+      );
     }
 
     const reportRunId = String(report.runId ?? report.experimentId ?? "");
     if (reportRunId !== runId) {
-      errors.push(`gemini-validator-report runId mismatch: expected '${runId}', got '${reportRunId}'`);
+      errors.push(
+        `gemini-validator-report runId mismatch: expected '${runId}', got '${reportRunId}'`,
+      );
     }
 
     const summary = report.summary ?? {};
     if (summary.totalAttemptedActions !== expectedActionsCount) {
-      errors.push(`gemini-validator-report attempted actions mismatch: expected ${expectedActionsCount}, got ${String(summary.totalAttemptedActions)}`);
+      errors.push(
+        `gemini-validator-report attempted actions mismatch: expected ${expectedActionsCount}, got ${String(summary.totalAttemptedActions)}`,
+      );
     }
 
     physicallyVerifiedCount = summary.verifiedActions ?? summary.physicallyVerifiedActions ?? 0;
     if (physicallyVerifiedCount !== expectedActionsCount) {
-      errors.push(`gemini-validator-report physically verified actions mismatch: expected ${expectedActionsCount}, got ${physicallyVerifiedCount}`);
+      errors.push(
+        `gemini-validator-report physically verified actions mismatch: expected ${expectedActionsCount}, got ${physicallyVerifiedCount}`,
+      );
     }
 
     const unverifiedCount = summary.unverifiedActions ?? summary.unverifiedActionClaims ?? 0;
     if (unverifiedCount !== 0) {
-      errors.push(`gemini-validator-report unverifiedActionClaims must be 0, got ${unverifiedCount}`);
+      errors.push(
+        `gemini-validator-report unverifiedActionClaims must be 0, got ${unverifiedCount}`,
+      );
     }
 
-    const inventoryDiscrepancies = summary.inventoryViolationsCount ?? summary.inventoryDiscrepancies ?? 0;
+    const inventoryDiscrepancies =
+      summary.inventoryViolationsCount ?? summary.inventoryDiscrepancies ?? 0;
     if (inventoryDiscrepancies !== 0) {
-      errors.push(`gemini-validator-report inventoryDiscrepancies must be 0, got ${inventoryDiscrepancies}`);
+      errors.push(
+        `gemini-validator-report inventoryDiscrepancies must be 0, got ${inventoryDiscrepancies}`,
+      );
     }
 
     let isHashChainValid = false;
@@ -611,7 +703,9 @@ export function verifyOfflineScenario(options: VerifyScenarioOptions): ScenarioV
     // Authenticity checks
     paperAttestationProven = Boolean(summary.durationProven ?? summary.durationVerified ?? false);
     if (paperAttestationProven) {
-      errors.push("Simulated report promoted to authenticated Paper evidence: durationProven is true for offline fixture");
+      errors.push(
+        "Simulated report promoted to authenticated Paper evidence: durationProven is true for offline fixture",
+      );
     }
 
     if (Array.isArray(report.notProven)) {
@@ -620,13 +714,17 @@ export function verifyOfflineScenario(options: VerifyScenarioOptions): ScenarioV
 
     const hasPaperAuthenticityUnproven = unprovenReasons.includes("UNPROVEN_PAPER_AUTHENTICITY");
     if (!hasPaperAuthenticityUnproven) {
-      warnings.push("gemini-validator-report did not include explicit UNPROVEN_PAPER_AUTHENTICITY gap code");
+      warnings.push(
+        "gemini-validator-report did not include explicit UNPROVEN_PAPER_AUTHENTICITY gap code",
+      );
     }
   } catch (err) {
     errors.push(`Failed to parse gemini-validator-report.json: ${String(err)}`);
   }
 
-  details.countsMatch = actionAttemptsCount === expectedActionsCount && actionObservationsCount === expectedActionsCount;
+  details.countsMatch =
+    actionAttemptsCount === expectedActionsCount &&
+    actionObservationsCount === expectedActionsCount;
   details.authenticityHonest = validatorVerdict === "NOT PROVEN" && !paperAttestationProven;
 
   const passed = errors.length === 0;
@@ -667,7 +765,9 @@ export function checkJournalCliIntegration(
 
   let hasScriptInPackageJson = false;
   try {
-    const pkg = JSON.parse(readFileSync(packageJsonPath, "utf8")) as { scripts?: Record<string, string> };
+    const pkg = JSON.parse(readFileSync(packageJsonPath, "utf8")) as {
+      scripts?: Record<string, string>;
+    };
     hasScriptInPackageJson = Boolean(pkg.scripts && pkg.scripts["v1:journal"]);
   } catch {
     // ignore
@@ -694,30 +794,100 @@ export function checkJournalCliIntegration(
   }
 
   const manifestPath = join(scenarioArtifactDir, "manifest.json");
-  const journalPath = "operator.jsonl";
-  const repo = "ManpreetS2/Minecraft-Ai-Civilization-windows-backup";
-  const sha = expectedSha ?? "HEAD";
-
+  let temporary: string | undefined;
   try {
-    const output = execFileSync(
-      "pnpm",
-      ["exec", "tsx", "tools/v1-integration/journal-cli-main.ts", manifestPath, sha, repo, scenarioArtifactDir, journalPath],
-      { cwd: root, encoding: "utf8" },
-    );
-
-    return {
-      status: "READY",
-      command: `pnpm v1:journal ${manifestPath}`,
-      details: `Journal cross-check succeeded: ${output.trim()}`,
-      forgedReceiptTestPassed: true,
+    const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+    const sha = expectedSha ?? manifest.sourceSha;
+    const repo = "ManpreetS2/Minecraft-Ai-Civilization-windows-backup";
+    const experiment = manifest.configuration?.experimentId;
+    const invoke = (args: string[]) => {
+      let output: string;
+      let code = 0;
+      try {
+        output = execFileSync(process.execPath, ["--import", "tsx", cliScriptPath, ...args], {
+          cwd: root,
+          encoding: "utf8",
+          stdio: ["ignore", "pipe", "pipe"],
+          timeout: 30_000,
+        });
+      } catch (error) {
+        const failure = error as { status?: number; stdout?: string };
+        if (typeof failure.status !== "number" || typeof failure.stdout !== "string") throw error;
+        code = failure.status;
+        output = failure.stdout;
+      }
+      const result = JSON.parse(output);
+      if (result.authenticatedLiveExecution !== false)
+        throw new Error("Journal CLI promoted local evidence to live execution");
+      return { code, result };
     };
-  } catch (err) {
+    const fullArgs = (path: string, directory: string) => [
+      path,
+      sha,
+      repo,
+      directory,
+      "operator.jsonl",
+      ...(typeof experiment === "string" ? [experiment] : []),
+    ];
+    const consistent = invoke(fullArgs(manifestPath, scenarioArtifactDir));
+    const missingRoot = invoke([manifestPath, sha, repo]);
+    const missingJournal = invoke([manifestPath, sha, repo, scenarioArtifactDir]);
+    temporary = mkdtempSync(join(tmpdir(), "offline-ci-forgery-"));
+    const forgedRoot = join(temporary, "evidence");
+    cpSync(scenarioArtifactDir, forgedRoot, { recursive: true });
+    const action = manifest.actions[0];
+    const reference = manifest.sourceReceipts.find(
+      (r: { id: string }) => r.id === action.receiptId,
+    );
+    const receiptPath = resolve(forgedRoot, reference.reference);
+    const rel = relative(forgedRoot, receiptPath);
+    if (!rel || isAbsolute(rel) || rel.startsWith(".."))
+      throw new Error("Unsafe forged receipt reference");
+    const receipt = JSON.parse(readFileSync(receiptPath, "utf8"));
+    receipt.inventoryAfter.oak_log = (receipt.inventoryBefore.oak_log ?? 0) + 30;
+    const bytes = JSON.stringify(receipt);
+    writeFileSync(receiptPath, bytes);
+    reference.sha256 = createHash("sha256").update(bytes).digest("hex");
+    action.inventoryDelta = { oak_log: 30 };
+    action.expectedDelta = { oak_log: 30 };
+    const forgedManifest = join(forgedRoot, "manifest.json");
+    writeFileSync(forgedManifest, JSON.stringify(manifest));
+    const forged = invoke(fullArgs(forgedManifest, forgedRoot));
+    const exitCodes = {
+      consistent: consistent.code,
+      missingRoot: missingRoot.code,
+      missingJournal: missingJournal.code,
+      forged: forged.code,
+    };
+    const passed =
+      consistent.code === 0 &&
+      consistent.result.status === "JOURNAL CONSISTENT" &&
+      consistent.result.verdict === "NOT PROVEN" &&
+      missingRoot.code === 2 &&
+      missingRoot.result.status === "NOT PROVEN" &&
+      missingJournal.code === 2 &&
+      missingJournal.result.status === "NOT PROVEN" &&
+      forged.code === 1 &&
+      forged.result.status === "FAIL" &&
+      forged.result.failures.some((f: string) => /Journal action/.test(f));
+    return {
+      status: passed ? "READY" : "FAILED",
+      executed: true,
+      command: "node --import tsx tools/v1-integration/journal-cli-main.ts",
+      exitCodes,
+      forgedReceiptTestPassed: forged.code === 1 && forged.result.status === "FAIL",
+      details: `Executed consistent, missing-root, missing-journal and rehashed forged-receipt cases: ${JSON.stringify(exitCodes)}. Local consistency is not live authenticity.`,
+    };
+  } catch (error) {
     return {
       status: "FAILED",
-      command: `pnpm v1:journal ${manifestPath}`,
-      details: `Journal cross-check failed: ${String(err)}`,
+      executed: true,
+      command: "pnpm v1:journal",
+      details: `Journal CLI execution failed: ${String(error)}`,
       forgedReceiptTestPassed: false,
     };
+  } finally {
+    if (temporary) rmSync(temporary, { recursive: true, force: true });
   }
 }
 
@@ -734,6 +904,8 @@ export function formatMarkdownSummary(report: OverallAcceptanceReport): string {
     `**Tested Commit SHA:** \`${report.testedSha}\`  `,
     `**Host Environment:** \`${report.system.platform} (${report.system.arch})\` | Node.js \`${report.system.nodeVersion}\`${report.system.pnpmVersion ? ` | pnpm \`${report.system.pnpmVersion}\`` : ""}  `,
     `**Overall Verdict:** **${statusText}**  `,
+    "",
+    "> OFFLINE ONLY: known PR #67 live-authenticity vulnerabilities are not fixed or accepted by this verification. No live gate may rely on this result.",
     "",
     "## Scenario Summary Matrix",
     "",
@@ -758,11 +930,15 @@ export function formatMarkdownSummary(report: OverallAcceptanceReport): string {
     lines.push("- **Status:** ⏸️ NOT RUN / NOT READY");
     lines.push(`- **Command:** \`${report.journalCliCheck.command}\``);
     lines.push(`- **Details:** ${report.journalCliCheck.details}`);
-    lines.push("- **Integration Handoff:** Once Codex's combined integration candidate lands on this branch, this gate will automatically cross-check original journal rows and execute forged-receipt negative regression tests.");
+    lines.push(
+      "- **Integration Handoff:** Once Codex's combined integration candidate lands on this branch, this gate will automatically cross-check original journal rows and execute forged-receipt negative regression tests.",
+    );
   } else if (report.journalCliCheck.status === "READY") {
     lines.push("- **Status:** ✅ READY & VERIFIED");
     lines.push(`- **Details:** ${report.journalCliCheck.details}`);
-    lines.push(`- **Forged-Receipt Negative Test:** ${report.journalCliCheck.forgedReceiptTestPassed ? "PASSED" : "FAILED"}`);
+    lines.push(
+      `- **Forged-Receipt Negative Test:** ${report.journalCliCheck.forgedReceiptTestPassed ? "PASSED" : "FAILED"}`,
+    );
   } else {
     lines.push("- **Status:** ❌ FAILED");
     lines.push(`- **Details:** ${report.journalCliCheck.details}`);
@@ -781,7 +957,9 @@ export function formatMarkdownSummary(report: OverallAcceptanceReport): string {
     lines.push("## Documented Missing Evidence / Gaps (Fail-Closed Policy)");
     lines.push("");
     lines.push("> [!NOTE]");
-    lines.push("> These checks are truthfully documented as NOT PROVEN. Offline simulated fixtures cannot fabricate live Paper server metrics or genuine LLM cognition.");
+    lines.push(
+      "> These checks are truthfully documented as NOT PROVEN. Offline simulated fixtures cannot fabricate live Paper server metrics or genuine LLM cognition.",
+    );
     lines.push("");
     for (const code of allUnproven) {
       lines.push(`- \`${code}\``);

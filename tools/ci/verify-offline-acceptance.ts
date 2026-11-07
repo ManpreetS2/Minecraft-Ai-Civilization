@@ -77,7 +77,9 @@ Options:
   };
 
   console.log(`[CI-Verifier] Verifying offline acceptance artifacts for commit ${testedSha}...`);
-  console.log(`[CI-Verifier] System: ${systemInfo.platform} (${systemInfo.arch}), Node: ${systemInfo.nodeVersion}`);
+  console.log(
+    `[CI-Verifier] System: ${systemInfo.platform} (${systemInfo.arch}), Node: ${systemInfo.nodeVersion}`,
+  );
 
   const scenarios: Record<string, ScenarioVerificationResult> = {};
   const allErrors: string[] = [];
@@ -107,10 +109,18 @@ Options:
   }
 
   // Check Codex Journal CLI Integration
-  console.log("[CI-Verifier] Checking Codex journal CLI integration (PR #58 / Release candidate)...");
+  console.log(
+    "[CI-Verifier] Checking Codex journal CLI integration (PR #58 / Release candidate)...",
+  );
   const journalCliCheck = checkJournalCliIntegration(cwd, resolve(cwd, scenario2Dir), testedSha);
 
-  const passed = res2.passed && res4.passed;
+  const journalPassed =
+    journalCliCheck.status === "READY" &&
+    journalCliCheck.executed === true &&
+    journalCliCheck.forgedReceiptTestPassed === true;
+  if (!journalPassed)
+    allErrors.push(`Journal CLI was not successfully exercised: ${journalCliCheck.details}`);
+  const passed = res2.passed && res4.passed && journalPassed;
 
   const report: OverallAcceptanceReport = {
     passed,
@@ -127,7 +137,9 @@ Options:
   if (process.env.GITHUB_STEP_SUMMARY) {
     try {
       appendFileSync(process.env.GITHUB_STEP_SUMMARY, `\n${markdownSummary}\n`, "utf8");
-      console.log(`[CI-Verifier] Appended summary to GITHUB_STEP_SUMMARY (${process.env.GITHUB_STEP_SUMMARY})`);
+      console.log(
+        `[CI-Verifier] Appended summary to GITHUB_STEP_SUMMARY (${process.env.GITHUB_STEP_SUMMARY})`,
+      );
     } catch (err) {
       console.warn(`[CI-Verifier] Failed to write to GITHUB_STEP_SUMMARY: ${String(err)}`);
     }
@@ -138,7 +150,11 @@ Options:
     const fullOutputDir = resolve(cwd, outputDir);
     mkdirSync(fullOutputDir, { recursive: true });
     writeFileSync(resolve(fullOutputDir, "ci-summary.md"), markdownSummary, "utf8");
-    writeFileSync(resolve(fullOutputDir, "ci-summary.json"), JSON.stringify(report, null, 2), "utf8");
+    writeFileSync(
+      resolve(fullOutputDir, "ci-summary.json"),
+      JSON.stringify(report, null, 2),
+      "utf8",
+    );
     console.log(`[CI-Verifier] Wrote sanitized summary reports to: ${fullOutputDir}`);
   } catch (err) {
     console.warn(`[CI-Verifier] Failed to write summary files: ${String(err)}`);
