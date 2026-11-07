@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+import { readFileSync, writeFileSync } from "node:fs";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   checkJournalCliIntegration,
@@ -9,7 +11,7 @@ import {
   type OverallAcceptanceReport,
   type ScenarioVerificationResult,
 } from "./offline-acceptance-verifier.js";
-import { cleanup, fresh, l1, shaOf, type Count } from "../../qa/verify-ci-verifier/test/support/bundle.js";
+import { cleanup, fresh, l1, readJson, receiptPath, shaOf, writeJson, type Count } from "../../qa/verify-ci-verifier/test/support/bundle.js";
 import { CASES, ORIGINAL_L1_MISSES } from "../../qa/verify-ci-verifier/test/support/cases.js";
 
 /**
@@ -71,6 +73,46 @@ describe("PR #72 tamper matrix on real bundles", () => {
     expect(r.passed).toBe(false);                // ... and the bundle is still rejected on cross-source disagreement
     expect(r.contradictions.some((m) => /worldChanges|journal/i.test(m))).toBe(true);
   });
+});
+
+describe("a forger who re-pins forged receipts is still caught (the pin is not the only check)", () => {
+  /** Edit a receipt, then recompute and store its SHA-256 pin, so the pin matches the forged bytes. */
+  const forgeAndRepin = (d: string, edit: (r: Record<string, unknown>) => void) => {
+    const m = readJson(d, "manifest.json");
+    const act = m.actions[0];
+    const p = receiptPath(d, act.receiptId);
+    const r = JSON.parse(readFileSync(p, "utf8")) as Record<string, unknown>;
+    edit(r);
+    const bytes = JSON.stringify(r, null, 2);
+    writeFileSync(p, bytes);
+    m.sourceReceipts.find((x: { id: string }) => x.id === act.receiptId).sha256 = createHash("sha256").update(bytes).digest("hex");
+    writeJson(d, "manifest.json", m);
+  };
+  for (const count of [2, 4] as const) {
+    const name = count === 2 ? "1v1" : "2v2";
+    it(`${name}: forged inventory in a re-pinned receipt disagrees with the original journal`, () => {
+      const d = fresh(count); forgeAndRepin(d, (r) => { r.inventoryAfter = { oak_log: 30 }; });
+      const r = l1(d, count);
+      expect(r.passed).toBe(false);
+      expect(r.contradictions.some((m) => /inventoryAfter/.test(m))).toBe(true);
+    });
+    it(`${name}: a re-pinned receipt with a different sourceSha disagrees with the manifest`, () => {
+      const d = fresh(count); forgeAndRepin(d, (r) => { r.sourceSha = "0123456789abcdef0123456789abcdef01234567"; });
+      const r = l1(d, count);
+      expect(r.passed).toBe(false);
+      expect(r.contradictions.some((m) => /sourceSha/.test(m))).toBe(true);
+    });
+    it(`${name}: a re-pinned receipt credited to another citizen disagrees with the manifest and journal`, () => {
+      const d = fresh(count); forgeAndRepin(d, (r) => { r.citizenId = "claude-a" === r.citizenId ? "gpt-a" : "claude-a"; });
+      expect(l1(d, count).passed).toBe(false);
+    });
+    it(`${name}: receipt journal coordinates pointing at the wrong original rows are rejected`, () => {
+      const d = fresh(count); forgeAndRepin(d, (r) => { r.journal = { attemptSequence: 1, observationSequence: 2 }; });
+      const r = l1(d, count);
+      expect(r.passed).toBe(false);
+      expect(r.contradictions.some((m) => /journal coordinates/.test(m))).toBe(true);
+    });
+  }
 });
 
 describe("authenticity claims from scripted offline fixtures are contradictions", () => {
