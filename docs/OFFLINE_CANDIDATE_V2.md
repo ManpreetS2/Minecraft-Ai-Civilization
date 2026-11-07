@@ -84,3 +84,38 @@ All commands use the frozen executable source above. The earlier workspace proce
 | cancellation | 48 | 0 | 0 | 0 |
 
 Workspace, tools, validator and cancellation-audit typechecks, lint and build all exit 0. Both rehearsal commands, the CI artifact verifier and the separate 2v2 journal CLI exit 0. The CI verifier records actual 0/2/2/1 subprocess controls. Node v22.12.0, pnpm 10.16.0, macOS x64. Raw logs and original rehearsal snapshots are under docs/evidence/offline-v2/. Counts overlap across commands and must not be summed as unique coverage. Hosted Ubuntu/macOS/Windows CI remains pending until the PR jobs complete. No current local integration failure remains; live-authenticity security is still blocked.
+
+
+## Ubuntu CI follow-up
+
+The Ubuntu smoke job on publication head `764436cb6a62882e1d631ed46cf31918e8d0fd92` failed two existing movement/guard assertions for `DATA/evidence`. Linux treated that as distinct from the protected `data` tree, while the offline safety policy requires conservative refusal of case-folded collisions. The unchanged POSIX lexical comparison tests also require case-sensitive syntax semantics.
+
+The fix separates portable isolation policy from lexical identity: `pathsCollideForIsolation` refuses either a lexical alias or its case-folded collision at the isolation boundary, while `pathsAliasSameTree` retains its existing POSIX behavior. No existing assertions were weakened. A new regression also requires genuinely separate sibling paths to remain permitted.
+
+Implementation commit: `6573847547b02f184c4adde80e9fc2b041f18e64`. Local replay: movement/guard QA 204 passed, 0 failed, 0 skipped; focused guard suites 104 passed, 0 failed, 1 Windows-only skip. Orchestrator typecheck and focused lint exit 0. Commands:
+
+```sh
+pnpm exec vitest run --config qa/v57/vitest.config.ts --maxWorkers=1 --no-file-parallelism
+pnpm exec vitest run apps/orchestrator/src/construction-case-policy.test.ts apps/orchestrator/src/construction-path-isolation.test.ts apps/orchestrator/src/construction-experiment-guard.test.ts apps/orchestrator/src/off13-qa39-regressions.test.ts --maxWorkers=1 --no-file-parallelism
+pnpm exec tsc -p apps/orchestrator/tsconfig.json --noEmit
+pnpm exec eslint apps/orchestrator/src/construction-experiment-guard.ts apps/orchestrator/src/construction-case-policy.test.ts
+```
+
+Failure and replay logs are in `docs/evidence/offline-v2/ci-followup/`. Hosted cross-platform checks must rerun on this follow-up; the earlier full local results above remain evidence for their stated earlier source. Live-authenticity vulnerabilities are unchanged and unaccepted.
+
+
+## Windows audit follow-up
+
+The Windows smoke job on `764436cb6a62882e1d631ed46cf31918e8d0fd92` reached cancellation QA and failed the strict coverage comparison. The scanner returned Windows backslashes as keys, and the POSIX-only `/testing/` check included a testing helper as production. This is separate from the Ubuntu protected-path policy issue.
+
+Implementation `792f7c017d2243eb74df16b08aada21eee7cf3eb` derives repository-relative paths with node:path.relative and normalizes separators before both exclusion and key generation. The coverage table and strict equality assertion remain unchanged. A new regression covers Windows spellings and a temporary production/test-helper tree, ensuring production calls remain counted while test helpers are excluded.
+
+Local commands (all exit 0):
+
+```sh
+pnpm exec vitest run --config qa/action-audit/vitest.config.ts --maxWorkers=1 --no-file-parallelism
+pnpm exec tsc --noEmit -p qa/action-audit/tsconfig.json
+pnpm exec eslint qa/action-audit/src/coverage.ts qa/action-audit/test/coverage.test.ts
+```
+
+Cancellation/audit: 49 passed, 0 failed, 0 skipped. Logs and the original Windows failure are under `docs/evidence/offline-v2/windows-followup/`. Hosted Windows verification remains pending on the new head. Runtime behavior and the unresolved live-authenticity security gate are unchanged.

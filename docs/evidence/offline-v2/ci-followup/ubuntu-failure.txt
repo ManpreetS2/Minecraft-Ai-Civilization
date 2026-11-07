@@ -1,0 +1,804 @@
+﻿2026-11-07T03:03:14.8323149Z Current runner version: '2.338.2'
+2026-11-07T03:03:14.8361652Z ##[group]Runner Image Provisioner
+2026-11-07T03:03:14.8363244Z Hosted Compute Agent
+2026-11-07T03:03:14.8364114Z Version: 20261028.624
+2026-11-07T03:03:14.8365080Z Commit: 54898b74c23fde5556c9b3c3a2290865feef0dfe
+2026-11-07T03:03:14.8366271Z Build Date: 2026-10-28T21:51:42Z
+2026-11-07T03:03:14.8367344Z Worker ID: {18275d8f-6d45-464f-856e-08adf8d48acb}
+2026-11-07T03:03:14.8368566Z Region: westus3
+2026-11-07T03:03:14.8369419Z Cloud: Azure
+2026-11-07T03:03:14.8370235Z ##[endgroup]
+2026-11-07T03:03:14.8372891Z ##[group]Operating System
+2026-11-07T03:03:14.8373857Z Ubuntu
+2026-11-07T03:03:14.8374612Z 26.04.1
+2026-11-07T03:03:14.8375486Z LTS
+2026-11-07T03:03:14.8376296Z ##[endgroup]
+2026-11-07T03:03:14.8377218Z ##[group]Runner Image
+2026-11-07T03:03:14.8378197Z Image: ubuntu-26.04
+2026-11-07T03:03:14.8379086Z Version: 20261101.186.1
+2026-11-07T03:03:14.8381095Z Included Software: https://github.com/actions/runner-images/blob/ubuntu26/20261101.186/images/ubuntu/Ubuntu2604-Readme.md
+2026-11-07T03:03:14.8383845Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu26%2F20261101.186
+2026-11-07T03:03:14.8385460Z ##[endgroup]
+2026-11-07T03:03:14.8387241Z ##[group]GITHUB_TOKEN Permissions
+2026-11-07T03:03:14.8389963Z Contents: read
+2026-11-07T03:03:14.8390825Z Metadata: read
+2026-11-07T03:03:14.8391814Z ##[endgroup]
+2026-11-07T03:03:14.8395024Z Secret source: Actions
+2026-11-07T03:03:14.8396527Z Cache mode: write
+2026-11-07T03:03:14.8397600Z Prepare workflow directory
+2026-11-07T03:03:14.9180618Z Prepare all required actions
+2026-11-07T03:03:14.9256836Z Getting action download info
+2026-11-07T03:03:15.3484963Z Download action repository 'actions/checkout@11d5960a326750d5838078e36cf38b85af677262' (SHA:11d5960a326750d5838078e36cf38b85af677262)
+2026-11-07T03:03:15.4621645Z Download action repository 'pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa' (SHA:f40ffcd9367d9f12939873eb1018b921a783ffaa)
+2026-11-07T03:03:16.0958731Z Download action repository 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' (SHA:49933ea5288caeca8642d1e84afbd3f7d6820020)
+2026-11-07T03:03:16.1536259Z Download action repository 'actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1' (SHA:4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1)
+2026-11-07T03:03:16.6134257Z Complete job name: Cross-platform smoke (ubuntu-latest)
+2026-11-07T03:03:16.7369281Z ##[group]Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+2026-11-07T03:03:16.7371023Z with:
+2026-11-07T03:03:16.7371908Z   persist-credentials: false
+2026-11-07T03:03:16.7373283Z   ref: 764436cb6a62882e1d631ed46cf31918e8d0fd92
+2026-11-07T03:03:16.7374758Z   repository: ManpreetS2/Minecraft-Ai-Civilization-windows-backup
+2026-11-07T03:03:16.7383367Z   token: ***
+2026-11-07T03:03:16.7384233Z   ssh-strict: true
+2026-11-07T03:03:16.7385101Z   ssh-user: git
+2026-11-07T03:03:16.7385963Z   clean: true
+2026-11-07T03:03:16.7386861Z   sparse-checkout-cone-mode: true
+2026-11-07T03:03:16.7387902Z   fetch-depth: 1
+2026-11-07T03:03:16.7388824Z   fetch-tags: false
+2026-11-07T03:03:16.7389723Z   show-progress: true
+2026-11-07T03:03:16.7390631Z   lfs: false
+2026-11-07T03:03:16.7391451Z   submodules: false
+2026-11-07T03:03:16.7392420Z   set-safe-directory: true
+2026-11-07T03:03:16.7393445Z   allow-unsafe-pr-checkout: false
+2026-11-07T03:03:16.7394801Z env:
+2026-11-07T03:03:16.7395647Z   CI: true
+2026-11-07T03:03:16.7396451Z   OPENAI_API_KEY: 
+2026-11-07T03:03:16.7397319Z   ANTHROPIC_API_KEY: 
+2026-11-07T03:03:16.7398202Z   GEMINI_API_KEY: 
+2026-11-07T03:03:16.7399067Z   LLM_PROVIDER: none
+2026-11-07T03:03:16.7399923Z   NODE_ENV: test
+2026-11-07T03:03:16.7400743Z ##[endgroup]
+2026-11-07T03:03:17.1763865Z Syncing repository: ManpreetS2/Minecraft-Ai-Civilization-windows-backup
+2026-11-07T03:03:17.1769677Z ##[group]Getting Git version info
+2026-11-07T03:03:17.1773899Z Working directory is '/home/runner/work/Minecraft-Ai-Civilization-windows-backup/Minecraft-Ai-Civilization-windows-backup'
+2026-11-07T03:03:17.1778739Z [command]/usr/bin/git version
+2026-11-07T03:03:17.1781163Z git version 2.56.0
+2026-11-07T03:03:17.1786909Z ##[endgroup]
+2026-11-07T03:03:17.1798023Z Temporarily overriding HOME='/home/runner/work/_temp/a9bcd4eb-13e9-4153-bd59-5f0a656c4e45' before making global git config changes
+2026-11-07T03:03:17.1803094Z Adding repository directory to the temporary git global config as a safe directory
+2026-11-07T03:03:17.1807983Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/Minecraft-Ai-Civilization-windows-backup/Minecraft-Ai-Civilization-windows-backup
+2026-11-07T03:03:17.1816831Z Deleting the contents of '/home/runner/work/Minecraft-Ai-Civilization-windows-backup/Minecraft-Ai-Civilization-windows-backup'
+2026-11-07T03:03:17.1825334Z ##[group]Initializing the repository
+2026-11-07T03:03:17.1829508Z [command]/usr/bin/git init /home/runner/work/Minecraft-Ai-Civilization-windows-backup/Minecraft-Ai-Civilization-windows-backup
+2026-11-07T03:03:17.1834386Z hint: Using 'master' as the name for the initial branch. This default branch name
+2026-11-07T03:03:17.1837070Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+2026-11-07T03:03:17.1840091Z hint: to use in all of your new repositories, which will suppress this warning,
+2026-11-07T03:03:17.1842676Z hint: call:
+2026-11-07T03:03:17.1844025Z hint:
+2026-11-07T03:03:17.1845847Z hint: 	git config --global init.defaultBranch <name>
+2026-11-07T03:03:17.1848048Z hint:
+2026-11-07T03:03:17.1849974Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2026-11-07T03:03:17.1853340Z hint: 'development'. The just-created branch can be renamed via this command:
+2026-11-07T03:03:17.1856298Z hint:
+2026-11-07T03:03:17.1857904Z hint: 	git branch -m <name>
+2026-11-07T03:03:17.1859562Z hint:
+2026-11-07T03:03:17.1861793Z hint: Disable this message with "git config set advice.defaultBranchName false"
+2026-11-07T03:03:17.1866419Z Initialized empty Git repository in /home/runner/work/Minecraft-Ai-Civilization-windows-backup/Minecraft-Ai-Civilization-windows-backup/.git/
+2026-11-07T03:03:17.1873448Z [command]/usr/bin/git remote add origin https://github.com/ManpreetS2/Minecraft-Ai-Civilization-windows-backup
+2026-11-07T03:03:17.1879271Z ##[endgroup]
+2026-11-07T03:03:17.1881611Z ##[group]Disabling automatic garbage collection
+2026-11-07T03:03:17.1883953Z [command]/usr/bin/git config --local gc.auto 0
+2026-11-07T03:03:17.1889475Z ##[endgroup]
+2026-11-07T03:03:17.1891877Z ##[group]Setting up auth
+2026-11-07T03:03:17.1894704Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-11-07T03:03:17.1901572Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-11-07T03:03:17.2132057Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-11-07T03:03:17.2168771Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-11-07T03:03:17.2430284Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-11-07T03:03:17.2467232Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-11-07T03:03:17.2718280Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2026-11-07T03:03:17.2789914Z ##[endgroup]
+2026-11-07T03:03:17.2792674Z ##[group]Fetching the repository
+2026-11-07T03:03:17.2796430Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin 764436cb6a62882e1d631ed46cf31918e8d0fd92
+2026-11-07T03:03:18.2094298Z From https://github.com/ManpreetS2/Minecraft-Ai-Civilization-windows-backup
+2026-11-07T03:03:18.2102325Z  * branch            764436cb6a62882e1d631ed46cf31918e8d0fd92 -> FETCH_HEAD
+2026-11-07T03:03:18.2107295Z ##[endgroup]
+2026-11-07T03:03:18.2108283Z ##[group]Determining the checkout info
+2026-11-07T03:03:18.2109621Z ##[endgroup]
+2026-11-07T03:03:18.2110497Z [command]/usr/bin/git sparse-checkout disable
+2026-11-07T03:03:18.2147473Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+2026-11-07T03:03:18.2179736Z ##[group]Checking out the ref
+2026-11-07T03:03:18.2190474Z [command]/usr/bin/git checkout --progress --force 764436cb6a62882e1d631ed46cf31918e8d0fd92
+2026-11-07T03:03:18.3086432Z Note: switching to '764436cb6a62882e1d631ed46cf31918e8d0fd92'.
+2026-11-07T03:03:18.3086870Z 
+2026-11-07T03:03:18.3087209Z You are in 'detached HEAD' state. You can look around, make experimental
+2026-11-07T03:03:18.3088138Z changes and commit them, and you can discard any commits you make in this
+2026-11-07T03:03:18.3089071Z state without impacting any branches by switching back to a branch.
+2026-11-07T03:03:18.3089604Z 
+2026-11-07T03:03:18.3089979Z If you want to create a new branch to retain commits you create, you may
+2026-11-07T03:03:18.3090822Z do so (now or later) by using -c with the switch command. Example:
+2026-11-07T03:03:18.3091331Z 
+2026-11-07T03:03:18.3091538Z   git switch -c <new-branch-name>
+2026-11-07T03:03:18.3091834Z 
+2026-11-07T03:03:18.3092056Z Or undo this operation with:
+2026-11-07T03:03:18.3092568Z 
+2026-11-07T03:03:18.3092768Z   git switch -
+2026-11-07T03:03:18.3093032Z 
+2026-11-07T03:03:18.3093429Z Turn off this advice by setting config variable advice.detachedHead to false
+2026-11-07T03:03:18.3093971Z 
+2026-11-07T03:03:18.3094405Z HEAD is now at 764436c Record offline v2 validation and unresolved live-authenticity gate
+2026-11-07T03:03:18.3096250Z ##[endgroup]
+2026-11-07T03:03:18.3097428Z [command]/usr/bin/git log -1 --format=%H
+2026-11-07T03:03:18.3128328Z 764436cb6a62882e1d631ed46cf31918e8d0fd92
+2026-11-07T03:03:18.3130719Z ##[group]Removing auth
+2026-11-07T03:03:18.3131669Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-11-07T03:03:18.3174380Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-11-07T03:03:18.3400289Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-11-07T03:03:18.3425961Z http.https://github.com/.extraheader
+2026-11-07T03:03:18.3435514Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+2026-11-07T03:03:18.3468541Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-11-07T03:03:18.3698109Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-11-07T03:03:18.3729275Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-11-07T03:03:18.3955815Z ##[endgroup]
+2026-11-07T03:03:18.4189783Z ##[group]Run pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa
+2026-11-07T03:03:18.4190229Z with:
+2026-11-07T03:03:18.4190468Z   version: 10.16.0
+2026-11-07T03:03:18.4190716Z   dest: ~/setup-pnpm
+2026-11-07T03:03:18.4190965Z   run_install: null
+2026-11-07T03:03:18.4191203Z   cache: false
+2026-11-07T03:03:18.4191459Z   cache_dependency_path: pnpm-lock.yaml
+2026-11-07T03:03:18.4191785Z   package_json_file: package.json
+2026-11-07T03:03:18.4192071Z   standalone: false
+2026-11-07T03:03:18.4192603Z env:
+2026-11-07T03:03:18.4192828Z   CI: true
+2026-11-07T03:03:18.4193070Z   OPENAI_API_KEY: 
+2026-11-07T03:03:18.4193322Z   ANTHROPIC_API_KEY: 
+2026-11-07T03:03:18.4193581Z   GEMINI_API_KEY: 
+2026-11-07T03:03:18.4193823Z   LLM_PROVIDER: none
+2026-11-07T03:03:18.4194067Z   NODE_ENV: test
+2026-11-07T03:03:18.4194305Z ##[endgroup]
+2026-11-07T03:03:18.5761384Z ##[group]Running self-installer...
+2026-11-07T03:03:19.1998690Z (node:2277) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+2026-11-07T03:03:19.2006188Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-11-07T03:03:19.3704803Z Progress: resolved 1, reused 0, downloaded 0, added 0
+2026-11-07T03:03:19.3860440Z Packages: +1
+2026-11-07T03:03:19.3883227Z +
+2026-11-07T03:03:19.8326024Z Progress: resolved 1, reused 0, downloaded 1, added 1, done
+2026-11-07T03:03:19.8604749Z 
+2026-11-07T03:03:19.8605707Z dependencies:
+2026-11-07T03:03:19.8613411Z + pnpm 10.16.0 (12.18.0 is available)
+2026-11-07T03:03:19.8613951Z 
+2026-11-07T03:03:19.8647292Z Done in 936ms
+2026-11-07T03:03:19.8784420Z ##[endgroup]
+2026-11-07T03:03:19.8803529Z Installation Completed!
+2026-11-07T03:03:19.8944018Z ##[group]Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+2026-11-07T03:03:19.8944423Z with:
+2026-11-07T03:03:19.8944625Z   node-version: 22.17.1
+2026-11-07T03:03:19.8944844Z   cache: pnpm
+2026-11-07T03:03:19.8945044Z   always-auth: false
+2026-11-07T03:03:19.8945247Z   check-latest: false
+2026-11-07T03:03:19.8947604Z   token: ***
+2026-11-07T03:03:19.8947791Z env:
+2026-11-07T03:03:19.8947968Z   CI: true
+2026-11-07T03:03:19.8948152Z   OPENAI_API_KEY: 
+2026-11-07T03:03:19.8948348Z   ANTHROPIC_API_KEY: 
+2026-11-07T03:03:19.8948546Z   GEMINI_API_KEY: 
+2026-11-07T03:03:19.8948739Z   LLM_PROVIDER: none
+2026-11-07T03:03:19.8948935Z   NODE_ENV: test
+2026-11-07T03:03:19.8949183Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-11-07T03:03:19.8949468Z ##[endgroup]
+2026-11-07T03:03:20.0457469Z Attempting to download 22.17.1...
+2026-11-07T03:03:20.0570624Z (node:2293) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-11-07T03:03:20.0572605Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-11-07T03:03:21.0609332Z Acquiring 22.17.1 - x64 from https://github.com/actions/node-versions/releases/download/22.17.1-16309770702/node-22.17.1-linux-x64.tar.gz
+2026-11-07T03:03:21.8103864Z Extracting ...
+2026-11-07T03:03:21.8281967Z [command]/usr/bin/tar xz --strip 1 --warning=no-unknown-keyword --overwrite -C /home/runner/work/_temp/82230e6b-932d-4e04-9f5a-4da4dedd67f6 -f /home/runner/work/_temp/be07d63b-5747-42ce-a88d-a06671c980e4
+2026-11-07T03:03:22.5861002Z Adding to the cache ...
+2026-11-07T03:03:24.2427546Z ##[group]Environment details
+2026-11-07T03:03:24.5117524Z node: v22.17.1
+2026-11-07T03:03:24.5118359Z npm: 10.9.2
+2026-11-07T03:03:24.5119052Z yarn: 1.22.22
+2026-11-07T03:03:24.5120039Z ##[endgroup]
+2026-11-07T03:03:24.5139457Z [command]/home/runner/setup-pnpm/node_modules/.bin/pnpm store path --silent
+2026-11-07T03:03:24.8640946Z /home/runner/setup-pnpm/node_modules/.bin/store/v10
+2026-11-07T03:03:25.1017642Z pnpm cache is not found
+2026-11-07T03:03:25.1190153Z ##[group]Run node -e "console.log({ platform: process.platform, arch: process.arch, node: process.version })"
+2026-11-07T03:03:25.1191105Z node -e "console.log({ platform: process.platform, arch: process.arch, node: process.version })"
+2026-11-07T03:03:25.1191671Z git rev-parse HEAD
+2026-11-07T03:03:25.1227861Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-11-07T03:03:25.1228269Z env:
+2026-11-07T03:03:25.1228646Z   CI: true
+2026-11-07T03:03:25.1228911Z   OPENAI_API_KEY: 
+2026-11-07T03:03:25.1229207Z   ANTHROPIC_API_KEY: 
+2026-11-07T03:03:25.1229505Z   GEMINI_API_KEY: 
+2026-11-07T03:03:25.1229780Z   LLM_PROVIDER: none
+2026-11-07T03:03:25.1230096Z   NODE_ENV: test
+2026-11-07T03:03:25.1230418Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-11-07T03:03:25.1230834Z ##[endgroup]
+2026-11-07T03:03:25.1519400Z { platform: 'linux', arch: 'x64', node: 'v22.17.1' }
+2026-11-07T03:03:25.1548046Z 764436cb6a62882e1d631ed46cf31918e8d0fd92
+2026-11-07T03:03:25.1694907Z ##[group]Run pnpm install --frozen-lockfile
+2026-11-07T03:03:25.1695394Z pnpm install --frozen-lockfile
+2026-11-07T03:03:25.1726005Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-11-07T03:03:25.1726337Z env:
+2026-11-07T03:03:25.1726520Z   CI: true
+2026-11-07T03:03:25.1726706Z   OPENAI_API_KEY: 
+2026-11-07T03:03:25.1726913Z   ANTHROPIC_API_KEY: 
+2026-11-07T03:03:25.1727119Z   GEMINI_API_KEY: 
+2026-11-07T03:03:25.1727308Z   LLM_PROVIDER: none
+2026-11-07T03:03:25.1727505Z   NODE_ENV: test
+2026-11-07T03:03:25.1727747Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-11-07T03:03:25.1728034Z ##[endgroup]
+2026-11-07T03:03:25.4893705Z Scope: all 14 workspace projects
+2026-11-07T03:03:25.6033804Z Lockfile is up to date, resolution step is skipped
+2026-11-07T03:03:25.6453513Z Progress: resolved 1, reused 0, downloaded 0, added 0
+2026-11-07T03:03:25.7089377Z Packages: +284
+2026-11-07T03:03:25.7124982Z ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+2026-11-07T03:03:26.6472789Z Progress: resolved 284, reused 0, downloaded 96, added 81
+2026-11-07T03:03:27.6514247Z Progress: resolved 284, reused 0, downloaded 187, added 121
+2026-11-07T03:03:28.6526554Z Progress: resolved 284, reused 0, downloaded 202, added 127
+2026-11-07T03:03:31.2963645Z Progress: resolved 284, reused 0, downloaded 203, added 127
+2026-11-07T03:03:32.1484670Z Progress: resolved 284, reused 0, downloaded 284, added 284, done
+2026-11-07T03:03:32.2954628Z .../node_modules/better-sqlite3 install$ prebuild-install || node-gyp rebuild --release
+2026-11-07T03:03:32.2965835Z .../esbuild@0.28.2/node_modules/esbuild postinstall$ node install.js
+2026-11-07T03:03:32.3869576Z .../esbuild@0.28.2/node_modules/esbuild postinstall: Done
+2026-11-07T03:03:32.7300434Z .../node_modules/better-sqlite3 install: Done
+2026-11-07T03:03:32.8402984Z 
+2026-11-07T03:03:32.8403784Z devDependencies:
+2026-11-07T03:03:32.8404342Z + @eslint/js 9.39.5
+2026-11-07T03:03:32.8404882Z + @types/node 22.20.3
+2026-11-07T03:03:32.8405350Z + eslint 9.39.5
+2026-11-07T03:03:32.8405805Z + prettier 3.9.7
+2026-11-07T03:03:32.8406244Z + tsx 4.23.13
+2026-11-07T03:03:32.8406672Z + typescript 5.9.3
+2026-11-07T03:03:32.8407179Z + typescript-eslint 8.70.0
+2026-11-07T03:03:32.8407661Z + vitest 3.2.7
+2026-11-07T03:03:32.8407939Z 
+2026-11-07T03:03:32.8733716Z Done in 7.6s using pnpm v10.16.0
+2026-11-07T03:03:32.9080526Z ##[group]Run pnpm typecheck
+2026-11-07T03:03:32.9080826Z pnpm typecheck
+2026-11-07T03:03:32.9081059Z pnpm typecheck:tools
+2026-11-07T03:03:32.9081319Z pnpm typecheck:evidence-validator
+2026-11-07T03:03:32.9110667Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-11-07T03:03:32.9110991Z env:
+2026-11-07T03:03:32.9111172Z   CI: true
+2026-11-07T03:03:32.9111362Z   OPENAI_API_KEY: 
+2026-11-07T03:03:32.9111568Z   ANTHROPIC_API_KEY: 
+2026-11-07T03:03:32.9111769Z   GEMINI_API_KEY: 
+2026-11-07T03:03:32.9111962Z   LLM_PROVIDER: none
+2026-11-07T03:03:32.9112335Z   NODE_ENV: test
+2026-11-07T03:03:32.9112624Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-11-07T03:03:32.9112929Z ##[endgroup]
+2026-11-07T03:03:33.1719479Z 
+2026-11-07T03:03:33.1721297Z > minecraft-ai-civilization@0.1.0 typecheck /home/runner/work/Minecraft-Ai-Civilization-windows-backup/Minecraft-Ai-Civilization-windows-backup
+2026-11-07T03:03:33.1723223Z > pnpm -r --if-present typecheck
+2026-11-07T03:03:33.1723639Z 
+2026-11-07T03:03:33.4946398Z Scope: 13 of 14 workspace projects
+2026-11-07T03:03:33.4979689Z experiments/evidence-validator typecheck$ tsc -p tsconfig.json --noEmit
+2026-11-07T03:03:33.4989519Z packages/session-isolation typecheck$ tsc -p tsconfig.json --noEmit
+2026-11-07T03:03:37.8993730Z packages/session-isolation typecheck: Done
+2026-11-07T03:03:37.9020968Z packages/shared typecheck$ tsc -p tsconfig.json --noEmit
+2026-11-07T03:03:40.1843764Z experiments/evidence-validator typecheck: Done
+2026-11-07T03:03:41.8503741Z packages/shared typecheck: Done
+2026-11-07T03:03:41.8508740Z packages/memory typecheck$ tsc -p tsconfig.json --noEmit
+2026-11-07T03:03:41.8513649Z packages/minecraft-adapter typecheck$ tsc -p tsconfig.json --noEmit
+2026-11-07T03:03:47.3436399Z packages/memory typecheck: Done
+2026-11-07T03:03:47.3482939Z packages/minecraft-knowledge typecheck$ tsc -p tsconfig.json --noEmit
+2026-11-07T03:03:50.3960023Z packages/minecraft-adapter typecheck: Done
+2026-11-07T03:03:50.3983523Z packages/society typecheck$ tsc -p tsconfig.json --noEmit
+2026-11-07T03:03:53.8023852Z packages/minecraft-knowledge typecheck: Done
+2026-11-07T03:03:54.3806299Z packages/society typecheck: Done
+2026-11-07T03:03:54.3815648Z packages/psychology typecheck$ tsc -p tsconfig.json --noEmit
+2026-11-07T03:03:54.3816651Z packages/skills typecheck$ tsc -p tsconfig.json --noEmit
+2026-11-07T03:04:00.5160231Z packages/psychology typecheck: Done
+2026-11-07T03:04:03.2914903Z packages/skills typecheck: Done
+2026-11-07T03:04:03.2924833Z packages/cognition typecheck$ tsc -p tsconfig.json --noEmit
+2026-11-07T03:04:08.9193196Z packages/cognition typecheck: Done
+2026-11-07T03:04:08.9197886Z packages/agent-core typecheck$ tsc -p tsconfig.json --noEmit
+2026-11-07T03:04:18.1150352Z packages/agent-core typecheck: Done
+2026-11-07T03:04:18.1155689Z apps/orchestrator typecheck$ tsc -p tsconfig.json --noEmit
+2026-11-07T03:04:26.3815007Z apps/orchestrator typecheck: Done
+2026-11-07T03:04:26.6456410Z 
+2026-11-07T03:04:26.6464720Z > minecraft-ai-civilization@0.1.0 typecheck:tools /home/runner/work/Minecraft-Ai-Civilization-windows-backup/Minecraft-Ai-Civilization-windows-backup
+2026-11-07T03:04:26.6466265Z > tsc -p tools/tsconfig.json
+2026-11-07T03:04:26.6466790Z 
+2026-11-07T03:04:35.5240116Z 
+2026-11-07T03:04:35.5241882Z > minecraft-ai-civilization@0.1.0 typecheck:evidence-validator /home/runner/work/Minecraft-Ai-Civilization-windows-backup/Minecraft-Ai-Civilization-windows-backup
+2026-11-07T03:04:35.5244277Z > tsc -p experiments/evidence-validator/tsconfig.json --noEmit
+2026-11-07T03:04:35.5244894Z 
+2026-11-07T03:04:39.1562361Z ##[group]Run pnpm lint
+2026-11-07T03:04:39.1562778Z pnpm lint
+2026-11-07T03:04:39.1608217Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-11-07T03:04:39.1608771Z env:
+2026-11-07T03:04:39.1609089Z   CI: true
+2026-11-07T03:04:39.1609412Z   OPENAI_API_KEY: 
+2026-11-07T03:04:39.1609772Z   ANTHROPIC_API_KEY: 
+2026-11-07T03:04:39.1610137Z   GEMINI_API_KEY: 
+2026-11-07T03:04:39.1610496Z   LLM_PROVIDER: none
+2026-11-07T03:04:39.1610838Z   NODE_ENV: test
+2026-11-07T03:04:39.1611263Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-11-07T03:04:39.1611781Z ##[endgroup]
+2026-11-07T03:04:39.4361136Z 
+2026-11-07T03:04:39.4363286Z > minecraft-ai-civilization@0.1.0 lint /home/runner/work/Minecraft-Ai-Civilization-windows-backup/Minecraft-Ai-Civilization-windows-backup
+2026-11-07T03:04:39.4389605Z > eslint .
+2026-11-07T03:04:39.4389845Z 
+2026-11-07T03:04:52.3076259Z ##[group]Run pnpm build
+2026-11-07T03:04:52.3076655Z pnpm build
+2026-11-07T03:04:52.3123161Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-11-07T03:04:52.3123720Z env:
+2026-11-07T03:04:52.3124051Z   CI: true
+2026-11-07T03:04:52.3124382Z   OPENAI_API_KEY: 
+2026-11-07T03:04:52.3124735Z   ANTHROPIC_API_KEY: 
+2026-11-07T03:04:52.3125108Z   GEMINI_API_KEY: 
+2026-11-07T03:04:52.3125478Z   LLM_PROVIDER: none
+2026-11-07T03:04:52.3125852Z   NODE_ENV: test
+2026-11-07T03:04:52.3126293Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-11-07T03:04:52.3126818Z ##[endgroup]
+2026-11-07T03:04:52.5886907Z 
+2026-11-07T03:04:52.5888747Z > minecraft-ai-civilization@0.1.0 build /home/runner/work/Minecraft-Ai-Civilization-windows-backup/Minecraft-Ai-Civilization-windows-backup
+2026-11-07T03:04:52.5890406Z > pnpm -r --if-present build
+2026-11-07T03:04:52.5890851Z 
+2026-11-07T03:04:52.8923741Z Scope: 13 of 14 workspace projects
+2026-11-07T03:04:52.8943744Z packages/session-isolation build$ tsc -p tsconfig.json
+2026-11-07T03:04:52.8950618Z packages/shared build$ tsc -p tsconfig.json
+2026-11-07T03:04:57.4843500Z packages/session-isolation build: Done
+2026-11-07T03:04:58.0901480Z packages/shared build: Done
+2026-11-07T03:04:58.0910201Z packages/minecraft-adapter build$ tsc -p tsconfig.json
+2026-11-07T03:04:58.0917817Z packages/memory build$ tsc -p tsconfig.json
+2026-11-07T03:05:04.1453568Z packages/memory build: Done
+2026-11-07T03:05:04.1493487Z packages/minecraft-knowledge build$ tsc -p tsconfig.json
+2026-11-07T03:05:07.5644031Z packages/minecraft-adapter build: Done
+2026-11-07T03:05:07.5657370Z packages/society build$ tsc -p tsconfig.json
+2026-11-07T03:05:11.5383762Z packages/minecraft-knowledge build: Done
+2026-11-07T03:05:12.1474304Z packages/society build: Done
+2026-11-07T03:05:12.1481151Z packages/skills build$ tsc -p tsconfig.json
+2026-11-07T03:05:12.1485338Z packages/psychology build$ tsc -p tsconfig.json
+2026-11-07T03:05:18.8583576Z packages/psychology build: Done
+2026-11-07T03:05:22.2948598Z packages/skills build: Done
+2026-11-07T03:05:22.2954430Z packages/cognition build$ tsc -p tsconfig.json
+2026-11-07T03:05:28.4161409Z packages/cognition build: Done
+2026-11-07T03:05:28.4165243Z packages/agent-core build$ tsc -p tsconfig.json
+2026-11-07T03:05:38.7212719Z packages/agent-core build: Done
+2026-11-07T03:05:38.7218384Z apps/orchestrator build$ tsc -p tsconfig.json
+2026-11-07T03:05:47.7405549Z apps/orchestrator build: Done
+2026-11-07T03:05:47.7567713Z ##[group]Run pnpm test:evidence-validator
+2026-11-07T03:05:47.7568060Z pnpm test:evidence-validator
+2026-11-07T03:05:47.7568328Z pnpm test:v1
+2026-11-07T03:05:47.7601665Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-11-07T03:05:47.7601990Z env:
+2026-11-07T03:05:47.7602431Z   CI: true
+2026-11-07T03:05:47.7602653Z   OPENAI_API_KEY: 
+2026-11-07T03:05:47.7602872Z   ANTHROPIC_API_KEY: 
+2026-11-07T03:05:47.7603075Z   GEMINI_API_KEY: 
+2026-11-07T03:05:47.7603271Z   LLM_PROVIDER: none
+2026-11-07T03:05:47.7603467Z   NODE_ENV: test
+2026-11-07T03:05:47.7603710Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-11-07T03:05:47.7603993Z ##[endgroup]
+2026-11-07T03:05:48.0518628Z 
+2026-11-07T03:05:48.0526825Z > minecraft-ai-civilization@0.1.0 test:evidence-validator /home/runner/work/Minecraft-Ai-Civilization-windows-backup/Minecraft-Ai-Civilization-windows-backup
+2026-11-07T03:05:48.0528718Z > vitest run --config experiments/evidence-validator/vitest.config.mjs
+2026-11-07T03:05:48.0529469Z 
+2026-11-07T03:05:48.4475863Z 
+2026-11-07T03:05:48.4479611Z  RUN  v3.2.7 /home/runner/work/Minecraft-Ai-Civilization-windows-backup/Minecraft-Ai-Civilization-windows-backup
+2026-11-07T03:05:48.4480959Z 
+2026-11-07T03:05:49.0764720Z  ✓ experiments/evidence-validator/test/phase2-crypto-verification.test.ts (15 tests) 77ms
+2026-11-07T03:05:49.4729404Z  ✓ experiments/evidence-validator/test/phase2-tampering-matrix.test.ts (21 tests) 24ms
+2026-11-07T03:05:49.8001628Z  ✓ experiments/evidence-validator/test/phase2-partial-histories.test.ts (10 tests) 16ms
+2026-11-07T03:05:50.1601768Z  ✓ experiments/evidence-validator/test/phase2-paper-tick.test.ts (8 tests) 34ms
+2026-11-07T03:05:50.4810079Z  ✓ experiments/evidence-validator/test/phase2-adversarial.test.ts (8 tests) 15ms
+2026-11-07T03:05:50.8060880Z  ✓ experiments/evidence-validator/test/negative-cases.test.ts (11 tests) 15ms
+2026-11-07T03:05:51.1152994Z  ✓ experiments/evidence-validator/test/phase2-adversarial-regressions.test.ts (14 tests) 8ms
+2026-11-07T03:05:51.4504578Z  ✓ experiments/evidence-validator/test/phase2-recorder-adapter.test.ts (10 tests) 15ms
+2026-11-07T03:05:51.9244944Z  ✓ experiments/evidence-validator/test/scripted-evidence-validation.test.ts (12 tests) 101ms
+2026-11-07T03:05:52.2549609Z  ✓ experiments/evidence-validator/test/phase2-adversarial-authenticity.test.ts (9 tests) 9ms
+2026-11-07T03:05:52.5468208Z  ✓ experiments/evidence-validator/test/action-verifier.test.ts (8 tests) 5ms
+2026-11-07T03:05:52.8520943Z  ✓ experiments/evidence-validator/test/v1-integration-bridge.test.ts (6 tests) 7ms
+2026-11-07T03:05:53.1629036Z  ✓ experiments/evidence-validator/test/phase2-v1-bridge-scenario.test.ts (3 tests) 7ms
+2026-11-07T03:05:53.4635530Z  ✓ experiments/evidence-validator/test/information-verifier.test.ts (5 tests) 4ms
+2026-11-07T03:05:53.7694918Z  ✓ experiments/evidence-validator/test/validator.test.ts (2 tests) 11ms
+2026-11-07T03:05:54.0747815Z  ✓ experiments/evidence-validator/test/phase2-incomplete-attestation.test.ts (7 tests) 11ms
+2026-11-07T03:05:54.3723437Z  ✓ experiments/evidence-validator/test/inventory-verifier.test.ts (3 tests) 4ms
+2026-11-07T03:05:54.7187919Z  ✓ experiments/evidence-validator/test/phase2-runtime-recorder-integration.test.ts (2 tests) 20ms
+2026-11-07T03:05:55.0228328Z  ✓ experiments/evidence-validator/test/duration-verifier.test.ts (3 tests) 4ms
+2026-11-07T03:05:55.3466176Z stdout | experiments/evidence-validator/test/cli.test.ts > Evidence Validator CLI > prints help and exits with code 0 on --help
+2026-11-07T03:05:55.3467737Z 
+2026-11-07T03:05:55.3468297Z Antigravity Experiment Evidence Validator CLI
+2026-11-07T03:05:55.3468804Z 
+2026-11-07T03:05:55.3469084Z Usage:
+2026-11-07T03:05:55.3469734Z   pnpm exec tsx experiments/evidence-validator/src/cli.ts [options]
+2026-11-07T03:05:55.3470320Z 
+2026-11-07T03:05:55.3470621Z Options:
+2026-11-07T03:05:55.3485018Z   --manifest <path>      Path to experiment manifest JSON
+2026-11-07T03:05:55.3485906Z   --journal <path>       Path to operator evidence journal JSONL
+2026-11-07T03:05:55.3493657Z   --events <path>        Path to events stream JSON or JSONL
+2026-11-07T03:05:55.3494963Z   --facts <path>         Path to citizen persistent facts JSON
+2026-11-07T03:05:55.3495991Z   --deliveries <path>    Path to citizen event deliveries JSON
+2026-11-07T03:05:55.3496991Z   --inventories <path>   Path to final inventories JSON
+2026-11-07T03:05:55.3497903Z   --output <path>        Output file for machine-readable JSON report
+2026-11-07T03:05:55.3498870Z   --summary <path>       Output file for human-readable Markdown summary
+2026-11-07T03:05:55.3499969Z   --strict               Exit with code 2 if overall status is NOT_PROVEN or VIOLATIONS_DETECTED
+2026-11-07T03:05:55.3500798Z   --help                 Show this help message
+2026-11-07T03:05:55.3501260Z 
+2026-11-07T03:05:55.3501396Z 
+2026-11-07T03:05:55.3608776Z stdout | experiments/evidence-validator/test/cli.test.ts > Evidence Validator CLI > processes manifest and journal files and outputs JSON and Markdown reports
+2026-11-07T03:05:55.3611256Z [validator] JSON report written to: /tmp/validator-cli-test-LTtsgE/report.json
+2026-11-07T03:05:55.3612750Z [validator] Markdown summary written to: /tmp/validator-cli-test-LTtsgE/summary.md
+2026-11-07T03:05:55.3613733Z [validator] Result: VERIFIED (Verified: 4, Violations: 0)
+2026-11-07T03:05:55.3614202Z 
+2026-11-07T03:05:55.3656005Z stdout | experiments/evidence-validator/test/cli.test.ts > Evidence Validator CLI > exits with code 2 on --strict when violations exist
+2026-11-07T03:05:55.3657355Z # Experiment Evidence Validation Report: exp-2v2-demo-001
+2026-11-07T03:05:55.3658288Z 
+2026-11-07T03:05:55.3662862Z **Overall Status:** 🔴 VIOLATIONS DETECTED | **Environment:** 🔬 Offline Simulated Fixture (Not a live Minecraft demo claim)
+2026-11-07T03:05:55.3664205Z **Generated At:** 2026-11-07T03:05:55.361Z
+2026-11-07T03:05:55.3664948Z **Source SHA:** `9945f02f38e14a7d63b3eed66279d191ad06ad3d`
+2026-11-07T03:05:55.3668100Z **Citizens:** gpt_atlas, gpt_maya, claude_theo, claude_ava
+2026-11-07T03:05:55.3668675Z **Communities:** north_cove, south_vale
+2026-11-07T03:05:55.3668953Z 
+2026-11-07T03:05:55.3669136Z > [!NOTE]
+2026-11-07T03:05:55.3670333Z > This report evaluates an **offline simulated test fixture**. Passing checks demonstrate verification capability and negative regression defense; they do **not** claim a successful live Minecraft demonstration on a Paper server.
+2026-11-07T03:05:55.3671155Z 
+2026-11-07T03:05:55.3671378Z ## Summary Metrics
+2026-11-07T03:05:55.3671522Z 
+2026-11-07T03:05:55.3671758Z | Metric | Value |
+2026-11-07T03:05:55.3672125Z | :--- | :--- |
+2026-11-07T03:05:55.3672764Z | **Total Attempted Actions** | 0 |
+2026-11-07T03:05:55.3673262Z | **Physically Verified Actions** | 0 |
+2026-11-07T03:05:55.3673733Z | **Unverified Action Claims** | 0 |
+2026-11-07T03:05:55.3674390Z | **Failed Actions** | 0 |
+2026-11-07T03:05:55.3674834Z | **Interrupted Actions** | 0 |
+2026-11-07T03:05:55.3675255Z | **Observed Facts** | 0 |
+2026-11-07T03:05:55.3675729Z | **Communicated Claims** | 0 |
+2026-11-07T03:05:55.3676170Z | **Privacy Violations** | 0 |
+2026-11-07T03:05:55.3676639Z | **Inventory Discrepancies** | 0 |
+2026-11-07T03:05:55.3677154Z | **Hash Chain Integrity** | INVALID / TAMPERED |
+2026-11-07T03:05:55.3677700Z | **Duration & Tick Proof** | DEFICIT / UNPROVEN |
+2026-11-07T03:05:55.3678125Z 
+2026-11-07T03:05:55.3683095Z ## ⚠️ Detected Violations
+2026-11-07T03:05:55.3683420Z 
+2026-11-07T03:05:55.3684107Z | Code | Citizen | Description | Severity |
+2026-11-07T03:05:55.3684693Z | :--- | :--- | :--- | :--- |
+2026-11-07T03:05:55.3687483Z | `DURATION_EVIDENCE_DEFICIT` | global | Simulation duration deficit: claimed 60 minutes, but evidence only proves 0 minutes (0 ms vs required 3600000 ms). A 58.8-minute run cannot be accepted as a completed 60-minute demonstration.; Missing tick evidence: no tick events recorded in evidence log; Absent TPS metrics: no server performance / TPS observations documented | **ERROR** |
+2026-11-07T03:05:55.3702737Z 
+2026-11-07T03:05:55.3713193Z ## ❓ Unproven Checks (Missing Evidence)
+2026-11-07T03:05:55.3715042Z 
+2026-11-07T03:05:55.3715362Z | Code | Description | Missing Fields |
+2026-11-07T03:05:55.3715904Z | :--- | :--- | :--- |
+2026-11-07T03:05:55.3716889Z | `NO_HASH_CHAIN_EVIDENCE` | Cryptographic operator journal hash chain not supplied | `rawJournalLines` |
+2026-11-07T03:05:55.3717704Z 
+2026-11-07T03:05:55.3718011Z ## Duration & Performance Audit
+2026-11-07T03:05:55.3718347Z 
+2026-11-07T03:05:55.3718624Z - **Claimed Duration:** 60 minutes
+2026-11-07T03:05:55.3719233Z - **Proven Duration:** 0 minutes (0 ms)
+2026-11-07T03:05:55.3719773Z - **Recorded Ticks:** 0
+2026-11-07T03:05:55.3720295Z - **Average Tick Duration:** 0 ms
+2026-11-07T03:05:55.3721010Z - **Average Measured TPS:** none recorded
+2026-11-07T03:05:55.3724409Z - **Duration Deficit Details:** Simulation duration deficit: claimed 60 minutes, but evidence only proves 0 minutes (0 ms vs required 3600000 ms). A 58.8-minute run cannot be accepted as a completed 60-minute demonstration.; Missing tick evidence: no tick events recorded in evidence log; Absent TPS metrics: no server performance / TPS observations documented
+2026-11-07T03:05:55.3726579Z 
+2026-11-07T03:05:55.3726803Z ---
+2026-11-07T03:05:55.3727698Z *Report generated by Google Antigravity Evidence Validator (redacted, offline verification).*
+2026-11-07T03:05:55.3728482Z 
+2026-11-07T03:05:55.3729630Z  ✓ experiments/evidence-validator/test/cli.test.ts (3 tests) 22ms
+2026-11-07T03:05:55.6704099Z  ✓ experiments/evidence-validator/test/smoke.test.ts (1 test) 5ms
+2026-11-07T03:05:55.6822806Z 
+2026-11-07T03:05:55.6834978Z  Test Files  21 passed (21)
+2026-11-07T03:05:55.6863494Z       Tests  161 passed (161)
+2026-11-07T03:05:55.6865434Z    Start at  03:05:48
+2026-11-07T03:05:55.6883635Z    Duration  7.23s (transform 412ms, setup 298ms, collect 770ms, tests 414ms, environment 5ms, prepare 2.99s)
+2026-11-07T03:05:55.6884521Z 
+2026-11-07T03:05:56.1287708Z 
+2026-11-07T03:05:56.1289364Z > minecraft-ai-civilization@0.1.0 test:v1 /home/runner/work/Minecraft-Ai-Civilization-windows-backup/Minecraft-Ai-Civilization-windows-backup
+2026-11-07T03:05:56.1290887Z > vitest run --config tools/vitest.config.ts
+2026-11-07T03:05:56.1291352Z 
+2026-11-07T03:05:56.5180258Z 
+2026-11-07T03:05:56.5194821Z  RUN  v3.2.7 /home/runner/work/Minecraft-Ai-Civilization-windows-backup/Minecraft-Ai-Civilization-windows-backup
+2026-11-07T03:05:56.5196193Z 
+2026-11-07T03:05:57.0309219Z  ✓ tools/ci/offline-acceptance.test.ts (16 tests) 31ms
+2026-11-07T03:05:57.4401248Z  ✓ tools/v1-integration/evidence-contract.test.ts (50 tests) 41ms
+2026-11-07T03:05:57.8554765Z  ✓ tools/v1-integration/journal-cross-check.test.ts (27 tests) 61ms
+2026-11-07T03:06:11.8045084Z stderr | tools/v1-integration/combined-cancellation.test.ts > discards actual delayed provider replies after citizen death and manager shutdown while preserving memory
+2026-11-07T03:06:11.8046521Z [shutdown] drain incomplete: attempted=4 remaining=2 timedOut=true
+2026-11-07T03:06:11.8047074Z 
+2026-11-07T03:06:11.8628103Z  ✓ tools/v1-integration/combined-cancellation.test.ts (2 tests) 11678ms
+2026-11-07T03:06:11.8630255Z    ✓ reopens partial construction after cancellation during delayed navigation without late placement  510ms
+2026-11-07T03:06:11.8631642Z    ✓ discards actual delayed provider replies after citizen death and manager shutdown while preserving memory  11167ms
+2026-11-07T03:06:36.2894644Z  ✓ tools/v1-integration/scenario.test.ts (4 tests) 23557ms
+2026-11-07T03:06:36.2905605Z    ✓ offline composition scenario > routes 2 citizens through scripted models and preserves private memory after reopening disposable SQLite  7347ms
+2026-11-07T03:06:36.2912533Z    ✓ offline composition scenario > routes 4 citizens through scripted models and preserves private memory after reopening disposable SQLite  13189ms
+2026-11-07T03:06:36.2914538Z    ✓ offline composition scenario > exposes the lower composition root createBody trust boundary without network access  3014ms
+2026-11-07T03:06:36.6427334Z  ✓ tools/v1-acceptance/engine.test.ts (9 tests) 15ms
+2026-11-07T03:06:36.9625624Z  ✓ tools/v1-integration/manifest.test.ts (13 tests) 9ms
+2026-11-07T03:06:58.2811522Z  ✓ tools/v1-integration/combined-journal.test.ts (2 tests) 20496ms
+2026-11-07T03:06:58.2813494Z    ✓ cross-checks 2 citizens' actual recorded actions without replacing IDs  7322ms
+2026-11-07T03:06:58.2814444Z    ✓ cross-checks 4 citizens' actual recorded actions without replacing IDs  13173ms
+2026-11-07T03:06:58.8264667Z  ✓ tools/v1-integration/preflight.test.ts (10 tests) 230ms
+2026-11-07T03:06:59.1312420Z  ✓ tools/v1-integration/regressions.test.ts (5 tests) 5ms
+2026-11-07T03:06:59.4689707Z  ✓ tools/v1-integration/validator-adapter.test.ts (6 tests) 5ms
+2026-11-07T03:07:01.8305958Z  ✓ tools/ci/journal-execution.test.ts (2 tests) 2050ms
+2026-11-07T03:07:01.8310872Z    ✓ executes the real journal CLI and its forged/missing controls without mutating original artifacts  1052ms
+2026-11-07T03:07:01.8312788Z    ✓ refuses to report verification success when the real journal CLI rejects the input  997ms
+2026-11-07T03:07:02.1346512Z  ✓ tools/v1-integration/branches.test.ts (2 tests) 5ms
+2026-11-07T03:07:03.0771705Z  ✓ tools/v1-integration/integrated-chest-adapter.test.ts (1 test) 114ms
+2026-11-07T03:07:03.0932882Z 
+2026-11-07T03:07:03.0934249Z  Test Files  14 passed (14)
+2026-11-07T03:07:03.0954275Z       Tests  149 passed (149)
+2026-11-07T03:07:03.0955474Z    Start at  03:05:56
+2026-11-07T03:07:03.0984533Z    Duration  66.57s (transform 1.65s, setup 177ms, collect 4.12s, tests 58.30s, environment 3ms, prepare 2.05s)
+2026-11-07T03:07:03.0985725Z 
+2026-11-07T03:07:03.2405122Z ##[group]Run pnpm exec vitest run --config qa/construction-persistence/vitest.config.ts
+2026-11-07T03:07:03.2406156Z pnpm exec vitest run --config qa/construction-persistence/vitest.config.ts
+2026-11-07T03:07:03.2406986Z pnpm exec vitest run --config qa/v57/vitest.config.ts
+2026-11-07T03:07:03.2407747Z pnpm exec vitest run --config qa/provider-safety/vitest.config.ts
+2026-11-07T03:07:03.2408532Z pnpm exec vitest run --config qa/action-audit/vitest.config.ts
+2026-11-07T03:07:03.2447410Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-11-07T03:07:03.2447741Z env:
+2026-11-07T03:07:03.2447925Z   CI: true
+2026-11-07T03:07:03.2448104Z   OPENAI_API_KEY: 
+2026-11-07T03:07:03.2448303Z   ANTHROPIC_API_KEY: 
+2026-11-07T03:07:03.2448500Z   GEMINI_API_KEY: 
+2026-11-07T03:07:03.2448691Z   LLM_PROVIDER: none
+2026-11-07T03:07:03.2448886Z   NODE_ENV: test
+2026-11-07T03:07:03.2449127Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-11-07T03:07:03.2449475Z ##[endgroup]
+2026-11-07T03:07:03.9126730Z 
+2026-11-07T03:07:03.9134364Z  RUN  v3.2.7 /home/runner/work/Minecraft-Ai-Civilization-windows-backup/Minecraft-Ai-Civilization-windows-backup
+2026-11-07T03:07:03.9134950Z 
+2026-11-07T03:07:06.4394120Z stdout | qa/construction-persistence/test/persistence.test.ts > completes through real executor placements and reopens SQLite without rebuilding
+2026-11-07T03:07:06.4421052Z completion evidence {"project":{"id":"project_workshop_cabin_v1_citizen_atlas_100_70_100","type":"STRUCTURE_BUILD","ownerCitizenId":"citizen_atlas","status":"COMPLETED","stage":"FINAL_VALIDATION","blueprintId":"workshop_cabin_v1","blueprintVersion":1,"facing":"south","site":{"x":100,"y":70,"z":100},"requiredResources":{"oak_planks":66,"oak_door":1,"torch":1,"chest":1,"crafting_table":1},"reservedResources":{},"blocked":[],"placed":71,"total":70,"verified":70,"startedAt":"2026-11-07T03:07:06.217Z","session":{"instanceId":"build_workshop_cabin_v1_1794020826217","blueprintId":"workshop_cabin_v1","blueprintVersion":1,"structureType":"WORKSHOP","facing":"south","origin":{"x":100,"y":70,"z":100},"materials":{"WALL_MATERIAL":"oak_planks","FLOOR_MATERIAL":"oak_planks","ROOF_MATERIAL":"oak_planks","FOUNDATION_MATERIAL":"oak_planks","DOOR_MATERIAL":"oak_door","LIGHT_MATERIAL":"torch","STORAGE_MATERIAL":"chest","WORKSTATION_MATERIAL":"crafting_table","BED_MATERIAL":"red_bed","FURNACE_MATERIAL":"furnace"},"extras":["chest","lighting","crafting_table"],"stage":"FINAL_VALIDATION","status":"COMPLETE","placed":71,"total":70,"failures":[]},"preflightBlockers":[],"remainingResources":{"crafting_table":1},"materialShortfall":{},"cancelled":false,"lastPersistOk":true,"completedAt":"2026-11-07T03:07:06.617Z"},"requests":70,"inventory":{"oak_planks":934,"oak_door":9,"chest":9,"torch":9,"crafting_table":9},"result":{"success":true,"data":{"complete":true,"persisted":true,"phase":"COMPLETED","projectId":"project_workshop_cabin_v1_citizen_atlas_100_70_100"},"durationMs":0}}
+2026-11-07T03:07:06.4428657Z 
+2026-11-07T03:07:06.7198278Z stdout | qa/construction-persistence/test/persistence.test.ts > dispatcher with property observations completes and reloads without duplicate placements
+2026-11-07T03:07:06.7211603Z dispatcher restart evidence {"id":"project_workshop_cabin_v1_citizen_atlas_100_70_100","status":"COMPLETED","placed":71,"requests":70,"inventory":{"oak_planks":934,"oak_door":9,"chest":9,"torch":9,"crafting_table":9}}
+2026-11-07T03:07:06.7213040Z 
+2026-11-07T03:07:06.7346931Z  ✓ qa/construction-persistence/test/persistence.test.ts (12 tests) 517ms
+2026-11-07T03:07:06.7523216Z 
+2026-11-07T03:07:06.7543758Z  Test Files  1 passed (1)
+2026-11-07T03:07:06.7557666Z       Tests  12 passed (12)
+2026-11-07T03:07:06.7578137Z    Start at  03:07:03
+2026-11-07T03:07:06.7624905Z    Duration  2.84s (transform 1.28s, setup 66ms, collect 1.90s, tests 517ms, environment 0ms, prepare 175ms)
+2026-11-07T03:07:06.7630837Z 
+2026-11-07T03:07:07.5569773Z 
+2026-11-07T03:07:07.5574240Z  RUN  v3.2.7 /home/runner/work/Minecraft-Ai-Civilization-windows-backup/Minecraft-Ai-Civilization-windows-backup/qa/v57
+2026-11-07T03:07:07.5575675Z 
+2026-11-07T03:07:08.7174821Z  ✓ test/adv57-movement.test.ts (51 tests) 173ms
+2026-11-07T03:07:10.9755051Z stderr | test/adv57-construction.test.ts > [ADV57-C3] defect 3: evidence directory isolation and protected paths > evidence dir INSIDE the isolated world-lab or equal to it: policy probe (INFO)
+2026-11-07T03:07:10.9757437Z QA57-INFO evidence==isolated world dir -> ALLOWED
+2026-11-07T03:07:10.9759222Z 
+2026-11-07T03:07:11.0059022Z stderr | test/adv57-construction.test.ts > [ADV57-C5] mixed-case and Unicode aliases (host filesystem dependent) > on a case-SENSITIVE host a nonexistent upper-case alias must still not be ALLOWED for evidence (future-created alias)
+2026-11-07T03:07:11.0062623Z QA57-INFO case-sensitive host: DATA/evidence -> ALLOWED (a different directory on this FS; correct to allow, not provable as alias)
+2026-11-07T03:07:11.0064158Z 
+2026-11-07T03:07:11.0339634Z  ❯ test/adv57-construction.test.ts (114 tests | 1 failed) 177ms
+2026-11-07T03:07:11.0342543Z    ✓ [ADV57-C0] control: the fixture is not vacuously refusing > approved configuration is ALLOWED, and its gate is frozen and carries canonical paths 12ms
+2026-11-07T03:07:11.0345704Z    ✓ [ADV57-C0] control: the fixture is not vacuously refusing > every approval variable missing/wrong is refused (default deny) 3ms
+2026-11-07T03:07:11.0349037Z    ✓ [ADV57-C1] defect 1: non-loopback server rejection > refuses MINECRAFT_HOST="mc.example.com" with a HOST-specific reason 4ms
+2026-11-07T03:07:11.0351210Z    ✓ [ADV57-C1] defect 1: non-loopback server rejection > refuses MINECRAFT_HOST="localhost" with a HOST-specific reason 2ms
+2026-11-07T03:07:11.0353783Z    ✓ [ADV57-C1] defect 1: non-loopback server rejection > refuses MINECRAFT_HOST="0.0.0.0" with a HOST-specific reason 1ms
+2026-11-07T03:07:11.0355753Z    ✓ [ADV57-C1] defect 1: non-loopback server rejection > refuses MINECRAFT_HOST="10.0.0.5" with a HOST-specific reason 1ms
+2026-11-07T03:07:11.0357291Z    ✓ [ADV57-C1] defect 1: non-loopback server rejection > refuses MINECRAFT_HOST="192.168.1.9" with a HOST-specific reason 1ms
+2026-11-07T03:07:11.0358775Z    ✓ [ADV57-C1] defect 1: non-loopback server rejection > refuses MINECRAFT_HOST="8.8.8.8" with a HOST-specific reason 1ms
+2026-11-07T03:07:11.0360164Z    ✓ [ADV57-C1] defect 1: non-loopback server rejection > refuses MINECRAFT_HOST="127.0.0.1.evil.com" with a HOST-specific reason 1ms
+2026-11-07T03:07:11.0361529Z    ✓ [ADV57-C1] defect 1: non-loopback server rejection > refuses MINECRAFT_HOST="127.1" with a HOST-specific reason 1ms
+2026-11-07T03:07:11.0363283Z    ✓ [ADV57-C1] defect 1: non-loopback server rejection > refuses MINECRAFT_HOST="2130706433" with a HOST-specific reason 1ms
+2026-11-07T03:07:11.0369947Z    ✓ [ADV57-C1] defect 1: non-loopback server rejection > refuses MINECRAFT_HOST="0x7f.0.0.1" with a HOST-specific reason 1ms
+2026-11-07T03:07:11.0376302Z    ✓ [ADV57-C1] defect 1: non-loopback server rejection > refuses MINECRAFT_HOST="127.0.0.1 " with a HOST-specific reason 1ms
+2026-11-07T03:07:11.0377814Z    ✓ [ADV57-C1] defect 1: non-loopback server rejection > refuses MINECRAFT_HOST=" 127.0.0.1" with a HOST-specific reason 1ms
+2026-11-07T03:07:11.0379224Z    ✓ [ADV57-C1] defect 1: non-loopback server rejection > refuses MINECRAFT_HOST="127.0.0.1\n" with a HOST-specific reason 1ms
+2026-11-07T03:07:11.0380788Z    ✓ [ADV57-C1] defect 1: non-loopback server rejection > refuses MINECRAFT_HOST="127.0.0.1/" with a HOST-specific reason 1ms
+2026-11-07T03:07:11.0383226Z    ✓ [ADV57-C1] defect 1: non-loopback server rejection > refuses MINECRAFT_HOST="[::1]" with a HOST-specific reason 1ms
+2026-11-07T03:07:11.0384860Z    ✓ [ADV57-C1] defect 1: non-loopback server rejection > refuses MINECRAFT_HOST="::" with a HOST-specific reason 1ms
+2026-11-07T03:07:11.0386978Z    ✓ [ADV57-C1] defect 1: non-loopback server rejection > refuses MINECRAFT_HOST="::ffff:127.0.0.1" with a HOST-specific reason 1ms
+2026-11-07T03:07:11.0393862Z    ✓ [ADV57-C1] defect 1: non-loopback server rejection > refuses MINECRAFT_HOST="fe80::1" with a HOST-specific reason 1ms
+2026-11-07T03:07:11.0395794Z    ✓ [ADV57-C1] defect 1: non-loopback server rejection > refuses MINECRAFT_HOST="fe80::1%lo0" with a HOST-specific reason 1ms
+2026-11-07T03:07:11.0397709Z    ✓ [ADV57-C1] defect 1: non-loopback server rejection > refuses MINECRAFT_HOST="::1%25lo0" with a HOST-specific reason 1ms
+2026-11-07T03:07:11.0399593Z    ✓ [ADV57-C1] defect 1: non-loopback server rejection > refuses MINECRAFT_HOST="::2" with a HOST-specific reason 1ms
+2026-11-07T03:07:11.0401568Z    ✓ [ADV57-C1] defect 1: non-loopback server rejection > refuses MINECRAFT_HOST="1::1" with a HOST-specific reason 1ms
+2026-11-07T03:07:11.0413917Z    ✓ [ADV57-C1] defect 1: non-loopback server rejection > refuses MINECRAFT_HOST="" with a HOST-specific reason 1ms
+2026-11-07T03:07:11.0416071Z    ✓ [ADV57-C1] defect 1: non-loopback server rejection > refuses MINECRAFT_HOST="127.0.0.1:25565" with a HOST-specific reason 1ms
+2026-11-07T03:07:11.0418377Z    ✓ [ADV57-C1] defect 1: non-loopback server rejection > refuses MINECRAFT_HOST="user@127.0.0.1" with a HOST-specific reason 1ms
+2026-11-07T03:07:11.0420804Z    ✓ [ADV57-C1] defect 1: non-loopback server rejection > refuses MINECRAFT_HOST="ⅰ.com" with a HOST-specific reason 2ms
+2026-11-07T03:07:11.0423229Z    ✓ [ADV57-C1] defect 1: non-loopback server rejection > refuses MINECRAFT_HOST="126.255.255.255" with a HOST-specific reason 1ms
+2026-11-07T03:07:11.0425341Z    ✓ [ADV57-C1] defect 1: non-loopback server rejection > refuses MINECRAFT_HOST="128.0.0.1" with a HOST-specific reason 1ms
+2026-11-07T03:07:11.0428199Z    ✓ [ADV57-C1] defect 1: non-loopback server rejection > refuses MINECRAFT_HOST="0177.0.0.1" with a HOST-specific reason 1ms
+2026-11-07T03:07:11.0472104Z    ✓ [ADV57-C1] defect 1: non-loopback server rejection > refuses MINECRAFT_HOST="::127.0.0.1" with a HOST-specific reason 1ms
+2026-11-07T03:07:11.0480154Z    ✓ [ADV57-C1] defect 1: non-loopback server rejection > accepts genuine loopback literal "127.0.0.1" 2ms
+2026-11-07T03:07:11.0481870Z    ✓ [ADV57-C1] defect 1: non-loopback server rejection > accepts genuine loopback literal "127.0.0.2" 9ms
+2026-11-07T03:07:11.0484404Z    ✓ [ADV57-C1] defect 1: non-loopback server rejection > accepts genuine loopback literal "127.255.255.254" 2ms
+2026-11-07T03:07:11.0486368Z    ✓ [ADV57-C1] defect 1: non-loopback server rejection > accepts genuine loopback literal "::1" 2ms
+2026-11-07T03:07:11.0488325Z    ✓ [ADV57-C1] defect 1: non-loopback server rejection > accepts genuine loopback literal "0:0:0:0:0:0:0:1" 1ms
+2026-11-07T03:07:11.0490393Z    ✓ [ADV57-C1] defect 1: non-loopback server rejection > accepts genuine loopback literal "0000:0000:0000:0000:0000:0000:0000:0001" 1ms
+2026-11-07T03:07:11.0492896Z    ✓ [ADV57-C1] defect 1: non-loopback server rejection > omitted host defaults to loopback 1ms
+2026-11-07T03:07:11.0494860Z    ✓ [ADV57-C1] defect 1: non-loopback server rejection > Stage-1 live gate inherits the host rule (cannot be bypassed by the auth phrase) 1ms
+2026-11-07T03:07:11.0497120Z    ✓ [ADV57-C1] defect 1: non-loopback server rejection > prototype/inherited env keys do not smuggle a host 1ms
+2026-11-07T03:07:11.0498871Z    ✓ [ADV57-C2] defect 2: Paper and RCON ports > shared port 25568/25568 refused 1ms
+2026-11-07T03:07:11.0500625Z    ✓ [ADV57-C2] defect 2: Paper and RCON ports > shared port 25578/25578 refused 1ms
+2026-11-07T03:07:11.0502371Z    ✓ [ADV57-C2] defect 2: Paper and RCON ports > shared port 30000/30000 refused 1ms
+2026-11-07T03:07:11.0504261Z    ✓ [ADV57-C2] defect 2: Paper and RCON ports > shared port 25568/25568 refused 2ms
+2026-11-07T03:07:11.0506329Z    ✓ [ADV57-C2] defect 2: Paper and RCON ports > shared-port refusal fires for a port that is NOT otherwise protected (proves the distinct-port rule itself) 1ms
+2026-11-07T03:07:11.0508627Z    ✓ [ADV57-C2] defect 2: Paper and RCON ports > bad/protected port "25565" refused 1ms
+2026-11-07T03:07:11.0510253Z    ✓ [ADV57-C2] defect 2: Paper and RCON ports > bad/protected port "25567" refused 1ms
+2026-11-07T03:07:11.0512028Z    ✓ [ADV57-C2] defect 2: Paper and RCON ports > bad/protected port "25575" refused 1ms
+2026-11-07T03:07:11.0513851Z    ✓ [ADV57-C2] defect 2: Paper and RCON ports > bad/protected port "25577" refused 1ms
+2026-11-07T03:07:11.0516071Z    ✓ [ADV57-C2] defect 2: Paper and RCON ports > bad/protected port "0" refused 1ms
+2026-11-07T03:07:11.0517721Z    ✓ [ADV57-C2] defect 2: Paper and RCON ports > bad/protected port "65536" refused 2ms
+2026-11-07T03:07:11.0519931Z    ✓ [ADV57-C2] defect 2: Paper and RCON ports > bad/protected port "-1" refused 1ms
+2026-11-07T03:07:11.0521457Z    ✓ [ADV57-C2] defect 2: Paper and RCON ports > bad/protected port "25568.5" refused 1ms
+2026-11-07T03:07:11.0523416Z    ✓ [ADV57-C2] defect 2: Paper and RCON ports > bad/protected port "1e4" refused 1ms
+2026-11-07T03:07:11.0524969Z    ✓ [ADV57-C2] defect 2: Paper and RCON ports > bad/protected port "0x63d0" refused 1ms
+2026-11-07T03:07:11.0526792Z    ✓ [ADV57-C2] defect 2: Paper and RCON ports > bad/protected port " 25568" refused 1ms
+2026-11-07T03:07:11.0528560Z    ✓ [ADV57-C2] defect 2: Paper and RCON ports > bad/protected port "25568 " refused 1ms
+2026-11-07T03:07:11.0530429Z    ✓ [ADV57-C2] defect 2: Paper and RCON ports > bad/protected port "٢٥٥٦٨" refused 1ms
+2026-11-07T03:07:11.0532537Z    ✓ [ADV57-C2] defect 2: Paper and RCON ports > bad/protected port "" refused 1ms
+2026-11-07T03:07:11.0534295Z    ✓ [ADV57-C2] defect 2: Paper and RCON ports > bad/protected port "NaN" refused 1ms
+2026-11-07T03:07:11.0536161Z    ✓ [ADV57-C2] defect 2: Paper and RCON ports > bad/protected port "99999999999999999999" refused 1ms
+2026-11-07T03:07:11.0538341Z    ✓ [ADV57-C2] defect 2: Paper and RCON ports > leading-zero spelling of a protected port (025567) cannot alias the protected port 1ms
+2026-11-07T03:07:11.0540418Z    ✓ [ADV57-C2] defect 2: Paper and RCON ports > leading-zero spelling of RCON 25577 refused 1ms
+2026-11-07T03:07:11.0542582Z    ✓ [ADV57-C2] defect 2: Paper and RCON ports > zero-padded equal ports refused as shared 1ms
+2026-11-07T03:07:11.0544810Z    ✓ [ADV57-C2] defect 2: Paper and RCON ports > an unprotected but non-isolated port is currently accepted (policy probe, INFO) 2ms
+2026-11-07T03:07:11.0547440Z    ✓ [ADV57-C3] defect 3: evidence directory isolation and protected paths > evidence="data/evidence" refused 1ms
+2026-11-07T03:07:11.0549620Z    ✓ [ADV57-C3] defect 3: evidence directory isolation and protected paths > evidence="data" refused 1ms
+2026-11-07T03:07:11.0551823Z    ✓ [ADV57-C3] defect 3: evidence directory isolation and protected paths > evidence="data/" refused 1ms
+2026-11-07T03:07:11.0554145Z    ✓ [ADV57-C3] defect 3: evidence directory isolation and protected paths > evidence="./data/evidence" refused 1ms
+2026-11-07T03:07:11.0556805Z    × [ADV57-C3] defect 3: evidence directory isolation and protected paths > evidence="DATA/evidence" refused 10ms
+2026-11-07T03:07:11.0558419Z      → expected 'ALLOWED' not to be 'ALLOWED' // Object.is equality
+2026-11-07T03:07:11.0560097Z    ✓ [ADV57-C3] defect 3: evidence directory isolation and protected paths > evidence="world-lab/evidence" refused 2ms
+2026-11-07T03:07:11.0562096Z    ✓ [ADV57-C3] defect 3: evidence directory isolation and protected paths > evidence="world-lab" refused 2ms
+2026-11-07T03:07:11.0564573Z    ✓ [ADV57-C3] defect 3: evidence directory isolation and protected paths > evidence="world-lab/inner" refused 2ms
+2026-11-07T03:07:11.0566935Z    ✓ [ADV57-C3] defect 3: evidence directory isolation and protected paths > evidence="." refused 1ms
+2026-11-07T03:07:11.0568825Z    ✓ [ADV57-C3] defect 3: evidence directory isolation and protected paths > evidence="" refused 2ms
+2026-11-07T03:07:11.0570922Z    ✓ [ADV57-C3] defect 3: evidence directory isolation and protected paths > evidence="isolated/../data/x" refused 1ms
+2026-11-07T03:07:11.0573266Z    ✓ [ADV57-C3] defect 3: evidence directory isolation and protected paths > evidence="data/../data/evidence/deep/er" refused 1ms
+2026-11-07T03:07:11.0575752Z    ✓ [ADV57-C3] defect 3: evidence directory isolation and protected paths > evidence beside the protected DB: refusal reason is the alias rule (not an incidental error) 1ms
+2026-11-07T03:07:11.0578962Z    ✓ [ADV57-C3] defect 3: evidence directory isolation and protected paths > evidence that is a PARENT of the protected tree (workspace root) refused 1ms
+2026-11-07T03:07:11.0581831Z    ✓ [ADV57-C3] defect 3: evidence directory isolation and protected paths > evidence as a symlink to the protected data dir refused 1ms
+2026-11-07T03:07:11.0585056Z    ✓ [ADV57-C3] defect 3: evidence directory isolation and protected paths > dangling symlink evidence dir refused (lstat vs stat) 1ms
+2026-11-07T03:07:11.0587653Z    ✓ [ADV57-C3] defect 3: evidence directory isolation and protected paths > evidence ancestor is a regular FILE refused 1ms
+2026-11-07T03:07:11.0590781Z    ✓ [ADV57-C3] defect 3: evidence directory isolation and protected paths > legitimate not-yet-created nested evidence dir is allowed (control) 1ms
+2026-11-07T03:07:11.0594202Z    ✓ [ADV57-C3] defect 3: evidence directory isolation and protected paths > evidence dir INSIDE the isolated world-lab or equal to it: policy probe (INFO) 2ms
+2026-11-07T03:07:11.0597452Z    ✓ [ADV57-C3] defect 3: evidence directory isolation and protected paths > isolated world == protected / DB == protected DB / world inside protected refused 2ms
+2026-11-07T03:07:11.0600101Z    ✓ [ADV57-C3] defect 3: evidence directory isolation and protected paths > missing / non-existent isolated or protected targets fail CLOSED 1ms
+2026-11-07T03:07:11.0603249Z    ✓ [ADV57-C3] defect 3: evidence directory isolation and protected paths > NUL byte / control chars in any path refused 2ms
+2026-11-07T03:07:11.0605937Z    ✓ [ADV57-C4] symlink / hardlink / alias behaviour > isolated DB hardlinked to the protected DB refused 1ms
+2026-11-07T03:07:11.0608955Z    ✓ [ADV57-C4] symlink / hardlink / alias behaviour > hardlink inside the evidence tree / world tree to a protected file refused 1ms
+2026-11-07T03:07:11.0611818Z    ✓ [ADV57-C4] symlink / hardlink / alias behaviour > symlink in the isolated world pointing at the protected world refused 1ms
+2026-11-07T03:07:11.0614880Z    ✓ [ADV57-C4] symlink / hardlink / alias behaviour > isolated world-lab path IS a symlink to protected world refused 2ms
+2026-11-07T03:07:11.0617571Z    ✓ [ADV57-C4] symlink / hardlink / alias behaviour > isolated DB symlink to protected DB refused (also via chain of two links) 1ms
+2026-11-07T03:07:11.0621783Z    ✓ [ADV57-C4] symlink / hardlink / alias behaviour > a symlink to a clean external dir inside the isolated tree is refused (links never allowed) -- control for strictness 2ms
+2026-11-07T03:07:11.0625878Z    ✓ [ADV57-C4] symlink / hardlink / alias behaviour > sidecars: -wal/-shm/-journal as symlink or hardlink to protected files refused; a plain regular sidecar allowed 3ms
+2026-11-07T03:07:11.0629049Z    ✓ [ADV57-C4] symlink / hardlink / alias behaviour > a FIFO / special file in the isolated tree refused 7ms
+2026-11-07T03:07:11.0632066Z    ✓ [ADV57-C5] mixed-case and Unicode aliases (host filesystem dependent) > [host case-insensitive=false] upper-case spellings of protected paths are refused in every slot 2ms
+2026-11-07T03:07:11.0635834Z    ✓ [ADV57-C5] mixed-case and Unicode aliases (host filesystem dependent) > on a case-SENSITIVE host a nonexistent upper-case alias must still not be ALLOWED for evidence (future-created alias) 2ms
+2026-11-07T03:07:11.0639221Z    ✓ [ADV57-C5] mixed-case and Unicode aliases (host filesystem dependent) > Unicode normalization alias (NFD vs NFC) of the protected world: refused or distinct-FS 2ms
+2026-11-07T03:07:11.0643115Z    ✓ [ADV57-C6] mutation after preflight and replayed/forged handoff > clean handoff opens exactly once, read-only; replay refused; forged copy refused; mutation of returned gate impossible 4ms
+2026-11-07T03:07:11.0646368Z    ✓ [ADV57-C6] mutation after preflight and replayed/forged handoff > close() is idempotent (no double-close of a recycled fd) 2ms
+2026-11-07T03:07:11.0649233Z    ✓ [ADV57-C6] mutation after preflight and replayed/forged handoff > two independent gates have independent single-use handoffs 3ms
+2026-11-07T03:07:11.0651681Z    ✓ [ADV57-C6] mutation after preflight and replayed/forged handoff > refuses handoff after: DB replaced by symlink to protected DB 2ms
+2026-11-07T03:07:11.0654537Z    ✓ [ADV57-C6] mutation after preflight and replayed/forged handoff > refuses handoff after: DB rewritten in place (size/mtime change) 1ms
+2026-11-07T03:07:11.0657033Z    ✓ [ADV57-C6] mutation after preflight and replayed/forged handoff > refuses handoff after: DB renamed away and replaced by fresh file 1ms
+2026-11-07T03:07:11.0659888Z    ✓ [ADV57-C6] mutation after preflight and replayed/forged handoff > refuses handoff after: WAL sidecar appears 1ms
+2026-11-07T03:07:11.0662299Z    ✓ [ADV57-C6] mutation after preflight and replayed/forged handoff > refuses handoff after: protected DB modified 1ms
+2026-11-07T03:07:11.0664959Z    ✓ [ADV57-C6] mutation after preflight and replayed/forged handoff > refuses handoff after: protected DB sidecar appears 2ms
+2026-11-07T03:07:11.0667175Z    ✓ [ADV57-C6] mutation after preflight and replayed/forged handoff > refuses handoff after: protected DB hardlinked into isolated tree 2ms
+2026-11-07T03:07:11.0670020Z    ✓ [ADV57-C6] mutation after preflight and replayed/forged handoff > refuses handoff after: evidence ancestor swapped for symlink to protected data 1ms
+2026-11-07T03:07:11.0672835Z    ✓ [ADV57-C6] mutation after preflight and replayed/forged handoff > refuses handoff after: new file added to isolated world 1ms
+2026-11-07T03:07:11.0675716Z    ✓ [ADV57-C6] mutation after preflight and replayed/forged handoff > a refused handoff still consumes the token (no retry oracle) 2ms
+2026-11-07T03:07:11.0678022Z    ✓ [ADV57-C7] assertIsolatedNotOriginal direct API > rejects relative escapes, root, empty 1ms
+2026-11-07T03:07:11.0680887Z    ✓ [ADV57-C7] assertIsolatedNotOriginal direct API > rejects Windows-syntax absolute paths on POSIX hosts and vice versa (fail closed) 1ms
+2026-11-07T03:07:11.4433019Z  ✓ test/adv57-primitives.test.ts (18 tests) 26ms
+2026-11-07T03:07:11.9531808Z  ✓ test/adv57-body-lifecycle.test.ts (7 tests) 38ms
+2026-11-07T03:07:12.6754378Z  ❯ test/adv57-construction-real.test.ts (10 tests | 1 failed) 37ms
+2026-11-07T03:07:12.6814583Z    ✓ [ADV57-R] unmocked, default-path, real workspace discovery > all-defaults configuration is allowed (control) and evidence defaults under the experiment root 6ms
+2026-11-07T03:07:12.6817081Z    ✓ [ADV57-R] unmocked, default-path, real workspace discovery > defect 1 (host) refused in the real environment 4ms
+2026-11-07T03:07:12.6818421Z    ✓ [ADV57-R] unmocked, default-path, real workspace discovery > defect 2 (shared port) refused in the real environment 1ms
+2026-11-07T03:07:12.6819909Z    × [ADV57-R] unmocked, default-path, real workspace discovery > defect 3 (evidence beside protected DB) refused in the real environment 10ms
+2026-11-07T03:07:12.6821285Z      → expected true to be false // Object.is equality
+2026-11-07T03:07:12.6822715Z    ✓ [ADV57-R] unmocked, default-path, real workspace discovery > workspace reached through a symlinked path (cwd = alias of root) still protects the originals 3ms
+2026-11-07T03:07:12.6825193Z    ✓ [ADV57-R] unmocked, default-path, real workspace discovery > fresh-clone shape (no protected world-lab/data present) fails CLOSED, never open 1ms
+2026-11-07T03:07:12.6827579Z    ✓ [ADV57-R] unmocked, default-path, real workspace discovery > isolated directory replaced by symlink to the protected world between runs is caught on the next run 2ms
+2026-11-07T03:07:12.6829770Z    ✓ [ADV57-R] unmocked, default-path, real workspace discovery > end-to-end: gate -> handoff -> fd is a read-only descriptor of the isolated DB (cannot write) 3ms
+2026-11-07T03:07:12.6831940Z    ✓ [ADV57-R] unmocked, default-path, real workspace discovery > a silent-env approval and loadConfig() agree on the Paper port the body would use 4ms
+2026-11-07T03:07:12.6834194Z    ✓ [ADV57-R] unmocked, default-path, real workspace discovery > the allowed gate exposes the vetted host so consumers need not re-read env 2ms
+2026-11-07T03:07:13.1441884Z stderr | test/adv57-recovery-hang.test.ts > [ADV57-M1 end-to-end] a hung lookAt in detour recovery escapes the whole-action deadline > control: with a resolving lookAt, moveToPosition returns before its budget
+2026-11-07T03:07:13.1444729Z QA57 control: lookAt resolves -> settled=true, goto calls=1
+2026-11-07T03:07:13.1445630Z 
+2026-11-07T03:07:13.1564370Z  ✓ test/adv57-recovery-hang.test.ts (4 tests) 24ms
+2026-11-07T03:07:13.1699961Z 
+2026-11-07T03:07:13.1743922Z ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+2026-11-07T03:07:13.1744514Z 
+2026-11-07T03:07:13.1784976Z  FAIL  test/adv57-construction-real.test.ts > [ADV57-R] unmocked, default-path, real workspace discovery > defect 3 (evidence beside protected DB) refused in the real environment
+2026-11-07T03:07:13.1803918Z AssertionError: expected true to be false // Object.is equality
+2026-11-07T03:07:13.1835767Z 
+2026-11-07T03:07:13.1858518Z - Expected
+2026-11-07T03:07:13.1870186Z + Received
+2026-11-07T03:07:13.1888099Z 
+2026-11-07T03:07:13.1956599Z - false
+2026-11-07T03:07:13.1993225Z + true
+2026-11-07T03:07:13.1993526Z 
+2026-11-07T03:07:13.2012572Z 
+2026-11-07T03:07:13.2013760Z  Test Files  2 failed | 4 passed (6)
+2026-11-07T03:07:13.2049724Z  ❯ test/adv57-construction-real.test.ts:32:97
+2026-11-07T03:07:13.2051019Z       Tests  2 failed | 202 passed (204)
+2026-11-07T03:07:13.2093495Z      30|     const g = run({ CONSTRUCTION_EXPERIMENT_EVIDENCE_DIR: "data/eviden…
+2026-11-07T03:07:13.2094304Z    Start at  03:07:07
+2026-11-07T03:07:13.2113618Z      31|     expect(run({ CONSTRUCTION_EXPERIMENT_EVIDENCE_DIR: join(ws, "data"…
+2026-11-07T03:07:13.2115143Z    Duration  5.61s (transform 1.70s, setup 111ms, collect 3.23s, tests 475ms, environment 2ms, prepare 920ms)
+2026-11-07T03:07:13.2115888Z 
+2026-11-07T03:07:13.2167946Z      32|     expect(run({ CONSTRUCTION_EXPERIMENT_EVIDENCE_DIR: join(ws, "DATA"…
+2026-11-07T03:07:13.2168497Z 
+2026-11-07T03:07:13.2213769Z        |                                                                                                 ^
+2026-11-07T03:07:13.2291511Z ##[error]AssertionError: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ test/adv57-construction-real.test.ts:32:97
+
+
+2026-11-07T03:07:13.2326025Z      33|   });
+2026-11-07T03:07:13.2327095Z      34|   it("workspace reached through a symlinked path (cwd = alias of root)…
+2026-11-07T03:07:13.2327779Z 
+2026-11-07T03:07:13.2328254Z ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+2026-11-07T03:07:13.2328654Z 
+2026-11-07T03:07:13.2330187Z  FAIL  test/adv57-construction.test.ts > [ADV57-C3] defect 3: evidence directory isolation and protected paths > evidence="DATA/evidence" refused
+2026-11-07T03:07:13.2352546Z AssertionError: expected 'ALLOWED' not to be 'ALLOWED' // Object.is equality
+2026-11-07T03:07:13.2354046Z  ❯ test/adv57-construction.test.ts:103:21
+2026-11-07T03:07:13.2355045Z     101|     "evidence=%j refused", (ev) => {
+2026-11-07T03:07:13.2356153Z     102|       const r = denied(env({ CONSTRUCTION_EXPERIMENT_EVIDENCE_DIR: ev …
+2026-11-07T03:07:13.2357391Z     103|       expect(r).not.toBe("ALLOWED");
+2026-11-07T03:07:13.2358327Z        |                     ^
+2026-11-07T03:07:13.2358931Z     104|     });
+2026-11-07T03:07:13.2359787Z     105|   it("evidence beside the protected DB: refusal reason is the alias ru…
+2026-11-07T03:07:13.2360337Z 
+2026-11-07T03:07:13.2360694Z ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+2026-11-07T03:07:13.2361044Z 
+2026-11-07T03:07:13.2361068Z 
+2026-11-07T03:07:13.2363720Z ##[error]AssertionError: expected 'ALLOWED' not to be 'ALLOWED' // Object.is equality
+ ❯ test/adv57-construction.test.ts:103:21
+
+
+2026-11-07T03:07:13.3604451Z ##[error]Process completed with exit code 1.
+2026-11-07T03:07:13.3697637Z ##[group]Run actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1
+2026-11-07T03:07:13.3698025Z with:
+2026-11-07T03:07:13.3698281Z   name: offline-acceptance-reports-ubuntu-latest
+2026-11-07T03:07:13.3699067Z   path: artifacts/v1/ci-summary.md
+artifacts/v1/ci-summary.json
+artifacts/v1/scenario-*/acceptance.md
+artifacts/v1/scenario-*/gemini-validator-summary.md
+artifacts/v1/scenario-*/verdict.json
+
+2026-11-07T03:07:13.3699789Z   if-no-files-found: warn
+2026-11-07T03:07:13.3700025Z   compression-level: 6
+2026-11-07T03:07:13.3700245Z   overwrite: false
+2026-11-07T03:07:13.3700462Z   include-hidden-files: false
+2026-11-07T03:07:13.3700686Z env:
+2026-11-07T03:07:13.3700865Z   CI: true
+2026-11-07T03:07:13.3701216Z   OPENAI_API_KEY: 
+2026-11-07T03:07:13.3701425Z   ANTHROPIC_API_KEY: 
+2026-11-07T03:07:13.3701634Z   GEMINI_API_KEY: 
+2026-11-07T03:07:13.3701833Z   LLM_PROVIDER: none
+2026-11-07T03:07:13.3702041Z   NODE_ENV: test
+2026-11-07T03:07:13.3702549Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-11-07T03:07:13.3702838Z ##[endgroup]
+2026-11-07T03:07:13.5485018Z (node:4681) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-11-07T03:07:13.5486537Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-11-07T03:07:13.5552745Z ##[warning]No files were found with the provided path: artifacts/v1/ci-summary.md
+artifacts/v1/ci-summary.json
+artifacts/v1/scenario-*/acceptance.md
+artifacts/v1/scenario-*/gemini-validator-summary.md
+artifacts/v1/scenario-*/verdict.json. No artifacts will be uploaded.
+2026-11-07T03:07:13.5784140Z Post job cleanup.
+2026-11-07T03:07:13.7543639Z Pruning is unnecessary.
+2026-11-07T03:07:13.7869128Z Post job cleanup.
+2026-11-07T03:07:13.9541799Z [command]/usr/bin/git version
+2026-11-07T03:07:13.9633136Z git version 2.56.0
+2026-11-07T03:07:13.9801522Z Temporarily overriding HOME='/home/runner/work/_temp/f61a0a79-c71b-46e5-bd0e-b20950f48e70' before making global git config changes
+2026-11-07T03:07:13.9833543Z Adding repository directory to the temporary git global config as a safe directory
+2026-11-07T03:07:13.9880473Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/Minecraft-Ai-Civilization-windows-backup/Minecraft-Ai-Civilization-windows-backup
+2026-11-07T03:07:13.9925364Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-11-07T03:07:13.9953856Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-11-07T03:07:14.0592709Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-11-07T03:07:14.0595386Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-11-07T03:07:14.1079904Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-11-07T03:07:14.1093597Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-11-07T03:07:14.1476225Z Cleaning up orphan processes
+2026-11-07T03:07:14.1754291Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@11d5960a326750d5838078e36cf38b85af677262, actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020, actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1, pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/

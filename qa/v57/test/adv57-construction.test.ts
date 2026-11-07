@@ -96,11 +96,8 @@ describe("[ADV57-C2] defect 2: Paper and RCON ports", () => {
   });
 });
 
-// "DATA/evidence" is an alias of "data/evidence" only on a case-insensitive filesystem (macOS, Windows). On Linux it is a different, nonexistent
-// path, and the host-aware test further below ("[host case-insensitive=...]") already covers it, so it is asserted here only where it is true.
-const hostCaseInsensitive = (() => { const d = mkdtempSync(join(tmpdir(), "qa57-ci0-")); try { writeFileSync(join(d, "a"), "x"); return existsSync(join(d, "A")); } finally { rmSync(d, { recursive: true, force: true }); } })();
 describe("[ADV57-C3] defect 3: evidence directory isolation and protected paths", () => {
-  it.each(["data/evidence", "data", "data/", "./data/evidence", ...(hostCaseInsensitive ? ["DATA/evidence"] : []), "world-lab/evidence", "world-lab", "world-lab/inner", ".", "", "isolated/../data/x", "data/../data/evidence/deep/er"])(
+  it.each(["data/evidence", "data", "data/", "./data/evidence", "DATA/evidence", "world-lab/evidence", "world-lab", "world-lab/inner", ".", "", "isolated/../data/x", "data/../data/evidence/deep/er"])(
     "evidence=%j refused", (ev) => {
       const r = denied(env({ CONSTRUCTION_EXPERIMENT_EVIDENCE_DIR: ev }));
       expect(r).not.toBe("ALLOWED");

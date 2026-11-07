@@ -1,0 +1,19 @@
+{
+  "implementationSha": "6573847547b02f184c4adde80e9fc2b041f18e64",
+  "failedJob": "https://github.com/ManpreetS2/Minecraft-Ai-Civilization-windows-backup/actions/runs/42332167600/job/128280913715",
+  "movement": {
+    "passed": 204,
+    "failed": 0,
+    "skipped": 0,
+    "exitCode": 0
+  },
+  "guard": {
+    "passed": 104,
+    "failed": 0,
+    "skipped": 1,
+    "exitCode": 0
+  },
+  "typecheckExit": 0,
+  "lintExit": 0,
+  "nativeCi": "pending"
+}
