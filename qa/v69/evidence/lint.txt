@@ -1,0 +1,4 @@
+
+> minecraft-ai-civilization@0.1.0 lint /Users/manpreetsingh/.t3/worktrees/Minecraft-Ai-Civilization/fix-lifecycle-qa
+> eslint .
+

@@ -1,0 +1,22 @@
+
+ RUN  v3.2.7 /Users/manpreetsingh/.t3/worktrees/Minecraft-Ai-Civilization/fix-lifecycle-qa
+
+ ✓ packages/skills/src/inventory-service.test.ts (6 tests) 128ms
+(node:46627) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:46632) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:46630) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ packages/skills/src/furnace.test.ts (2 tests) 5ms
+ ✓ packages/agent-core/src/construction-production-path.test.ts (15 tests) 143ms
+ ✓ packages/agent-core/src/action-boundary.test.ts (8 tests) 283ms
+ ✓ packages/skills/src/mineflayer-fish-cycle.test.ts (15 tests) 3061ms
+   ✓ two independent mineflayer clients > times out one bot without retracting the other  1080ms
+   ✓ two independent mineflayer clients > does not claim a catch from a late particle after timeout  1132ms
+
+ Test Files  5 passed (5)
+      Tests  46 passed (46)
+   Start at  19:50:01
+   Duration  4.57s (transform 1.75s, setup 391ms, collect 4.45s, tests 3.62s, environment 1ms, prepare 949ms)
+

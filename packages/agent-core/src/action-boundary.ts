@@ -1,5 +1,5 @@
 import { AsyncLocalStorage } from "node:async_hooks";
-import { fail, type ActionResult } from "@civ/shared";
+import { currentCleanupPermit, fail, type ActionResult } from "@civ/shared";
 import type { MinecraftBody } from "@civ/minecraft-adapter";
 
 /**
@@ -108,19 +108,73 @@ export interface ClientLike {
   write(name: string, data?: Record<string, unknown>): void;
 }
 
+function isLateRefusal(error: unknown): boolean {
+  return error instanceof Error && (error as { code?: string }).code === LATE_WRITE_REFUSED;
+}
+
+function refuseLateWrite(name: string, owner: Owner): never {
+  throw Object.assign(new Error(`late ${name} refused: action '${owner.name}' is no longer active`), {
+    name: "AbortError",
+    code: LATE_WRITE_REFUSED,
+  });
+}
+
+/**
+ * Mineflayer arms some writes on its own timers (digging's swing interval). A refused write must not escape
+ * that timer as an uncaught exception. Callbacks scheduled during an action swallow only LATE_WRITE_REFUSED;
+ * every other error still propagates, and the packet is still not sent.
+ */
+let timerWrapDepth = 0;
+let savedTimeout: typeof setTimeout | undefined;
+let savedInterval: typeof setInterval | undefined;
+
+type TimerCallback = (this: unknown, ...args: unknown[]) => unknown;
+
+function guardTimer(fn: TimerCallback): TimerCallback {
+  return function guarded(this: unknown, ...args: unknown[]) {
+    try {
+      return fn.apply(this, args);
+    } catch (error) {
+      if (isLateRefusal(error)) return undefined;
+      throw error;
+    }
+  };
+}
+
+function bindScheduledCallbacks(): () => void {
+  if (timerWrapDepth === 0) {
+    savedTimeout = globalThis.setTimeout;
+    savedInterval = globalThis.setInterval;
+    const timeout = savedTimeout;
+    const interval = savedInterval;
+    globalThis.setTimeout = ((fn: TimerCallback, ms?: number, ...args: unknown[]) =>
+      timeout(guardTimer(fn) as never, ms as number, ...(args as []))) as typeof setTimeout;
+    globalThis.setInterval = ((fn: TimerCallback, ms?: number, ...args: unknown[]) =>
+      interval(guardTimer(fn) as never, ms as number, ...(args as []))) as typeof setInterval;
+  }
+  timerWrapDepth += 1;
+  let restored = false;
+  return () => {
+    if (restored) return;
+    restored = true;
+    timerWrapDepth -= 1;
+    if (timerWrapDepth === 0 && savedTimeout && savedInterval) {
+      globalThis.setTimeout = savedTimeout;
+      globalThis.setInterval = savedInterval;
+      savedTimeout = undefined;
+      savedInterval = undefined;
+    }
+  };
+}
+
 export function installPacketGuard(client: ClientLike): void {
   if (guarded.has(client)) return;
   guarded.add(client);
   const original = client.write.bind(client);
   client.write = (name: string, data?: Record<string, unknown>) => {
-    if (MUTATING_PACKETS.has(name) && !cleanupDig(name, data)) {
+    if (MUTATING_PACKETS.has(name) && !cleanupDig(name, data) && !currentCleanupPermit()?.packets.has(name)) {
       const owner = owners.getStore();
-      if (owner !== undefined && !owner.active) {
-        throw Object.assign(new Error(`late ${name} refused: action '${owner.name}' is no longer active`), {
-          name: "AbortError",
-          code: LATE_WRITE_REFUSED,
-        });
-      }
+      if (owner !== undefined && !owner.active) refuseLateWrite(name, owner);
     }
     return original(name, data);
   };
@@ -153,9 +207,19 @@ export function createActionBoundary(
     const client = clientOf();
     if (client) installPacketGuard(client);
     const owner: Owner = { active: true, name };
-    const restoreEmitters = (emittersOf?.() ?? [])
-      .filter((emitter): emitter is object => emitter != null && typeof (emitter as { on?: unknown }).on === "function")
-      .map((emitter) => bindEmitter(emitter, owner));
+    const restoreTimers = bindScheduledCallbacks();
+    const emitters: object[] = [];
+    const seen = new Set<object>();
+    const addEmitter = (value: object | undefined) => {
+      if (!value || seen.has(value) || typeof (value as { on?: unknown }).on !== "function") return;
+      seen.add(value);
+      emitters.push(value);
+    };
+    // The guarded client is an emitter for fishing. Listeners registered on it during the action keep this owner
+    // even when the test boundary was not given a separate emitters list.
+    if (client && typeof client === "object") addEmitter(client);
+    for (const emitter of emittersOf?.() ?? []) addEmitter(emitter);
+    const restoreEmitters = emitters.map((emitter) => bindEmitter(emitter, owner));
     const started = Date.now();
     const controller = new AbortController();
     const forward = () => controller.abort(options.signal?.reason);
@@ -212,6 +276,7 @@ export function createActionBoundary(
       options.signal?.removeEventListener("abort", forward);
       owner.active = false;
       for (const restore of restoreEmitters) restore();
+      restoreTimers();
     }
   }
 

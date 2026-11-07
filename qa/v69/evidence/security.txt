@@ -1,0 +1,51 @@
+
+> minecraft-ai-civilization@0.1.0 test:security /Users/manpreetsingh/.t3/worktrees/Minecraft-Ai-Civilization/fix-lifecycle-qa
+> vitest run sec001 knowledge-provenance downstream-prompt-isolation persistent-fact-provenance citizen-context-2v2 bulletin-2v2 visibility-2v2 untrusted-model-output pr16-review http-server-origin workstations-community storage-community-access
+
+
+ RUN  v3.2.7 /Users/manpreetsingh/.t3/worktrees/Minecraft-Ai-Civilization/fix-lifecycle-qa
+
+(node:50930) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:50933) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ packages/agent-core/src/knowledge-provenance.test.ts (19 tests) 337ms
+ ✓ packages/agent-core/src/sec001-round2.test.ts (20 tests) 483ms
+ ✓ packages/agent-core/src/sec001-migration-qa.test.ts (12 tests) 569ms
+(node:50929) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:50934) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:50932) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:50931) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ packages/agent-core/src/sec001-audience.test.ts (8 tests) 295ms
+ ✓ packages/agent-core/src/sec001-round3.test.ts (14 tests) 527ms
+ ✓ packages/agent-core/src/sec001-migration-recovery-qa.test.ts (7 tests) 446ms
+ ✓ packages/agent-core/src/sec001-quarantine-durability-qa.test.ts (8 tests) 336ms
+ ✓ packages/agent-core/src/storage-community-access.test.ts (8 tests) 138ms
+ ✓ apps/orchestrator/src/http-server-origin.test.ts (4 tests) 198ms
+ ✓ packages/agent-core/src/pr16-review.test.ts (5 tests) 887ms
+   ✓ deferred bulletin delivery > a share names the line the model was shown, even if an earlier line was withdrawn while it was thinking  387ms
+ ✓ packages/agent-core/src/sec001-migration-manager-qa.test.ts (5 tests) 887ms
+   ✓ Independent migrated SQLite -> actual manager cognition QA > migrated flagged fact and exact-derived memory cannot reach manager cognition, including after restart  479ms
+ ✓ packages/agent-core/src/downstream-prompt-isolation.test.ts (13 tests) 1421ms
+ ✓ packages/agent-core/src/persistent-fact-provenance.test.ts (12 tests) 152ms
+ ✓ packages/agent-core/src/t3-sec001-boundaries.test.ts (10 tests) 159ms
+ ✓ packages/agent-core/src/workstations-community.test.ts (9 tests) 150ms
+ ✓ packages/shared/src/bulletin-2v2-contract.test.ts (9 tests) 47ms
+ ✓ packages/agent-core/src/citizen-context-2v2.test.ts (27 tests) 172ms
+ ✓ packages/shared/src/visibility-2v2-contract.test.ts (19 tests) 19ms
+ ✓ packages/agent-core/src/sec001-manager.test.ts (38 tests) 3613ms
+   ✓ same-community announcements (criterion 2) > a citizen's own choice reaches every member of its community through the real manager path, and no one else  596ms
+ ✓ packages/agent-core/src/untrusted-model-output.test.ts (37 tests) 4517ms
+   ✓ untrusted model output > a shell field rejects the whole decision  445ms
+ ✓ packages/agent-core/src/sec001-independent-review.test.ts (74 tests) 5257ms
+   ✓ community membership timing reaches the model-facing context > a citizen who joins after an announcement never receives it  514ms
+
+ Test Files  21 passed (21)
+      Tests  358 passed (358)
+   Start at  19:51:41
+   Duration  10.20s (transform 6.60s, setup 1.49s, collect 27.72s, tests 20.61s, environment 3ms, prepare 3.91s)
+

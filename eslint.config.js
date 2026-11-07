@@ -24,4 +24,11 @@ export default tseslint.config(
       "no-console": "off",
     },
   },
+  {
+    files: ["qa/v69/**/*.ts"],
+    rules: {
+      "@typescript-eslint/no-explicit-any": "off",
+      "no-constant-condition": "off",
+    },
+  },
 );

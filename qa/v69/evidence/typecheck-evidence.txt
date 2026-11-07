@@ -1,0 +1,4 @@
+
+> minecraft-ai-civilization@0.1.0 typecheck:evidence-validator /Users/manpreetsingh/.t3/worktrees/Minecraft-Ai-Civilization/fix-lifecycle-qa
+> tsc -p experiments/evidence-validator/tsconfig.json --noEmit
+

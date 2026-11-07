@@ -480,6 +480,17 @@ export async function resumeBlueprintBuild(
   return advanceBlueprintBuild(ctx, session, opts);
 }
 
+function interruptedNavigation(
+  result: { success: boolean; code?: string },
+  signal?: AbortSignal,
+): "CANCELLED" | "INTERRUPTED" | "CURFEW_STOP" | undefined {
+  if (signal?.aborted) return "CANCELLED";
+  if (!result.success && (result.code === "CANCELLED" || result.code === "INTERRUPTED" || result.code === "CURFEW_STOP")) {
+    return result.code;
+  }
+  return undefined;
+}
+
 export async function validateBuiltStructure(
   ctx: SkillContext,
   session: BuildSession,
@@ -502,15 +513,30 @@ export async function validateBuiltStructure(
   }) ?? expanded.interiorLocal[0];
   if (!standing) failures.push("INTERIOR_UNREACHABLE");
 
+  const halted = (code: "CANCELLED" | "INTERRUPTED" | "CURFEW_STOP", entered = false) => ({
+    ok: false as const,
+    failures,
+    interrupted: code,
+    entered,
+    exited: false,
+    usedWorkstation: false,
+  });
+
   const toApproach = await moveTo(ctx, { x: approach.x + 0.5, y: approach.y, z: approach.z + 0.5 }, 1.6);
+  const approachStop = interruptedNavigation(toApproach, ctx.signal);
+  if (approachStop) return halted(approachStop);
   if (!toApproach.success) failures.push("ENTRANCE_BLOCKED");
   const door = await openDoor(ctx, entrance);
+  const doorStop = interruptedNavigation(door, ctx.signal);
+  if (doorStop) return halted(doorStop);
   if (!door.success) failures.push("ENTRANCE_BLOCKED");
 
   let entered = false;
   if (standing) {
     const inside = worldPosition(origin, standing.dx, standing.dy, standing.dz, expanded.blueprint.footprint, session.facing);
     const movedIn = await moveTo(ctx, { x: inside.x + 0.5, y: inside.y, z: inside.z + 0.5 }, 1.2);
+    const insideStop = interruptedNavigation(movedIn, ctx.signal);
+    if (insideStop) return halted(insideStop);
     if (!movedIn.success) failures.push("INTERIOR_UNREACHABLE");
     else entered = true;
     const head = blockName(ctx, { x: inside.x, y: inside.y + 1, z: inside.z });
@@ -525,6 +551,8 @@ export async function validateBuiltStructure(
     // recovery after a failed durable write must not transfer another item.
     try {
       const reachable = await navigationBackend().navigateToInteractWithBlock(ctx.bot, chestPos, { timeoutMs: ctx.timeoutMs ?? 12_000, signal: ctx.signal });
+      const chestStop = interruptedNavigation(reachable, ctx.signal);
+      if (chestStop) return { ok: false, failures, interrupted: chestStop, entered, exited: false, usedWorkstation };
       const block = ctx.bot.blockAt(new Vec3Class(chestPos.x, chestPos.y, chestPos.z));
       if (ctx.signal?.aborted) return { ok: false, failures, interrupted: "CANCELLED", entered, exited: false, usedWorkstation };
       if (!reachable.success || !block || block.name !== "chest") failures.push("WORKSTATION_UNREACHABLE");
@@ -542,6 +570,8 @@ export async function validateBuiltStructure(
   }
 
   const movedOut = await moveTo(ctx, { x: approach.x + 0.5, y: approach.y, z: approach.z + 0.5 }, 1.6);
+  const exitStop = interruptedNavigation(movedOut, ctx.signal);
+  if (exitStop) return { ok: false, failures, interrupted: exitStop, entered, exited: false, usedWorkstation };
   const exited = movedOut.success;
   if (!exited) failures.push("ENTRANCE_BLOCKED");
 

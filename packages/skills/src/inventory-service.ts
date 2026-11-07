@@ -660,6 +660,17 @@ export async function withdrawItem(
     }
     await chest.withdraw(stack.type, null, Math.min(count, stack.count));
     const containerAfter = containerCounts(chest)[name] ?? 0;
+    if (ctx.signal?.aborted) {
+      const citizenAfter = countItem(ctx, name);
+      const gained = citizenAfter - citizenBefore;
+      chest.close();
+      // Items that already moved are reported on the result. Do not emit ItemWithdrawn once the signal has
+      // aborted: the boundary may already have recorded TIMEOUT, and a later success event would contradict it.
+      if (gained > 0) {
+        return ok({ item: name, count: gained, citizenAfter, containerAfter }, Date.now() - started);
+      }
+      return cancelledResult(started, "withdraw cancelled during the transfer");
+    }
     chest.close();
     const citizenAfter = await waitForCount(ctx, name, (value) => value > citizenBefore);
     const gained = citizenAfter - citizenBefore;

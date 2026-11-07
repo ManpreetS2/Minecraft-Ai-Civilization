@@ -1,0 +1,510 @@
+
+> minecraft-ai-civilization@0.1.0 test /Users/manpreetsingh/.t3/worktrees/Minecraft-Ai-Civilization/fix-lifecycle-qa
+> vitest run
+
+
+ RUN  v3.2.7 /Users/manpreetsingh/.t3/worktrees/Minecraft-Ai-Civilization/fix-lifecycle-qa
+
+(node:47268) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ packages/agent-core/src/sec001-round3.test.ts (14 tests) 385ms
+ ✓ packages/cognition/src/v2.test.ts (21 tests) 86ms
+(node:47265) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ packages/cognition/src/routing/claude-sdk-transport.contract.test.ts (90 tests) 656ms
+(node:47270) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ packages/cognition/src/routing/citizen-routing.test.ts (100 tests) 554ms
+(node:47266) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:47263) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+stderr | packages/agent-core/src/ops-persistence.test.ts > OPS-001 restart: crash (no close) and in-flight writes > writes through safeWrite after shutdown are refused and never reach disk
+[store] skipped write after close: late-meta
+
+ ✓ packages/agent-core/src/ops-persistence.test.ts (18 tests) 349ms
+(node:47335) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ packages/agent-core/src/planner.test.ts (49 tests) 253ms
+ ✓ packages/agent-core/src/knowledge-provenance.test.ts (19 tests) 448ms
+ ✓ packages/agent-core/src/sec001-round2.test.ts (20 tests) 744ms
+(node:47354) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ packages/agent-core/src/ops-recovery.test.ts (29 tests) 1557ms
+   ✓ OPS-001 stuck-stop: navigation STUCK / TIMEOUT never turns into fake progress > mineBlock: a STUCK approach is returned as-is, blacklists the target, and never digs  410ms
+   ✓ OPS-001 stuck-stop: navigation STUCK / TIMEOUT never turns into fake progress > a gather that keeps failing is eventually told to back off instead of looping forever  324ms
+   ✓ OPS-001 failure recovery: executor failure paths > bot.dig throwing a non-Error value becomes a DIG_FAILED result (no throw), no event, no claim left behind  502ms
+(node:47370) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ packages/agent-core/src/home-ops.test.ts (10 tests) 344ms
+(node:47374) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ packages/agent-core/src/ops-cancellation.test.ts (18 tests) 1082ms
+(node:47441) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:47462) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ packages/agent-core/src/construction-production-path.test.ts (15 tests) 275ms
+ ✓ packages/minecraft-adapter/src/hazard-nav.test.ts (15 tests) 75ms
+(node:47646) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ tools/v1-integration/evidence-contract.test.ts (50 tests) 141ms
+ ✓ packages/agent-core/src/sec001-manager.test.ts (38 tests) 3567ms
+   ✓ same-community announcements (criterion 2) > a citizen's own choice reaches every member of its community through the real manager path, and no one else  575ms
+(node:48048) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:48047) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ packages/cognition/src/openai-retry.test.ts (44 tests) 234ms
+ ✓ packages/skills/src/bootstrap-progression.test.ts (11 tests) 87ms
+ ✓ packages/agent-core/src/manager-citizen-routing.test.ts (18 tests) 2545ms
+   ✓ AgentManager routes each citizen to its own session > four citizens decide through four sessions, and each decision returns to its own citizen  581ms
+stderr | packages/agent-core/src/community-container-contents.test.ts > executor uses observed contents, not global stock > does not let a delayed stale withdrawal erase a newer observation
+[executor] stale container observation discarded
+
+ ✓ packages/agent-core/src/sec001-independent-review.test.ts (74 tests) 5380ms
+   ✓ community membership timing reaches the model-facing context > a citizen who joins after an announcement never receives it  652ms
+ ✓ packages/session-isolation/src/adapters.test.ts (25 tests) 147ms
+(node:48445) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ packages/cognition/src/cloud-admission-adversarial.test.ts (24 tests) 1086ms
+   ✓ cloud spend admission (mock-only) > never exceeds the allowance across randomized in-bound workloads  600ms
+ ✓ packages/agent-core/src/community-container-contents.test.ts (13 tests) 1930ms
+   ✓ concurrent chest observers > lets exactly one of two database connections win the same token  1666ms
+(node:48453) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ packages/skills/src/dig-abort.test.ts (11 tests) 286ms
+ ✓ packages/agent-core/src/dispatch-integrity.test.ts (16 tests) 198ms
+(node:48464) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ packages/skills/src/mineflayer-fish-cycle.test.ts (15 tests) 3049ms
+   ✓ two independent mineflayer clients > times out one bot without retracting the other  1087ms
+   ✓ two independent mineflayer clients > does not claim a catch from a late particle after timeout  1120ms
+ ✓ packages/skills/src/survival-gauntlet.test.ts (9 tests) 4246ms
+   ✓ Mission 017 survival gauntlet > scenario 1 — resource acquisition requires inventory delta  301ms
+   ✓ Mission 017 survival gauntlet > scenario 3 — hunger recovery requires observable evidence  1607ms
+   ✓ Mission 017 survival gauntlet > scenario 4 — farming reports zero invented yield  1911ms
+   ✓ Mission 017 survival gauntlet > scenario 7 — unreachable destination fails without false arrival  404ms
+ ✓ packages/agent-core/src/citizen-context-2v2.test.ts (27 tests) 86ms
+ ✓ packages/agent-core/src/untrusted-model-output.test.ts (37 tests) 4520ms
+   ✓ untrusted model output > a shell field rejects the whole decision  439ms
+ ✓ packages/agent-core/src/sec001-audience.test.ts (8 tests) 350ms
+ ✓ packages/agent-core/src/community-physical-state.test.ts (22 tests) 463ms
+ ✓ packages/minecraft-adapter/src/step-jump.test.ts (17 tests) 17ms
+ ✓ packages/psychology/src/scenarios.test.ts (9 tests) 239ms
+(node:48486) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ packages/shared/src/demo-identity.test.ts (14 tests) 57ms
+(node:48489) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ packages/cognition/src/openai-responses.test.ts (23 tests) 210ms
+ ✓ packages/shared/src/event-audience.test.ts (36 tests) 74ms
+ ✓ packages/minecraft-knowledge/src/knowledge.test.ts (22 tests) 90ms
+(node:48492) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:48498) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ packages/agent-core/src/build-structure-intention.test.ts (10 tests) 189ms
+ ✓ packages/agent-core/src/activity-choice.test.ts (15 tests) 122ms
+ ✓ packages/skills/src/fish-quota.test.ts (19 tests) 71ms
+ ✓ packages/session-isolation/src/cancellation.test.ts (18 tests) 94ms
+(node:48519) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ packages/session-isolation/src/isolation.test.ts (19 tests) 63ms
+ ✓ packages/agent-core/src/sec001-migration-qa.test.ts (12 tests) 501ms
+(node:48517) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ packages/skills/src/mine.test.ts (22 tests) 36ms
+ ✓ packages/agent-core/src/sec001-migration-recovery-qa.test.ts (7 tests) 349ms
+(node:48536) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ packages/agent-core/src/homes.test.ts (8 tests) 104ms
+ ✓ packages/agent-core/src/downstream-prompt-isolation.test.ts (13 tests) 1502ms
+   ✓ PRIV-007 actual manager-to-cognition boundary > Phase A SECURITY REGRESSION: newly leaked settlement facts must not reach manager cognition  321ms
+ ✓ packages/shared/src/observer.test.ts (10 tests) 70ms
+(node:48548) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ packages/cognition/src/openai-schema-regression.test.ts (40 tests) 127ms
+ ✓ packages/cognition/src/openai-usage-regression.test.ts (16 tests) 206ms
+ ✓ packages/agent-core/src/autonomous-survival-cycle.test.ts (9 tests) 163ms
+ ✓ packages/agent-core/src/t3-sec001-boundaries.test.ts (10 tests) 118ms
+(node:48563) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:48567) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ packages/agent-core/src/construction-mission004-audit.test.ts (7 tests) 66ms
+ ✓ packages/cognition/src/routing/preflight.test.ts (26 tests) 115ms
+(node:48607) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:48610) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:48612) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ packages/agent-core/src/demo-identity.test.ts (4 tests) 115ms
+ ✓ packages/agent-core/src/pr16-review.test.ts (5 tests) 795ms
+   ✓ deferred bulletin delivery > a share names the line the model was shown, even if an earlier line was withdrawn while it was thinking  311ms
+(node:48617) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:48623) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ packages/agent-core/src/autonomy-precedence.test.ts (12 tests) 120ms
+ ✓ packages/skills/src/collect-inventory-delta.test.ts (8 tests) 1009ms
+   ✓ collectResource inventory-delta verification > delayed drop: an item arriving after the dig (within the poll window) is still counted  376ms
+(node:48632) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:48634) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:48642) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ packages/skills/src/farm.test.ts (11 tests) 1631ms
+   ✓ workFarmPlot verified progress > treats an already-planted immature plot as idle success  1512ms
+ ✓ packages/session-isolation/src/persistence.test.ts (14 tests) 135ms
+ ✓ apps/orchestrator/src/construction-path-isolation.test.ts (51 tests) 53ms
+ ✓ packages/agent-core/src/experiment-evidence.test.ts (11 tests) 117ms
+(node:48685) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:48693) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+stderr | packages/agent-core/src/community-construction-runtime.test.ts > per-community construction runtime > reports persisted:false and does not claim success when the SQLite write fails
+[community-construction] write failed: disk I/O error
+
+stderr | packages/agent-core/src/community-construction-runtime.test.ts > per-community construction runtime > reports persisted:false and does not claim success when the SQLite write fails
+[community-construction] write failed: disk I/O error
+
+(node:48704) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ packages/agent-core/src/community-construction-runtime.test.ts (6 tests) 2731ms
+   ✓ per-community construction runtime > lets two communities build simultaneously without sharing or overwriting project state  631ms
+   ✓ per-community construction runtime > restores each community's own project after a SQLite restart  849ms
+   ✓ per-community construction runtime > rejects a stale handle after the citizen leaves its community, and never reads another community's row  413ms
+   ✓ per-community construction runtime > reports persisted:false and does not claim success when the SQLite write fails  417ms
+   ✓ legacy single-settlement persistence honesty > still persists to the settlement row and reports it  412ms
+ ✓ packages/agent-core/src/gather-fallback.test.ts (6 tests) 720ms
+ ✓ packages/skills/src/harvest-truth.test.ts (8 tests) 4117ms
+   ✓ harvestCropAt / harvestPlot yield truthfulness > reports verified yield only from inventory deltas  478ms
+   ✓ harvestCropAt / harvestPlot yield truthfulness > keeps cropBroken true when drops are not collected  405ms
+   ✓ harvestCropAt / harvestPlot yield truthfulness > does not count existing inventory wheat as new yield  1917ms
+   ✓ harvestCropAt / harvestPlot yield truthfulness > reports replant success after verified harvest  656ms
+   ✓ harvestCropAt / harvestPlot yield truthfulness > keeps harvest success when replant fails after crop break  654ms
+ ✓ packages/minecraft-adapter/src/ops-body-lock.test.ts (23 tests) 327ms
+(node:48728) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ packages/cognition/src/routing/mixed-provider-faults.test.ts (7 tests) 381ms
+ ✓ packages/agent-core/src/property-safety.test.ts (7 tests) 71ms
+ ✓ packages/minecraft-knowledge/src/recipes-121.test.ts (12 tests) 45ms
+ ✓ packages/agent-core/src/gather-possession.test.ts (6 tests) 3030ms
+   ✓ gather_wood possession vs excavation > F11: no ResourceCollected when the verified path fails (nothing entered inventory)  1294ms
+   ✓ gather_wood possession vs excavation > excavation without an inventory gain is not success, workComplete, a ResourceCollected event, or a completion memory  1307ms
+(node:48764) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ packages/agent-core/src/bootstrap-decision-cycle.test.ts (3 tests) 112ms
+ ✓ packages/skills/src/collect.test.ts (12 tests) 2144ms
+   ✓ collectResource inventory truthfulness > fails ITEM_NOT_FOUND when the block is removed but no drop is collected  1293ms
+ ✓ packages/agent-core/src/experiment-preflight.test.ts (32 tests) 118ms
+(node:48781) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ packages/agent-core/src/wait-inside-home.test.ts (9 tests) 13ms
+ ✓ packages/agent-core/src/persistent-fact-provenance.test.ts (12 tests) 136ms
+(node:48791) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ packages/minecraft-knowledge/src/build-preflight.test.ts (10 tests) 42ms
+ ✓ packages/skills/src/fish.test.ts (11 tests) 29ms
+stdout | packages/agent-core/src/manager-physical-integration.test.ts > real manager/planner/executor physical capabilities (offline only) > 2 empty-start bodies gather/eat and execute independent family mock choices
+{"scenario":"manager-physical-capabilities","count":2,"mode":"offline","trace":[{"id":"gpt-a","action":"gatherFood","source":"reflex","success":true,"food":7,"inventory":[{"name":"sweet_berries","count":2}]},{"id":"claude-a","action":"gatherFood","source":"reflex","success":true,"food":7,"inventory":[{"name":"sweet_berries","count":2}]},{"id":"gpt-a","action":"eatFood","source":"reflex","success":true,"food":9,"inventory":[{"name":"sweet_berries","count":1}]},{"id":"claude-a","action":"eatFood","source":"reflex","success":true,"food":9,"inventory":[{"name":"sweet_berries","count":1}]},{"id":"gpt-a","action":"mineBlock","source":"llm","success":true,"food":9,"inventory":[{"name":"sweet_berries","count":1},{"name":"oak_log","count":1}]},{"id":"claude-a","action":"craftItem","source":"llm","success":true,"food":9,"inventory":[{"name":"sweet_berries","count":1},{"name":"oak_planks","count":3},{"name":"stick","count":2},{"name":"wooden_pickaxe","count":1}]}],"globalSettlementIsolation":"BLOCKED: run separate executor isolation reproducer","humanInterventions":0,"unmodeled":["live physics","hostiles","night survival","real model decisions"]}
+
+(node:48804) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ packages/psychology/src/psychology.test.ts (9 tests) 79ms
+(node:48806) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ packages/agent-core/src/home-discovery.test.ts (9 tests) 63ms
+(node:48813) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ packages/agent-core/src/action-boundary.test.ts (8 tests) 313ms
+ ✓ packages/agent-core/src/sec001-quarantine-durability-qa.test.ts (8 tests) 305ms
+ ✓ packages/shared/src/directives.test.ts (10 tests) 34ms
+(node:48829) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ packages/minecraft-adapter/src/server-commands.test.ts (16 tests) 254ms
+ ✓ packages/session-isolation/src/guards.test.ts (9 tests) 87ms
+(node:48857) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ packages/agent-core/src/task-recovery.test.ts (9 tests) 54ms
+(node:48911) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ packages/minecraft-adapter/src/return-home-nav.test.ts (6 tests) 7ms
+(node:48944) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ packages/cognition/src/openai-config-regression.test.ts (42 tests) 146ms
+ ✓ apps/orchestrator/src/world-lab-one-citizen-guard.test.ts (10 tests) 43ms
+(node:48956) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ packages/cognition/src/learning.test.ts (9 tests) 68ms
+ ✓ packages/cognition/src/cloud-budget-regression.test.ts (9 tests) 21ms
+ ✓ packages/agent-core/src/construction-persistence-reliability.test.ts (4 tests) 309ms
+ ✓ packages/skills/src/collect-drop-mapping.test.ts (9 tests) 4521ms
+   ✓ collectResource drop-to-possession mapping > does not count an unrelated oak_sapling pickup as a log  1293ms
+   ✓ collectResource drop-to-possession mapping > fails when stone is broken and nothing is picked up  1304ms
+   ✓ collectResource drop-to-possession mapping > a pre-existing coal stack is not mistaken for a new acquisition when nothing drops  1286ms
+stdout | packages/agent-core/src/manager-physical-integration.test.ts > real manager/planner/executor physical capabilities (offline only) > 4 empty-start bodies gather/eat and execute independent family mock choices
+{"scenario":"manager-physical-capabilities","count":4,"mode":"offline","trace":[{"id":"gpt-a","action":"gatherFood","source":"reflex","success":true,"food":7,"inventory":[{"name":"sweet_berries","count":2}]},{"id":"gpt-b","action":"gatherFood","source":"reflex","success":true,"food":7,"inventory":[{"name":"sweet_berries","count":2}]},{"id":"claude-a","action":"gatherFood","source":"reflex","success":true,"food":7,"inventory":[{"name":"sweet_berries","count":2}]},{"id":"claude-b","action":"gatherFood","source":"reflex","success":true,"food":7,"inventory":[{"name":"sweet_berries","count":2}]},{"id":"gpt-a","action":"eatFood","source":"reflex","success":true,"food":9,"inventory":[{"name":"sweet_berries","count":1}]},{"id":"gpt-b","action":"eatFood","source":"reflex","success":true,"food":9,"inventory":[{"name":"sweet_berries","count":1}]},{"id":"claude-a","action":"eatFood","source":"reflex","success":true,"food":9,"inventory":[{"name":"sweet_berries","count":1}]},{"id":"claude-b","action":"eatFood","source":"reflex","success":true,"food":9,"inventory":[{"name":"sweet_berries","count":1}]},{"id":"gpt-a","action":"mineBlock","source":"llm","success":true,"food":9,"inventory":[{"name":"sweet_berries","count":1},{"name":"oak_log","count":1}]},{"id":"gpt-b","action":"mineBlock","source":"llm","success":true,"food":9,"inventory":[{"name":"sweet_berries","count":1},{"name":"oak_log","count":1}]},{"id":"claude-a","action":"craftItem","source":"llm","success":true,"food":9,"inventory":[{"name":"sweet_berries","count":1},{"name":"oak_planks","count":3},{"name":"stick","count":2},{"name":"wooden_pickaxe","count":1}]},{"id":"claude-b","action":"craftItem","source":"llm","success":true,"food":9,"inventory":[{"name":"sweet_berries","count":1},{"name":"oak_planks","count":3},{"name":"stick","count":2},{"name":"wooden_pickaxe","count":1}]}],"globalSettlementIsolation":"BLOCKED: run separate executor isolation reproducer","humanInterventions":0,"unmodeled":["live physics","hostiles","night survival","real model decisions"]}
+
+ ✓ packages/minecraft-adapter/src/ops-stuck-stop.test.ts (10 tests) 31ms
+(node:48978) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ packages/agent-core/src/workstations-community.test.ts (9 tests) 115ms
+(node:48983) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ packages/shared/src/bulletin-2v2-contract.test.ts (9 tests) 44ms
+stdout | packages/skills/src/craft-e2e-empty-start.test.ts > deterministic resource capability seeds (fake Mineflayer only) > seed 17 verifies an empty-start tool and stone chain
+{"scenario":"empty-start-capability","seed":17,"mode":"offline-fixture","humanInterventions":0,"suppliedInventory":[],"finalInventory":[{"name":"oak_planks","count":3},{"name":"stick","count":2},{"name":"wooden_pickaxe","count":1},{"name":"cobblestone","count":1}],"verifiedWorldModifications":[{"name":"crafting_table","position":{"x":5,"y":64,"z":5}}],"digs":["oak_log","oak_log","oak_log","stone"],"crafts":[{"result":"oak_planks","crafts":1,"withTable":false},{"result":"stick","crafts":1,"withTable":false},{"result":"oak_planks","crafts":1,"withTable":false},{"result":"crafting_table","crafts":1,"withTable":false},{"result":"oak_planks","crafts":1,"withTable":false},{"result":"wooden_pickaxe","crafts":1,"withTable":true}],"modelDecisions":0,"skillRequests":["obtain wooden_pickaxe","collect stone"],"health":[20,20],"hunger":[20,20],"deaths":0,"unmodeled":["hostiles","server physics","provider decisions","hunger progression"]}
+
+ ✓ apps/orchestrator/src/pr48-review-escapes.test.ts (4 tests) 60ms
+ ✓ packages/minecraft-knowledge/src/structures.test.ts (7 tests) 89ms
+ ✓ packages/agent-core/src/independent-qa-chest-contents.test.ts (7 tests) 509ms
+ ✓ packages/cognition/src/cloud-fallback-regression.test.ts (8 tests) 239ms
+(node:49189) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ packages/agent-core/src/goal-dispatch.test.ts (9 tests) 96ms
+ ✓ packages/agent-core/src/manager-physical-integration.test.ts (7 tests) 15835ms
+   ✓ real manager/planner/executor physical capabilities (offline only) > 2 empty-start bodies gather/eat and execute independent family mock choices  6147ms
+   ✓ real manager/planner/executor physical capabilities (offline only) > 4 empty-start bodies gather/eat and execute independent family mock choices  5930ms
+   ✓ real manager/planner/executor physical capabilities (offline only) > restart preserves real SQLite private history and independent session identities alongside persistent simulated bodies  1470ms
+   ✓ real manager/planner/executor physical capabilities (offline only) > a failed Claude inference does not stop either body's verified hunger recovery or the GPT decision  1450ms
+   ✓ real manager/planner/executor physical capabilities (offline only) > two rival bodies contest one observable bush without duplicating its drop or crediting both  438ms
+   ✓ real manager/planner/executor physical capabilities (offline only) > does not import the prepared World-Lab house catalog into an unrelated community's fallback planning  379ms
+(node:49212) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+stderr | apps/orchestrator/src/independent-offline-runtime.test.ts > scripted 1 GPT vs 1 Claude integrated offline 1v1 > starts identities, verifies survival, keeps secrets, restarts, and shuts down with no network
+[store] skipped write after close: appendEvent
+
+ ✓ apps/orchestrator/src/runtime-sqlite-launch.test.ts (10 tests) 94ms
+ ✓ packages/minecraft-adapter/src/travel-home.test.ts (9 tests) 8ms
+(node:49217) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:49219) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ packages/agent-core/src/construction-mission003.test.ts (8 tests) 195ms
+ ✓ packages/agent-core/src/sec001-migration-manager-qa.test.ts (5 tests) 992ms
+   ✓ Independent migrated SQLite -> actual manager cognition QA > migrated flagged fact and exact-derived memory cannot reach manager cognition, including after restart  533ms
+ ✓ packages/skills/src/world.test.ts (4 tests) 250ms
+ ✓ packages/shared/src/shared.test.ts (7 tests) 242ms
+stdout | packages/skills/src/craft-e2e-empty-start.test.ts > deterministic resource capability seeds (fake Mineflayer only) > seed 41 verifies an empty-start tool and stone chain
+{"scenario":"empty-start-capability","seed":41,"mode":"offline-fixture","humanInterventions":0,"suppliedInventory":[],"finalInventory":[{"name":"oak_planks","count":3},{"name":"stick","count":2},{"name":"wooden_pickaxe","count":1},{"name":"cobblestone","count":1}],"verifiedWorldModifications":[{"name":"crafting_table","position":{"x":5,"y":64,"z":5}}],"digs":["oak_log","oak_log","oak_log","stone"],"crafts":[{"result":"oak_planks","crafts":1,"withTable":false},{"result":"stick","crafts":1,"withTable":false},{"result":"oak_planks","crafts":1,"withTable":false},{"result":"crafting_table","crafts":1,"withTable":false},{"result":"oak_planks","crafts":1,"withTable":false},{"result":"wooden_pickaxe","crafts":1,"withTable":true}],"modelDecisions":0,"skillRequests":["obtain wooden_pickaxe","collect stone"],"health":[20,20],"hunger":[20,20],"deaths":0,"unmodeled":["hostiles","server physics","provider decisions","hunger progression"]}
+
+(node:49229) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ packages/skills/src/placement.test.ts (10 tests) 12ms
+ ✓ packages/minecraft-adapter/src/obstacle-detour.test.ts (3 tests) 22ms
+ ✓ tools/v1-acceptance/engine.test.ts (9 tests) 92ms
+ ✓ packages/minecraft-knowledge/src/ores.test.ts (9 tests) 22ms
+(node:49244) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:49246) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:49247) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ packages/agent-core/src/curfew-runtime.test.ts (7 tests) 25ms
+ ✓ packages/skills/src/gather.test.ts (4 tests) 419ms
+   ✓ mineBlock verifies the world change > fails when the log is still present after dig  411ms
+ ✓ apps/orchestrator/src/independent-offline-default-deny.test.ts (19 tests) 27849ms
+   ✓ offline composition is default-deny for model transports > a refused call leaves nothing running: a valid call afterwards still starts normally  3026ms
+   ✓ valid scripted runtimes still work > 2 citizens: GPT and Claude are answered from the script and nothing else is touched  9108ms
+   ✓ valid scripted runtimes still work > 4 citizens: GPT and Claude are answered from the script and nothing else is touched  11959ms
+   ✓ valid scripted runtimes still work > a scripted failure is reported as that citizen's failure, not retried onto a network  3439ms
+ ✓ packages/skills/src/eat-food.test.ts (6 tests) 1742ms
+   ✓ eatFood verifies hunger recovery > succeeds only when food is consumed and hunger rises  928ms
+   ✓ eatFood verifies hunger recovery > fails VERIFY_FAILED when consume is a no-op  804ms
+ ✓ packages/skills/src/inventory-service.test.ts (6 tests) 508ms
+   ✓ authoritative inventory model > builds compact cognition facts from a snapshot, not raw slots  483ms
+stdout | packages/skills/src/craft-e2e-empty-start.test.ts > deterministic resource capability seeds (fake Mineflayer only) > seed 99 verifies an empty-start tool and stone chain
+{"scenario":"empty-start-capability","seed":99,"mode":"offline-fixture","humanInterventions":0,"suppliedInventory":[],"finalInventory":[{"name":"oak_planks","count":3},{"name":"stick","count":2},{"name":"wooden_pickaxe","count":1},{"name":"cobblestone","count":1}],"verifiedWorldModifications":[{"name":"crafting_table","position":{"x":7,"y":64,"z":3}}],"digs":["oak_log","oak_log","oak_log","stone"],"crafts":[{"result":"oak_planks","crafts":1,"withTable":false},{"result":"stick","crafts":1,"withTable":false},{"result":"oak_planks","crafts":1,"withTable":false},{"result":"crafting_table","crafts":1,"withTable":false},{"result":"oak_planks","crafts":1,"withTable":false},{"result":"wooden_pickaxe","crafts":1,"withTable":true}],"modelDecisions":0,"skillRequests":["obtain wooden_pickaxe","collect stone"],"health":[20,20],"hunger":[20,20],"deaths":0,"unmodeled":["hostiles","server physics","provider decisions","hunger progression"]}
+
+ ✓ packages/skills/src/craft-e2e-empty-start.test.ts (9 tests) 28882ms
+   ✓ CRAFT-001 offline bootstrap from an empty inventory > staged chain: logs -> planks -> sticks -> crafting table (placed) -> wooden pickaxe, with inventory deltas at every step  3546ms
+   ✓ CRAFT-001 offline bootstrap from an empty inventory > obtainItem(wooden_pickaxe) from an empty inventory gathers, crafts, places a table, uses the table window  4732ms
+   ✓ CRAFT-001 offline bootstrap from an empty inventory > is idempotent: a second obtainItem with the pickaxe held changes nothing  4721ms
+   ✓ CRAFT-001 offline bootstrap from an empty inventory > surfaces a rejected craft instead of reporting a pickaxe  591ms
+   ✓ deterministic resource capability seeds (fake Mineflayer only) > seed 17 verifies an empty-start tool and stone chain  5041ms
+   ✓ deterministic resource capability seeds (fake Mineflayer only) > seed 41 verifies an empty-start tool and stone chain  5049ms
+   ✓ deterministic resource capability seeds (fake Mineflayer only) > seed 99 verifies an empty-start tool and stone chain  5041ms
+ ✓ packages/minecraft-adapter/src/execution-engine.test.ts (9 tests) 9ms
+ ✓ test-support/offline-network-guard.test.ts (6 tests) 3855ms
+   ✓ offline network guard > fails a test that swallows a blocked attempt (checked in a child vitest run)  3703ms
+ ✓ packages/memory/src/audience-observers.test.ts (8 tests) 24ms
+ ✓ packages/agent-core/src/storage-community-access.test.ts (8 tests) 238ms
+(node:49472) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+stderr | packages/agent-core/src/store.test.ts > CivilizationStore > safeWrite and safeRead refuse work after close without throwing
+[store] skipped write after close: late
+
+ ✓ packages/agent-core/src/store.test.ts (5 tests) 176ms
+ ✓ packages/agent-core/src/available-homes.test.ts (6 tests) 179ms
+ ✓ packages/agent-core/src/operation-tracker.test.ts (4 tests) 45ms
+ ✓ packages/agent-core/src/site-and-delivery-boundaries.test.ts (5 tests) 143ms
+(node:49488) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:49490) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ packages/minecraft-adapter/src/local-escape.test.ts (6 tests) 58ms
+ ✓ apps/orchestrator/src/two-fish-test-guard.test.ts (7 tests) 78ms
+stderr | apps/orchestrator/src/independent-offline-runtime.test.ts > scripted 1 GPT vs 1 Claude integrated offline 1v1 > a late cognition callback after shutdown cannot write closed SQLite or throw
+[store] skipped write after close: late-llm
+
+ ✓ apps/orchestrator/src/independent-offline-runtime.test.ts (11 tests) 40869ms
+   ✓ independent offline composition and normal manager startup > normal start creates 2 bodies and real planning executes routed survival choices  9377ms
+   ✓ independent offline composition and normal manager startup > normal start creates 4 bodies and real planning executes routed survival choices  11984ms
+   ✓ scripted 1 GPT vs 1 Claude integrated offline 1v1 > starts identities, verifies survival, keeps secrets, restarts, and shuts down with no network  16421ms
+   ✓ scripted 1 GPT vs 1 Claude integrated offline 1v1 > a late cognition callback after shutdown cannot write closed SQLite or throw  3039ms
+ ✓ packages/minecraft-knowledge/src/construction-blueprint-rules.test.ts (11 tests) 51ms
+(node:49495) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:49497) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ apps/orchestrator/src/fish-test-guard.test.ts (6 tests) 141ms
+ ✓ packages/minecraft-adapter/src/movement-sync.test.ts (5 tests) 16ms
+ ✓ packages/society/src/society.test.ts (7 tests) 11ms
+ ✓ apps/orchestrator/src/construction-experiment-guard.test.ts (14 tests) 22ms
+(node:49507) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ packages/minecraft-adapter/src/interaction.test.ts (4 tests) 37ms
+ ✓ packages/agent-core/src/independent-qa-community-isolation.test.ts (9 tests) 30739ms
+   ✓ QA: personal inventory must not become the legacy settlement_first stock > Regression: gathering berries raises settlement_first.food (0 -> 2)  488ms
+   ✓ QA: personal inventory must not become the legacy settlement_first stock > Regression: chopping and crafting raise settlement_first.wood and .tools from personal inventory  5921ms
+   ✓ QA: personal inventory must not become the legacy settlement_first stock > Regression: the leaked stock is written to SQLite and survives a manager restart  339ms
+   ✓ QA: nothing one community knows reaches the other's provider prompt > private locations and inventories stay in their owner's prompts across gathering, crafting and restart  10244ms
+   ✓ QA: nothing one community knows reaches the other's provider prompt > each prompt describes only its own inventory, not the rival's crafted tools  5826ms
+   ✓ QA: event provenance > every observed event names a real actor and task results stay actor-private  5801ms
+   ✓ authenticated executor workstation creation > records a physically placed table only for its creator and preserves legacy rows  1556ms
+(node:49519) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ packages/agent-core/src/action-evidence.test.ts (1 test) 216ms
+(node:49543) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:49542) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ packages/skills/src/obtain.test.ts (5 tests) 160ms
+ ✓ packages/shared/src/visibility-2v2-contract.test.ts (19 tests) 16ms
+ ✓ apps/orchestrator/src/world-lab-one-citizen-sequence.test.ts (5 tests) 17ms
+ ✓ packages/agent-core/src/executor-community-storage.test.ts (5 tests) 295ms
+ ✓ tools/v1-integration/manifest.test.ts (13 tests) 28ms
+(node:49549) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ packages/agent-core/src/build-structure.test.ts (3 tests) 51ms
+ ✓ packages/cognition/src/inference-queue-regression.test.ts (4 tests) 12ms
+ ✓ packages/minecraft-adapter/src/shared-auto-jump.test.ts (1 test) 28ms
+ ✓ packages/minecraft-adapter/src/terrain-memory.test.ts (3 tests) 22ms
+ ✓ packages/agent-core/src/workstations.test.ts (5 tests) 75ms
+ ✓ packages/agent-core/src/manager-roster-start.test.ts (7 tests) 3087ms
+   ✓ explicit independent citizen startup > connects the supplied stable roster rather than Atlas/Maya and preserves the experiment run ID  3054ms
+(node:49627) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ apps/orchestrator/src/mine-test-guard.test.ts (6 tests) 25ms
+ ✓ apps/orchestrator/src/http-server-origin.test.ts (4 tests) 197ms
+ ✓ packages/agent-core/src/community-audit-guard.test.ts (3 tests) 178ms
+ ✓ packages/agent-core/src/craft-e2e-planner-loop.test.ts (1 test) 5244ms
+   ✓ CRAFT-001 planner->executor loop from an empty inventory > reaches a wooden_pickaxe in a bounded number of ticks, each tick's claim matching the real inventory  5242ms
+ ✓ packages/agent-core/src/execution-engine.test.ts (4 tests) 272ms
+(node:49639) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:49650) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:49653) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ packages/agent-core/src/executor-food.test.ts (6 tests) 15ms
+(node:49659) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ packages/cognition/src/cognition.test.ts (8 tests) 29ms
+ ✓ packages/agent-core/src/recipes.test.ts (6 tests) 260ms
+ ✓ packages/skills/src/mechanics.test.ts (3 tests) 239ms
+ ✓ packages/agent-core/src/planner-food-backoff.test.ts (3 tests) 181ms
+(node:49687) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ packages/skills/src/combat.test.ts (2 tests) 964ms
+   ✓ combat live-entity narrowing > attacks the live hostile entity and reports death without calling it out of range  960ms
+ ✓ packages/skills/src/optional-work.test.ts (3 tests) 130ms
+ ✓ apps/orchestrator/src/home-test-guard.test.ts (5 tests) 14ms
+ ✓ packages/memory/src/store.test.ts (2 tests) 35ms
+(node:49789) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ packages/minecraft-adapter/src/connection-health.test.ts (3 tests) 7ms
+ ✓ packages/memory/src/retrieval.test.ts (3 tests) 8ms
+ ✓ packages/minecraft-adapter/src/path-recovery.test.ts (4 tests) 9ms
+ ✓ packages/skills/src/shared-drop-conservation.test.ts (2 tests) 223ms
+(node:49891) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:49892) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ packages/skills/src/gauntlet.test.ts (4 tests) 7ms
+(node:49900) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ packages/minecraft-adapter/src/enter-home.test.ts (2 tests) 21ms
+ ✓ packages/agent-core/src/claims.test.ts (4 tests) 9ms
+ ✓ tools/v1-integration/regressions.test.ts (5 tests) 5ms
+ ✓ tools/v1-integration/validator-adapter.test.ts (6 tests) 16ms
+ ✓ packages/agent-core/src/failure-backoff.test.ts (2 tests) 4ms
+ ✓ packages/agent-core/src/construction-evidence.test.ts (2 tests) 15ms
+ ✓ apps/orchestrator/src/farm-test-guard.test.ts (4 tests) 6ms
+ ✓ packages/shared/src/entity-target.test.ts (4 tests) 4ms
+ ✓ tools/v1-integration/preflight.test.ts (10 tests) 4538ms
+   ✓ read-only preflight blocks unsafe startup > accepts matching offline configuration and records binary versions  647ms
+   ✓ read-only preflight blocks unsafe startup > refuses port before startup callback  437ms
+   ✓ read-only preflight blocks unsafe startup > refuses provider before startup callback  632ms
+   ✓ read-only preflight blocks unsafe startup > refuses body before startup callback  492ms
+   ✓ read-only preflight blocks unsafe startup > refuses database before startup callback  483ms
+   ✓ read-only preflight blocks unsafe startup > refuses host before startup callback  459ms
+   ✓ read-only preflight blocks unsafe startup > refuses sha before startup callback  442ms
+   ✓ read-only preflight blocks unsafe startup > refuses output before startup callback  455ms
+   ✓ read-only preflight blocks unsafe startup > refuses mode before startup callback  479ms
+ ✓ packages/minecraft-knowledge/src/experiment-version-compatibility.test.ts (3 tests) 310ms
+ ✓ packages/memory/src/events.test.ts (3 tests) 23ms
+ ✓ packages/agent-core/src/projects.test.ts (2 tests) 22ms
+ ✓ apps/orchestrator/src/two-probe-test-guard.test.ts (3 tests) 9ms
+ ✓ packages/agent-core/src/executor-community-construction.test.ts (2 tests) 1195ms
+   ✓ executor construction community scoping > legacy single-settlement mode still persists the project (test sensitivity)  734ms
+   ✓ executor construction community scoping > community mode leaves the shared settlement row untouched  458ms
+ ✓ tools/v1-integration/branches.test.ts (2 tests) 12ms
+ ✓ packages/minecraft-adapter/src/navigation.test.ts (2 tests) 5ms
+ ✓ packages/shared/src/colony-world.test.ts (2 tests) 7ms
+ ✓ packages/agent-core/src/dev-reset.test.ts (2 tests) 6ms
+ ✓ packages/minecraft-knowledge/src/property.test.ts (3 tests) 7ms
+(node:50610) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ packages/skills/src/execution-engine.test.ts (4 tests) 280ms
+(node:50706) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ packages/agent-core/src/site.test.ts (2 tests) 13ms
+(node:50705) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ packages/agent-core/src/inventory-view.test.ts (2 tests) 9ms
+ ✓ packages/agent-core/src/bootstrap-wood-lists.test.ts (19 tests) 19ms
+(node:50718) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:50715) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:50719) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ packages/minecraft-adapter/src/death.test.ts (1 test) 8ms
+ ✓ tools/v1-integration/integrated-chest-adapter.test.ts (1 test) 204ms
+ ✓ packages/agent-core/src/blueprint.test.ts (2 tests) 27ms
+ ✓ packages/skills/src/furnace.test.ts (2 tests) 7ms
+ ✓ packages/agent-core/src/shelter.test.ts (1 test) 10ms
+(node:50728) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ packages/agent-core/src/planner-log-items.test.ts (10 tests) 185ms
+ ✓ packages/skills/src/blueprint-clear-site-safety.test.ts (1 test) 3ms
+ ✓ packages/agent-core/src/construction-water.test.ts (1 test) 4ms
+ ✓ packages/memory/src/memory.test.ts (1 test) 5ms
+ ✓ packages/minecraft-adapter/src/body-lock.test.ts (2 tests) 2ms
+ ✓ packages/agent-core/src/transfer.test.ts (1 test) 2ms
+ ✓ packages/skills/src/skills.test.ts (1 test) 5ms
+ ✓ tools/v1-integration/scenario.test.ts (4 tests) 24086ms
+   ✓ offline composition scenario > routes 2 citizens through scripted models and preserves private memory after reopening disposable SQLite  7747ms
+   ✓ offline composition scenario > routes 4 citizens through scripted models and preserves private memory after reopening disposable SQLite  13310ms
+   ✓ offline composition scenario > exposes the lower composition root createBody trust boundary without network access  3020ms
+
+ Test Files  201 passed (201)
+      Tests  2276 passed (2276)
+   Start at  19:50:34
+   Duration  65.21s (transform 8.31s, setup 5.97s, collect 125.68s, tests 262.20s, environment 37ms, prepare 37.25s)
+

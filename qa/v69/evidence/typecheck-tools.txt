@@ -1,0 +1,4 @@
+
+> minecraft-ai-civilization@0.1.0 typecheck:tools /Users/manpreetsingh/.t3/worktrees/Minecraft-Ai-Civilization/fix-lifecycle-qa
+> tsc -p tools/tsconfig.json
+

@@ -14,6 +14,8 @@
  * Do not call stock `bot.fish()` for concurrent Kai+Atlas fishing.
  */
 
+import { runBoundedCleanup } from "@civ/shared";
+
 function isBobberName(name: string): boolean {
   const text = name.toLowerCase();
   return text.includes("fishing_bobber") || text.includes("fishing hook") || text.trim() === "bobber";
@@ -91,6 +93,9 @@ export type FishCycleEvent =
   | "bound";
 
 const inflight = new WeakMap<object, { cancel: (reason: string) => void; phase: FishCyclePhase }>();
+const fishAttempt = new WeakMap<object, symbol>();
+/** How long the cancel-retrieve may still send its single use_item after the action is no longer allowed to cast. */
+const FISH_RETRIEVE_DEADLINE_MS = 250;
 
 export function hypotXZ(a: Vec3Like, b: Vec3Like): number {
   return Math.hypot(a.x - b.x, a.z - b.z);
@@ -307,6 +312,10 @@ export async function runMineflayerFishCycle(
     log("IDLE", "none", "already-fishing-on-this-client");
     return { result: "already-fishing", logs, activations: 0 };
   }
+  if (opts.signal?.aborted) {
+    log("IDLE", "none", "cancelled-before-cast");
+    return { result: "cancelled", logs, activations: 0 };
+  }
 
   let bound: BobberEntity | undefined;
   let reeled = false;
@@ -326,6 +335,10 @@ export async function runMineflayerFishCycle(
     },
   };
   inflight.set(bot, handle);
+  const attempt = Symbol(attemptId);
+  const client = bot._client;
+  fishAttempt.set(bot, attempt);
+  const stillThisCast = () => fishAttempt.get(bot) === attempt && bot._client === client;
 
   const activate = (why: string, next: FishCyclePhase) => {
     bot.activateItem();
@@ -370,6 +383,7 @@ export async function runMineflayerFishCycle(
   };
 
   const reelOwnBite = (why: string) => {
+    if (!stillThisCast() || opts.signal?.aborted || cancelReason || reeled) return;
     const cmd = rodCommandForEvent({
       phase: "WAIT_FOR_OWN_BITE",
       event: "own-bite",
@@ -383,6 +397,7 @@ export async function runMineflayerFishCycle(
   };
 
   const onSpawn = (...args: unknown[]) => {
+    if (!stillThisCast() || opts.signal?.aborted || cancelReason) return;
     const packet = args[0] as
       | {
           type?: number | string;
@@ -424,6 +439,7 @@ export async function runMineflayerFishCycle(
   };
 
   const onParticles = (...args: unknown[]) => {
+    if (!stillThisCast() || opts.signal?.aborted || cancelReason) return;
     if (!bound || reeled || (handle.phase !== "WAIT_FOR_OWN_BITE" && handle.phase !== "CAST")) return;
     const packet = args[0] as ParticlePacket | undefined;
     const pos = bot.entities[bound.id]?.position ?? bound.position;
@@ -443,6 +459,7 @@ export async function runMineflayerFishCycle(
   };
 
   const onMetadata = (...args: unknown[]) => {
+    if (!stillThisCast() || opts.signal?.aborted || cancelReason) return;
     if (!bound || reeled || (handle.phase !== "WAIT_FOR_OWN_BITE" && handle.phase !== "CAST")) return;
     const packet = args[0] as { entityId?: number; metadata?: Array<{ key?: number; value?: unknown }> } | undefined;
     if (!packet) return;
@@ -451,6 +468,7 @@ export async function runMineflayerFishCycle(
   };
 
   const onDestroy = (...args: unknown[]) => {
+    if (!stillThisCast() || opts.signal?.aborted || cancelReason) return;
     if (!bound) return;
     const packet = args[0] as { entityIds?: number[] } | undefined;
     if (!packet?.entityIds?.includes(bound.id)) return;
@@ -465,10 +483,22 @@ export async function runMineflayerFishCycle(
     log(handle.phase, "bobber-lost", "entity_destroy of bound bobber");
   };
 
-  bot._client.on("spawn_entity", onSpawn);
-  bot._client.on("world_particles", onParticles);
-  bot._client.on("entity_metadata", onMetadata);
-  bot._client.on("entity_destroy", onDestroy);
+  client.on("spawn_entity", onSpawn);
+  client.on("world_particles", onParticles);
+  client.on("entity_metadata", onMetadata);
+  client.on("entity_destroy", onDestroy);
+  const detachAll = () => {
+    detach(client, "spawn_entity", onSpawn);
+    detach(client, "world_particles", onParticles);
+    detach(client, "entity_metadata", onMetadata);
+    detach(client, "entity_destroy", onDestroy);
+  };
+  const onAbort = () => {
+    cancelReason = cancelReason ?? "abort";
+    detachAll();
+  };
+  if (opts.signal?.aborted) onAbort();
+  else opts.signal?.addEventListener("abort", onAbort, { once: true });
 
   try {
     const start = rodCommandForEvent({
@@ -504,7 +534,14 @@ export async function runMineflayerFishCycle(
     }
 
     if (opts.signal?.aborted || cancelReason) {
-      if (!reeled && bound && bot.entities[bound.id]) activate("cancel-retrieve", "REEL");
+      if (!reeled && bound && bot.entities[bound.id]) {
+        reeled = true;
+        // The owner is already inactive. This permit allows the retrieve and nothing else, and it expires.
+        runBoundedCleanup(() => activate("cancel-retrieve", "REEL"), {
+          packets: ["use_item"],
+          deadlineMs: FISH_RETRIEVE_DEADLINE_MS,
+        });
+      }
       return { result: "cancelled", logs, activations, bobberId: bound?.id };
     }
     if (reeled) {
@@ -517,10 +554,9 @@ export async function runMineflayerFishCycle(
     log(handle.phase, "timeout", "no own bite particle or biting metadata within budget");
     return { result: "timeout", logs, activations, bobberId: bound?.id };
   } finally {
-    detach(bot._client, "spawn_entity", onSpawn);
-    detach(bot._client, "world_particles", onParticles);
-    detach(bot._client, "entity_metadata", onMetadata);
-    detach(bot._client, "entity_destroy", onDestroy);
+    opts.signal?.removeEventListener("abort", onAbort);
+    detachAll();
+    if (fishAttempt.get(bot) === attempt) fishAttempt.delete(bot);
     inflight.delete(bot);
   }
 }

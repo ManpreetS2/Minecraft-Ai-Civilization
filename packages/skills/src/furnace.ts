@@ -135,8 +135,25 @@ export async function smeltItem(
       return fail("SMELT_FAILED", `${inName} did not produce ${outName} in time`, Date.now() - started, true);
     }
     await furnace.takeOutput();
-    // The output is already in the inventory. Report that result even if cancellation arrives now.
+    // The ingot is already in the inventory. Do not start another furnace click after cancellation:
+    // the packet guard would refuse it and the catch below would hide a smelt that actually finished.
+    if (ctx.signal?.aborted) {
+      furnace.close();
+      const taken = countItem(ctx, outName) - before;
+      if (taken >= 1) {
+        return ok({ input: inName, output: outName, produced: taken, workstation: block.name }, Date.now() - started);
+      }
+      return cancelledResult(started, "smelting cancelled after the output was taken");
+    }
     if (furnace.inputItem() && furnace.takeInput) await furnace.takeInput();
+    if (ctx.signal?.aborted) {
+      furnace.close();
+      const taken = countItem(ctx, outName) - before;
+      if (taken >= 1) {
+        return ok({ input: inName, output: outName, produced: taken, workstation: block.name }, Date.now() - started);
+      }
+      return cancelledResult(started, "smelting cancelled before recovering fuel");
+    }
     if (furnace.fuelItem() && furnace.takeFuel) await furnace.takeFuel();
     furnace.close();
   } catch (error) {
@@ -145,10 +162,22 @@ export async function smeltItem(
     } catch {
       // ignore
     }
+    const taken = countItem(ctx, outName) - before;
+    if (taken >= 1) {
+      return ok({ input: inName, output: outName, produced: taken, workstation: block.name }, Date.now() - started);
+    }
+    if (ctx.signal?.aborted) return cancelledResult(started, "smelting cancelled");
     if (error instanceof WindowOpenError) {
       return fail(error.code, error.message, Date.now() - started, error.code === "TIMEOUT");
     }
     return fail("SMELT_FAILED", error instanceof Error ? error.message : String(error), Date.now() - started, true);
+  }
+  if (ctx.signal?.aborted) {
+    const taken = countItem(ctx, outName) - before;
+    if (taken >= 1) {
+      return ok({ input: inName, output: outName, produced: taken, workstation: block.name }, Date.now() - started);
+    }
+    return cancelledResult(started, "smelting cancelled");
   }
   await new Promise((resolve) => setTimeout(resolve, 300));
   const gained = countItem(ctx, outName) - before;

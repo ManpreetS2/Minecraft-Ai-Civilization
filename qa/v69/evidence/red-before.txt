@@ -1,0 +1,255 @@
+
+ RUN  v3.2.7 /Users/manpreetsingh/.t3/worktrees/Minecraft-Ai-Civilization/fix-lifecycle-qa/qa/v69
+
+stdout | test/adv69-boundary-als.test.ts > packet guard: which packets are cut after the action loses ownership > packets that mutate world/inventory but are NOT in the guard set pass after ownership is lost (coverage gap, characterised)
+UNGUARDED_MUTATING_PACKETS craft_recipe_request,select_trade,enchant_item,pick_item,set_creative_slot,update_sign,chat_command,chat_message
+
+ ✓ test/adv69-boundary-als.test.ts > packet guard: which packets are cut after the action loses ownership > every MUTATING packet is refused from an inactive owner; cleanup dig (status 1/5) and non-mutating packets pass 19ms
+ ✓ test/adv69-boundary-als.test.ts > packet guard: which packets are cut after the action loses ownership > packets that mutate world/inventory but are NOT in the guard set pass after ownership is lost (coverage gap, characterised) 16ms
+ ✓ test/adv69-boundary-als.test.ts > packet guard: which packets are cut after the action loses ownership > installPacketGuard is idempotent per client and survives reconnection (a NEW client is guarded on its next action) 13ms
+stdout | test/adv69-production-callbacks.test.ts > production fishing under the production boundary > control: a normal cycle casts (use_item), binds the bobber and is cancelled with a retrieve (use_item) while the owner is ACTIVE
+FISH_CANCEL wire= use_item activations= 2
+
+ ✓ test/adv69-production-callbacks.test.ts > production fishing under the production boundary > control: a normal cycle casts (use_item), binds the bobber and is cancelled with a retrieve (use_item) while the owner is ACTIVE 160ms
+ ✓ test/adv69-boundary-als.test.ts > AsyncLocalStorage: which asynchronous origins keep the owner after the action is abandoned > timers, promise continuations, microtasks, nextTick and await all keep the owner (late writes refused) 204ms
+(node:31515) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:31514) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+stdout | test/adv69-boundary-als.test.ts > AsyncLocalStorage: which asynchronous origins keep the owner after the action is abandoned > GAP: a listener registered inside the action on a long-lived emitter, fired from an ownerless context, is NOT contained
+ALS_EMITTER_LISTENER_AFTER_ABANDON passed wire= block_place
+
+stdout | test/adv69-production-callbacks.test.ts > production fishing under the production boundary > [QA69-M2] the cancel-retrieve reel is itself a use_item written after the owner went inactive; the guard refuses it, so the bobber stays cast
+FISH_RETRIEVE_AFTER_ABORT retrieveWritesReachedWire= 0 cycleError= LATE_WRITE_REFUSED
+
+stdout | test/adv69-boundary-als.test.ts > AsyncLocalStorage: which asynchronous origins keep the owner after the action is abandoned > cut-off is not at abort(): a write issued in the same synchronous turn or the next microtask after abort still passes
+CUTOFF_WINDOW sync-after-abort:passed | 1-microtask:passed | 10ms:refused wire= window_click,window_click
+
+stdout | test/adv69-production-callbacks.test.ts > production fishing under the production boundary > [QA69-M3] a production listener (fish bite, 5 ms after abort, owner provably inactive) must not reach the wire
+FISH_BITE_AFTER_OWNER_INACTIVE lateUseItemOnWire= 1
+
+ ✓ test/adv69-boundary-als.test.ts > AsyncLocalStorage: which asynchronous origins keep the owner after the action is abandoned > GAP: a listener registered inside the action on a long-lived emitter, fired from an ownerless context, is NOT contained 205ms
+ ✓ test/adv69-boundary-als.test.ts > AsyncLocalStorage: which asynchronous origins keep the owner after the action is abandoned > a write from a DIFFERENT, still-active owner is allowed (owners are not shared across actions) 23ms
+ ✓ test/adv69-boundary-als.test.ts > AsyncLocalStorage: which asynchronous origins keep the owner after the action is abandoned > cut-off is not at abort(): a write issued in the same synchronous turn or the next microtask after abort still passes 18ms
+ ✓ test/adv69-boundary-als.test.ts > boundary semantics > the owner gap is real: a write with no owner is never refused, even for an action that was abandoned a second ago 13ms
+(node:31517) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+stdout | test/adv69-boundary-als.test.ts > boundary semantics > an action queued behind another with an already-aborted signal still STARTS its skill once (skills must refuse on entry)
+PREABORTED started= 1 success= true
+
+ ✓ test/adv69-boundary-als.test.ts > boundary semantics > a skill that never settles returns TIMEOUT (non-retryable), counts as an orphan, and does not block the next action 68ms
+ ✓ test/adv69-boundary-als.test.ts > boundary semantics > a skill that rejects becomes UNKNOWN non-retryable; a throwing clientOf rejects run() but the queue keeps working 2ms
+ ✓ test/adv69-boundary-als.test.ts > boundary semantics > an action queued behind another with an already-aborted signal still STARTS its skill once (skills must refuse on entry) 0ms
+ ✓ test/adv69-boundary-als.test.ts > boundary semantics > timeoutMs of 0 or NaN aborts immediately instead of running unbounded 23ms
+stdout | test/adv69-boundary-als.test.ts > boundary semantics > re-entrant run() from inside a running action deadlocks until the outer deadline (no production caller found)
+REENTRANT result= TIMEOUT after 143 ms
+
+ ✓ test/adv69-boundary-als.test.ts > boundary semantics > re-entrant run() from inside a running action deadlocks until the outer deadline (no production caller found) 143ms
+stdout | test/adv69-construction.test.ts > cancellation during FINAL_VALIDATION must not turn a finished build into a permanently BLOCKED one > abort lands on navigation call #1 (first approach move) of live validation: session stays IN_PROGRESS and the result is CANCELLED/INTERRUPTED
+FINAL_VALIDATION_CANCEL first approach move calls= 4 result= CANCELLED session.status= IN_PROGRESS failures= ["ENTRANCE_BLOCKED","ENTRANCE_BLOCKED"]
+
+stdout | test/adv69-construction.test.ts > cancellation during FINAL_VALIDATION must not turn a finished build into a permanently BLOCKED one > abort lands on navigation call #2 (entrance door / interior move) of live validation: session stays IN_PROGRESS and the result is CANCELLED/INTERRUPTED
+FINAL_VALIDATION_CANCEL entrance door / interior move calls= 4 result= CANCELLED session.status= IN_PROGRESS failures= ["ENTRANCE_BLOCKED"]
+
+stdout | test/adv69-construction.test.ts > cancellation during FINAL_VALIDATION must not turn a finished build into a permanently BLOCKED one > abort lands on navigation call #4 (final move out) of live validation: session stays IN_PROGRESS and the result is CANCELLED/INTERRUPTED
+FINAL_VALIDATION_CANCEL final move out calls= 4 result= CANCELLED session.status= IN_PROGRESS failures= []
+
+stdout | test/adv69-construction.test.ts > cancellation during FINAL_VALIDATION must not turn a finished build into a permanently BLOCKED one > [QA69-M1] WITHOUT any workstation (basic_shelter_v1): abort on navigation call #1 of live validation must still be CANCELLED/INTERRUPTED and leave the session IN_PROGRESS
+SHELTER_BUILT status= COMPLETE stage= FINAL_VALIDATION placed= 55
+
+stdout | test/adv69-construction.test.ts > cancellation during FINAL_VALIDATION must not turn a finished build into a permanently BLOCKED one > [QA69-M1] WITHOUT any workstation (basic_shelter_v1): abort on navigation call #1 of live validation must still be CANCELLED/INTERRUPTED and leave the session IN_PROGRESS
+NO_CHEST_VALIDATION_CANCEL when= 1 calls= 4 result= ENTRANCE_BLOCKED session.status= BLOCKED failures= ["ENTRANCE_BLOCKED"]
+
+stdout | test/adv69-construction.test.ts > cancellation during FINAL_VALIDATION must not turn a finished build into a permanently BLOCKED one > [QA69-M1] WITHOUT any workstation (basic_shelter_v1): abort on navigation call #2 of live validation must still be CANCELLED/INTERRUPTED and leave the session IN_PROGRESS
+SHELTER_BUILT status= COMPLETE stage= FINAL_VALIDATION placed= 55
+
+stdout | test/adv69-construction.test.ts > cancellation during FINAL_VALIDATION must not turn a finished build into a permanently BLOCKED one > [QA69-M1] WITHOUT any workstation (basic_shelter_v1): abort on navigation call #2 of live validation must still be CANCELLED/INTERRUPTED and leave the session IN_PROGRESS
+NO_CHEST_VALIDATION_CANCEL when= 2 calls= 4 result= ENTRANCE_BLOCKED session.status= BLOCKED failures= ["ENTRANCE_BLOCKED"]
+
+stdout | test/adv69-construction.test.ts > cancellation during FINAL_VALIDATION must not turn a finished build into a permanently BLOCKED one > [QA69-M1] WITHOUT any workstation (basic_shelter_v1): abort on navigation call #3 of live validation must still be CANCELLED/INTERRUPTED and leave the session IN_PROGRESS
+SHELTER_BUILT status= COMPLETE stage= FINAL_VALIDATION placed= 55
+
+stdout | test/adv69-construction.test.ts > cancellation during FINAL_VALIDATION must not turn a finished build into a permanently BLOCKED one > [QA69-M1] WITHOUT any workstation (basic_shelter_v1): abort on navigation call #3 of live validation must still be CANCELLED/INTERRUPTED and leave the session IN_PROGRESS
+NO_CHEST_VALIDATION_CANCEL when= 3 calls= 4 result= INTERIOR_UNREACHABLE session.status= BLOCKED failures= ["INTERIOR_UNREACHABLE"]
+
+stdout | test/adv69-construction.test.ts > cancellation during FINAL_VALIDATION must not turn a finished build into a permanently BLOCKED one > [QA69-M1] WITHOUT any workstation (basic_shelter_v1): abort on navigation call #4 of live validation must still be CANCELLED/INTERRUPTED and leave the session IN_PROGRESS
+SHELTER_BUILT status= COMPLETE stage= FINAL_VALIDATION placed= 55
+
+stdout | test/adv69-construction.test.ts > cancellation during FINAL_VALIDATION must not turn a finished build into a permanently BLOCKED one > [QA69-M1] WITHOUT any workstation (basic_shelter_v1): abort on navigation call #4 of live validation must still be CANCELLED/INTERRUPTED and leave the session IN_PROGRESS
+NO_CHEST_VALIDATION_CANCEL when= 4 calls= 4 result= ENTRANCE_BLOCKED session.status= BLOCKED failures= ["ENTRANCE_BLOCKED"]
+
+ ✓ test/adv69-construction.test.ts > cancellation during FINAL_VALIDATION must not turn a finished build into a permanently BLOCKED one > control: the harness builds the structure to COMPLETE with static validation 175ms
+ ✓ test/adv69-construction.test.ts > cancellation during FINAL_VALIDATION must not turn a finished build into a permanently BLOCKED one > abort lands on navigation call #1 (first approach move) of live validation: session stays IN_PROGRESS and the result is CANCELLED/INTERRUPTED 17ms
+ ✓ test/adv69-construction.test.ts > cancellation during FINAL_VALIDATION must not turn a finished build into a permanently BLOCKED one > abort lands on navigation call #2 (entrance door / interior move) of live validation: session stays IN_PROGRESS and the result is CANCELLED/INTERRUPTED 13ms
+ ✓ test/adv69-construction.test.ts > cancellation during FINAL_VALIDATION must not turn a finished build into a permanently BLOCKED one > abort lands on navigation call #4 (final move out) of live validation: session stays IN_PROGRESS and the result is CANCELLED/INTERRUPTED 6ms
+ ✓ test/adv69-construction.test.ts > cancellation during FINAL_VALIDATION must not turn a finished build into a permanently BLOCKED one > progress is preserved and resumable: after a cancelled validation the next call completes the build 8ms
+ ✓ test/adv69-construction.test.ts > cancellation during FINAL_VALIDATION must not turn a finished build into a permanently BLOCKED one > [QA69-M1] WITHOUT any workstation (basic_shelter_v1): abort on navigation call #1 of live validation must still be CANCELLED/INTERRUPTED and leave the session IN_PROGRESS 50ms
+ ✓ test/adv69-construction.test.ts > cancellation during FINAL_VALIDATION must not turn a finished build into a permanently BLOCKED one > [QA69-M1] WITHOUT any workstation (basic_shelter_v1): abort on navigation call #2 of live validation must still be CANCELLED/INTERRUPTED and leave the session IN_PROGRESS 12ms
+ ✓ test/adv69-construction.test.ts > cancellation during FINAL_VALIDATION must not turn a finished build into a permanently BLOCKED one > [QA69-M1] WITHOUT any workstation (basic_shelter_v1): abort on navigation call #3 of live validation must still be CANCELLED/INTERRUPTED and leave the session IN_PROGRESS 4ms
+ ✓ test/adv69-construction.test.ts > cancellation during FINAL_VALIDATION must not turn a finished build into a permanently BLOCKED one > [QA69-M1] WITHOUT any workstation (basic_shelter_v1): abort on navigation call #4 of live validation must still be CANCELLED/INTERRUPTED and leave the session IN_PROGRESS 4ms
+ ✓ test/adv69-construction.test.ts > cancellation during FINAL_VALIDATION must not turn a finished build into a permanently BLOCKED one > a genuine (non-cancel) validation failure still BLOCKS: the fix must not hide real failures 4ms
+stdout | test/adv69-production-callbacks.test.ts > real mineflayer digging plugin under the production guard (child process, stub bot) > production dig path (abort => stopDigging) survives
+DIG_WITH_STOP exit= 1 
+
+stdout | test/adv69-manager.test.ts > interruption of a running physical action through the real manager > disconnect (end): aborts the signal, no furnace op starts afterwards, flags clear, memories untouched
+IRQ disconnect (end) lateOps= none result= CANCELLED busy= false live= false
+
+ ✓ test/adv69-manager.test.ts > interruption of a running physical action through the real manager > disconnect (end): aborts the signal, no furnace op starts afterwards, flags clear, memories untouched 1261ms
+stdout | test/adv69-manager.test.ts > interruption of a running physical action through the real manager > kick: aborts the signal, no furnace op starts afterwards, flags clear, memories untouched
+IRQ kick lateOps= none result= CANCELLED busy= false live= false
+
+ ✓ test/adv69-manager.test.ts > interruption of a running physical action through the real manager > kick: aborts the signal, no furnace op starts afterwards, flags clear, memories untouched 513ms
+stdout | test/adv69-skills.test.ts > smeltItem: abort sweep > [QA69-L1] no furnace operation STARTS after the abort, at any abort offset (0..450 ms)
+SMELT_POST_ABORT_STARTS abort@480ms: takeFuel@+67 (result success=true)
+
+ ✓ test/adv69-skills.test.ts > smeltItem: abort sweep > [QA69-L1] no furnace operation STARTS after the abort, at any abort offset (0..450 ms) 3203ms
+stdout | test/adv69-manager.test.ts > interruption of a running physical action through the real manager > death during the operation: the action is aborted and cannot place/withdraw afterwards
+DEATH aborted= true depositAfterDeath= 0 result= CANCELLED status= online
+
+stdout | test/adv69-production-callbacks.test.ts > real mineflayer digging plugin under the production guard (child process, stub bot) > [QA69-L3 latent, informational] an abandoned dig that is NOT stopped makes the guard throw inside mineflayer's setInterval (uncaught => process exit)
+DIG_NO_STOP exit= 1 
+
+ ✓ test/adv69-production-callbacks.test.ts > production fishing under the production boundary > [QA69-M2] the cancel-retrieve reel is itself a use_item written after the owner went inactive; the guard refuses it, so the bobber stays cast 317ms
+ ✓ test/adv69-production-callbacks.test.ts > production fishing under the production boundary > [QA69-M3] a production listener (fish bite, 5 ms after abort, owner provably inactive) must not reach the wire 14ms
+ × test/adv69-production-callbacks.test.ts > real mineflayer digging plugin under the production guard (child process, stub bot) > production dig path (abort => stopDigging) survives 2181ms
+   → expected 1 to be +0 // Object.is equality
+ × test/adv69-production-callbacks.test.ts > real mineflayer digging plugin under the production guard (child process, stub bot) > [QA69-L3 latent, informational] an abandoned dig that is NOT stopped makes the guard throw inside mineflayer's setInterval (uncaught => process exit) 1714ms
+   → expected '\nnode:internal/modules/run_main:122\…' to match /late arm_animation refused/
+stdout | test/adv69-manager.test.ts > shutdown, expiry and late promises > stop() with a skill that never answers completes quickly and fully drains (hanging openContainer)
+SHUTDOWN_HANG took= 3 ms drain= {"attempted":1,"remaining":0,"timedOut":false,"fullyDrained":true}
+
+ ✓ test/adv69-manager.test.ts > interruption of a running physical action through the real manager > death during the operation: the action is aborted and cannot place/withdraw afterwards 472ms
+ ✓ test/adv69-manager.test.ts > shutdown, expiry and late promises > stop() with a skill that never answers completes quickly and fully drains (hanging openContainer) 83ms
+stdout | test/adv69-manager.test.ts > shutdown, expiry and late promises > stop() with a skill that ignores the signal entirely: boundary abandons it at the grace period; no write to the closed store
+SHUTDOWN_IGNORING took= 252 drain= {"attempted":1,"remaining":0,"timedOut":false,"fullyDrained":true} unhandled= 0
+
+stdout | test/adv69-manager.test.ts > shutdown, expiry and late promises > action expiry at the 22 s deadline: TIMEOUT recorded once, flags clear, a late success from the abandoned skill is ignored
+EXPIRY started= 1 TaskFailed before/after late= 1 1 TaskCompleted= 0 lastOutcome= {"s":false,"e":"travelTowardHousing exceeded 22000 ms an"}
+
+stdout | test/adv69-manager.test.ts > shutdown, expiry and late promises > an abandoned action cannot mutate the body after the next action has started (guard + owner), and the next action runs
+ABANDONED_VS_NEXT A-start > B-start > B-write > A-late-write-refused
+
+ ✓ test/adv69-manager.test.ts > shutdown, expiry and late promises > stop() with a skill that ignores the signal entirely: boundary abandons it at the grace period; no write to the closed store 1915ms
+ ✓ test/adv69-manager.test.ts > shutdown, expiry and late promises > action expiry at the 22 s deadline: TIMEOUT recorded once, flags clear, a late success from the abandoned skill is ignored 15ms
+ ✓ test/adv69-manager.test.ts > shutdown, expiry and late promises > an abandoned action cannot mutate the body after the next action has started (guard + owner), and the next action runs 15ms
+ ✓ test/adv69-manager.test.ts > duplicate scheduling and competing actions > two concurrent ticks for one citizen start exactly one action 159ms
+stdout | test/adv69-manager.test.ts > duplicate scheduling and competing actions > stopCitizen / ADMIN override clear busy but actionLive still blocks a second action until the first has unwound
+STOP_THEN_TICK started= 2 peakOverlap= 1
+
+ ✓ test/adv69-manager.test.ts > duplicate scheduling and competing actions > stopCitizen / ADMIN override clear busy but actionLive still blocks a second action until the first has unwound 402ms
+stdout | test/adv69-manager.test.ts > duplicate scheduling and competing actions > two physical actions queued on one body never overlap, even when the first ignores its signal
+COMPETING peakOverlap= 2 (A was abandoned at its deadline while still running)
+
+stdout | test/adv69-skills.test.ts > smeltItem: abort sweep > result is truthful: success iff the smelted ingot actually reached the inventory
+SMELT_TRUTHFULNESS all truthful
+
+ ✓ test/adv69-skills.test.ts > smeltItem: abort sweep > result is truthful: success iff the smelted ingot actually reached the inventory 3583ms
+ ✓ test/adv69-skills.test.ts > smeltItem: abort sweep > returns promptly after abort when it has not yet taken the output 74ms
+stdout | test/adv69-manager.test.ts > reconnection and stale client callbacks > after reconnect the new client is guarded on its first action; the old client's late window/callbacks cannot mutate the new bot
+RECONNECT oldResult= CANCELLED newBotWrites= block_place
+
+ ✓ test/adv69-manager.test.ts > duplicate scheduling and competing actions > two physical actions queued on one body never overlap, even when the first ignores its signal 256ms
+ ✓ test/adv69-manager.test.ts > reconnection and stale client callbacks > after reconnect the new client is guarded on its first action; the old client's late window/callbacks cannot mutate the new bot 700ms
+stdout | test/adv69-manager.test.ts > what the packet guard does NOT contain: side effects of an abandoned skill other than packets > [QA69-L2] a withdraw that lands just after the deadline is reported TIMEOUT to the manager, yet its success event and inventory change still appear later
+LATE_SIDE_EFFECTS managerSaw= TIMEOUT afterMs= 83 eventsAfterAbandonment= ItemWithdrawn inventoryNow= 2
+
+ ✓ test/adv69-manager.test.ts > what the packet guard does NOT contain: side effects of an abandoned skill other than packets > [QA69-L2] a withdraw that lands just after the deadline is reported TIMEOUT to the manager, yet its success event and inventory change still appear later 369ms
+stdout | test/adv69-skills.test.ts > chest deposit / withdraw: abort sweep > deposit: no transfer STARTS after abort at any offset, and success is truthful
+DEPOSIT_SWEEP clean
+
+ ✓ test/adv69-skills.test.ts > chest deposit / withdraw: abort sweep > deposit: control (no abort) succeeds on this fixture 616ms
+ ✓ test/adv69-skills.test.ts > chest deposit / withdraw: abort sweep > deposit: no transfer STARTS after abort at any offset, and success is truthful 830ms
+ ✓ test/adv69-skills.test.ts > chest deposit / withdraw: abort sweep > withdraw: control (no abort) succeeds on this fixture 603ms
+stdout | test/adv69-skills.test.ts > chest deposit / withdraw: abort sweep > withdraw: no transfer STARTS after abort at any offset, and success is truthful
+WITHDRAW_SWEEP clean
+
+ ✓ test/adv69-skills.test.ts > chest deposit / withdraw: abort sweep > withdraw: no transfer STARTS after abort at any offset, and success is truthful 828ms
+stdout | test/adv69-skills.test.ts > placeBlock / executeStructure / huntAnimal: abort sweep > placeBlock: no block_place starts after abort, and a failure after abort is CANCELLED
+PLACE_SWEEP clean
+
+ ✓ test/adv69-skills.test.ts > placeBlock / executeStructure / huntAnimal: abort sweep > placeBlock: no block_place starts after abort, and a failure after abort is CANCELLED 733ms
+stdout | test/adv69-skills.test.ts > placeBlock / executeStructure / huntAnimal: abort sweep > executeStructure: a cancel at any block is CANCELLED (never BUILD_BLOCKED) and nothing is placed after it
+STRUCTURE_SWEEP clean
+
+ ✓ test/adv69-skills.test.ts > placeBlock / executeStructure / huntAnimal: abort sweep > executeStructure: a cancel at any block is CANCELLED (never BUILD_BLOCKED) and nothing is placed after it 635ms
+stdout | test/adv69-skills.test.ts > placeBlock / executeStructure / huntAnimal: abort sweep > huntAnimal: no attack after abort at any offset; returns promptly
+HUNT_SWEEP clean
+
+ ✓ test/adv69-skills.test.ts > placeBlock / executeStructure / huntAnimal: abort sweep > huntAnimal: no attack after abort at any offset; returns promptly 1616ms
+ ✓ test/adv69-skills.test.ts > openWindowBounded > calls open exactly once; a window arriving after CANCEL is closed exactly once and never returned 139ms
+ ✓ test/adv69-skills.test.ts > openWindowBounded > a window arriving after the DEADLINE is closed exactly once 155ms
+ ✓ test/adv69-skills.test.ts > openWindowBounded > a late REJECTION after timeout/cancel is swallowed (no unhandled rejection) and a never-opening window times out 165ms
+ ✓ test/adv69-skills.test.ts > openWindowBounded > an already-expired budget or pre-aborted signal never invokes open() 1ms
+ ✓ test/adv69-skills.test.ts > openWindowBounded > a synchronous throw from open(), and a close() that throws on the late path, do not escape as unhandled errors 91ms
+ ✓ test/adv69-skills.test.ts > openWindowBounded > success path returns the window unclosed; waitForSignal removes its listener 13ms
+stdout | test/adv69-skills.test.ts > smeltItem THROUGH the production boundary (packet guard active) > [QA69-L1] success is truthful at every abort offset when the guard refuses the post-abort furnace clicks
+SMELT_VIA_BOUNDARY abort@480ms: ingotInInventory=true reported=SMELT_FAILED || abort@520ms: ingotInInventory=true reported=SMELT_FAILED
+
+ ✓ test/adv69-skills.test.ts > smeltItem THROUGH the production boundary (packet guard active) > [QA69-L1] success is truthful at every abort offset when the guard refuses the post-abort furnace clicks 3373ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/adv69-production-callbacks.test.ts > real mineflayer digging plugin under the production guard (child process, stub bot) > production dig path (abort => stopDigging) survives
+AssertionError: expected 1 to be +0 // Object.is equality
+
+- Expected
++ Received
+
+- 0
++ 1
+
+ ❯ test/adv69-production-callbacks.test.ts:96:20
+     94|     const r = run("abandon-with-stop");
+     95|     console.log("DIG_WITH_STOP exit=", r.code, r.out.trim().slice(0, 1…
+     96|     expect(r.code).toBe(0);
+       |                    ^
+     97|   });
+     98|   it("[QA69-L3 latent, informational] an abandoned dig that is NOT sto…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  test/adv69-production-callbacks.test.ts > real mineflayer digging plugin under the production guard (child process, stub bot) > [QA69-L3 latent, informational] an abandoned dig that is NOT stopped makes the guard throw inside mineflayer's setInterval (uncaught => process exit)
+AssertionError: expected '\nnode:internal/modules/run_main:122\…' to match /late arm_animation refused/
+
+- Expected: 
+/late arm_animation refused/
+
++ Received: 
+"
+node:internal/modules/run_main:122
+    triggerUncaughtException(
+    ^
+Error [ERR_MODULE_NOT_FOUND]: Cannot find module '/Users/manpreetsingh/.t3/worktrees/Minecraft-Ai-Civilization/fix-lifecycle-qa/qa-independent/v69/scripts/dig-timer-child.ts' imported from /Users/manpreetsingh/.t3/worktrees/Minecraft-Ai-Civilization/fix-lifecycle-qa/
+    at finalizeResolution (node:internal/modules/esm/resolve:275:11)
+    at moduleResolve (node:internal/modules/esm/resolve:932:10)
+    at defaultResolve (node:internal/modules/esm/resolve:1056:11)
+    at nextResolve (node:internal/modules/esm/hooks:748:28)
+    at resolveBase (file:///Users/manpreetsingh/.t3/worktrees/Minecraft-Ai-Civilization/fix-lifecycle-qa/node_modules/.pnpm/tsx@4.23.13/node_modules/tsx/dist/register-SoqaU4rg.mjs:2:10334)
+    at resolveDirectory (file:///Users/manpreetsingh/.t3/worktrees/Minecraft-Ai-Civilization/fix-lifecycle-qa/node_modules/.pnpm/tsx@4.23.13/node_modules/tsx/dist/register-SoqaU4rg.mjs:2:11421)
+    at resolveTsPaths (file:///Users/manpreetsingh/.t3/worktrees/Minecraft-Ai-Civilization/fix-lifecycle-qa/node_modules/.pnpm/tsx@4.23.13/node_modules/tsx/dist/register-SoqaU4rg.mjs:2:13062)
+    at resolve (file:///Users/manpreetsingh/.t3/worktrees/Minecraft-Ai-Civilization/fix-lifecycle-qa/node_modules/.pnpm/tsx@4.23.13/node_modules/tsx/dist/register-SoqaU4rg.mjs:2:14748)
+    at nextResolve (node:internal/modules/esm/hooks:748:28)
+    at Hooks.resolve (node:internal/modules/esm/hooks:240:30) {
+  code: 'ERR_MODULE_NOT_FOUND',
+  url: 'file:///Users/manpreetsingh/.t3/worktrees/Minecraft-Ai-Civilization/fix-lifecycle-qa/qa-independent/v69/scripts/dig-timer-child.ts'
+}
+
+Node.js v22.12.0
+"
+
+ ❯ test/adv69-production-callbacks.test.ts:102:19
+    100|     console.log("DIG_NO_STOP exit=", r.code, (r.err.match(/late [a-z_]…
+    101|     expect(r.code).not.toBe(0);
+    102|     expect(r.err).toMatch(/late arm_animation refused/);
+       |                   ^
+    103|   });
+    104| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed | 4 passed (5)
+      Tests  2 failed | 55 passed (57)
+   Start at  19:40:15
+   Duration  19.36s (transform 3.16s, setup 452ms, collect 7.26s, tests 28.27s, environment 1ms, prepare 917ms)
+
