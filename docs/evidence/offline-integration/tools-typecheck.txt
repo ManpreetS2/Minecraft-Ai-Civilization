@@ -1,0 +1,4 @@
+
+> minecraft-ai-civilization@0.1.0 typecheck:tools /private/tmp/minecraft-offline-integration
+> tsc -p tools/tsconfig.json
+

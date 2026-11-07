@@ -1,0 +1,22 @@
+
+> minecraft-ai-civilization@0.1.0 v1:journal /private/tmp/minecraft-offline-integration
+> tsx tools/v1-integration/journal-cli-main.ts /private/tmp/minecraft-offline-integration/artifacts/v1/integration-final-1v1/manifest.json ffffffffffffffffffffffffffffffffffffffff ManpreetS2/Minecraft-Ai-Civilization-windows-backup /private/tmp/minecraft-offline-integration/artifacts/v1/integration-final-1v1 operator.jsonl off2
+
+{
+  "verdict": "FAIL",
+  "failures": [
+    "Expected candidate source SHA mismatch or invalid full SHA",
+    "Original journal run/source/repository attribution mismatch",
+    "Journal row source mismatch"
+  ],
+  "unproven": [
+    "Independent evidence validator pending",
+    "External authenticity NOT PROVEN: all artifacts can be replaced consistently without an independently verified external anchor; journal matching does not authenticate Paper execution",
+    "Original journal lacks embedded source/repository attribution; caller descriptor is a binding declaration, not an independent source anchor"
+  ],
+  "journalConsistent": false,
+  "status": "FAIL",
+  "authenticatedLiveExecution": false,
+  "exitCode": 1
+}
+ ELIFECYCLE  Command failed with exit code 1.

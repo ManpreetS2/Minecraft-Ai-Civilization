@@ -1,0 +1,716 @@
+{
+  "sourceSha": "6aa953ddef3ffa7b7ef28a9f16eeb256d19727d4",
+  "mode": "offline-fixture",
+  "decisionTransport": "scripted-in-process",
+  "citizens": [
+    {
+      "id": "gpt-a",
+      "username": "GPT_A"
+    },
+    {
+      "id": "gpt-b",
+      "username": "GPT_B"
+    },
+    {
+      "id": "claude-a",
+      "username": "Claude_A"
+    },
+    {
+      "id": "claude-b",
+      "username": "Claude_B"
+    }
+  ],
+  "providers": [
+    {
+      "citizenId": "gpt-a",
+      "family": "gpt",
+      "model": "gpt-4o-mini",
+      "sessionId": "v1-offline-fixture:gpt-a:f0bdd924-4b69-4c73-9d12-d516109ddbc2",
+      "requests": 3,
+      "ownMemorySeen": true,
+      "leakedMemoryIds": [],
+      "accounting": {
+        "requests": 3,
+        "retries": 0,
+        "refused": 0,
+        "inputTokens": 300,
+        "outputTokens": 60,
+        "estimatedSpendUsd": 0.00008099999999999999,
+        "unverifiedHoldUsd": 0,
+        "reservedUsd": 0
+      }
+    },
+    {
+      "citizenId": "gpt-b",
+      "family": "gpt",
+      "model": "gpt-4.1-mini",
+      "sessionId": "v1-offline-fixture:gpt-b:3354588d-3a8f-4584-a8da-9844dade4b05",
+      "requests": 3,
+      "ownMemorySeen": true,
+      "leakedMemoryIds": [],
+      "accounting": {
+        "requests": 3,
+        "retries": 0,
+        "refused": 0,
+        "inputTokens": 300,
+        "outputTokens": 60,
+        "estimatedSpendUsd": 0.000216,
+        "unverifiedHoldUsd": 0,
+        "reservedUsd": 0
+      }
+    },
+    {
+      "citizenId": "claude-a",
+      "family": "claude",
+      "model": "claude-haiku-5-5",
+      "sessionId": "v1-offline-fixture:claude-a:781ff8d6-6322-4ac5-976d-c8284425b505",
+      "requests": 3,
+      "ownMemorySeen": true,
+      "leakedMemoryIds": [],
+      "accounting": {
+        "requests": 3,
+        "retries": 0,
+        "refused": 0,
+        "inputTokens": 300,
+        "outputTokens": 60,
+        "estimatedSpendUsd": 0.00006000000000000001,
+        "unverifiedHoldUsd": 0,
+        "reservedUsd": 0
+      }
+    },
+    {
+      "citizenId": "claude-b",
+      "family": "claude",
+      "model": "claude-sonnet-5-5",
+      "sessionId": "v1-offline-fixture:claude-b:74afd16a-6a29-4fc5-b091-d27fce467b30",
+      "requests": 3,
+      "ownMemorySeen": true,
+      "leakedMemoryIds": [],
+      "accounting": {
+        "requests": 3,
+        "retries": 0,
+        "refused": 0,
+        "inputTokens": 300,
+        "outputTokens": 60,
+        "estimatedSpendUsd": 0.0012000000000000001,
+        "unverifiedHoldUsd": 0,
+        "reservedUsd": 0
+      }
+    }
+  ],
+  "inventoryBefore": {
+    "gpt-a": 0,
+    "gpt-b": 0,
+    "claude-a": 0,
+    "claude-b": 0
+  },
+  "inventoryAfter": {
+    "gpt-a": 3,
+    "gpt-b": 3,
+    "claude-a": 3,
+    "claude-b": 3
+  },
+  "actions": [
+    {
+      "sequence": 1,
+      "citizenId": "gpt-a",
+      "reportedSuccess": true,
+      "observedSuccess": true,
+      "inventoryDelta": {
+        "oak_log": 1
+      },
+      "authorizedKnowledge": true,
+      "decisionTransport": "scripted-in-process",
+      "originPosition": {
+        "x": 0.5,
+        "y": 64,
+        "z": 0.5
+      },
+      "actionType": "gather",
+      "expectedDelta": {
+        "oak_log": 1
+      },
+      "decisionSource": "planner",
+      "inventoryScope": "citizen",
+      "eventId": "889457cf-2eb4-4b2c-a310-2750d0dfe7a4",
+      "attemptId": "7693282b-6f7e-4239-b018-1574a2391847",
+      "runId": "fixture-4-6aa953ddef3f",
+      "sourceSha": "6aa953ddef3ffa7b7ef28a9f16eeb256d19727d4",
+      "receiptId": "receipt-7693282b-6f7e-4239-b018-1574a2391847",
+      "sourceEventId": "889457cf-2eb4-4b2c-a310-2750d0dfe7a4"
+    },
+    {
+      "sequence": 2,
+      "citizenId": "gpt-b",
+      "reportedSuccess": true,
+      "observedSuccess": true,
+      "inventoryDelta": {
+        "oak_log": 1
+      },
+      "authorizedKnowledge": true,
+      "decisionTransport": "scripted-in-process",
+      "originPosition": {
+        "x": 30.5,
+        "y": 64,
+        "z": 0.5
+      },
+      "actionType": "gather",
+      "expectedDelta": {
+        "oak_log": 1
+      },
+      "decisionSource": "planner",
+      "inventoryScope": "citizen",
+      "eventId": "270e5840-fd1e-4bb7-9bb1-9985cdc4e4a3",
+      "attemptId": "573c34b8-a1a0-4d21-8185-f1f3381a9b7a",
+      "runId": "fixture-4-6aa953ddef3f",
+      "sourceSha": "6aa953ddef3ffa7b7ef28a9f16eeb256d19727d4",
+      "receiptId": "receipt-573c34b8-a1a0-4d21-8185-f1f3381a9b7a",
+      "sourceEventId": "270e5840-fd1e-4bb7-9bb1-9985cdc4e4a3"
+    },
+    {
+      "sequence": 3,
+      "citizenId": "claude-a",
+      "reportedSuccess": true,
+      "observedSuccess": true,
+      "inventoryDelta": {
+        "oak_log": 1
+      },
+      "authorizedKnowledge": true,
+      "decisionTransport": "scripted-in-process",
+      "originPosition": {
+        "x": 60.5,
+        "y": 64,
+        "z": 0.5
+      },
+      "actionType": "gather",
+      "expectedDelta": {
+        "oak_log": 1
+      },
+      "decisionSource": "planner",
+      "inventoryScope": "citizen",
+      "eventId": "63bf1fa5-38b7-457d-b371-32129179312a",
+      "attemptId": "b6723500-130a-482c-8821-1e6620c8f36b",
+      "runId": "fixture-4-6aa953ddef3f",
+      "sourceSha": "6aa953ddef3ffa7b7ef28a9f16eeb256d19727d4",
+      "receiptId": "receipt-b6723500-130a-482c-8821-1e6620c8f36b",
+      "sourceEventId": "63bf1fa5-38b7-457d-b371-32129179312a"
+    },
+    {
+      "sequence": 4,
+      "citizenId": "claude-b",
+      "reportedSuccess": true,
+      "observedSuccess": true,
+      "inventoryDelta": {
+        "oak_log": 1
+      },
+      "authorizedKnowledge": true,
+      "decisionTransport": "scripted-in-process",
+      "originPosition": {
+        "x": 90.5,
+        "y": 64,
+        "z": 0.5
+      },
+      "actionType": "gather",
+      "expectedDelta": {
+        "oak_log": 1
+      },
+      "decisionSource": "planner",
+      "inventoryScope": "citizen",
+      "eventId": "73356fde-86f2-4292-931b-c37abf4cbb36",
+      "attemptId": "34979ddd-d27d-4975-957f-65f5c4d082eb",
+      "runId": "fixture-4-6aa953ddef3f",
+      "sourceSha": "6aa953ddef3ffa7b7ef28a9f16eeb256d19727d4",
+      "receiptId": "receipt-34979ddd-d27d-4975-957f-65f5c4d082eb",
+      "sourceEventId": "73356fde-86f2-4292-931b-c37abf4cbb36"
+    },
+    {
+      "sequence": 5,
+      "citizenId": "gpt-a",
+      "reportedSuccess": true,
+      "observedSuccess": true,
+      "inventoryDelta": {
+        "oak_log": 1
+      },
+      "authorizedKnowledge": true,
+      "decisionTransport": "scripted-in-process",
+      "originPosition": {
+        "x": 6.053172837962275,
+        "y": 64,
+        "z": 3.4400729286526794
+      },
+      "actionType": "gather",
+      "expectedDelta": {
+        "oak_log": 1
+      },
+      "decisionSource": "scripted",
+      "inventoryScope": "citizen",
+      "eventId": "222ffff7-584b-4557-8c10-e8e29917c974",
+      "attemptId": "13e4f221-1a5e-44a0-88e3-68b5d3479613",
+      "runId": "fixture-4-6aa953ddef3f",
+      "sourceSha": "6aa953ddef3ffa7b7ef28a9f16eeb256d19727d4",
+      "receiptId": "receipt-13e4f221-1a5e-44a0-88e3-68b5d3479613",
+      "sourceEventId": "222ffff7-584b-4557-8c10-e8e29917c974"
+    },
+    {
+      "sequence": 6,
+      "citizenId": "gpt-b",
+      "reportedSuccess": true,
+      "observedSuccess": true,
+      "inventoryDelta": {
+        "oak_log": 1
+      },
+      "authorizedKnowledge": true,
+      "decisionTransport": "scripted-in-process",
+      "originPosition": {
+        "x": 36.05317283796227,
+        "y": 64,
+        "z": 3.440072928652679
+      },
+      "actionType": "gather",
+      "expectedDelta": {
+        "oak_log": 1
+      },
+      "decisionSource": "scripted",
+      "inventoryScope": "citizen",
+      "eventId": "bb856360-1c97-432c-9159-f2ba6e18f448",
+      "attemptId": "c5c40a66-ac37-4ff8-89d4-23f211627ac6",
+      "runId": "fixture-4-6aa953ddef3f",
+      "sourceSha": "6aa953ddef3ffa7b7ef28a9f16eeb256d19727d4",
+      "receiptId": "receipt-c5c40a66-ac37-4ff8-89d4-23f211627ac6",
+      "sourceEventId": "bb856360-1c97-432c-9159-f2ba6e18f448"
+    },
+    {
+      "sequence": 7,
+      "citizenId": "claude-a",
+      "reportedSuccess": true,
+      "observedSuccess": true,
+      "inventoryDelta": {
+        "oak_log": 1
+      },
+      "authorizedKnowledge": true,
+      "decisionTransport": "scripted-in-process",
+      "originPosition": {
+        "x": 66.05317283796228,
+        "y": 64,
+        "z": 3.440072928652679
+      },
+      "actionType": "gather",
+      "expectedDelta": {
+        "oak_log": 1
+      },
+      "decisionSource": "scripted",
+      "inventoryScope": "citizen",
+      "eventId": "c1330b52-33d1-4d26-903b-76beef48544c",
+      "attemptId": "d0ebc9c0-2f66-4600-9fc7-6e1aade34ffc",
+      "runId": "fixture-4-6aa953ddef3f",
+      "sourceSha": "6aa953ddef3ffa7b7ef28a9f16eeb256d19727d4",
+      "receiptId": "receipt-d0ebc9c0-2f66-4600-9fc7-6e1aade34ffc",
+      "sourceEventId": "c1330b52-33d1-4d26-903b-76beef48544c"
+    },
+    {
+      "sequence": 8,
+      "citizenId": "claude-b",
+      "reportedSuccess": true,
+      "observedSuccess": true,
+      "inventoryDelta": {
+        "oak_log": 1
+      },
+      "authorizedKnowledge": true,
+      "decisionTransport": "scripted-in-process",
+      "originPosition": {
+        "x": 96.05317283796228,
+        "y": 64,
+        "z": 3.440072928652679
+      },
+      "actionType": "gather",
+      "expectedDelta": {
+        "oak_log": 1
+      },
+      "decisionSource": "scripted",
+      "inventoryScope": "citizen",
+      "eventId": "873fcf70-cd46-4f44-9e84-9dc5d18d37af",
+      "attemptId": "7b96b90d-4cef-4f5e-bb38-4a1d66aa36cf",
+      "runId": "fixture-4-6aa953ddef3f",
+      "sourceSha": "6aa953ddef3ffa7b7ef28a9f16eeb256d19727d4",
+      "receiptId": "receipt-7b96b90d-4cef-4f5e-bb38-4a1d66aa36cf",
+      "sourceEventId": "873fcf70-cd46-4f44-9e84-9dc5d18d37af"
+    },
+    {
+      "sequence": 9,
+      "citizenId": "gpt-a",
+      "reportedSuccess": true,
+      "observedSuccess": true,
+      "inventoryDelta": {
+        "oak_log": 1
+      },
+      "authorizedKnowledge": true,
+      "decisionTransport": "scripted-in-process",
+      "originPosition": {
+        "x": 6.053172837962275,
+        "y": 64,
+        "z": 3.4400729286526794
+      },
+      "actionType": "gather",
+      "expectedDelta": {
+        "oak_log": 1
+      },
+      "decisionSource": "scripted",
+      "inventoryScope": "citizen",
+      "eventId": "089afaf8-b762-47b8-b513-280b72a5920f",
+      "attemptId": "60a56f10-e70b-4727-9925-ef9bea3df5ea",
+      "runId": "fixture-4-6aa953ddef3f",
+      "sourceSha": "6aa953ddef3ffa7b7ef28a9f16eeb256d19727d4",
+      "receiptId": "receipt-60a56f10-e70b-4727-9925-ef9bea3df5ea",
+      "sourceEventId": "089afaf8-b762-47b8-b513-280b72a5920f"
+    },
+    {
+      "sequence": 10,
+      "citizenId": "gpt-b",
+      "reportedSuccess": true,
+      "observedSuccess": true,
+      "inventoryDelta": {
+        "oak_log": 1
+      },
+      "authorizedKnowledge": true,
+      "decisionTransport": "scripted-in-process",
+      "originPosition": {
+        "x": 36.05317283796227,
+        "y": 64,
+        "z": 3.4400729286526803
+      },
+      "actionType": "gather",
+      "expectedDelta": {
+        "oak_log": 1
+      },
+      "decisionSource": "scripted",
+      "inventoryScope": "citizen",
+      "eventId": "ef36040d-5a56-4047-9d86-cb5bbdc03f1d",
+      "attemptId": "bb27f3ec-21e3-4784-9bfe-0eafce8ee1a8",
+      "runId": "fixture-4-6aa953ddef3f",
+      "sourceSha": "6aa953ddef3ffa7b7ef28a9f16eeb256d19727d4",
+      "receiptId": "receipt-bb27f3ec-21e3-4784-9bfe-0eafce8ee1a8",
+      "sourceEventId": "ef36040d-5a56-4047-9d86-cb5bbdc03f1d"
+    },
+    {
+      "sequence": 11,
+      "citizenId": "claude-a",
+      "reportedSuccess": true,
+      "observedSuccess": true,
+      "inventoryDelta": {
+        "oak_log": 1
+      },
+      "authorizedKnowledge": true,
+      "decisionTransport": "scripted-in-process",
+      "originPosition": {
+        "x": 66.05317283796228,
+        "y": 64,
+        "z": 3.440072928652679
+      },
+      "actionType": "gather",
+      "expectedDelta": {
+        "oak_log": 1
+      },
+      "decisionSource": "scripted",
+      "inventoryScope": "citizen",
+      "eventId": "4da8acbe-41ce-4488-82f2-e2ce4ea24d1d",
+      "attemptId": "d27bf268-9736-4980-843c-cade708afe03",
+      "runId": "fixture-4-6aa953ddef3f",
+      "sourceSha": "6aa953ddef3ffa7b7ef28a9f16eeb256d19727d4",
+      "receiptId": "receipt-d27bf268-9736-4980-843c-cade708afe03",
+      "sourceEventId": "4da8acbe-41ce-4488-82f2-e2ce4ea24d1d"
+    },
+    {
+      "sequence": 12,
+      "citizenId": "claude-b",
+      "reportedSuccess": true,
+      "observedSuccess": true,
+      "inventoryDelta": {
+        "oak_log": 1
+      },
+      "authorizedKnowledge": true,
+      "decisionTransport": "scripted-in-process",
+      "originPosition": {
+        "x": 96.05317283796228,
+        "y": 64,
+        "z": 3.440072928652679
+      },
+      "actionType": "gather",
+      "expectedDelta": {
+        "oak_log": 1
+      },
+      "decisionSource": "scripted",
+      "inventoryScope": "citizen",
+      "eventId": "9486a742-943c-49d1-8d22-4dd7e236b549",
+      "attemptId": "0aefcd71-7513-4e25-bae9-ddc4e52a474d",
+      "runId": "fixture-4-6aa953ddef3f",
+      "sourceSha": "6aa953ddef3ffa7b7ef28a9f16eeb256d19727d4",
+      "receiptId": "receipt-0aefcd71-7513-4e25-bae9-ddc4e52a474d",
+      "sourceEventId": "9486a742-943c-49d1-8d22-4dd7e236b549"
+    }
+  ],
+  "sourceReceipts": [
+    {
+      "id": "receipt-7693282b-6f7e-4239-b018-1574a2391847",
+      "eventId": "889457cf-2eb4-4b2c-a310-2750d0dfe7a4",
+      "attemptId": "7693282b-6f7e-4239-b018-1574a2391847",
+      "runId": "fixture-4-6aa953ddef3f",
+      "sourceSha": "6aa953ddef3ffa7b7ef28a9f16eeb256d19727d4",
+      "repository": "ManpreetS2/Minecraft-Ai-Civilization-windows-backup",
+      "citizenId": "gpt-a",
+      "reference": "receipts/receipt-7693282b-6f7e-4239-b018-1574a2391847.json",
+      "sha256": "67c3545e9c3a06415f1167fac1e4d764e104cbfb21d6c4fdaa4c85527c5c5a19"
+    },
+    {
+      "id": "receipt-573c34b8-a1a0-4d21-8185-f1f3381a9b7a",
+      "eventId": "270e5840-fd1e-4bb7-9bb1-9985cdc4e4a3",
+      "attemptId": "573c34b8-a1a0-4d21-8185-f1f3381a9b7a",
+      "runId": "fixture-4-6aa953ddef3f",
+      "sourceSha": "6aa953ddef3ffa7b7ef28a9f16eeb256d19727d4",
+      "repository": "ManpreetS2/Minecraft-Ai-Civilization-windows-backup",
+      "citizenId": "gpt-b",
+      "reference": "receipts/receipt-573c34b8-a1a0-4d21-8185-f1f3381a9b7a.json",
+      "sha256": "043b3a58a7a89c885cdec38183ffc20958c87a9a7e7c87996e60047d60c3d802"
+    },
+    {
+      "id": "receipt-b6723500-130a-482c-8821-1e6620c8f36b",
+      "eventId": "63bf1fa5-38b7-457d-b371-32129179312a",
+      "attemptId": "b6723500-130a-482c-8821-1e6620c8f36b",
+      "runId": "fixture-4-6aa953ddef3f",
+      "sourceSha": "6aa953ddef3ffa7b7ef28a9f16eeb256d19727d4",
+      "repository": "ManpreetS2/Minecraft-Ai-Civilization-windows-backup",
+      "citizenId": "claude-a",
+      "reference": "receipts/receipt-b6723500-130a-482c-8821-1e6620c8f36b.json",
+      "sha256": "4b1c92645eccd2df36f8bb78c4bf623bfb9dde69669c66519c8b77ddd4084f1a"
+    },
+    {
+      "id": "receipt-34979ddd-d27d-4975-957f-65f5c4d082eb",
+      "eventId": "73356fde-86f2-4292-931b-c37abf4cbb36",
+      "attemptId": "34979ddd-d27d-4975-957f-65f5c4d082eb",
+      "runId": "fixture-4-6aa953ddef3f",
+      "sourceSha": "6aa953ddef3ffa7b7ef28a9f16eeb256d19727d4",
+      "repository": "ManpreetS2/Minecraft-Ai-Civilization-windows-backup",
+      "citizenId": "claude-b",
+      "reference": "receipts/receipt-34979ddd-d27d-4975-957f-65f5c4d082eb.json",
+      "sha256": "786425dee6b5df263c4fcb4c10ec366acb606ce45a78e0dde186e3f1094695c4"
+    },
+    {
+      "id": "receipt-13e4f221-1a5e-44a0-88e3-68b5d3479613",
+      "eventId": "222ffff7-584b-4557-8c10-e8e29917c974",
+      "attemptId": "13e4f221-1a5e-44a0-88e3-68b5d3479613",
+      "runId": "fixture-4-6aa953ddef3f",
+      "sourceSha": "6aa953ddef3ffa7b7ef28a9f16eeb256d19727d4",
+      "repository": "ManpreetS2/Minecraft-Ai-Civilization-windows-backup",
+      "citizenId": "gpt-a",
+      "reference": "receipts/receipt-13e4f221-1a5e-44a0-88e3-68b5d3479613.json",
+      "sha256": "8e045a6bdeef64997e23f51e42d82335a67cb2f6249ea9369a627a910e7f0db9"
+    },
+    {
+      "id": "receipt-c5c40a66-ac37-4ff8-89d4-23f211627ac6",
+      "eventId": "bb856360-1c97-432c-9159-f2ba6e18f448",
+      "attemptId": "c5c40a66-ac37-4ff8-89d4-23f211627ac6",
+      "runId": "fixture-4-6aa953ddef3f",
+      "sourceSha": "6aa953ddef3ffa7b7ef28a9f16eeb256d19727d4",
+      "repository": "ManpreetS2/Minecraft-Ai-Civilization-windows-backup",
+      "citizenId": "gpt-b",
+      "reference": "receipts/receipt-c5c40a66-ac37-4ff8-89d4-23f211627ac6.json",
+      "sha256": "b817fcb32e04583610deac5a53020833c9040a7d17e0bb4f6feebd6e467a9757"
+    },
+    {
+      "id": "receipt-d0ebc9c0-2f66-4600-9fc7-6e1aade34ffc",
+      "eventId": "c1330b52-33d1-4d26-903b-76beef48544c",
+      "attemptId": "d0ebc9c0-2f66-4600-9fc7-6e1aade34ffc",
+      "runId": "fixture-4-6aa953ddef3f",
+      "sourceSha": "6aa953ddef3ffa7b7ef28a9f16eeb256d19727d4",
+      "repository": "ManpreetS2/Minecraft-Ai-Civilization-windows-backup",
+      "citizenId": "claude-a",
+      "reference": "receipts/receipt-d0ebc9c0-2f66-4600-9fc7-6e1aade34ffc.json",
+      "sha256": "b0057c191baccedaacb6a7fc74d5e590b89c58246f89474eaf3fcbaed0251309"
+    },
+    {
+      "id": "receipt-7b96b90d-4cef-4f5e-bb38-4a1d66aa36cf",
+      "eventId": "873fcf70-cd46-4f44-9e84-9dc5d18d37af",
+      "attemptId": "7b96b90d-4cef-4f5e-bb38-4a1d66aa36cf",
+      "runId": "fixture-4-6aa953ddef3f",
+      "sourceSha": "6aa953ddef3ffa7b7ef28a9f16eeb256d19727d4",
+      "repository": "ManpreetS2/Minecraft-Ai-Civilization-windows-backup",
+      "citizenId": "claude-b",
+      "reference": "receipts/receipt-7b96b90d-4cef-4f5e-bb38-4a1d66aa36cf.json",
+      "sha256": "4034961b1250a285beedfd5498c9de620c9c469f1de6a0975f882fb5febbfd40"
+    },
+    {
+      "id": "receipt-60a56f10-e70b-4727-9925-ef9bea3df5ea",
+      "eventId": "089afaf8-b762-47b8-b513-280b72a5920f",
+      "attemptId": "60a56f10-e70b-4727-9925-ef9bea3df5ea",
+      "runId": "fixture-4-6aa953ddef3f",
+      "sourceSha": "6aa953ddef3ffa7b7ef28a9f16eeb256d19727d4",
+      "repository": "ManpreetS2/Minecraft-Ai-Civilization-windows-backup",
+      "citizenId": "gpt-a",
+      "reference": "receipts/receipt-60a56f10-e70b-4727-9925-ef9bea3df5ea.json",
+      "sha256": "3b3418b3ce3f8dacf5738960162f7c923987f6f3fa9f2002cd2e54c25497a73b"
+    },
+    {
+      "id": "receipt-bb27f3ec-21e3-4784-9bfe-0eafce8ee1a8",
+      "eventId": "ef36040d-5a56-4047-9d86-cb5bbdc03f1d",
+      "attemptId": "bb27f3ec-21e3-4784-9bfe-0eafce8ee1a8",
+      "runId": "fixture-4-6aa953ddef3f",
+      "sourceSha": "6aa953ddef3ffa7b7ef28a9f16eeb256d19727d4",
+      "repository": "ManpreetS2/Minecraft-Ai-Civilization-windows-backup",
+      "citizenId": "gpt-b",
+      "reference": "receipts/receipt-bb27f3ec-21e3-4784-9bfe-0eafce8ee1a8.json",
+      "sha256": "9add017ab323f9421dc314d37152cb5cb3fc7dd51be5719a0b196c48d7323df8"
+    },
+    {
+      "id": "receipt-d27bf268-9736-4980-843c-cade708afe03",
+      "eventId": "4da8acbe-41ce-4488-82f2-e2ce4ea24d1d",
+      "attemptId": "d27bf268-9736-4980-843c-cade708afe03",
+      "runId": "fixture-4-6aa953ddef3f",
+      "sourceSha": "6aa953ddef3ffa7b7ef28a9f16eeb256d19727d4",
+      "repository": "ManpreetS2/Minecraft-Ai-Civilization-windows-backup",
+      "citizenId": "claude-a",
+      "reference": "receipts/receipt-d27bf268-9736-4980-843c-cade708afe03.json",
+      "sha256": "47187ead9a322159a02808257b1756425f553429af8f71cb68d05ce4db7482f8"
+    },
+    {
+      "id": "receipt-0aefcd71-7513-4e25-bae9-ddc4e52a474d",
+      "eventId": "9486a742-943c-49d1-8d22-4dd7e236b549",
+      "attemptId": "0aefcd71-7513-4e25-bae9-ddc4e52a474d",
+      "runId": "fixture-4-6aa953ddef3f",
+      "sourceSha": "6aa953ddef3ffa7b7ef28a9f16eeb256d19727d4",
+      "repository": "ManpreetS2/Minecraft-Ai-Civilization-windows-backup",
+      "citizenId": "claude-b",
+      "reference": "receipts/receipt-0aefcd71-7513-4e25-bae9-ddc4e52a474d.json",
+      "sha256": "7088fd976c3d413b8fcfd2bdc5617c19906282ce6311f6f9185dee4edbad8197"
+    },
+    {
+      "id": "receipt-fact-memory-gpt-a",
+      "eventId": "07b23bc7-73a3-445e-96f0-d9baef36413a",
+      "attemptId": "fact-attempt-memory-gpt-a",
+      "runId": "fixture-4-6aa953ddef3f",
+      "sourceSha": "6aa953ddef3ffa7b7ef28a9f16eeb256d19727d4",
+      "repository": "ManpreetS2/Minecraft-Ai-Civilization-windows-backup",
+      "citizenId": "gpt-a",
+      "reference": "receipts/receipt-fact-memory-gpt-a.json",
+      "sha256": "beb54d05590bc78b59a2d86898a6995e3c9066a0c8ceec1fa853c4f26669d716"
+    },
+    {
+      "id": "receipt-fact-memory-gpt-b",
+      "eventId": "93853638-964d-4cc5-adfd-10278a05b560",
+      "attemptId": "fact-attempt-memory-gpt-b",
+      "runId": "fixture-4-6aa953ddef3f",
+      "sourceSha": "6aa953ddef3ffa7b7ef28a9f16eeb256d19727d4",
+      "repository": "ManpreetS2/Minecraft-Ai-Civilization-windows-backup",
+      "citizenId": "gpt-b",
+      "reference": "receipts/receipt-fact-memory-gpt-b.json",
+      "sha256": "4f1a48b5131aefe816b3f3f3db0d6f050bf7c1d4423e753b1158d2505703ca41"
+    },
+    {
+      "id": "receipt-fact-memory-claude-a",
+      "eventId": "1d7b2175-b9f2-4cca-a666-b85edaea901d",
+      "attemptId": "fact-attempt-memory-claude-a",
+      "runId": "fixture-4-6aa953ddef3f",
+      "sourceSha": "6aa953ddef3ffa7b7ef28a9f16eeb256d19727d4",
+      "repository": "ManpreetS2/Minecraft-Ai-Civilization-windows-backup",
+      "citizenId": "claude-a",
+      "reference": "receipts/receipt-fact-memory-claude-a.json",
+      "sha256": "b739a0ef6131136bae770c26b2bccb2953e32ad559f9a09a1aa3d90e023a93ff"
+    },
+    {
+      "id": "receipt-fact-memory-claude-b",
+      "eventId": "00ac078b-9151-4d3e-b70e-3626428f888e",
+      "attemptId": "fact-attempt-memory-claude-b",
+      "runId": "fixture-4-6aa953ddef3f",
+      "sourceSha": "6aa953ddef3ffa7b7ef28a9f16eeb256d19727d4",
+      "repository": "ManpreetS2/Minecraft-Ai-Civilization-windows-backup",
+      "citizenId": "claude-b",
+      "reference": "receipts/receipt-fact-memory-claude-b.json",
+      "sha256": "013db0291ddf8bf26d5cd773a4540c307950910f98877ede9b25065ebd482ba4"
+    }
+  ],
+  "persistentFacts": [
+    {
+      "id": "memory-gpt-a",
+      "citizenId": "gpt-a",
+      "runId": "fixture-4-6aa953ddef3f",
+      "sourceSha": "6aa953ddef3ffa7b7ef28a9f16eeb256d19727d4",
+      "sourceEventId": "07b23bc7-73a3-445e-96f0-d9baef36413a",
+      "receiptId": "receipt-fact-memory-gpt-a",
+      "authorizedKnowledge": true
+    },
+    {
+      "id": "memory-gpt-b",
+      "citizenId": "gpt-b",
+      "runId": "fixture-4-6aa953ddef3f",
+      "sourceSha": "6aa953ddef3ffa7b7ef28a9f16eeb256d19727d4",
+      "sourceEventId": "93853638-964d-4cc5-adfd-10278a05b560",
+      "receiptId": "receipt-fact-memory-gpt-b",
+      "authorizedKnowledge": true
+    },
+    {
+      "id": "memory-claude-a",
+      "citizenId": "claude-a",
+      "runId": "fixture-4-6aa953ddef3f",
+      "sourceSha": "6aa953ddef3ffa7b7ef28a9f16eeb256d19727d4",
+      "sourceEventId": "1d7b2175-b9f2-4cca-a666-b85edaea901d",
+      "receiptId": "receipt-fact-memory-claude-a",
+      "authorizedKnowledge": true
+    },
+    {
+      "id": "memory-claude-b",
+      "citizenId": "claude-b",
+      "runId": "fixture-4-6aa953ddef3f",
+      "sourceSha": "6aa953ddef3ffa7b7ef28a9f16eeb256d19727d4",
+      "sourceEventId": "00ac078b-9151-4d3e-b70e-3626428f888e",
+      "receiptId": "receipt-fact-memory-claude-b",
+      "authorizedKnowledge": true
+    }
+  ],
+  "runId": "fixture-4-6aa953ddef3f",
+  "repository": "ManpreetS2/Minecraft-Ai-Civilization-windows-backup",
+  "restart": {
+    "citizens": [
+      {
+        "id": "gpt-a",
+        "username": "GPT_A"
+      },
+      {
+        "id": "gpt-b",
+        "username": "GPT_B"
+      },
+      {
+        "id": "claude-a",
+        "username": "Claude_A"
+      },
+      {
+        "id": "claude-b",
+        "username": "Claude_B"
+      }
+    ],
+    "memoryPreserved": true,
+    "storage": "reopened disposable SQLite database; in-memory session store not process-durable",
+    "sessionDurability": "not_claimed_across_process_restart"
+  },
+  "evidenceJournalPath": "/private/tmp/minecraft-offline-integration/artifacts/v1/integration-final-2v2/operator.jsonl",
+  "evidenceJournalSha256": "027b034edc07b00a91aa6a06f9a83c95525db17c34fbe288096a44a75a1289ad",
+  "evidenceSummary": {
+    "experimentId": "off4",
+    "mode": "offline",
+    "attempted": 12,
+    "verified": 12,
+    "unverified": 0,
+    "interrupted": 0,
+    "failed": 0,
+    "deaths": 0,
+    "respawns": 0,
+    "interventions": 1,
+    "incompleteActions": 0
+  },
+  "unproven": [
+    "real model decisions",
+    "session persistence across process restart",
+    "respawn",
+    "live Minecraft",
+    "Paper serverGameTick",
+    "tool durability (fixture does not expose damage counts)",
+    "actual API charges"
+  ]
+}

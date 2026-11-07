@@ -1,0 +1,12 @@
+{
+  "unproven": [
+    "real model decisions",
+    "session persistence across process restart",
+    "respawn",
+    "live Minecraft",
+    "Paper serverGameTick",
+    "tool durability (fixture does not expose damage counts)",
+    "actual API charges"
+  ],
+  "note": "Offline rehearsal — never invents Paper ticks, live model replies, or API charges"
+}

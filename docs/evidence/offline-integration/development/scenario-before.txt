@@ -1,0 +1,8 @@
+
+> minecraft-ai-civilization@0.1.0 v1:offline /private/tmp/minecraft-offline-integration
+> tsx tools/v1-integration/cli.ts 2 artifacts/v1/integration-before-1v1
+
+(node:72448) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+Offline 2-citizen scripted rehearsal at 8a0a256afbd8a697896528294bc7ec4d415ba79a. Bundle: /private/tmp/minecraft-offline-integration/artifacts/v1/integration-before-1v1. Journal: /private/tmp/minecraft-offline-integration/artifacts/v1/integration-before-1v1/operator.jsonl. Structural verdict: FAIL. Gemini: NOT_PROVEN.
+ ELIFECYCLE  Command failed with exit code 1.

@@ -1,0 +1,10 @@
+
+> minecraft-ai-civilization@0.1.0 test /private/tmp/minecraft-offline-integration
+> vitest run --maxWorkers=1 --no-file-parallelism
+
+
+ RUN  v3.2.7 /private/tmp/minecraft-offline-integration
+
+(node:87874) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ELIFECYCLE  Test failed. See above for more details.

@@ -1,0 +1,612 @@
+{
+  "version": "1.0.0",
+  "validatorName": "antigravity-evidence-validator",
+  "generatedAt": "2026-11-07T02:02:56.130Z",
+  "experimentId": "fixture-4-6aa953ddef3f",
+  "sourceSha": "6aa953ddef3ffa7b7ef28a9f16eeb256d19727d4",
+  "mode": "offline_simulated",
+  "overallStatus": "NOT_PROVEN",
+  "summary": {
+    "totalAttemptedActions": 12,
+    "verifiedActions": 12,
+    "unverifiedActions": 0,
+    "failedActions": 0,
+    "interruptedActions": 0,
+    "observedFacts": 0,
+    "communicatedClaims": 0,
+    "privacyViolationsCount": 0,
+    "inventoryViolationsCount": 0,
+    "hashChainValid": true,
+    "durationVerified": false,
+    "notProvenChecksCount": 26
+  },
+  "hashChainAudit": {
+    "valid": true,
+    "totalRows": 30
+  },
+  "durationAudit": {
+    "claimedDurationMinutes": 0,
+    "provenDurationMs": 7252,
+    "provenDurationMinutes": 0.12,
+    "tickCount": 3,
+    "averageTickDurationMs": 10,
+    "tpsEvidencePresent": false,
+    "serverTickProven": false,
+    "serverTickCount": 0,
+    "durationComplete": false,
+    "gapsDetected": [],
+    "sourceAttestationAudit": {
+      "proven": false,
+      "sourceType": "missing",
+      "authorityTrusted": false,
+      "sessionBound": false,
+      "experimentBound": false,
+      "signatureValid": false,
+      "reasons": [
+        "Missing source attestation: no cryptographic source attestation provided. Live Paper server authenticity cannot be established without genuine server capture attestation."
+      ]
+    },
+    "reasons": [
+      "Absent TPS metrics: no server performance / TPS observations documented"
+    ]
+  },
+  "sourceAttestationAudit": {
+    "proven": false,
+    "sourceType": "missing",
+    "authorityTrusted": false,
+    "sessionBound": false,
+    "experimentBound": false,
+    "signatureValid": false,
+    "reasons": [
+      "Missing source attestation: no cryptographic source attestation provided. Live Paper server authenticity cannot be established without genuine server capture attestation."
+    ]
+  },
+  "inventoryAudit": {
+    "initialInventoriesEmpty": true,
+    "totalItemsAcquired": {
+      "oak_log": 12
+    },
+    "totalItemsConsumed": {},
+    "citizenFinalInventories": {
+      "gpt-a": {
+        "oak_log": 3
+      },
+      "gpt-b": {
+        "oak_log": 3
+      },
+      "claude-a": {
+        "oak_log": 3
+      },
+      "claude-b": {
+        "oak_log": 3
+      }
+    },
+    "discrepancies": [],
+    "valid": true
+  },
+  "informationAudit": {
+    "totalAuditedEvents": 1,
+    "totalAuditedFacts": 0,
+    "observedFactsCount": 0,
+    "communicatedClaimsCount": 0,
+    "violations": [],
+    "valid": true
+  },
+  "actionVerifications": [
+    {
+      "attemptId": "7693282b-6f7e-4239-b018-1574a2391847",
+      "citizenId": "gpt-a",
+      "action": "gather",
+      "decisionEventId": "889457cf-2eb4-4b2c-a310-2750d0dfe7a4",
+      "decisionSource": "planner",
+      "status": "VERIFIED",
+      "classification": "successful_action",
+      "chain": {
+        "worldEventProven": true,
+        "legitimatelyObserved": true,
+        "legitimateBelief": true,
+        "decisionDocumented": true,
+        "actionAttempted": true,
+        "physicalOutcomeVerified": true
+      },
+      "physicalDeltas": {
+        "inventoryDelta": {
+          "oak_log": 1
+        },
+        "hungerDelta": 0,
+        "worldChangesCount": 1
+      },
+      "reasons": []
+    },
+    {
+      "attemptId": "573c34b8-a1a0-4d21-8185-f1f3381a9b7a",
+      "citizenId": "gpt-b",
+      "action": "gather",
+      "decisionEventId": "270e5840-fd1e-4bb7-9bb1-9985cdc4e4a3",
+      "decisionSource": "planner",
+      "status": "VERIFIED",
+      "classification": "successful_action",
+      "chain": {
+        "worldEventProven": true,
+        "legitimatelyObserved": true,
+        "legitimateBelief": true,
+        "decisionDocumented": true,
+        "actionAttempted": true,
+        "physicalOutcomeVerified": true
+      },
+      "physicalDeltas": {
+        "inventoryDelta": {
+          "oak_log": 1
+        },
+        "hungerDelta": 0,
+        "worldChangesCount": 1
+      },
+      "reasons": []
+    },
+    {
+      "attemptId": "b6723500-130a-482c-8821-1e6620c8f36b",
+      "citizenId": "claude-a",
+      "action": "gather",
+      "decisionEventId": "63bf1fa5-38b7-457d-b371-32129179312a",
+      "decisionSource": "planner",
+      "status": "VERIFIED",
+      "classification": "successful_action",
+      "chain": {
+        "worldEventProven": true,
+        "legitimatelyObserved": true,
+        "legitimateBelief": true,
+        "decisionDocumented": true,
+        "actionAttempted": true,
+        "physicalOutcomeVerified": true
+      },
+      "physicalDeltas": {
+        "inventoryDelta": {
+          "oak_log": 1
+        },
+        "hungerDelta": 0,
+        "worldChangesCount": 1
+      },
+      "reasons": []
+    },
+    {
+      "attemptId": "34979ddd-d27d-4975-957f-65f5c4d082eb",
+      "citizenId": "claude-b",
+      "action": "gather",
+      "decisionEventId": "73356fde-86f2-4292-931b-c37abf4cbb36",
+      "decisionSource": "planner",
+      "status": "VERIFIED",
+      "classification": "successful_action",
+      "chain": {
+        "worldEventProven": true,
+        "legitimatelyObserved": true,
+        "legitimateBelief": true,
+        "decisionDocumented": true,
+        "actionAttempted": true,
+        "physicalOutcomeVerified": true
+      },
+      "physicalDeltas": {
+        "inventoryDelta": {
+          "oak_log": 1
+        },
+        "hungerDelta": 0,
+        "worldChangesCount": 1
+      },
+      "reasons": []
+    },
+    {
+      "attemptId": "13e4f221-1a5e-44a0-88e3-68b5d3479613",
+      "citizenId": "gpt-a",
+      "action": "gather",
+      "decisionEventId": "222ffff7-584b-4557-8c10-e8e29917c974",
+      "decisionSource": "scripted",
+      "status": "VERIFIED",
+      "classification": "successful_action",
+      "chain": {
+        "worldEventProven": true,
+        "legitimatelyObserved": true,
+        "legitimateBelief": true,
+        "decisionDocumented": true,
+        "actionAttempted": true,
+        "physicalOutcomeVerified": true
+      },
+      "physicalDeltas": {
+        "inventoryDelta": {
+          "oak_log": 1
+        },
+        "hungerDelta": 0,
+        "worldChangesCount": 1
+      },
+      "reasons": []
+    },
+    {
+      "attemptId": "c5c40a66-ac37-4ff8-89d4-23f211627ac6",
+      "citizenId": "gpt-b",
+      "action": "gather",
+      "decisionEventId": "bb856360-1c97-432c-9159-f2ba6e18f448",
+      "decisionSource": "scripted",
+      "status": "VERIFIED",
+      "classification": "successful_action",
+      "chain": {
+        "worldEventProven": true,
+        "legitimatelyObserved": true,
+        "legitimateBelief": true,
+        "decisionDocumented": true,
+        "actionAttempted": true,
+        "physicalOutcomeVerified": true
+      },
+      "physicalDeltas": {
+        "inventoryDelta": {
+          "oak_log": 1
+        },
+        "hungerDelta": 0,
+        "worldChangesCount": 1
+      },
+      "reasons": []
+    },
+    {
+      "attemptId": "d0ebc9c0-2f66-4600-9fc7-6e1aade34ffc",
+      "citizenId": "claude-a",
+      "action": "gather",
+      "decisionEventId": "c1330b52-33d1-4d26-903b-76beef48544c",
+      "decisionSource": "scripted",
+      "status": "VERIFIED",
+      "classification": "successful_action",
+      "chain": {
+        "worldEventProven": true,
+        "legitimatelyObserved": true,
+        "legitimateBelief": true,
+        "decisionDocumented": true,
+        "actionAttempted": true,
+        "physicalOutcomeVerified": true
+      },
+      "physicalDeltas": {
+        "inventoryDelta": {
+          "oak_log": 1
+        },
+        "hungerDelta": 0,
+        "worldChangesCount": 1
+      },
+      "reasons": []
+    },
+    {
+      "attemptId": "7b96b90d-4cef-4f5e-bb38-4a1d66aa36cf",
+      "citizenId": "claude-b",
+      "action": "gather",
+      "decisionEventId": "873fcf70-cd46-4f44-9e84-9dc5d18d37af",
+      "decisionSource": "scripted",
+      "status": "VERIFIED",
+      "classification": "successful_action",
+      "chain": {
+        "worldEventProven": true,
+        "legitimatelyObserved": true,
+        "legitimateBelief": true,
+        "decisionDocumented": true,
+        "actionAttempted": true,
+        "physicalOutcomeVerified": true
+      },
+      "physicalDeltas": {
+        "inventoryDelta": {
+          "oak_log": 1
+        },
+        "hungerDelta": 0,
+        "worldChangesCount": 1
+      },
+      "reasons": []
+    },
+    {
+      "attemptId": "60a56f10-e70b-4727-9925-ef9bea3df5ea",
+      "citizenId": "gpt-a",
+      "action": "gather",
+      "decisionEventId": "089afaf8-b762-47b8-b513-280b72a5920f",
+      "decisionSource": "scripted",
+      "status": "VERIFIED",
+      "classification": "successful_action",
+      "chain": {
+        "worldEventProven": true,
+        "legitimatelyObserved": true,
+        "legitimateBelief": true,
+        "decisionDocumented": true,
+        "actionAttempted": true,
+        "physicalOutcomeVerified": true
+      },
+      "physicalDeltas": {
+        "inventoryDelta": {
+          "oak_log": 1
+        },
+        "hungerDelta": 0,
+        "worldChangesCount": 1
+      },
+      "reasons": []
+    },
+    {
+      "attemptId": "bb27f3ec-21e3-4784-9bfe-0eafce8ee1a8",
+      "citizenId": "gpt-b",
+      "action": "gather",
+      "decisionEventId": "ef36040d-5a56-4047-9d86-cb5bbdc03f1d",
+      "decisionSource": "scripted",
+      "status": "VERIFIED",
+      "classification": "successful_action",
+      "chain": {
+        "worldEventProven": true,
+        "legitimatelyObserved": true,
+        "legitimateBelief": true,
+        "decisionDocumented": true,
+        "actionAttempted": true,
+        "physicalOutcomeVerified": true
+      },
+      "physicalDeltas": {
+        "inventoryDelta": {
+          "oak_log": 1
+        },
+        "hungerDelta": 0,
+        "worldChangesCount": 1
+      },
+      "reasons": []
+    },
+    {
+      "attemptId": "d27bf268-9736-4980-843c-cade708afe03",
+      "citizenId": "claude-a",
+      "action": "gather",
+      "decisionEventId": "4da8acbe-41ce-4488-82f2-e2ce4ea24d1d",
+      "decisionSource": "scripted",
+      "status": "VERIFIED",
+      "classification": "successful_action",
+      "chain": {
+        "worldEventProven": true,
+        "legitimatelyObserved": true,
+        "legitimateBelief": true,
+        "decisionDocumented": true,
+        "actionAttempted": true,
+        "physicalOutcomeVerified": true
+      },
+      "physicalDeltas": {
+        "inventoryDelta": {
+          "oak_log": 1
+        },
+        "hungerDelta": 0,
+        "worldChangesCount": 1
+      },
+      "reasons": []
+    },
+    {
+      "attemptId": "0aefcd71-7513-4e25-bae9-ddc4e52a474d",
+      "citizenId": "claude-b",
+      "action": "gather",
+      "decisionEventId": "9486a742-943c-49d1-8d22-4dd7e236b549",
+      "decisionSource": "scripted",
+      "status": "VERIFIED",
+      "classification": "successful_action",
+      "chain": {
+        "worldEventProven": true,
+        "legitimatelyObserved": true,
+        "legitimateBelief": true,
+        "decisionDocumented": true,
+        "actionAttempted": true,
+        "physicalOutcomeVerified": true
+      },
+      "physicalDeltas": {
+        "inventoryDelta": {
+          "oak_log": 1
+        },
+        "hungerDelta": 0,
+        "worldChangesCount": 1
+      },
+      "reasons": []
+    }
+  ],
+  "violations": [],
+  "notProven": [
+    {
+      "code": "RECORDER_GAP_TOOL_DURABILITY",
+      "description": "action_observation records lack toolDurabilityBefore/After. Tool-wear checks are NOT_PROVEN.",
+      "missingFields": [
+        "toolDurabilityBefore",
+        "toolDurabilityAfter"
+      ]
+    },
+    {
+      "code": "RECORDER_GAP_SERVER_GAME_TICK",
+      "description": "tick records lack serverGameTick. Uninterrupted 60-minute Paper server proof is NOT_PROVEN.",
+      "missingFields": [
+        "serverGameTick"
+      ]
+    },
+    {
+      "code": "MISSING_CITIZEN_COMMUNITY",
+      "citizenId": "gpt-a",
+      "description": "Citizen 'gpt-a' lacks explicit communityId configuration. Validator refuses to assign community by array index.",
+      "missingFields": [
+        "communityId_gpt-a"
+      ]
+    },
+    {
+      "code": "MISSING_CITIZEN_PERSONALITY_SEED",
+      "citizenId": "gpt-a",
+      "description": "Citizen 'gpt-a' lacks explicit personalitySeed configuration. Validator refuses to fabricate 'seed_gpt-a'.",
+      "missingFields": [
+        "personalitySeed_gpt-a"
+      ]
+    },
+    {
+      "code": "MISSING_CITIZEN_COMMUNITY",
+      "citizenId": "gpt-b",
+      "description": "Citizen 'gpt-b' lacks explicit communityId configuration. Validator refuses to assign community by array index.",
+      "missingFields": [
+        "communityId_gpt-b"
+      ]
+    },
+    {
+      "code": "MISSING_CITIZEN_PERSONALITY_SEED",
+      "citizenId": "gpt-b",
+      "description": "Citizen 'gpt-b' lacks explicit personalitySeed configuration. Validator refuses to fabricate 'seed_gpt-b'.",
+      "missingFields": [
+        "personalitySeed_gpt-b"
+      ]
+    },
+    {
+      "code": "MISSING_CITIZEN_COMMUNITY",
+      "citizenId": "claude-a",
+      "description": "Citizen 'claude-a' lacks explicit communityId configuration. Validator refuses to assign community by array index.",
+      "missingFields": [
+        "communityId_claude-a"
+      ]
+    },
+    {
+      "code": "MISSING_CITIZEN_PERSONALITY_SEED",
+      "citizenId": "claude-a",
+      "description": "Citizen 'claude-a' lacks explicit personalitySeed configuration. Validator refuses to fabricate 'seed_claude-a'.",
+      "missingFields": [
+        "personalitySeed_claude-a"
+      ]
+    },
+    {
+      "code": "MISSING_CITIZEN_COMMUNITY",
+      "citizenId": "claude-b",
+      "description": "Citizen 'claude-b' lacks explicit communityId configuration. Validator refuses to assign community by array index.",
+      "missingFields": [
+        "communityId_claude-b"
+      ]
+    },
+    {
+      "code": "MISSING_CITIZEN_PERSONALITY_SEED",
+      "citizenId": "claude-b",
+      "description": "Citizen 'claude-b' lacks explicit personalitySeed configuration. Validator refuses to fabricate 'seed_claude-b'.",
+      "missingFields": [
+        "personalitySeed_claude-b"
+      ]
+    },
+    {
+      "code": "MISSING_SITE_BIOME",
+      "citizenId": "gpt-a",
+      "description": "Starting site for 'gpt-a' lacks explicit observed biome configuration. Validator refuses to default to 'plains'.",
+      "missingFields": [
+        "biome_gpt-a"
+      ]
+    },
+    {
+      "code": "MISSING_SITE_BIOME",
+      "citizenId": "gpt-b",
+      "description": "Starting site for 'gpt-b' lacks explicit observed biome configuration. Validator refuses to default to 'plains'.",
+      "missingFields": [
+        "biome_gpt-b"
+      ]
+    },
+    {
+      "code": "MISSING_SITE_BIOME",
+      "citizenId": "claude-a",
+      "description": "Starting site for 'claude-a' lacks explicit observed biome configuration. Validator refuses to default to 'plains'.",
+      "missingFields": [
+        "biome_claude-a"
+      ]
+    },
+    {
+      "code": "MISSING_SITE_BIOME",
+      "citizenId": "claude-b",
+      "description": "Starting site for 'claude-b' lacks explicit observed biome configuration. Validator refuses to default to 'plains'.",
+      "missingFields": [
+        "biome_claude-b"
+      ]
+    },
+    {
+      "code": "MISSING_SERVER_CONFIG",
+      "description": "RunBundle configuration lacks genuine serverVersion, paperBuild, or difficulty.",
+      "missingFields": [
+        "serverVersion",
+        "paperBuild",
+        "difficulty"
+      ]
+    },
+    {
+      "code": "MISSING_GAMERULE_CONFIG",
+      "description": "RunBundle configuration lacks explicit boolean game rules (keepInventory, hardcore, doDaylightCycle, doMobSpawning, doMobLoot). Validator refuses to assume default values.",
+      "missingFields": [
+        "keepInventory",
+        "hardcore",
+        "doDaylightCycle",
+        "doMobSpawning",
+        "doMobLoot"
+      ]
+    },
+    {
+      "code": "UNVERIFIED_SHELTER_ABSENCE",
+      "description": "RunBundle provides no physical verification receipt that shelters were absent at start.",
+      "missingFields": [
+        "shelterVerifiedAbsent"
+      ]
+    },
+    {
+      "code": "MISSING_BUDGET_CEILING",
+      "description": "RunBundle lacks explicit budgetCeilingUsd.",
+      "missingFields": [
+        "budgetCeilingUsd"
+      ]
+    },
+    {
+      "code": "MISSING_OPERATIONAL_PATHS",
+      "description": "RunBundle lacks explicit paths configuration (runRoot, worldPath, databasePath, evidencePath). Validator refuses to construct synthetic paths.",
+      "missingFields": [
+        "runRoot",
+        "worldPath",
+        "databasePath",
+        "evidencePath"
+      ]
+    },
+    {
+      "code": "MISSING_RECORDING_CONFIG",
+      "description": "RunBundle configuration lacks explicit recordingEnabled (boolean) or recordingAudience ('operator_only' | 'citizen_shared'). Validator refuses to infer them from bundle mode.",
+      "missingFields": [
+        "recordingEnabled",
+        "recordingAudience"
+      ]
+    },
+    {
+      "code": "MISSING_PRIVACY_REPLAY_EVIDENCE",
+      "description": "RunBundle lacks observed privacy replay test counters (privacyReplayPassed, privacyReplayFailed, privacyReplaySkipped). Validator refuses to initialize them to zero.",
+      "missingFields": [
+        "privacyReplayPassed",
+        "privacyReplayFailed",
+        "privacyReplaySkipped"
+      ]
+    },
+    {
+      "code": "NO_TICK_EVIDENCE",
+      "description": "RunBundle contains no tick records. Continuous world progression cannot be proven.",
+      "missingFields": [
+        "ticks"
+      ]
+    },
+    {
+      "code": "RECORDER_OR_BRIDGE_GAP",
+      "description": "toolDurabilityBefore/After absent from action_observation rows: tool-wear verification not possible. CODEX 1 integration request: add toolDurabilityBefore/After to observationSchema (see RECORDER_GAP_ANALYSIS.md §2.3).",
+      "missingFields": []
+    },
+    {
+      "code": "RECORDER_OR_BRIDGE_GAP",
+      "description": "serverGameTick absent from tick rows: Paper server tick continuity cannot be proven. CODEX 1 integration request: add serverGameTick to recordTick() (see RECORDER_GAP_ANALYSIS.md §2.2).",
+      "missingFields": []
+    },
+    {
+      "code": "RECORDER_OR_BRIDGE_GAP",
+      "description": "ValidatedManifest withheld due to missing genuine source fields: [citizens.gpt-a.communityId, citizens.gpt-a.personalitySeed, citizens.gpt-b.communityId, citizens.gpt-b.personalitySeed, citizens.claude-a.communityId, citizens.claude-a.personalitySeed, citizens.claude-b.communityId, citizens.claude-b.personalitySeed, biome_gpt-a, biome_gpt-b, biome_claude-a, biome_claude-b, configuration.server, configuration.gameRules, configuration.shelterVerifiedAbsent, configuration.budgetCeilingUsd, configuration.paths, configuration.recording, configuration.privacyReplay]. Validator refuses to fabricate evidence.",
+      "missingFields": []
+    },
+    {
+      "code": "UNPROVEN_PAPER_AUTHENTICITY",
+      "description": "Offline fixture only. Paper authenticity is NOT verified; live acceptance remains blocked until Gemini implements real signature verification and a trustworthy Paper capture source.",
+      "missingFields": [
+        "paper_server_attested"
+      ]
+    }
+  ],
+  "redacted": true,
+  "attribution": {
+    "runId": "fixture-4-6aa953ddef3f",
+    "citizens": [
+      "gpt-a",
+      "gpt-b",
+      "claude-a",
+      "claude-b"
+    ],
+    "communities": []
+  }
+}

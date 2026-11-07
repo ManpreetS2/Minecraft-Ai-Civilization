@@ -1,0 +1,15 @@
+{
+  "criterionId": "A-SESSION",
+  "repository": "ManpreetS2/Minecraft-Ai-Civilization-windows-backup",
+  "sourceSha": "6aa953ddef3ffa7b7ef28a9f16eeb256d19727d4",
+  "command": "pnpm v1:offline 2",
+  "exitCode": 0,
+  "mode": "offline-fixture",
+  "outcome": "PASS",
+  "assertions": [
+    {
+      "name": "routed scripted sessions are distinct with bounded calls",
+      "passed": true
+    }
+  ]
+}

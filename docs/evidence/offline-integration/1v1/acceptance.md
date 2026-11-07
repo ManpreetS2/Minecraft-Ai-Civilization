@@ -1,0 +1,46 @@
+# V1 acceptance
+Candidate: ManpreetS2/Minecraft-Ai-Civilization-windows-backup @ 6aa953ddef3ffa7b7ef28a9f16eeb256d19727d4
+
+- Offline: 0/30; NOT MEASURABLE
+- Live: 0/37; NOT MEASURABLE
+- Milestones: 0/2
+- Gate A: 0/13 live criteria
+- Gate B: 0/24 live criteria
+
+- A-CONNECT: offline NOT PROVEN, live NOT PROVEN; evidence missing; blocker Evidence not supplied; evidence missing; evidence missing
+- A-FOOD: offline NOT PROVEN, live NOT PROVEN; evidence missing; blocker Evidence not supplied; evidence missing; evidence missing
+- A-NAVIGATION: offline NOT PROVEN, live NOT PROVEN; evidence missing; blocker Evidence not supplied; evidence missing; evidence missing
+- A-SHELTER: offline NOT PROVEN, live NOT PROVEN; evidence missing; blocker Evidence not supplied; evidence missing; evidence missing
+- A-IDENTITY: offline FAIL, live FAIL; evidence missing; blocker Evidence not supplied; trusted independent review missing; simulation or unknown mode cannot establish live acceptance; trusted independent review missing; independently reviewed live validator artifact missing or invalid
+- A-RESPAWN: offline NOT PROVEN, live NOT PROVEN; evidence missing; blocker Evidence not supplied; evidence missing; evidence missing
+- A-STOP: offline NOT PROVEN, live NOT PROVEN; evidence missing; blocker Evidence not supplied; evidence missing; evidence missing
+- A-ROSTER: offline NOT PROVEN, live NOT PROVEN; evidence missing; blocker Evidence not supplied; evidence missing; evidence missing
+- A-SESSION: offline FAIL, live FAIL; evidence missing; blocker Evidence not supplied; trusted independent review missing; simulation or unknown mode cannot establish live acceptance; trusted independent review missing; independently reviewed live validator artifact missing or invalid
+- A-MEMORY: offline FAIL, live FAIL; evidence missing; blocker Evidence not supplied; trusted independent review missing; simulation or unknown mode cannot establish live acceptance; trusted independent review missing; independently reviewed live validator artifact missing or invalid
+- A-VISIBILITY: offline NOT PROVEN, live NOT PROVEN; evidence missing; blocker Evidence not supplied; evidence missing; evidence missing
+- A-ACTIONS: offline FAIL, live FAIL; evidence missing; blocker Evidence not supplied; trusted independent review missing; simulation or unknown mode cannot establish live acceptance; trusted independent review missing; independently reviewed live validator artifact missing or invalid
+- A-USAGE: offline NOT PROVEN, live NOT PROVEN; evidence missing; blocker Evidence not supplied; evidence missing; evidence missing
+- B-ROSTER: offline NOT PROVEN, live NOT PROVEN; evidence missing; blocker Evidence not supplied; evidence missing; evidence missing
+- B-WORLD: offline N/A, live NOT PROVEN; evidence missing; blocker Evidence not supplied; evidence missing
+- B-START: offline N/A, live NOT PROVEN; evidence missing; blocker Evidence not supplied; evidence missing
+- B-INVENTORY: offline NOT PROVEN, live NOT PROVEN; evidence missing; blocker Evidence not supplied; evidence missing; evidence missing
+- B-PRESSURE: offline N/A, live NOT PROVEN; evidence missing; blocker Evidence not supplied; evidence missing
+- B-AUTONOMY: offline NOT PROVEN, live NOT PROVEN; evidence missing; blocker Evidence not supplied; evidence missing; evidence missing
+- B-OUTCOMES: offline NOT PROVEN, live NOT PROVEN; evidence missing; blocker Evidence not supplied; evidence missing; evidence missing
+- B-PRIVACY: offline NOT PROVEN, live NOT PROVEN; evidence missing; blocker Evidence not supplied; evidence missing; evidence missing
+- B-SPEECH: offline NOT PROVEN, live NOT PROVEN; evidence missing; blocker Evidence not supplied; evidence missing; evidence missing
+- B-OBSERVER: offline NOT PROVEN, live NOT PROVEN; evidence missing; blocker Evidence not supplied; evidence missing; evidence missing
+- B-MIGRATION: offline NOT PROVEN, live NOT PROVEN; evidence missing; blocker Evidence not supplied; evidence missing; evidence missing
+- B-CHOICES: offline NOT PROVEN, live NOT PROVEN; evidence missing; blocker Evidence not supplied; evidence missing; evidence missing
+- B-INVENTORY-LOG: offline NOT PROVEN, live NOT PROVEN; evidence missing; blocker Evidence not supplied; evidence missing; evidence missing
+- B-BLOCK-LOG: offline NOT PROVEN, live NOT PROVEN; evidence missing; blocker Evidence not supplied; evidence missing; evidence missing
+- B-HEALTH-LOG: offline NOT PROVEN, live NOT PROVEN; evidence missing; blocker Evidence not supplied; evidence missing; evidence missing
+- B-MODELS: offline NOT PROVEN, live NOT PROVEN; evidence missing; blocker Evidence not supplied; evidence missing; evidence missing
+- B-AUTH: offline NOT PROVEN, live NOT PROVEN; evidence missing; blocker Evidence not supplied; evidence missing; evidence missing
+- B-COST: offline NOT PROVEN, live NOT PROVEN; evidence missing; blocker Evidence not supplied; evidence missing; evidence missing
+- B-DURATION: offline N/A, live NOT PROVEN; evidence missing; blocker Evidence not supplied; evidence missing
+- B-TICKS: offline N/A, live NOT PROVEN; evidence missing; blocker Evidence not supplied; evidence missing
+- B-RESPAWN: offline NOT PROVEN, live NOT PROVEN; evidence missing; blocker Evidence not supplied; evidence missing; evidence missing
+- B-KEEP-INVENTORY: offline N/A, live NOT PROVEN; evidence missing; blocker Evidence not supplied; evidence missing
+- B-INTERVENTION: offline N/A, live NOT PROVEN; evidence missing; blocker Evidence not supplied; evidence missing
+- B-INTERVENTION-LOG: offline NOT PROVEN, live NOT PROVEN; evidence missing; blocker Evidence not supplied; evidence missing; evidence missing

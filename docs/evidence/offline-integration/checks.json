@@ -1,0 +1,163 @@
+{
+  "sourceSha": "6aa953ddef3ffa7b7ef28a9f16eeb256d19727d4",
+  "checks": {
+    "workspace": {
+      "command": [
+        "pnpm",
+        "test",
+        "--maxWorkers=1",
+        "--no-file-parallelism"
+      ],
+      "exitCode": 0,
+      "passed": 2527,
+      "failed": 0,
+      "skipped": 1,
+      "filesPassed": 212,
+      "log": "workspace-final.txt",
+      "supersededExitCode": 143
+    },
+    "security": {
+      "command": [
+        "pnpm",
+        "test:security",
+        "--maxWorkers=1",
+        "--no-file-parallelism"
+      ],
+      "exitCode": 0,
+      "seconds": 30.89,
+      "passed": 358,
+      "skipped": 0,
+      "failed": 0
+    },
+    "ai": {
+      "command": [
+        "pnpm",
+        "test:ai",
+        "--maxWorkers=1",
+        "--no-file-parallelism"
+      ],
+      "exitCode": 0,
+      "seconds": 76.34,
+      "passed": 514,
+      "skipped": 0,
+      "failed": 0
+    },
+    "v1": {
+      "command": [
+        "pnpm",
+        "test:v1",
+        "--maxWorkers=1",
+        "--no-file-parallelism"
+      ],
+      "exitCode": 0,
+      "seconds": 61.82,
+      "passed": 129,
+      "skipped": 0,
+      "failed": 0
+    },
+    "validator": {
+      "command": [
+        "pnpm",
+        "test:evidence-validator",
+        "--maxWorkers=1",
+        "--no-file-parallelism"
+      ],
+      "exitCode": 0,
+      "seconds": 15.4,
+      "passed": 161,
+      "skipped": 0,
+      "failed": 0
+    },
+    "construction": {
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "--config",
+        "qa/construction-persistence/vitest.config.ts",
+        "--maxWorkers=1",
+        "--no-file-parallelism"
+      ],
+      "exitCode": 0,
+      "seconds": 6.07,
+      "passed": 12,
+      "skipped": 0,
+      "failed": 0
+    },
+    "movement-guard": {
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "--config",
+        "qa/v57/vitest.config.ts",
+        "--maxWorkers=1",
+        "--no-file-parallelism"
+      ],
+      "exitCode": 0,
+      "seconds": 10.57,
+      "passed": 204,
+      "skipped": 0,
+      "failed": 0
+    },
+    "provider": {
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "--config",
+        "qa/provider-safety/vitest.config.ts",
+        "--maxWorkers=1",
+        "--no-file-parallelism"
+      ],
+      "exitCode": 0,
+      "seconds": 8.24,
+      "passed": 10,
+      "skipped": 0,
+      "failed": 0
+    },
+    "typecheck": {
+      "command": [
+        "pnpm",
+        "typecheck"
+      ],
+      "exitCode": 0,
+      "seconds": 31.19
+    },
+    "tools-typecheck": {
+      "command": [
+        "pnpm",
+        "typecheck:tools"
+      ],
+      "exitCode": 0,
+      "seconds": 6.15
+    },
+    "validator-typecheck": {
+      "command": [
+        "pnpm",
+        "typecheck:evidence-validator"
+      ],
+      "exitCode": 0,
+      "seconds": 2.69
+    },
+    "lint": {
+      "command": [
+        "pnpm",
+        "lint"
+      ],
+      "exitCode": 0,
+      "seconds": 8.95
+    },
+    "build": {
+      "command": [
+        "pnpm",
+        "build"
+      ],
+      "exitCode": 0,
+      "seconds": 50.9
+    }
+  }
+}

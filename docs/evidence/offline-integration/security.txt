@@ -1,0 +1,47 @@
+
+> minecraft-ai-civilization@0.1.0 test:security /private/tmp/minecraft-offline-integration
+> vitest run sec001 knowledge-provenance downstream-prompt-isolation persistent-fact-provenance citizen-context-2v2 bulletin-2v2 visibility-2v2 untrusted-model-output pr16-review http-server-origin workstations-community storage-community-access --maxWorkers=1 --no-file-parallelism
+
+
+ RUN  v3.2.7 /private/tmp/minecraft-offline-integration
+
+(node:88129) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ packages/agent-core/src/sec001-independent-review.test.ts (74 tests) 4852ms
+(node:88384) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ packages/agent-core/src/untrusted-model-output.test.ts (37 tests) 4359ms
+(node:88450) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ packages/agent-core/src/sec001-manager.test.ts (38 tests) 3219ms
+   ✓ same-community announcements (criterion 2) > a citizen's own choice reaches every member of its community through the real manager path, and no one else  370ms
+(node:88645) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ packages/agent-core/src/downstream-prompt-isolation.test.ts (13 tests) 1152ms
+(node:88763) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ packages/agent-core/src/pr16-review.test.ts (5 tests) 655ms
+(node:88804) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ packages/agent-core/src/sec001-migration-manager-qa.test.ts (5 tests) 554ms
+ ✓ packages/agent-core/src/sec001-migration-qa.test.ts (12 tests) 369ms
+ ✓ packages/agent-core/src/sec001-round3.test.ts (14 tests) 264ms
+ ✓ packages/agent-core/src/sec001-migration-recovery-qa.test.ts (7 tests) 226ms
+ ✓ packages/agent-core/src/sec001-round2.test.ts (20 tests) 245ms
+ ✓ packages/agent-core/src/sec001-quarantine-durability-qa.test.ts (8 tests) 214ms
+ ✓ packages/agent-core/src/sec001-audience.test.ts (8 tests) 143ms
+ ✓ packages/agent-core/src/knowledge-provenance.test.ts (19 tests) 139ms
+ ✓ apps/orchestrator/src/http-server-origin.test.ts (4 tests) 54ms
+ ✓ packages/agent-core/src/workstations-community.test.ts (9 tests) 69ms
+ ✓ packages/agent-core/src/t3-sec001-boundaries.test.ts (10 tests) 71ms
+ ✓ packages/agent-core/src/persistent-fact-provenance.test.ts (12 tests) 82ms
+ ✓ packages/agent-core/src/citizen-context-2v2.test.ts (27 tests) 49ms
+ ✓ packages/agent-core/src/storage-community-access.test.ts (8 tests) 54ms
+ ✓ packages/shared/src/bulletin-2v2-contract.test.ts (9 tests) 19ms
+ ✓ packages/shared/src/visibility-2v2-contract.test.ts (19 tests) 8ms
+
+ Test Files  21 passed (21)
+      Tests  358 passed (358)
+   Start at  18:02:27
+   Duration  29.53s (transform 1.34s, setup 263ms, collect 4.46s, tests 16.80s, environment 2ms, prepare 1.19s)
+

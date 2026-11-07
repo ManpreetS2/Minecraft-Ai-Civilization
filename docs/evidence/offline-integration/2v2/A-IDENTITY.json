@@ -1,0 +1,15 @@
+{
+  "criterionId": "A-IDENTITY",
+  "repository": "ManpreetS2/Minecraft-Ai-Civilization-windows-backup",
+  "sourceSha": "6aa953ddef3ffa7b7ef28a9f16eeb256d19727d4",
+  "command": "pnpm v1:offline 4",
+  "exitCode": 0,
+  "mode": "offline-fixture",
+  "outcome": "PASS",
+  "assertions": [
+    {
+      "name": "SQLite reopen preserves usernames and private memory",
+      "passed": true
+    }
+  ]
+}

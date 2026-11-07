@@ -1,0 +1,24 @@
+
+> minecraft-ai-civilization@0.1.0 v1:journal /private/tmp/minecraft-offline-integration
+> tsx tools/v1-integration/journal-cli-main.ts /var/folders/b9/cn4lvm9s7hl781fnd0dgknkm0000gn/T/integration-forgery-zuo0_gpz/evidence/manifest.json 6aa953ddef3ffa7b7ef28a9f16eeb256d19727d4 ManpreetS2/Minecraft-Ai-Civilization-windows-backup /var/folders/b9/cn4lvm9s7hl781fnd0dgknkm0000gn/T/integration-forgery-zuo0_gpz/evidence operator.jsonl off2
+
+{
+  "verdict": "FAIL",
+  "failures": [
+    "Action 1: inventory delta contradicts expected effects",
+    "Action 3: inventory receipt contradicts prior stock",
+    "Action 5: inventory receipt contradicts prior stock",
+    "Journal action 1: journal afterInventory contradicts receipt",
+    "Journal action 1: journal inventory delta contradicts manifest"
+  ],
+  "unproven": [
+    "Independent evidence validator pending",
+    "External authenticity NOT PROVEN: all artifacts can be replaced consistently without an independently verified external anchor; journal matching does not authenticate Paper execution",
+    "Original journal lacks embedded source/repository attribution; caller descriptor is a binding declaration, not an independent source anchor"
+  ],
+  "journalConsistent": false,
+  "status": "FAIL",
+  "authenticatedLiveExecution": false,
+  "exitCode": 1
+}
+ ELIFECYCLE  Command failed with exit code 1.

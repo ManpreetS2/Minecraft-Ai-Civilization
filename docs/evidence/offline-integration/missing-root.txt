@@ -1,0 +1,29 @@
+
+> minecraft-ai-civilization@0.1.0 v1:journal /private/tmp/minecraft-offline-integration
+> tsx tools/v1-integration/journal-cli-main.ts /private/tmp/minecraft-offline-integration/artifacts/v1/integration-final-1v1/manifest.json 6aa953ddef3ffa7b7ef28a9f16eeb256d19727d4 ManpreetS2/Minecraft-Ai-Civilization-windows-backup
+
+{
+  "verdict": "NOT PROVEN",
+  "failures": [],
+  "unproven": [
+    "Source receipt evidenceRoot missing; artifact not read",
+    "Source receipt evidenceRoot missing; artifact not read",
+    "Source receipt evidenceRoot missing; artifact not read",
+    "Source receipt evidenceRoot missing; artifact not read",
+    "Source receipt evidenceRoot missing; artifact not read",
+    "Source receipt evidenceRoot missing; artifact not read",
+    "Source receipt evidenceRoot missing; artifact not read",
+    "Source receipt evidenceRoot missing; artifact not read",
+    "Source receipt evidenceRoot missing; artifact not read",
+    "Persistent fact source-event receipt unavailable",
+    "Persistent fact source-event receipt unavailable",
+    "Independent evidence validator pending",
+    "External authenticity NOT PROVEN: all artifacts can be replaced consistently without an independently verified external anchor; journal matching does not authenticate Paper execution",
+    "Original operator journal missing"
+  ],
+  "journalConsistent": false,
+  "status": "NOT PROVEN",
+  "authenticatedLiveExecution": false,
+  "exitCode": 2
+}
+ ELIFECYCLE  Command failed with exit code 2.

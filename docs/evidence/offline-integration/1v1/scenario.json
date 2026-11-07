@@ -1,0 +1,384 @@
+{
+  "sourceSha": "6aa953ddef3ffa7b7ef28a9f16eeb256d19727d4",
+  "mode": "offline-fixture",
+  "decisionTransport": "scripted-in-process",
+  "citizens": [
+    {
+      "id": "gpt-a",
+      "username": "GPT_A"
+    },
+    {
+      "id": "claude-a",
+      "username": "Claude_A"
+    }
+  ],
+  "providers": [
+    {
+      "citizenId": "gpt-a",
+      "family": "gpt",
+      "model": "gpt-4o-mini",
+      "sessionId": "v1-offline-fixture:gpt-a:e9fe62db-8a6b-4c1a-b381-435b6845f5c3",
+      "requests": 3,
+      "ownMemorySeen": true,
+      "leakedMemoryIds": [],
+      "accounting": {
+        "requests": 3,
+        "retries": 0,
+        "refused": 0,
+        "inputTokens": 300,
+        "outputTokens": 60,
+        "estimatedSpendUsd": 0.00008099999999999999,
+        "unverifiedHoldUsd": 0,
+        "reservedUsd": 0
+      }
+    },
+    {
+      "citizenId": "claude-a",
+      "family": "claude",
+      "model": "claude-haiku-5-5",
+      "sessionId": "v1-offline-fixture:claude-a:63134eaf-10d8-49db-9bea-0388a11fd351",
+      "requests": 3,
+      "ownMemorySeen": true,
+      "leakedMemoryIds": [],
+      "accounting": {
+        "requests": 3,
+        "retries": 0,
+        "refused": 0,
+        "inputTokens": 300,
+        "outputTokens": 60,
+        "estimatedSpendUsd": 0.00006000000000000001,
+        "unverifiedHoldUsd": 0,
+        "reservedUsd": 0
+      }
+    }
+  ],
+  "inventoryBefore": {
+    "gpt-a": 0,
+    "claude-a": 0
+  },
+  "inventoryAfter": {
+    "gpt-a": 3,
+    "claude-a": 3
+  },
+  "actions": [
+    {
+      "sequence": 1,
+      "citizenId": "gpt-a",
+      "reportedSuccess": true,
+      "observedSuccess": true,
+      "inventoryDelta": {
+        "oak_log": 1
+      },
+      "authorizedKnowledge": true,
+      "decisionTransport": "scripted-in-process",
+      "originPosition": {
+        "x": 0.5,
+        "y": 64,
+        "z": 0.5
+      },
+      "actionType": "gather",
+      "expectedDelta": {
+        "oak_log": 1
+      },
+      "decisionSource": "planner",
+      "inventoryScope": "citizen",
+      "eventId": "be638423-cccc-4321-877a-91efae0aebb5",
+      "attemptId": "8ea6acc2-9018-4066-8924-b3d3e18a866a",
+      "runId": "fixture-2-6aa953ddef3f",
+      "sourceSha": "6aa953ddef3ffa7b7ef28a9f16eeb256d19727d4",
+      "receiptId": "receipt-8ea6acc2-9018-4066-8924-b3d3e18a866a",
+      "sourceEventId": "be638423-cccc-4321-877a-91efae0aebb5"
+    },
+    {
+      "sequence": 2,
+      "citizenId": "claude-a",
+      "reportedSuccess": true,
+      "observedSuccess": true,
+      "inventoryDelta": {
+        "oak_log": 1
+      },
+      "authorizedKnowledge": true,
+      "decisionTransport": "scripted-in-process",
+      "originPosition": {
+        "x": 30.5,
+        "y": 64,
+        "z": 0.5
+      },
+      "actionType": "gather",
+      "expectedDelta": {
+        "oak_log": 1
+      },
+      "decisionSource": "planner",
+      "inventoryScope": "citizen",
+      "eventId": "6f54cd73-b04b-461f-9218-d44f2bd00c90",
+      "attemptId": "44e010ca-73b8-4a2c-a0e6-43cd3f92431b",
+      "runId": "fixture-2-6aa953ddef3f",
+      "sourceSha": "6aa953ddef3ffa7b7ef28a9f16eeb256d19727d4",
+      "receiptId": "receipt-44e010ca-73b8-4a2c-a0e6-43cd3f92431b",
+      "sourceEventId": "6f54cd73-b04b-461f-9218-d44f2bd00c90"
+    },
+    {
+      "sequence": 3,
+      "citizenId": "gpt-a",
+      "reportedSuccess": true,
+      "observedSuccess": true,
+      "inventoryDelta": {
+        "oak_log": 1
+      },
+      "authorizedKnowledge": true,
+      "decisionTransport": "scripted-in-process",
+      "originPosition": {
+        "x": 6.053172837962275,
+        "y": 64,
+        "z": 3.4400729286526794
+      },
+      "actionType": "gather",
+      "expectedDelta": {
+        "oak_log": 1
+      },
+      "decisionSource": "scripted",
+      "inventoryScope": "citizen",
+      "eventId": "ceb44dc2-1b80-423e-9ee7-f5630560470d",
+      "attemptId": "58961c57-e6ed-443b-bc2d-902a0fa011ba",
+      "runId": "fixture-2-6aa953ddef3f",
+      "sourceSha": "6aa953ddef3ffa7b7ef28a9f16eeb256d19727d4",
+      "receiptId": "receipt-58961c57-e6ed-443b-bc2d-902a0fa011ba",
+      "sourceEventId": "ceb44dc2-1b80-423e-9ee7-f5630560470d"
+    },
+    {
+      "sequence": 4,
+      "citizenId": "claude-a",
+      "reportedSuccess": true,
+      "observedSuccess": true,
+      "inventoryDelta": {
+        "oak_log": 1
+      },
+      "authorizedKnowledge": true,
+      "decisionTransport": "scripted-in-process",
+      "originPosition": {
+        "x": 36.05317283796227,
+        "y": 64,
+        "z": 3.440072928652679
+      },
+      "actionType": "gather",
+      "expectedDelta": {
+        "oak_log": 1
+      },
+      "decisionSource": "scripted",
+      "inventoryScope": "citizen",
+      "eventId": "490b40ed-5abd-458c-b122-7bc03709d59a",
+      "attemptId": "0a0127c8-7f49-4c73-a0bb-609836c1eaf8",
+      "runId": "fixture-2-6aa953ddef3f",
+      "sourceSha": "6aa953ddef3ffa7b7ef28a9f16eeb256d19727d4",
+      "receiptId": "receipt-0a0127c8-7f49-4c73-a0bb-609836c1eaf8",
+      "sourceEventId": "490b40ed-5abd-458c-b122-7bc03709d59a"
+    },
+    {
+      "sequence": 5,
+      "citizenId": "gpt-a",
+      "reportedSuccess": true,
+      "observedSuccess": true,
+      "inventoryDelta": {
+        "oak_log": 1
+      },
+      "authorizedKnowledge": true,
+      "decisionTransport": "scripted-in-process",
+      "originPosition": {
+        "x": 6.053172837962275,
+        "y": 64,
+        "z": 3.4400729286526794
+      },
+      "actionType": "gather",
+      "expectedDelta": {
+        "oak_log": 1
+      },
+      "decisionSource": "scripted",
+      "inventoryScope": "citizen",
+      "eventId": "ba38db21-cd67-483f-87f3-fe28614349a5",
+      "attemptId": "21f09801-8c22-44cb-b833-65f6cb38e169",
+      "runId": "fixture-2-6aa953ddef3f",
+      "sourceSha": "6aa953ddef3ffa7b7ef28a9f16eeb256d19727d4",
+      "receiptId": "receipt-21f09801-8c22-44cb-b833-65f6cb38e169",
+      "sourceEventId": "ba38db21-cd67-483f-87f3-fe28614349a5"
+    },
+    {
+      "sequence": 6,
+      "citizenId": "claude-a",
+      "reportedSuccess": true,
+      "observedSuccess": true,
+      "inventoryDelta": {
+        "oak_log": 1
+      },
+      "authorizedKnowledge": true,
+      "decisionTransport": "scripted-in-process",
+      "originPosition": {
+        "x": 36.05317283796227,
+        "y": 64,
+        "z": 3.4400729286526803
+      },
+      "actionType": "gather",
+      "expectedDelta": {
+        "oak_log": 1
+      },
+      "decisionSource": "scripted",
+      "inventoryScope": "citizen",
+      "eventId": "0a3d8065-b043-4ec6-8cfa-242d3a5d4df4",
+      "attemptId": "02b3c2e5-ab0e-4fb2-86b1-e8ee15817fb7",
+      "runId": "fixture-2-6aa953ddef3f",
+      "sourceSha": "6aa953ddef3ffa7b7ef28a9f16eeb256d19727d4",
+      "receiptId": "receipt-02b3c2e5-ab0e-4fb2-86b1-e8ee15817fb7",
+      "sourceEventId": "0a3d8065-b043-4ec6-8cfa-242d3a5d4df4"
+    }
+  ],
+  "sourceReceipts": [
+    {
+      "id": "receipt-8ea6acc2-9018-4066-8924-b3d3e18a866a",
+      "eventId": "be638423-cccc-4321-877a-91efae0aebb5",
+      "attemptId": "8ea6acc2-9018-4066-8924-b3d3e18a866a",
+      "runId": "fixture-2-6aa953ddef3f",
+      "sourceSha": "6aa953ddef3ffa7b7ef28a9f16eeb256d19727d4",
+      "repository": "ManpreetS2/Minecraft-Ai-Civilization-windows-backup",
+      "citizenId": "gpt-a",
+      "reference": "receipts/receipt-8ea6acc2-9018-4066-8924-b3d3e18a866a.json",
+      "sha256": "9c9d5330d484ddd0261c7abd4382e9b8bdaf5ee350cee7661655f512fcc816e3"
+    },
+    {
+      "id": "receipt-44e010ca-73b8-4a2c-a0e6-43cd3f92431b",
+      "eventId": "6f54cd73-b04b-461f-9218-d44f2bd00c90",
+      "attemptId": "44e010ca-73b8-4a2c-a0e6-43cd3f92431b",
+      "runId": "fixture-2-6aa953ddef3f",
+      "sourceSha": "6aa953ddef3ffa7b7ef28a9f16eeb256d19727d4",
+      "repository": "ManpreetS2/Minecraft-Ai-Civilization-windows-backup",
+      "citizenId": "claude-a",
+      "reference": "receipts/receipt-44e010ca-73b8-4a2c-a0e6-43cd3f92431b.json",
+      "sha256": "1fa1de0371a8fbed93a1fd6d26a67a51f1bb6face1dcd018e63cb4e39d43d043"
+    },
+    {
+      "id": "receipt-58961c57-e6ed-443b-bc2d-902a0fa011ba",
+      "eventId": "ceb44dc2-1b80-423e-9ee7-f5630560470d",
+      "attemptId": "58961c57-e6ed-443b-bc2d-902a0fa011ba",
+      "runId": "fixture-2-6aa953ddef3f",
+      "sourceSha": "6aa953ddef3ffa7b7ef28a9f16eeb256d19727d4",
+      "repository": "ManpreetS2/Minecraft-Ai-Civilization-windows-backup",
+      "citizenId": "gpt-a",
+      "reference": "receipts/receipt-58961c57-e6ed-443b-bc2d-902a0fa011ba.json",
+      "sha256": "e47d7e68923ef93577461e7b5fffd00ab93ba999d22be6369d954de6a25f8a29"
+    },
+    {
+      "id": "receipt-0a0127c8-7f49-4c73-a0bb-609836c1eaf8",
+      "eventId": "490b40ed-5abd-458c-b122-7bc03709d59a",
+      "attemptId": "0a0127c8-7f49-4c73-a0bb-609836c1eaf8",
+      "runId": "fixture-2-6aa953ddef3f",
+      "sourceSha": "6aa953ddef3ffa7b7ef28a9f16eeb256d19727d4",
+      "repository": "ManpreetS2/Minecraft-Ai-Civilization-windows-backup",
+      "citizenId": "claude-a",
+      "reference": "receipts/receipt-0a0127c8-7f49-4c73-a0bb-609836c1eaf8.json",
+      "sha256": "05a077931cf76f0e1e59adb4e4845ecd945f37a38c6ea5cabb1c3636eaa94158"
+    },
+    {
+      "id": "receipt-21f09801-8c22-44cb-b833-65f6cb38e169",
+      "eventId": "ba38db21-cd67-483f-87f3-fe28614349a5",
+      "attemptId": "21f09801-8c22-44cb-b833-65f6cb38e169",
+      "runId": "fixture-2-6aa953ddef3f",
+      "sourceSha": "6aa953ddef3ffa7b7ef28a9f16eeb256d19727d4",
+      "repository": "ManpreetS2/Minecraft-Ai-Civilization-windows-backup",
+      "citizenId": "gpt-a",
+      "reference": "receipts/receipt-21f09801-8c22-44cb-b833-65f6cb38e169.json",
+      "sha256": "70c4848ebd2a3631ce0a71846177db66efe63e4b1a4442e753a81dc6a86e7d8d"
+    },
+    {
+      "id": "receipt-02b3c2e5-ab0e-4fb2-86b1-e8ee15817fb7",
+      "eventId": "0a3d8065-b043-4ec6-8cfa-242d3a5d4df4",
+      "attemptId": "02b3c2e5-ab0e-4fb2-86b1-e8ee15817fb7",
+      "runId": "fixture-2-6aa953ddef3f",
+      "sourceSha": "6aa953ddef3ffa7b7ef28a9f16eeb256d19727d4",
+      "repository": "ManpreetS2/Minecraft-Ai-Civilization-windows-backup",
+      "citizenId": "claude-a",
+      "reference": "receipts/receipt-02b3c2e5-ab0e-4fb2-86b1-e8ee15817fb7.json",
+      "sha256": "83cc1f0d6511cabd9f7cb4d0a10a57d9fb3bcdbae53dc8653bf02cdd3e9ac870"
+    },
+    {
+      "id": "receipt-fact-memory-gpt-a",
+      "eventId": "e96cd0e1-eaf2-48be-a755-3d3be48ad0a7",
+      "attemptId": "fact-attempt-memory-gpt-a",
+      "runId": "fixture-2-6aa953ddef3f",
+      "sourceSha": "6aa953ddef3ffa7b7ef28a9f16eeb256d19727d4",
+      "repository": "ManpreetS2/Minecraft-Ai-Civilization-windows-backup",
+      "citizenId": "gpt-a",
+      "reference": "receipts/receipt-fact-memory-gpt-a.json",
+      "sha256": "9a387e6570b8479aeff05dee463f2eb8d4fb76280ed5e00379e09ecc312a401c"
+    },
+    {
+      "id": "receipt-fact-memory-claude-a",
+      "eventId": "3f24a90b-71e3-4088-8556-2a0256280121",
+      "attemptId": "fact-attempt-memory-claude-a",
+      "runId": "fixture-2-6aa953ddef3f",
+      "sourceSha": "6aa953ddef3ffa7b7ef28a9f16eeb256d19727d4",
+      "repository": "ManpreetS2/Minecraft-Ai-Civilization-windows-backup",
+      "citizenId": "claude-a",
+      "reference": "receipts/receipt-fact-memory-claude-a.json",
+      "sha256": "de5f479069f53ceebe067da1161d05b01861dc83c4935c24e5109cea6946dec2"
+    }
+  ],
+  "persistentFacts": [
+    {
+      "id": "memory-gpt-a",
+      "citizenId": "gpt-a",
+      "runId": "fixture-2-6aa953ddef3f",
+      "sourceSha": "6aa953ddef3ffa7b7ef28a9f16eeb256d19727d4",
+      "sourceEventId": "e96cd0e1-eaf2-48be-a755-3d3be48ad0a7",
+      "receiptId": "receipt-fact-memory-gpt-a",
+      "authorizedKnowledge": true
+    },
+    {
+      "id": "memory-claude-a",
+      "citizenId": "claude-a",
+      "runId": "fixture-2-6aa953ddef3f",
+      "sourceSha": "6aa953ddef3ffa7b7ef28a9f16eeb256d19727d4",
+      "sourceEventId": "3f24a90b-71e3-4088-8556-2a0256280121",
+      "receiptId": "receipt-fact-memory-claude-a",
+      "authorizedKnowledge": true
+    }
+  ],
+  "runId": "fixture-2-6aa953ddef3f",
+  "repository": "ManpreetS2/Minecraft-Ai-Civilization-windows-backup",
+  "restart": {
+    "citizens": [
+      {
+        "id": "gpt-a",
+        "username": "GPT_A"
+      },
+      {
+        "id": "claude-a",
+        "username": "Claude_A"
+      }
+    ],
+    "memoryPreserved": true,
+    "storage": "reopened disposable SQLite database; in-memory session store not process-durable",
+    "sessionDurability": "not_claimed_across_process_restart"
+  },
+  "evidenceJournalPath": "/private/tmp/minecraft-offline-integration/artifacts/v1/integration-final-1v1/operator.jsonl",
+  "evidenceJournalSha256": "e05aa500d9088f0e95e4648d273cd4939e4618014fd2e21b26c3416e02d917a5",
+  "evidenceSummary": {
+    "experimentId": "off2",
+    "mode": "offline",
+    "attempted": 6,
+    "verified": 6,
+    "unverified": 0,
+    "interrupted": 0,
+    "failed": 0,
+    "deaths": 0,
+    "respawns": 0,
+    "interventions": 1,
+    "incompleteActions": 0
+  },
+  "unproven": [
+    "real model decisions",
+    "session persistence across process restart",
+    "respawn",
+    "live Minecraft",
+    "Paper serverGameTick",
+    "tool durability (fixture does not expose damage counts)",
+    "actual API charges"
+  ]
+}

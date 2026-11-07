@@ -1,0 +1,127 @@
+{
+  "1v1": {
+    "sourceSha": "6aa953ddef3ffa7b7ef28a9f16eeb256d19727d4",
+    "actions": 6,
+    "attempts": 6,
+    "observations": 6,
+    "journalRows": 18,
+    "wholeHashChainVerified": true,
+    "journalCli": {
+      "command": [
+        "pnpm",
+        "v1:journal",
+        "/private/tmp/minecraft-offline-integration/artifacts/v1/integration-final-1v1/manifest.json",
+        "6aa953ddef3ffa7b7ef28a9f16eeb256d19727d4",
+        "ManpreetS2/Minecraft-Ai-Civilization-windows-backup",
+        "/private/tmp/minecraft-offline-integration/artifacts/v1/integration-final-1v1",
+        "operator.jsonl",
+        "off2"
+      ],
+      "exitCode": 0,
+      "status": "JOURNAL CONSISTENT",
+      "verdict": "NOT PROVEN",
+      "authenticatedLiveExecution": false,
+      "failures": []
+    },
+    "validatorStatus": "NOT_PROVEN"
+  },
+  "2v2": {
+    "sourceSha": "6aa953ddef3ffa7b7ef28a9f16eeb256d19727d4",
+    "actions": 12,
+    "attempts": 12,
+    "observations": 12,
+    "journalRows": 30,
+    "wholeHashChainVerified": true,
+    "journalCli": {
+      "command": [
+        "pnpm",
+        "v1:journal",
+        "/private/tmp/minecraft-offline-integration/artifacts/v1/integration-final-2v2/manifest.json",
+        "6aa953ddef3ffa7b7ef28a9f16eeb256d19727d4",
+        "ManpreetS2/Minecraft-Ai-Civilization-windows-backup",
+        "/private/tmp/minecraft-offline-integration/artifacts/v1/integration-final-2v2",
+        "operator.jsonl",
+        "off4"
+      ],
+      "exitCode": 0,
+      "status": "JOURNAL CONSISTENT",
+      "verdict": "NOT PROVEN",
+      "authenticatedLiveExecution": false,
+      "failures": []
+    },
+    "validatorStatus": "NOT_PROVEN"
+  },
+  "missingRoot": {
+    "command": [
+      "pnpm",
+      "v1:journal",
+      "/private/tmp/minecraft-offline-integration/artifacts/v1/integration-final-1v1/manifest.json",
+      "6aa953ddef3ffa7b7ef28a9f16eeb256d19727d4",
+      "ManpreetS2/Minecraft-Ai-Civilization-windows-backup"
+    ],
+    "exitCode": 2,
+    "status": "NOT PROVEN",
+    "verdict": "NOT PROVEN",
+    "authenticatedLiveExecution": false,
+    "failures": []
+  },
+  "missingJournal": {
+    "command": [
+      "pnpm",
+      "v1:journal",
+      "/private/tmp/minecraft-offline-integration/artifacts/v1/integration-final-1v1/manifest.json",
+      "6aa953ddef3ffa7b7ef28a9f16eeb256d19727d4",
+      "ManpreetS2/Minecraft-Ai-Civilization-windows-backup",
+      "/private/tmp/minecraft-offline-integration/artifacts/v1/integration-final-1v1"
+    ],
+    "exitCode": 2,
+    "status": "NOT PROVEN",
+    "verdict": "NOT PROVEN",
+    "authenticatedLiveExecution": false,
+    "failures": []
+  },
+  "forgery": {
+    "command": [
+      "pnpm",
+      "v1:journal",
+      "/var/folders/b9/cn4lvm9s7hl781fnd0dgknkm0000gn/T/integration-forgery-zuo0_gpz/evidence/manifest.json",
+      "6aa953ddef3ffa7b7ef28a9f16eeb256d19727d4",
+      "ManpreetS2/Minecraft-Ai-Civilization-windows-backup",
+      "/var/folders/b9/cn4lvm9s7hl781fnd0dgknkm0000gn/T/integration-forgery-zuo0_gpz/evidence",
+      "operator.jsonl",
+      "off2"
+    ],
+    "exitCode": 1,
+    "status": "FAIL",
+    "verdict": "FAIL",
+    "authenticatedLiveExecution": false,
+    "failures": [
+      "Action 1: inventory delta contradicts expected effects",
+      "Action 3: inventory receipt contradicts prior stock",
+      "Action 5: inventory receipt contradicts prior stock",
+      "Journal action 1: journal afterInventory contradicts receipt",
+      "Journal action 1: journal inventory delta contradicts manifest"
+    ]
+  },
+  "wrongSource": {
+    "command": [
+      "pnpm",
+      "v1:journal",
+      "/private/tmp/minecraft-offline-integration/artifacts/v1/integration-final-1v1/manifest.json",
+      "ffffffffffffffffffffffffffffffffffffffff",
+      "ManpreetS2/Minecraft-Ai-Civilization-windows-backup",
+      "/private/tmp/minecraft-offline-integration/artifacts/v1/integration-final-1v1",
+      "operator.jsonl",
+      "off2"
+    ],
+    "exitCode": 1,
+    "status": "FAIL",
+    "verdict": "FAIL",
+    "authenticatedLiveExecution": false,
+    "failures": [
+      "Expected candidate source SHA mismatch or invalid full SHA",
+      "Original journal run/source/repository attribution mismatch",
+      "Journal row source mismatch"
+    ]
+  }
+}
