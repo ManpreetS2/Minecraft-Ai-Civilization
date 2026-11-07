@@ -1,10 +1,9 @@
-import { spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { checkJournalCliIntegration } from "../../../tools/ci/offline-acceptance-verifier.js";
-import { cleanup, CLI_PRESENT, fresh, l2, REPO_ROOT, shaOf, type Count } from "./support/bundle.js";
+import { cleanup, CLI_PRESENT, fresh, l2, REPO_ROOT, run, shaOf, type Count } from "./support/bundle.js";
 import { CASES } from "./support/cases.js";
 
 /**
@@ -23,19 +22,19 @@ interface Summary {
   acceptance: Record<string, { offline: { passed: number; total: number; measurement: string }; live: { passed: number; total: number; measurement: string }; failingCriteria: string[]; notMeasurable: boolean }>;
   scenarios: Record<string, { passed: boolean; errors: string[] }>;
 }
-function runWrapper(d2: string, d4: string) {
+async function runWrapper(d2: string, d4: string) {
   const out = tmp("ciqa-out-");
-  const r = spawnSync(process.execPath, ["--import", "tsx", "tools/ci/verify-offline-acceptance.ts", "--scenario2", d2, "--scenario4", d4, "--sha", shaOf(d2), "--output", out], { cwd: REPO_ROOT, encoding: "utf8" });
+  const r = await run(["tools/ci/verify-offline-acceptance.ts", "--scenario2", d2, "--scenario4", d4, "--sha", shaOf(d2), "--output", out]);
   const summary = JSON.parse(readFileSync(join(out, "ci-summary.json"), "utf8")) as Summary;
-  return { exit: r.status, summary, md: readFileSync(join(out, "ci-summary.md"), "utf8"), stdout: r.stdout, stderr: r.stderr };
+  return { exit: r.exit, summary, md: readFileSync(join(out, "ci-summary.md"), "utf8"), stdout: r.stdout, stderr: r.stderr };
 }
 const inspect = (dir: string) => checkJournalCliIntegration(REPO_ROOT, dir, shaOf(dir));
 const forged = (count: Count, id: string) => { const d = fresh(count); CASES.find((c) => c.id === id)!.apply(d, count); return d; };
 const EXPECT: Record<Count, { citizens: number; attempts: number }> = { 2: { citizens: 2, attempts: 6 }, 4: { citizens: 4, attempts: 12 } };
 
 describe("journal CLI integration: independent real-subprocess controls PER scenario", () => {
-  it.skipIf(!CLI_PRESENT)("[CLI behaviour] calling PR #68's CLI without the experimentId still rejects an untouched bundle (the bug PR #73 fixed in the caller)", () => {
-    const r = l2(fresh(2), 2, { experimentId: null });
+  it.skipIf(!CLI_PRESENT)("[CLI behaviour] calling PR #68's CLI without the experimentId still rejects an untouched bundle (the bug PR #73 fixed in the caller)", async () => {
+    const r = await l2(fresh(2), 2, { experimentId: null });
     expect(r.exit).toBe(1);
     expect(r.failures?.some((f) => /Foreign run journal event replay/.test(f))).toBe(true);
   });
@@ -70,8 +69,8 @@ describe("journal CLI integration: independent real-subprocess controls PER scen
     });
   }
 
-  it.skipIf(!CLI_PRESENT)("both scenarios are cross-checked independently by the wrapper and both are recorded", () => {
-    const r = runWrapper(fresh(2), fresh(4));
+  it.skipIf(!CLI_PRESENT)("both scenarios are cross-checked independently by the wrapper and both are recorded", async () => {
+    const r = await runWrapper(fresh(2), fresh(4));
     expect(r.exit).toBe(0);
     for (const key of ["scenario-2", "scenario-4"]) {
       const c = r.summary.journalCliChecks[key]!;
@@ -82,15 +81,15 @@ describe("journal CLI integration: independent real-subprocess controls PER scen
     expect(r.summary.journalCliChecks["scenario-4"]!.scenario).toEqual({ citizens: 4, attempts: 12, observations: 12 });
   });
 
-  it.skipIf(!CLI_PRESENT)("a failed required check produces a NONZERO exit: forged 1v1 only (2v2 stays READY, independently)", () => {
-    const r = runWrapper(forged(2, "T07"), fresh(4));
+  it.skipIf(!CLI_PRESENT)("a failed required check produces a NONZERO exit: forged 1v1 only (2v2 stays READY, independently)", async () => {
+    const r = await runWrapper(forged(2, "T07"), fresh(4));
     expect(r.exit).not.toBe(0); expect(r.summary.passed).toBe(false);
     expect(r.summary.journalCliChecks["scenario-2"]!.status).toBe("FAILED");
     expect(r.summary.journalCliChecks["scenario-4"]!.status).toBe("READY");
   });
 
-  it.skipIf(!CLI_PRESENT)("a failed required check produces a NONZERO exit: forged 2v2 only (1v1 stays READY, independently)", () => {
-    const r = runWrapper(fresh(2), forged(4, "T07"));
+  it.skipIf(!CLI_PRESENT)("a failed required check produces a NONZERO exit: forged 2v2 only (1v1 stays READY, independently)", async () => {
+    const r = await runWrapper(fresh(2), forged(4, "T07"));
     expect(r.exit).not.toBe(0); expect(r.summary.passed).toBe(false);
     expect(r.summary.journalCliChecks["scenario-2"]!.status).toBe("READY");
     expect(r.summary.journalCliChecks["scenario-4"]!.status).toBe("FAILED");
@@ -115,16 +114,16 @@ describe("journal CLI integration: independent real-subprocess controls PER scen
 });
 
 describe("process exit codes and honest top-level status", () => {
-  it("untouched real bundles: exit 0, status OFFLINE_STRUCTURAL_PASS, Paper execution NOT PROVEN", () => {
-    const r = runWrapper(fresh(2), fresh(4));
+  it("untouched real bundles: exit 0, status OFFLINE_STRUCTURAL_PASS, Paper execution NOT PROVEN", async () => {
+    const r = await runWrapper(fresh(2), fresh(4));
     expect(r.exit).toBe(0);
     expect(r.summary.status).toBe("OFFLINE_STRUCTURAL_PASS");
     expect(r.summary.paperExecution).toBe("NOT PROVEN");
     expect(r.summary.contradictions).toEqual([]); expect(r.summary.incomplete).toEqual([]);
   });
 
-  it("the headline never reads as live acceptance for synthetic evidence", () => {
-    const r = runWrapper(fresh(2), fresh(4));
+  it("the headline never reads as live acceptance for synthetic evidence", async () => {
+    const r = await runWrapper(fresh(2), fresh(4));
     const head = r.md.split("\n")[0]!;
     expect(head).toMatch(/Offline structural checks PASSED/);
     expect(head).toMatch(/Paper execution NOT PROVEN/i);
@@ -132,16 +131,16 @@ describe("process exit codes and honest top-level status", () => {
     expect(r.md).not.toMatch(/acceptance (is )?(complete|passed|verified)/i);
   });
 
-  it("the report separates the four states explicitly", () => {
-    const r = runWrapper(fresh(2), fresh(4));
+  it("the report separates the four states explicitly", async () => {
+    const r = await runWrapper(fresh(2), fresh(4));
     expect(r.md).toMatch(/Offline structural checks:\*\*\s*PASSED/);
     expect(r.md).toMatch(/Required verification:\*\*\s*COMPLETE/);
     expect(r.md).toMatch(/Contradictory evidence:\*\*\s*none detected/);
     expect(r.md).toMatch(/Genuine Paper execution:\*\*\s*NOT PROVEN/);
   });
 
-  it("criteria that remain NOT MEASURABLE are reported, with the failing criteria named", () => {
-    const r = runWrapper(fresh(2), fresh(4));
+  it("criteria that remain NOT MEASURABLE are reported, with the failing criteria named", async () => {
+    const r = await runWrapper(fresh(2), fresh(4));
     expect(r.md).toMatch(/NOT MEASURABLE/);
     expect(r.md).toMatch(/0\/30/); expect(r.md).toMatch(/0\/37/);
     for (const key of ["scenario-2", "scenario-4"]) {
@@ -152,8 +151,8 @@ describe("process exit codes and honest top-level status", () => {
     }
   });
 
-  it("contradictory evidence is REJECTED with its own status, headline and nonzero exit (acceptance.json claims live 37/37)", () => {
-    const r = runWrapper(forged(2, "T22"), fresh(4));
+  it("contradictory evidence is REJECTED with its own status, headline and nonzero exit (acceptance.json claims live 37/37)", async () => {
+    const r = await runWrapper(forged(2, "T22"), fresh(4));
     expect(r.exit).not.toBe(0);
     expect(r.summary.status).toBe("CONTRADICTORY_EVIDENCE_REJECTED");
     expect(r.summary.contradictions.length).toBeGreaterThan(0);
@@ -161,8 +160,8 @@ describe("process exit codes and honest top-level status", () => {
     expect(r.md).toMatch(/Genuine Paper execution:\*\*\s*NOT PROVEN/);
   });
 
-  it("an unprovable/incomplete verification is reported as INCOMPLETE with a nonzero exit (2v2 evidence missing)", () => {
-    const r = runWrapper(fresh(2), join(tmp("ciqa-empty-"), "does-not-exist"));
+  it("an unprovable/incomplete verification is reported as INCOMPLETE with a nonzero exit (2v2 evidence missing)", async () => {
+    const r = await runWrapper(fresh(2), join(tmp("ciqa-empty-"), "does-not-exist"));
     expect(r.exit).not.toBe(0);
     expect(r.summary.status).toBe("VERIFICATION_INCOMPLETE");
     expect(r.summary.incomplete.length).toBeGreaterThan(0);
@@ -170,30 +169,30 @@ describe("process exit codes and honest top-level status", () => {
     expect(r.md).toMatch(/Offline structural checks:\*\*\s*NOT ESTABLISHED/);
   });
 
-  it("removing an action everywhere is rejected as CONTRADICTORY: the unedited validator report still lists it", () => {
-    const r = runWrapper(forged(2, "T13"), fresh(4));
+  it("removing an action everywhere is rejected as CONTRADICTORY: the unedited validator report still lists it", async () => {
+    const r = await runWrapper(forged(2, "T13"), fresh(4));
     expect(r.exit).not.toBe(0);
     expect(r.summary.status).toBe("CONTRADICTORY_EVIDENCE_REJECTED");
     expect(r.summary.contradictions.some((c) => /actionVerifications|validator/i.test(c))).toBe(true);
   });
 
-  it("a pinned receipt file that is missing is an ordinary structural VERIFICATION_FAILED, nonzero (not called contradictory)", () => {
-    const r = runWrapper(forged(2, "T09"), fresh(4));
+  it("a pinned receipt file that is missing is an ordinary structural VERIFICATION_FAILED, nonzero (not called contradictory)", async () => {
+    const r = await runWrapper(forged(2, "T09"), fresh(4));
     expect(r.exit).not.toBe(0);
     expect(r.summary.status).toBe("VERIFICATION_FAILED");
     expect(r.summary.contradictions).toEqual([]);
     expect(r.summary.scenarios["scenario-2"]!.errors.some((e) => /receipt file/i.test(e))).toBe(true);
   });
 
-  it("a journal edited without recomputing its hash chain is rejected, nonzero (the real CLI also rejects it, so it is CONTRADICTORY)", () => {
-    const r = runWrapper(forged(2, "T25"), fresh(4));
+  it("a journal edited without recomputing its hash chain is rejected, nonzero (the real CLI also rejects it, so it is CONTRADICTORY)", async () => {
+    const r = await runWrapper(forged(2, "T25"), fresh(4));
     expect(r.exit).not.toBe(0);
     expect(r.summary.status).toBe("CONTRADICTORY_EVIDENCE_REJECTED");
     expect(r.summary.scenarios["scenario-2"]!.errors.some((e) => /hash chain|tampering/i.test(e))).toBe(true);
   });
 
-  it("the Paper / live-model gaps are listed as NOT PROVEN and live execution is never claimed", () => {
-    const r = runWrapper(fresh(2), fresh(4));
+  it("the Paper / live-model gaps are listed as NOT PROVEN and live execution is never claimed", async () => {
+    const r = await runWrapper(fresh(2), fresh(4));
     expect(r.md).toMatch(/UNPROVEN_PAPER_AUTHENTICITY/);
     expect(r.md).not.toMatch(/live (minecraft|paper)[^.\n]*(verified|authenticated)/i);
   });

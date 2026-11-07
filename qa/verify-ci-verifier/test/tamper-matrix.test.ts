@@ -20,8 +20,8 @@ describe("control", () => {
       expect(r.paperAttestationProven).toBe(false);
       expect(r.validatorVerdict).toBe("NOT PROVEN");
     });
-    it.skipIf(!CLI_PRESENT)(`an untouched real ${count}-citizen bundle is JOURNAL CONSISTENT under PR #68's CLI when called with its experimentId`, () => {
-      const r = l2(fresh(count), count);
+    it.skipIf(!CLI_PRESENT)(`an untouched real ${count}-citizen bundle is JOURNAL CONSISTENT under PR #68's CLI when called with its experimentId`, async () => {
+      const r = await l2(fresh(count), count);
       expect(r.exit).toBe(0);
       expect(r.journalConsistent).toBe(true);
     });
@@ -52,23 +52,23 @@ for (const c of CASES) {
       }
 
       if (c.l2 === "by-design") {
-        it.skipIf(!CLI_PRESENT)("[LIMITATION BY DESIGN] PR #68's journal check also reports a coherent forgery as consistent", () => {
+        it.skipIf(!CLI_PRESENT)("[LIMITATION BY DESIGN] PR #68's journal check also reports a coherent forgery as consistent", async () => {
           const d = fresh(count); c.apply(d, count);
-          const r = l2(d, count);
+          const r = await l2(d, count);
           expect(r.journalConsistent).toBe(true);
           expect(r.verdict).toBe("NOT PROVEN"); // and it says so itself: authenticity stays NOT PROVEN
         });
       } else if (c.l2 === "detects") {
-        it.skipIf(!CLI_PRESENT)("L2: PR #68's journal cross-check rejects it", () => {
+        it.skipIf(!CLI_PRESENT)("L2: PR #68's journal cross-check rejects it", async () => {
           const d = fresh(count); c.apply(d, count);
-          expect(l2Detects(l2(d, count))).toBe(true);
+          expect(l2Detects(await l2(d, count))).toBe(true);
         });
       } else if (c.l1 === "misses") {
         // Neither layer sees it.
-        it.fails("[GAP] neither PR #70 nor PR #68's journal check rejects it", () => {
+        it.fails("[GAP] neither PR #70 nor PR #68's journal check rejects it", async () => {
           const d = fresh(count); c.apply(d, count);
           const miss1 = l1(d, count).passed;
-          const miss2 = CLI_PRESENT ? !l2Detects(l2(d, count)) : true;
+          const miss2 = CLI_PRESENT ? !l2Detects(await l2(d, count)) : true;
           expect(miss1 && miss2).toBe(false);
         });
       }

@@ -1,4 +1,4 @@
-import { spawnSync } from "node:child_process";
+import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import { cpSync, existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -67,14 +67,26 @@ export function l1(dir: string, count: Count, expectedSha = shaOf(dir)) {
   return verifyOfflineScenario({ artifactDir: dir, expectedCount: count, expectedSha });
 }
 
+/** Non-blocking child process (a blocked worker event loop makes vitest's RPC time out on slow runners). */
+export function run(args: string[], cwd = REPO_ROOT): Promise<{ exit: number | null; stdout: string; stderr: string }> {
+  return new Promise((resolvePromise, reject) => {
+    const child = spawn(process.execPath, ["--import", "tsx", ...args], { cwd, stdio: ["ignore", "pipe", "pipe"] });
+    let stdout = ""; let stderr = "";
+    child.stdout.on("data", (d: Buffer) => { stdout += d.toString("utf8"); });
+    child.stderr.on("data", (d: Buffer) => { stderr += d.toString("utf8"); });
+    child.on("error", reject);
+    child.on("close", (code) => resolvePromise({ exit: code, stdout, stderr }));
+  });
+}
+
 /** PR #68's real journal cross-check, called the way PR #68's own cli.ts calls it (experimentId included). */
-export function l2(dir: string, count: Count, opts: { experimentId?: string | null; sha?: string } = {}) {
-  const args = ["exec", "tsx", "tools/v1-integration/journal-cli-main.ts", join(dir, "manifest.json"), opts.sha ?? shaOf(dir), REPOSITORY, dir, "operator.jsonl"];
+export async function l2(dir: string, count: Count, opts: { experimentId?: string | null; sha?: string } = {}) {
+  const args = ["tools/v1-integration/journal-cli-main.ts", join(dir, "manifest.json"), opts.sha ?? shaOf(dir), REPOSITORY, dir, "operator.jsonl"];
   if (opts.experimentId !== null) args.push(opts.experimentId ?? `off${count}`);
-  const r = spawnSync("pnpm", args, { cwd: REPO_ROOT, encoding: "utf8", shell: process.platform === "win32" });
+  const r = await run(args);
   let parsed: { verdict?: string; journalConsistent?: boolean; failures?: string[]; status?: string } = {};
   try { parsed = JSON.parse(r.stdout); } catch { /* leave empty */ }
-  return { exit: r.status, ...parsed, raw: r.stdout + r.stderr };
+  return { exit: r.exit, ...parsed, raw: r.stdout + r.stderr };
 }
-export const l2Detects = (r: ReturnType<typeof l2>): boolean => r.exit !== 0 || r.journalConsistent !== true;
+export const l2Detects = (r: Awaited<ReturnType<typeof l2>>): boolean => r.exit !== 0 || r.journalConsistent !== true;
 export { readdirSync };
