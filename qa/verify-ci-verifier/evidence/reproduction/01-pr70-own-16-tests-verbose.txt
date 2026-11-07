@@ -1,0 +1,25 @@
+
+ RUN  v3.2.7 <scratch>/wt/a70
+
+ ✓ tools/ci/offline-acceptance.test.ts > Offline Acceptance Artifact Verifier > computes journal row hash consistently without the hash property 4ms
+ ✓ tools/ci/offline-acceptance.test.ts > Offline Acceptance Artifact Verifier > accepts a valid 1v1 (2-citizen) offline artifact bundle 11ms
+ ✓ tools/ci/offline-acceptance.test.ts > Offline Acceptance Artifact Verifier > accepts a valid 2v2 (4-citizen) offline artifact bundle 6ms
+ ✓ tools/ci/offline-acceptance.test.ts > Offline Acceptance Artifact Verifier > rejects wrong source SHA 4ms
+ ✓ tools/ci/offline-acceptance.test.ts > Offline Acceptance Artifact Verifier > rejects incorrect citizen count 2ms
+ ✓ tools/ci/offline-acceptance.test.ts > Offline Acceptance Artifact Verifier > rejects duplicate attempts 3ms
+ ✓ tools/ci/offline-acceptance.test.ts > Offline Acceptance Artifact Verifier > rejects missing observations 2ms
+ ✓ tools/ci/offline-acceptance.test.ts > Offline Acceptance Artifact Verifier > rejects artificially increased inventory 2ms
+ ✓ tools/ci/offline-acceptance.test.ts > Offline Acceptance Artifact Verifier > rejects scripted decisions disguised as genuine model decisions 3ms
+ ✓ tools/ci/offline-acceptance.test.ts > Offline Acceptance Artifact Verifier > rejects a simulated report promoted to authenticated Paper evidence (verdict PASS) 3ms
+ ✓ tools/ci/offline-acceptance.test.ts > Offline Acceptance Artifact Verifier > rejects a simulated report promoted to authenticated Paper evidence (validator report VERIFIED) 3ms
+ ✓ tools/ci/offline-acceptance.test.ts > Offline Acceptance Artifact Verifier > rejects journal hash tampering 2ms
+ ✓ tools/ci/offline-acceptance.test.ts > Offline Acceptance Artifact Verifier > rejects cross-citizen identity confusion in observations 2ms
+ ✓ tools/ci/offline-acceptance.test.ts > Offline Acceptance Artifact Verifier > rejects out-of-order execution (observation seq precedes attempt seq) 2ms
+ ✓ tools/ci/offline-acceptance.test.ts > Offline Acceptance Artifact Verifier > reports Codex journal CLI check as NOT_RUN when command is absent on this branch 0ms
+ ✓ tools/ci/offline-acceptance.test.ts > Offline Acceptance Artifact Verifier > formats Markdown summary with all required sections and fail-closed notice 2ms
+
+ Test Files  1 passed (1)
+      Tests  16 passed (16)
+   Start at  18:44:58
+   Duration  904ms (transform 166ms, setup 64ms, collect 120ms, tests 52ms, environment 0ms, prepare 78ms)
+

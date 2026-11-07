@@ -9,6 +9,7 @@ on:
       - experiments/**
       - tools/**
       - qa/**
+      - docs/evidence/offline-integration/**
       - test-support/**
       - pnpm-lock.yaml
       - package.json
@@ -118,6 +119,12 @@ jobs:
             --scenario4 artifacts/v1/scenario-4 \
             --sha $(git rev-parse HEAD)
 
+      - name: Independent adversarial evidence suite (real 1v1 and 2v2 bundles)
+        run: |
+          CI_QA_BUNDLE_ROOT="$(node -p "require('path').resolve('artifacts/v1')")" \
+          CI_QA_SHA="$(git rev-parse HEAD)" \
+          pnpm exec vitest run -c qa/verify-ci-verifier/vitest.config.ts --maxWorkers=1 --no-file-parallelism
+
       - name: Upload sanitized verification reports
         uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # v4.6.1
         if: always()
@@ -183,6 +190,12 @@ jobs:
             --scenario2 artifacts/v1/scenario-2 \
             --scenario4 artifacts/v1/scenario-4 \
             --sha $(git rev-parse HEAD)
+
+      - name: Independent adversarial evidence suite (real 1v1 and 2v2 bundles)
+        run: |
+          CI_QA_BUNDLE_ROOT="$(node -p "require('path').resolve('artifacts/v1')")" \
+          CI_QA_SHA="$(git rev-parse HEAD)" \
+          pnpm exec vitest run -c qa/verify-ci-verifier/vitest.config.ts --maxWorkers=1 --no-file-parallelism
 
       - name: Upload full verification reports
         uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # v4.6.1

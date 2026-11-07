@@ -1,0 +1,152 @@
+Preparing worktree (detached HEAD e754370)
+(node:57065) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:57404) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+candidate=e754370efa7f23bc56f01a15830d1ff7618600ee overlay=none harness=3d24186f385dc90114e199c670fce0243fbbb0f6 node=v22.12.0 platform=darwin/x64 bundles=<scratch>/wt/qaA/artifacts/v1
+
+ RUN  v3.2.7 <scratch>/wt/qaA/qa-independent/verify-ci-verifier
+
+ ✓ test/integration-and-honesty.test.ts (13 tests | 6 skipped) 6693ms
+   ✓ honest reporting of incomplete checks > the summary prominently lists the Paper / live-model gaps as NOT PROVEN and never claims live execution  1631ms
+   ✓ honest reporting of incomplete checks > [PR #70 branch alone] the absent journal CLI is shown as NOT RUN, not as a pass  1536ms
+   ✓ honest reporting of incomplete checks > [HONESTY-LOW] the headline should not read an unqualified PASSED while a gate is NOT RUN / FAILED  1453ms
+   ✓ honest reporting of incomplete checks > [HONESTY-LOW] the report should surface that acceptance.json is 0/30 offline 'NOT MEASURABLE' (and lists FAIL criteria) next to a PASSED headline  1535ms
+ ❯ test/workflow-facts.test.ts (11 tests | 3 failed) 27ms
+   ✓ offline-acceptance.yml: secrets, privacy and trigger safety > uses pull_request, never pull_request_target (fork code gets no secrets and no write token) 2ms
+   ✓ offline-acceptance.yml: secrets, privacy and trigger safety > grants the token read-only contents permission and nothing else 2ms
+   ✓ offline-acceptance.yml: secrets, privacy and trigger safety > never references the secrets context and blanks every provider key 2ms
+   × offline-acceptance.yml: secrets, privacy and trigger safety > every checkout disables persisted credentials 8ms
+     → expected 1 to be greater than or equal to 2
+   ✓ offline-acceptance.yml: secrets, privacy and trigger safety > every third-party action is pinned to a full 40-hex SHA 1ms
+   ✓ offline-acceptance.yml: secrets, privacy and trigger safety > no step masks failure with continue-on-error or '|| true' 1ms
+   × offline-acceptance.yml: secrets, privacy and trigger safety > uploads only sanitized summaries: never the raw journal, receipts, manifest or provider usage 5ms
+     → expected 1 to be 2 // Object.is equality
+   ✓ offline-acceptance.yml: SHA binding > checks out the PR head commit explicitly (not the synthetic merge commit) 1ms
+   ✓ offline-acceptance.yml: SHA binding > [GAP-LOW] the SHA handed to the verifier comes from the same checkout it verifies (`git rev-parse HEAD`), not from the event that triggered the run 3ms
+   × offline-acceptance.yml: SHA binding > [GAP-LOW] the required-check name is stable across path-filtered skips (a PR touching only qa/ or docs/ never runs this workflow) 2ms
+     → Expect test to fail
+   ✓ offline-acceptance.yml: SHA binding > step labels do not overclaim: the 'Full workspace tests (2260+ tests)' label is a count claim, not a gate 0ms
+ ❯ test/tamper-matrix.test.ts (67 tests | 1 failed | 28 skipped) 428ms
+   ✓ control > an untouched real 2-citizen bundle passes the PR #70 verifier 38ms
+   ↓ control > an untouched real 2-citizen bundle is JOURNAL CONSISTENT under PR #68's CLI when called with its experimentId
+   ✓ control > an untouched real 4-citizen bundle passes the PR #70 verifier 18ms
+   ↓ control > an untouched real 4-citizen bundle is JOURNAL CONSISTENT under PR #68's CLI when called with its experimentId
+   ✓ T01 [2v] rehashed journal: observation worldChanges position moved > [GAP] L1: PR #70 verifier should reject it, but accepts the bundle 27ms
+   ↓ T01 [2v] rehashed journal: observation worldChanges position moved > L2: PR #68's journal cross-check rejects it
+   ✓ T01 [4v] rehashed journal: observation worldChanges position moved > [GAP] L1: PR #70 verifier should reject it, but accepts the bundle 24ms
+   ↓ T01 [4v] rehashed journal: observation worldChanges position moved > L2: PR #68's journal cross-check rejects it
+   ✓ T02 rehashed journal: attempt target changed > [GAP] L1: PR #70 verifier should reject it, but accepts the bundle 14ms
+   ↓ T02 rehashed journal: attempt target changed > L2: PR #68's journal cross-check rejects it
+   ✓ T03 rehashed journal: observation flipped to successReported=false, verified=false > [GAP] L1: PR #70 verifier should reject it, but accepts the bundle 12ms
+   ↓ T03 rehashed journal: observation flipped to successReported=false, verified=false > L2: PR #68's journal cross-check rejects it
+   ✓ T04 [2v] rehashed journal: citizen identities swapped between gpt-a#1 and claude-a#1 (attempt and observation) > [GAP] L1: PR #70 verifier should reject it, but accepts the bundle 10ms
+   ↓ T04 [2v] rehashed journal: citizen identities swapped between gpt-a#1 and claude-a#1 (attempt and observation) > L2: PR #68's journal cross-check rejects it
+   ✓ T04 [4v] rehashed journal: citizen identities swapped between gpt-a#1 and claude-a#1 (attempt and observation) > [GAP] L1: PR #70 verifier should reject it, but accepts the bundle 10ms
+   ↓ T04 [4v] rehashed journal: citizen identities swapped between gpt-a#1 and claude-a#1 (attempt and observation) > L2: PR #68's journal cross-check rejects it
+   ✓ T05 [2v] manifest + receipt citizenIds swapped between two actions (journal untouched) > [GAP] L1: PR #70 verifier should reject it, but accepts the bundle 8ms
+   ↓ T05 [2v] manifest + receipt citizenIds swapped between two actions (journal untouched) > L2: PR #68's journal cross-check rejects it
+   ✓ T05 [4v] manifest + receipt citizenIds swapped between two actions (journal untouched) > [GAP] L1: PR #70 verifier should reject it, but accepts the bundle 11ms
+   ↓ T05 [4v] manifest + receipt citizenIds swapped between two actions (journal untouched) > L2: PR #68's journal cross-check rejects it
+   ✓ T06 receipt reference replaced with another existing receipt > L1: PR #70 verifier rejects it 6ms
+   ↓ T06 receipt reference replaced with another existing receipt > L2: PR #68's journal cross-check rejects it
+   ✓ T07 [2v] receipt CONTENT forged (ids kept; inventoryAfter=9, worldChanges emptied) > [GAP] L1: PR #70 verifier should reject it, but accepts the bundle 10ms
+   ↓ T07 [2v] receipt CONTENT forged (ids kept; inventoryAfter=9, worldChanges emptied) > L2: PR #68's journal cross-check rejects it
+   ✓ T07 [4v] receipt CONTENT forged (ids kept; inventoryAfter=9, worldChanges emptied) > [GAP] L1: PR #70 verifier should reject it, but accepts the bundle 16ms
+   ↓ T07 [4v] receipt CONTENT forged (ids kept; inventoryAfter=9, worldChanges emptied) > L2: PR #68's journal cross-check rejects it
+   ✓ T08 receipt sourceSha changed to a different SHA > [GAP] L1: PR #70 verifier should reject it, but accepts the bundle 17ms
+   ↓ T08 receipt sourceSha changed to a different SHA > L2: PR #68's journal cross-check rejects it
+   ✓ T09 referenced receipt file deleted > L1: PR #70 verifier rejects it 10ms
+   ↓ T09 referenced receipt file deleted > L2: PR #68's journal cross-check rejects it
+   ✓ T10 manifest.sourceReceipts[0].sha256 altered > [GAP] L1: PR #70 verifier should reject it, but accepts the bundle 8ms
+   ↓ T10 manifest.sourceReceipts[0].sha256 altered > L2: PR #68's journal cross-check rejects it
+   ✓ T11 manifest action duplicated over another (new attemptId, same receipt) > L1: PR #70 verifier rejects it 6ms
+   ↓ T11 manifest action duplicated over another (new attemptId, same receipt) > L2: PR #68's journal cross-check rejects it
+   ✓ T12 rehashed journal: gpt-a#3 replaced by a clone of #1 (fresh attemptId, inventory 0->1) > [GAP] L1: PR #70 verifier should reject it, but accepts the bundle 6ms
+   ↓ T12 rehashed journal: gpt-a#3 replaced by a clone of #1 (fresh attemptId, inventory 0->1) > L2: PR #68's journal cross-check rejects it
+   ✓ T13 [2v] one action removed everywhere (manifest + journal pair) > L1: PR #70 verifier rejects it 7ms
+   ↓ T13 [2v] one action removed everywhere (manifest + journal pair) > L2: PR #68's journal cross-check rejects it
+   ✓ T13 [4v] one action removed everywhere (manifest + journal pair) > L1: PR #70 verifier rejects it 9ms
+   ↓ T13 [4v] one action removed everywhere (manifest + journal pair) > L2: PR #68's journal cross-check rejects it
+   ✓ T14 evidence sources disagree: manifest says delta=9, observedSuccess=false; journal says otherwise > [GAP] L1: PR #70 verifier should reject it, but accepts the bundle 8ms
+   ↓ T14 evidence sources disagree: manifest says delta=9, observedSuccess=false; journal says otherwise > L2: PR #68's journal cross-check rejects it
+   ✓ T15 [2v] source SHA differs: manifest only > L1: PR #70 verifier rejects it 8ms
+   ↓ T15 [2v] source SHA differs: manifest only > L2: PR #68's journal cross-check rejects it
+   ✓ T15 [4v] source SHA differs: manifest only > L1: PR #70 verifier rejects it 8ms
+   ↓ T15 [4v] source SHA differs: manifest only > L2: PR #68's journal cross-check rejects it
+   ✓ T16 source SHA differs: original journal start row (rehashed) vs manifest > L1: PR #70 verifier rejects it 8ms
+   ↓ T16 source SHA differs: original journal start row (rehashed) vs manifest > L2: PR #68's journal cross-check rejects it
+   ✓ T17 source SHA differs: validator report only > L1: PR #70 verifier rejects it 7ms
+   ✓ T18 [2v] simulated presented as authenticated: verdict.json = PASS > L1: PR #70 verifier rejects it 7ms
+   ✓ T18 [4v] simulated presented as authenticated: verdict.json = PASS > L1: PR #70 verifier rejects it 9ms
+   ✓ T19 simulated presented as authenticated: validator overallStatus = VERIFIED > L1: PR #70 verifier rejects it 7ms
+   ✓ T20 simulated presented as authenticated: manifest.mode = paper-live > L1: PR #70 verifier rejects it 7ms
+   ↓ T20 simulated presented as authenticated: manifest.mode = paper-live > L2: PR #68's journal cross-check rejects it
+   ✓ T21 simulated presented as authenticated: citizen authentication = microsoft > L1: PR #70 verifier rejects it 6ms
+   ✓ T22 simulated presented as authenticated: acceptance.json claims live 37/37 VERIFIED (a published artifact) > [GAP] L1: PR #70 verifier should reject it, but accepts the bundle 10ms
+   ✓ T22 simulated presented as authenticated: acceptance.json claims live 37/37 VERIFIED (a published artifact) > [GAP] neither PR #70 nor PR #68's journal check rejects it 8ms
+   ✓ T23 simulated presented as authenticated: validator environment = 'Authenticated Paper live server' > [GAP] L1: PR #70 verifier should reject it, but accepts the bundle 7ms
+   ✓ T23 simulated presented as authenticated: validator environment = 'Authenticated Paper live server' > [GAP] neither PR #70 nor PR #68's journal check rejects it 6ms
+   ✓ T24 UNPROVEN_PAPER_AUTHENTICITY gap code silently removed from the validator report > [GAP] L1: PR #70 verifier should reject it, but accepts the bundle 10ms
+   ✓ T24 UNPROVEN_PAPER_AUTHENTICITY gap code silently removed from the validator report > [GAP] neither PR #70 nor PR #68's journal check rejects it 10ms
+   ✓ T25 [2v] journal row tampered WITHOUT recomputing the hash chain > L1: PR #70 verifier rejects it 7ms
+   ↓ T25 [2v] journal row tampered WITHOUT recomputing the hash chain > L2: PR #68's journal cross-check rejects it
+   ✓ T25 [4v] journal row tampered WITHOUT recomputing the hash chain > L1: PR #70 verifier rejects it 9ms
+   ↓ T25 [4v] journal row tampered WITHOUT recomputing the hash chain > L2: PR #68's journal cross-check rejects it
+   × T26 COHERENT forgery: journal + receipt worldChanges edited, journal rehashed, receipt sha256 re-pinned > [LIMITATION BY DESIGN] a coherent forgery passes the PR #70 verifier (nothing offline can tell it from a real run) 10ms
+     → Cannot read properties of undefined (reading '0')
+   ↓ T26 COHERENT forgery: journal + receipt worldChanges edited, journal rehashed, receipt sha256 re-pinned > [LIMITATION BY DESIGN] PR #68's journal check also reports a coherent forgery as consistent
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/tamper-matrix.test.ts > T26 COHERENT forgery: journal + receipt worldChanges edited, journal rehashed, receipt sha256 re-pinned > [LIMITATION BY DESIGN] a coherent forgery passes the PR #70 verifier (nothing offline can tell it from a real run)
+TypeError: Cannot read properties of undefined (reading '0')
+ ❯ test/support/cases.ts:47:511
+
+ ❯ editReceipt test/support/cases.ts:11:110
+ ❯ Object.apply test/support/cases.ts:47:470
+ ❯ test/tamper-matrix.test.ts:37:37
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯
+
+ FAIL  test/workflow-facts.test.ts > offline-acceptance.yml: secrets, privacy and trigger safety > every checkout disables persisted credentials
+AssertionError: expected 1 to be greater than or equal to 2
+ ❯ test/workflow-facts.test.ts:31:30
+     29|   it("every checkout disables persisted credentials", () => {
+     30|     const checkouts = yml.match(/actions\/checkout@[^\n]+\n\s+with:\n(…
+     31|     expect(checkouts.length).toBeGreaterThanOrEqual(2);
+       |                              ^
+     32|     for (const c of checkouts) expect(c).toMatch(/persist-credentials:…
+     33|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/4]⎯
+
+ FAIL  test/workflow-facts.test.ts > offline-acceptance.yml: secrets, privacy and trigger safety > uploads only sanitized summaries: never the raw journal, receipts, manifest or provider usage
+AssertionError: expected 1 to be 2 // Object.is equality
+
+- Expected
++ Received
+
+- 2
++ 1
+
+ ❯ test/workflow-facts.test.ts:45:28
+     43|   it("uploads only sanitized summaries: never the raw journal, receipt…
+     44|     const uploads = [...yml.matchAll(/upload-artifact@[^\n]+\n(?:\s+[^…
+     45|     expect(uploads.length).toBe(2);
+       |                            ^
+     46|     for (const u of uploads) {
+     47|       expect(u).not.toMatch(/operator\.jsonl|receipts|manifest\.json|p…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/4]⎯
+
+ FAIL  test/workflow-facts.test.ts > offline-acceptance.yml: SHA binding > [GAP-LOW] the required-check name is stable across path-filtered skips (a PR touching only qa/ or docs/ never runs this workflow)
+Error: Expect test to fail
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/4]⎯
+
+
+ Test Files  2 failed | 1 passed (3)
+      Tests  4 failed | 53 passed | 34 skipped (91)
+   Start at  18:53:58
+   Duration  8.81s (transform 202ms, setup 103ms, collect 247ms, tests 7.15s, environment 0ms, prepare 229ms)
+

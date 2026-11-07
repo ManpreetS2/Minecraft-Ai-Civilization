@@ -1,0 +1,2 @@
+# Recorded offline evidence is hashed byte-for-byte (journal digests, receipt SHA-256 pins). Never let a platform rewrite line endings.
+docs/evidence/offline-integration/** -text

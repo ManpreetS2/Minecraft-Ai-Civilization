@@ -42,72 +42,38 @@ function buildOfflineArtifactFixture(dir: string, options: BuildFixtureOptions =
   const count = options.count ?? 2;
   const sha = options.sourceSha ?? VALID_SHA;
   const runId = options.runId ?? `fixture-${count}-${sha.slice(0, 12)}`;
+  const repository = "ManpreetS2/Minecraft-Ai-Civilization-windows-backup";
   const citizens = count === 2 ? ["gpt-a", "claude-a"] : ["gpt-a", "gpt-b", "claude-a", "claude-b"];
   const receiptsDir = join(dir, "receipts");
   mkdirSync(receiptsDir, { recursive: true });
 
-  // 1. Build actions and receipts
-  const actions: Record<string, unknown>[] = [];
+  // 1. Build the planned actions. The shape mirrors what `pnpm v1:offline` really records (event ids, journal coordinates, receipt pins).
   const actionDetails: Array<{
     attemptId: string;
     citizenId: string;
     decisionSource: string;
-    gatherSeq: number;
+    eventId: string;
+    receiptId: string;
     step: number;
   }> = [];
-
-  let seqNum = 1;
   for (let step = 0; step < 3; step++) {
     for (const citizenId of citizens) {
       const attemptId = `attempt-${citizenId}-${step + 1}`;
-      const receiptId = `receipt-${attemptId}`;
-      const decisionSource = step === 0 ? "planner" : "scripted";
-
       actionDetails.push({
         attemptId,
         citizenId,
-        decisionSource,
-        gatherSeq: step + 1,
+        decisionSource: step === 0 ? "planner" : "scripted",
+        eventId: `event-${attemptId}`,
+        receiptId: `receipt-${attemptId}`,
         step,
       });
-
-      actions.push({
-        sequence: seqNum++,
-        citizenId,
-        reportedSuccess: true,
-        observedSuccess: true,
-        inventoryDelta: { oak_log: 1 },
-        actionType: "gather",
-        expectedDelta: { oak_log: 1 },
-        attemptId,
-        runId,
-        sourceSha: sha,
-        receiptId,
-      });
-
-      // Write receipt file
-      writeFileSync(
-        join(receiptsDir, `${receiptId}.json`),
-        JSON.stringify(
-          {
-            id: receiptId,
-            attemptId,
-            citizenId,
-            action: "gather",
-            sourceSha: sha,
-            verified: true,
-          },
-          null,
-          2,
-        ),
-      );
     }
   }
 
   // 2. Build journal rows
   const rawRows: Record<string, unknown>[] = [];
-
-  // Start row
+  const target = { x: 6, y: 64, z: 3 };
+  const position = { x: 6.05, y: 64, z: 3.44 };
   rawRows.push({
     experimentId: `off${count}`,
     seq: 1,
@@ -126,7 +92,6 @@ function buildOfflineArtifactFixture(dir: string, options: BuildFixtureOptions =
   for (const c of citizens) citizenLogCounts[c] = 0;
 
   for (let step = 0; step < 3; step++) {
-    // Tick row
     rawRows.push({
       experimentId: `off${count}`,
       seq: currentSeq++,
@@ -137,10 +102,7 @@ function buildOfflineArtifactFixture(dir: string, options: BuildFixtureOptions =
       simulatedStep: step,
       tickProvenance: "unavailable",
     });
-
     const stepActions = actionDetails.filter((a) => a.step === step);
-
-    // Attempts
     for (const act of stepActions) {
       rawRows.push({
         experimentId: `off${count}`,
@@ -151,16 +113,15 @@ function buildOfflineArtifactFixture(dir: string, options: BuildFixtureOptions =
         attemptId: act.attemptId,
         action: "gather",
         decisionSource: act.decisionSource,
+        decisionEventId: act.eventId,
         expectedItem: "oak_log",
+        target,
       });
     }
-
-    // Observations
     for (const act of stepActions) {
       const beforeCount = citizenLogCounts[act.citizenId] ?? 0;
       const afterCount = beforeCount + 1;
       citizenLogCounts[act.citizenId] = afterCount;
-
       rawRows.push({
         experimentId: `off${count}`,
         seq: currentSeq++,
@@ -172,25 +133,29 @@ function buildOfflineArtifactFixture(dir: string, options: BuildFixtureOptions =
         successReported: true,
         beforeInventory: beforeCount > 0 ? { oak_log: beforeCount } : {},
         afterInventory: { oak_log: afterCount },
-        worldChanges: [{ position: { x: 6, y: 64, z: 3 }, before: "oak_log", after: "air" }],
+        position,
+        hungerBefore: 20,
+        hungerAfter: 20,
+        worldChanges: [{ position: target, before: "oak_log", after: "air" }],
       });
     }
   }
 
-  // Allow custom alterations to journal rows before hashing
+  // Allow custom alterations to journal rows before hashing (hash chain is recomputed, as a forger would).
   if (options.alterJournalRows) {
     options.alterJournalRows(rawRows);
   }
 
-  // Hash-chain rows
   let priorHash = "";
   const chainedLines: string[] = [];
+  const finalRows: Record<string, unknown>[] = [];
   for (let i = 0; i < rawRows.length; i++) {
     const row = rawRows[i]!;
     row.seq = i + 1;
     const { row: finalizedRow, hash } = createJournalRow(row, priorHash);
     priorHash = hash;
     chainedLines.push(JSON.stringify(finalizedRow));
+    finalRows.push(finalizedRow);
   }
 
   const journalContent = chainedLines.join("\n") + "\n";
@@ -198,39 +163,108 @@ function buildOfflineArtifactFixture(dir: string, options: BuildFixtureOptions =
   writeFileSync(journalPath, journalContent);
   const journalSha256 = createHash("sha256").update(Buffer.from(journalContent)).digest("hex");
 
-  // 3. Manifest
+  // 3. Receipts are derived from the journal rows that were actually written, then pinned by SHA-256 in the manifest.
+  const manifestCitizens = citizens.map((id) => ({
+    id,
+    family: id.startsWith("gpt") ? "gpt" : "claude",
+    model: null,
+    sessionId: `session-${id}`,
+    authentication: "synthetic",
+    initialInventory: {},
+  }));
+  const actions: Record<string, unknown>[] = [];
+  const sourceReceipts: Record<string, unknown>[] = [];
+  let seqNum = 1;
+  for (const act of actionDetails) {
+    const attemptRow = finalRows.find((r) => r.kind === "action_attempt" && r.attemptId === act.attemptId) ?? {};
+    const obsRow = finalRows.find((r) => r.kind === "action_observation" && r.attemptId === act.attemptId) ?? {};
+    const citizen = manifestCitizens.find((c) => c.id === act.citizenId)!;
+    actions.push({
+      sequence: seqNum++,
+      citizenId: act.citizenId,
+      reportedSuccess: true,
+      observedSuccess: true,
+      inventoryDelta: { oak_log: 1 },
+      actionType: "gather",
+      expectedDelta: { oak_log: 1 },
+      attemptId: act.attemptId,
+      eventId: act.eventId,
+      sourceEventId: act.eventId,
+      decisionSource: act.decisionSource,
+      runId,
+      sourceSha: sha,
+      receiptId: act.receiptId,
+    });
+    const receiptBytes = JSON.stringify(
+      {
+        id: act.receiptId,
+        eventId: act.eventId,
+        attemptId: act.attemptId,
+        runId,
+        sourceSha: sha,
+        repository,
+        citizenId: act.citizenId,
+        family: citizen.family,
+        model: citizen.model,
+        sessionId: citizen.sessionId,
+        actionType: "gather",
+        inventoryScope: "citizen",
+        observedSuccess: true,
+        journal: { attemptSequence: attemptRow.seq, observationSequence: obsRow.seq },
+        worldChanges: obsRow.worldChanges,
+        hungerBefore: obsRow.hungerBefore,
+        hungerAfter: obsRow.hungerAfter,
+        targetPosition: attemptRow.target,
+        inventoryBefore: obsRow.beforeInventory,
+        inventoryAfter: obsRow.afterInventory,
+        positionAfter: obsRow.position,
+      },
+      null,
+      2,
+    );
+    writeFileSync(join(receiptsDir, `${act.receiptId}.json`), receiptBytes);
+    sourceReceipts.push({
+      id: act.receiptId,
+      eventId: act.eventId,
+      attemptId: act.attemptId,
+      runId,
+      sourceSha: sha,
+      repository,
+      citizenId: act.citizenId,
+      reference: `receipts/${act.receiptId}.json`,
+      sha256: createHash("sha256").update(Buffer.from(receiptBytes)).digest("hex"),
+    });
+  }
+
+  // 4. Manifest
   const manifest: Record<string, unknown> = {
     schemaVersion: 1,
     runId,
-    repository: "ManpreetS2/Minecraft-Ai-Civilization-windows-backup",
+    repository,
     sourceSha: sha,
     mode: "offline-fixture",
-    citizens: citizens.map((id) => ({
-      id,
-      family: id.startsWith("gpt") ? "gpt" : "claude",
-      model: null,
-      sessionId: `session-${id}`,
-      authentication: "synthetic",
-      initialInventory: {},
-    })),
+    configuration: { count, experimentId: `off${count}` },
+    citizens: manifestCitizens,
     actions,
+    sourceReceipts,
+    persistentFacts: [],
     validator: {
       name: "offline-bundle-structure",
       verdict: "NOT PROVEN",
       artifact: "verdict.json",
     },
   };
-
   if (options.alterManifest) {
     options.alterManifest(manifest);
   }
   writeFileSync(join(dir, "manifest.json"), JSON.stringify(manifest, null, 2));
 
-  // 4. Verdict
+  // 5. Verdict
   const verdict: Record<string, unknown> = {
     verdict: "NOT PROVEN",
     failures: [],
     unproven: ["Paper ticks unavailable"],
+    journalConsistent: true,
     evidenceJournalSha256: journalSha256,
   };
   if (options.alterVerdict) {
@@ -238,14 +272,17 @@ function buildOfflineArtifactFixture(dir: string, options: BuildFixtureOptions =
   }
   writeFileSync(join(dir, "verdict.json"), JSON.stringify(verdict, null, 2));
 
-  // 5. Gemini Validator Report
+  // 6. Validator report
   const totalActions = count * 3;
   const report: Record<string, unknown> = {
     overallStatus: "NOT_PROVEN",
     environment: "Offline Simulated Fixture (Not a live Minecraft demo claim)",
+    mode: "offline_simulated",
     sourceSha: sha,
     runId,
     citizens,
+    attribution: { runId, citizens },
+    sourceAttestationAudit: { proven: false, sourceType: "missing" },
     summary: {
       totalAttemptedActions: totalActions,
       physicallyVerifiedActions: totalActions,
@@ -266,10 +303,26 @@ function buildOfflineArtifactFixture(dir: string, options: BuildFixtureOptions =
   }
   writeFileSync(join(dir, "gemini-validator-report.json"), JSON.stringify(report, null, 2));
 
-  // 6. Acceptance
+  // 7. Acceptance: the real shape. Offline fixtures can never measure live acceptance.
   writeFileSync(
     join(dir, "acceptance.json"),
-    JSON.stringify({ outcome: "NOT PROVEN", candidateSha: sha }, null, 2),
+    JSON.stringify(
+      {
+        repository,
+        candidateSha: sha,
+        catalogValid: true,
+        offline: { passed: 0, total: 30, percentage: null, measurement: "NOT MEASURABLE" },
+        live: { passed: 0, total: 37, percentage: null, measurement: "NOT MEASURABLE" },
+        milestones: [{ gate: "Gate A", passed: 0, total: 13, accepted: false }],
+        milestoneCount: { passed: 0, total: 2 },
+        results: [
+          { criterion: { id: "A-CONNECT" }, offline: { verdict: "NOT PROVEN" }, live: { verdict: "NOT PROVEN" } },
+          { criterion: { id: "A-IDENTITY" }, offline: { verdict: "FAIL" }, live: { verdict: "FAIL" } },
+        ],
+      },
+      null,
+      2,
+    ),
   );
 }
 
@@ -588,7 +641,11 @@ describe("Offline Acceptance Artifact Verifier", () => {
     };
 
     const md = formatMarkdownSummary(report);
-    expect(md).toContain("# ✅ Offline Acceptance Verification Report: PASSED");
+    // Changed deliberately (hardening branch): the old unqualified "Offline Acceptance Verification Report: PASSED" headline read as live
+    // acceptance for synthetic evidence. The headline must state it is structural and that Paper execution is NOT PROVEN.
+    expect(md.split("\n")[0]).toBe("# ✅ Offline structural checks PASSED — genuine Paper execution NOT PROVEN");
+    expect(md).not.toContain("Offline Acceptance Verification Report: PASSED");
+    expect(md).toContain("**Genuine Paper execution:** NOT PROVEN");
     expect(md).toContain(VALID_SHA);
     expect(md).toContain("1v1 (2 Citizens)");
     expect(md).toContain("Codex Journal CLI Integration");

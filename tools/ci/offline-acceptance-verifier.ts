@@ -11,6 +11,7 @@ import { tmpdir } from "node:os";
 import { resolve, join, relative, isAbsolute } from "node:path";
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
+import { crossCheckEvidence, type AcceptanceSummary } from "./evidence-consistency.js";
 
 export interface VerifyScenarioOptions {
   artifactDir: string;
@@ -46,8 +47,12 @@ export interface ScenarioVerificationResult {
   paperAttestationProven: boolean;
   unprovenReasons: string[];
   errors: string[];
+  /** Subset of `errors` that are contradictions: assertions that disagree with other recorded evidence or claim live / authenticated / completed status. */
+  contradictions: string[];
   warnings: string[];
   details: ScenarioCheckDetails;
+  /** Parsed acceptance.json tallies, so criteria that remain NOT MEASURABLE are reported rather than hidden behind a PASSED headline. */
+  acceptance?: AcceptanceSummary;
 }
 
 export interface JournalCliCheckResult {
@@ -55,6 +60,13 @@ export interface JournalCliCheckResult {
   command: string;
   details: string;
   forgedReceiptTestPassed?: boolean;
+  /** A journal rewritten with a VALID recomputed hash chain was rejected by the real journal CLI. */
+  forgedJournalTestPassed?: boolean;
+  /** Status the real CLI returned for the UNTOUCHED bundle ("JOURNAL CONSISTENT" | "NOT PROVEN" | "FAIL"), and its first failures. */
+  consistentStatus?: string;
+  failures?: string[];
+  /** Citizen / original attempt / original observation counts read from the journal this check ran against. */
+  scenario?: { citizens: number; attempts: number; observations: number };
   executed?: boolean;
   exitCodes?: Record<string, number>;
 }
@@ -66,13 +78,64 @@ export interface SystemInfo {
   pnpmVersion?: string;
 }
 
+/**
+ * The four honest outcomes. Only OFFLINE_STRUCTURAL_PASS exits 0, and even that never means live acceptance:
+ * genuine Paper execution is always NOT PROVEN for scripted offline evidence.
+ */
+export type VerificationStatus =
+  | "OFFLINE_STRUCTURAL_PASS"
+  | "VERIFICATION_INCOMPLETE"
+  | "CONTRADICTORY_EVIDENCE_REJECTED"
+  | "VERIFICATION_FAILED";
+
 export interface OverallAcceptanceReport {
+  /** True only for OFFLINE_STRUCTURAL_PASS. Not a statement about live execution or acceptance. */
   passed: boolean;
   testedSha: string;
   system: SystemInfo;
   scenarios: Record<string, ScenarioVerificationResult>;
+  /** The 1v1 result, kept for existing consumers. The authoritative per-scenario results are in `journalCliChecks`. */
   journalCliCheck: JournalCliCheckResult;
   allErrors: string[];
+  status?: VerificationStatus;
+  paperExecution?: "NOT PROVEN";
+  /** One independent journal-CLI result per scenario ("scenario-2" = 1v1, "scenario-4" = 2v2). */
+  journalCliChecks?: Record<string, JournalCliCheckResult>;
+  contradictions?: string[];
+  incomplete?: string[];
+  acceptance?: Record<string, AcceptanceSummary>;
+}
+
+/** Scenario-qualified outcome classification. Contradictions outrank incompleteness, which outranks ordinary failures. */
+export function classifyOutcome(input: {
+  scenarios: Record<string, ScenarioVerificationResult>;
+  journalCliChecks: Record<string, JournalCliCheckResult>;
+}): { status: VerificationStatus; contradictions: string[]; incomplete: string[]; allErrors: string[] } {
+  const allErrors: string[] = [];
+  const contradictions: string[] = [];
+  const incomplete: string[] = [];
+  for (const [key, res] of Object.entries(input.scenarios)) {
+    const label = `[${key === "scenario-2" ? "Scenario-2" : "Scenario-4"}]`;
+    for (const e of res.errors) allErrors.push(`${label} ${e}`);
+    for (const e of res.contradictions) contradictions.push(`${label} ${e}`);
+    if (res.errors.some((e) => /^Missing required/.test(e))) incomplete.push(`${label} required artifacts are missing, so this scenario could not be verified`);
+  }
+  for (const [key, j] of Object.entries(input.journalCliChecks)) {
+    const label = `[${key === "scenario-2" ? "Scenario-2" : "Scenario-4"}]`;
+    const done = j.status === "READY" && j.executed === true && j.forgedReceiptTestPassed === true && j.forgedJournalTestPassed === true;
+    if (done) continue;
+    if (j.status === "NOT_RUN") incomplete.push(`${label} journal CLI was not run: ${j.details}`);
+    else if (j.consistentStatus === "FAIL") contradictions.push(`${label} the real journal cross-check rejected the bundle: ${(j.failures ?? []).slice(0, 3).join("; ") || j.details}`);
+    else allErrors.push(`${label} journal CLI was not successfully exercised: ${j.details}`);
+    if (j.status !== "NOT_RUN" && j.consistentStatus === "FAIL") allErrors.push(`${label} journal CLI was not successfully exercised: ${j.details}`);
+  }
+  allErrors.push(...incomplete.filter((i) => !allErrors.includes(i)));
+  const status: VerificationStatus =
+    contradictions.length > 0 ? "CONTRADICTORY_EVIDENCE_REJECTED"
+    : incomplete.length > 0 ? "VERIFICATION_INCOMPLETE"
+    : allErrors.length > 0 ? "VERIFICATION_FAILED"
+    : "OFFLINE_STRUCTURAL_PASS";
+  return { status, contradictions, incomplete, allErrors };
 }
 
 /**
@@ -158,6 +221,16 @@ export function auditJournalHashChain(lines: readonly string[]): {
 }
 
 /**
+ * Existing (pre-hardening) error texts that describe a CONTRADICTION rather than a structural gap: evidence that disagrees with other
+ * evidence, or a scripted fixture presented as authenticated / live. Count and shape errors ("count mismatch", "Missing", "Duplicate") are
+ * deliberately not contradictions.
+ */
+export function isLegacyContradiction(message: string): boolean {
+  if (/count|Missing|Duplicate|lacks|not exist|Failed to parse|empty/i.test(message)) return false;
+  return /promoted to authenticated|authentication must be|mode must be|identity confusion|mismatch|Wrong source SHA|disguised as genuine|Artificially increased|Spontaneous inventory/i.test(message);
+}
+
+/**
  * Verifies all artifacts in an offline scenario run directory (1v1 or 2v2).
  */
 export function verifyOfflineScenario(options: VerifyScenarioOptions): ScenarioVerificationResult {
@@ -231,6 +304,7 @@ export function verifyOfflineScenario(options: VerifyScenarioOptions): ScenarioV
       paperAttestationProven,
       unprovenReasons,
       errors,
+      contradictions: [],
       warnings,
       details,
     };
@@ -712,12 +786,7 @@ export function verifyOfflineScenario(options: VerifyScenarioOptions): ScenarioV
       unprovenReasons = report.notProven.map((np) => String(np.code ?? "UNKNOWN"));
     }
 
-    const hasPaperAuthenticityUnproven = unprovenReasons.includes("UNPROVEN_PAPER_AUTHENTICITY");
-    if (!hasPaperAuthenticityUnproven) {
-      warnings.push(
-        "gemini-validator-report did not include explicit UNPROVEN_PAPER_AUTHENTICITY gap code",
-      );
-    }
+    // A missing UNPROVEN_PAPER_AUTHENTICITY gap code is rejected as a contradiction by crossCheckEvidence below (absence is not proof).
   } catch (err) {
     errors.push(`Failed to parse gemini-validator-report.json: ${String(err)}`);
   }
@@ -726,6 +795,18 @@ export function verifyOfflineScenario(options: VerifyScenarioOptions): ScenarioV
     actionAttemptsCount === expectedActionsCount &&
     actionObservationsCount === expectedActionsCount;
   details.authenticityHonest = validatorVerdict === "NOT PROVEN" && !paperAttestationProven;
+
+  // 6. Cross-source agreement and authenticity claims (original journal <-> manifest <-> receipts and pins <-> reports).
+  const legacyContradictions = errors.filter(isLegacyContradiction);
+  let acceptance: AcceptanceSummary | undefined;
+  let crossContradictions: string[] = [];
+  if (details.hashChainValid && manifest && Object.keys(manifest).length > 0) {
+    const cross = crossCheckEvidence({ artifactDir, expectedCount: count, testedSha, runId, manifest, rows: hashChainAudit.rows });
+    errors.push(...cross.errors, ...cross.contradictions);
+    crossContradictions = cross.contradictions;
+    acceptance = cross.acceptance;
+  }
+  const contradictions = [...legacyContradictions, ...crossContradictions];
 
   const passed = errors.length === 0;
 
@@ -744,8 +825,10 @@ export function verifyOfflineScenario(options: VerifyScenarioOptions): ScenarioV
     paperAttestationProven,
     unprovenReasons,
     errors,
+    contradictions,
     warnings,
     details,
+    acceptance,
   };
 }
 
@@ -853,13 +936,66 @@ export function checkJournalCliIntegration(
     const forgedManifest = join(forgedRoot, "manifest.json");
     writeFileSync(forgedManifest, JSON.stringify(manifest));
     const forged = invoke(fullArgs(forgedManifest, forgedRoot));
+    // Missing-evidence control #3: a pinned receipt file removed from an otherwise intact copy must not be reported consistent.
+    const missingReceiptRoot = join(temporary, "missing-receipt");
+    cpSync(scenarioArtifactDir, missingReceiptRoot, { recursive: true });
+    const missingPin = manifest.sourceReceipts.find((r: { id: string }) => r.id === action.receiptId);
+    rmSync(resolve(missingReceiptRoot, missingPin.reference), { force: true });
+    const missingReceipt = invoke(fullArgs(join(missingReceiptRoot, "manifest.json"), missingReceiptRoot));
+    // Forged-evidence control #2: an original-journal observation altered and the WHOLE hash chain recomputed, so the chain is valid.
+    const forgedJournalRoot = join(temporary, "forged-journal");
+    cpSync(scenarioArtifactDir, forgedJournalRoot, { recursive: true });
+    const journalFile = join(forgedJournalRoot, "operator.jsonl");
+    const journalRows = readFileSync(journalFile, "utf8")
+      .split(/\r?\n/)
+      .filter((l) => l.trim())
+      .map((l) => JSON.parse(l) as Record<string, unknown>);
+    const target = journalRows.find((r) => r.kind === "action_observation") as
+      | { worldChanges?: Array<{ position?: unknown }>; successReported?: boolean }
+      | undefined;
+    if (!target) throw new Error("No original action_observation row to forge");
+    if (target.worldChanges?.[0]) target.worldChanges[0].position = { x: 9999, y: 1, z: 9999 };
+    else target.successReported = !target.successReported;
+    let priorHash = "";
+    const rehashed = journalRows.map((row) => {
+      const next: Record<string, unknown> = { ...row, previousHash: priorHash };
+      delete next.hash;
+      const hash = computeJournalRowHash(next);
+      priorHash = hash;
+      return JSON.stringify({ ...next, hash });
+    });
+    writeFileSync(journalFile, `${rehashed.join("\n")}\n`);
+    const forgedJournal = invoke(fullArgs(join(forgedJournalRoot, "manifest.json"), forgedJournalRoot));
+    // The scenario shape is read from the ORIGINAL journal (not the forged copy).
+    const originalRows = readFileSync(join(scenarioArtifactDir, "operator.jsonl"), "utf8")
+      .split(/\r?\n/)
+      .filter((l) => l.trim())
+      .map((l) => JSON.parse(l) as { kind?: string });
+    const shape = {
+      citizens: Array.isArray(manifest.citizens) ? manifest.citizens.length : 0,
+      attempts: originalRows.filter((r) => r.kind === "action_attempt").length,
+      observations: originalRows.filter((r) => r.kind === "action_observation").length,
+    };
+    const shapeOk =
+      (shape.citizens === 2 || shape.citizens === 4) &&
+      shape.attempts === shape.citizens * 3 &&
+      shape.observations === shape.citizens * 3;
     const exitCodes = {
       consistent: consistent.code,
       missingRoot: missingRoot.code,
       missingJournal: missingJournal.code,
+      missingReceipt: missingReceipt.code,
       forged: forged.code,
+      forgedReceipt: forged.code,
+      forgedJournal: forgedJournal.code,
     };
+    const missingReceiptRejected =
+      missingReceipt.code !== 0 && missingReceipt.result.status !== "JOURNAL CONSISTENT";
+    const forgedJournalRejected = forgedJournal.code === 1 && forgedJournal.result.status === "FAIL";
     const passed =
+      shapeOk &&
+      missingReceiptRejected &&
+      forgedJournalRejected &&
       consistent.code === 0 &&
       consistent.result.status === "JOURNAL CONSISTENT" &&
       consistent.result.verdict === "NOT PROVEN" &&
@@ -876,7 +1012,11 @@ export function checkJournalCliIntegration(
       command: "node --import tsx tools/v1-integration/journal-cli-main.ts",
       exitCodes,
       forgedReceiptTestPassed: forged.code === 1 && forged.result.status === "FAIL",
-      details: `Executed consistent, missing-root, missing-journal and rehashed forged-receipt cases: ${JSON.stringify(exitCodes)}. Local consistency is not live authenticity.`,
+      forgedJournalTestPassed: forgedJournalRejected,
+      consistentStatus: String(consistent.result.status),
+      failures: Array.isArray(consistent.result.failures) ? consistent.result.failures.map(String).slice(0, 5) : [],
+      scenario: shape,
+      details: `Executed consistent, missing-root, missing-journal, missing-receipt, rehashed forged-receipt and rehashed forged-journal cases for ${shape.citizens} citizens / ${shape.attempts} attempts / ${shape.observations} observations: ${JSON.stringify(exitCodes)}${shapeOk ? "" : " (SCENARIO SHAPE NOT 2x3 or 4x3)"}. Local consistency is not live authenticity.`,
     };
   } catch (error) {
     return {
@@ -892,20 +1032,36 @@ export function checkJournalCliIntegration(
 }
 
 /**
- * Formats a comprehensive Markdown summary of offline acceptance verification.
+ * Formats the Markdown summary. The headline can never read as live acceptance: it states which of four outcomes occurred and that
+ * genuine Paper execution is NOT PROVEN, because this verification only ever sees locally generated, scripted offline evidence.
  */
 export function formatMarkdownSummary(report: OverallAcceptanceReport): string {
-  const statusEmoji = report.passed ? "✅" : "❌";
-  const statusText = report.passed ? "PASSED" : "FAILED";
+  const status: VerificationStatus = report.status ?? (report.passed ? "OFFLINE_STRUCTURAL_PASS" : "VERIFICATION_FAILED");
+  const contradictions = report.contradictions ?? [];
+  const incomplete = report.incomplete ?? [];
+  const headline: Record<VerificationStatus, string> = {
+    OFFLINE_STRUCTURAL_PASS: "# ✅ Offline structural checks PASSED — genuine Paper execution NOT PROVEN",
+    VERIFICATION_INCOMPLETE: "# ⚠️ Required verification incomplete — genuine Paper execution NOT PROVEN",
+    CONTRADICTORY_EVIDENCE_REJECTED: "# ❌ Contradictory evidence rejected — genuine Paper execution NOT PROVEN",
+    VERIFICATION_FAILED: "# ❌ Offline verification failed — genuine Paper execution NOT PROVEN",
+  };
+  const structural =
+    status === "OFFLINE_STRUCTURAL_PASS" ? "PASSED" : status === "VERIFICATION_INCOMPLETE" ? "NOT ESTABLISHED" : "FAILED";
 
   const lines: string[] = [
-    `# ${statusEmoji} Offline Acceptance Verification Report: ${statusText}`,
+    headline[status],
     "",
     `**Tested Commit SHA:** \`${report.testedSha}\`  `,
     `**Host Environment:** \`${report.system.platform} (${report.system.arch})\` | Node.js \`${report.system.nodeVersion}\`${report.system.pnpmVersion ? ` | pnpm \`${report.system.pnpmVersion}\`` : ""}  `,
-    `**Overall Verdict:** **${statusText}**  `,
     "",
-    "> OFFLINE ONLY: known PR #67 live-authenticity vulnerabilities are not fixed or accepted by this verification. No live gate may rely on this result.",
+    "## Verification status",
+    "",
+    `- **Offline structural checks:** ${structural}`,
+    `- **Required verification:** ${incomplete.length === 0 ? "COMPLETE" : `INCOMPLETE (${incomplete.length})`}`,
+    `- **Contradictory evidence:** ${contradictions.length === 0 ? "none detected" : `REJECTED (${contradictions.length})`}`,
+    "- **Genuine Paper execution:** NOT PROVEN",
+    "",
+    "> OFFLINE ONLY: this checks that locally generated, scripted artifacts agree with each other and do not claim live success. It cannot authenticate them: a forger who coherently regenerates every local artifact is indistinguishable offline. Known PR #67 live-authenticity vulnerabilities are not fixed or accepted by this verification. No live gate may rely on this result.",
     "",
     "## Scenario Summary Matrix",
     "",
@@ -926,58 +1082,72 @@ export function formatMarkdownSummary(report: OverallAcceptanceReport): string {
   lines.push("");
   lines.push("## Codex Journal CLI Integration (PR #58 / Release Candidate)");
   lines.push("");
-  if (report.journalCliCheck.status === "NOT_RUN") {
-    lines.push("- **Status:** ⏸️ NOT RUN / NOT READY");
-    lines.push(`- **Command:** \`${report.journalCliCheck.command}\``);
-    lines.push(`- **Details:** ${report.journalCliCheck.details}`);
-    lines.push(
-      "- **Integration Handoff:** Once Codex's combined integration candidate lands on this branch, this gate will automatically cross-check original journal rows and execute forged-receipt negative regression tests.",
-    );
-  } else if (report.journalCliCheck.status === "READY") {
-    lines.push("- **Status:** ✅ READY & VERIFIED");
-    lines.push(`- **Details:** ${report.journalCliCheck.details}`);
-    lines.push(
-      `- **Forged-Receipt Negative Test:** ${report.journalCliCheck.forgedReceiptTestPassed ? "PASSED" : "FAILED"}`,
-    );
-  } else {
-    lines.push("- **Status:** ❌ FAILED");
-    lines.push(`- **Details:** ${report.journalCliCheck.details}`);
-  }
-
-  // Missing Evidence Summary across scenarios
-  const allUnproven = new Set<string>();
-  for (const res of Object.values(report.scenarios)) {
-    for (const code of res.unprovenReasons) {
-      allUnproven.add(code);
+  const checks: Record<string, JournalCliCheckResult> = report.journalCliChecks ?? { "scenario-2": report.journalCliCheck };
+  for (const [key, check] of Object.entries(checks)) {
+    const name = key === "scenario-2" ? "1v1 (2 citizens, 6 attempts/observations)" : "2v2 (4 citizens, 12 attempts/observations)";
+    lines.push(`### ${name}`);
+    if (check.status === "NOT_RUN") {
+      lines.push("- **Status:** ⏸️ NOT RUN / NOT READY");
+      lines.push(`- **Command:** \`${check.command}\``);
+      lines.push(`- **Details:** ${check.details}`);
+      lines.push("- **Integration Handoff:** Once Codex's combined integration candidate lands on this branch, this gate will automatically cross-check original journal rows and execute forged-receipt negative regression tests.");
+    } else if (check.status === "READY") {
+      lines.push("- **Status:** ✅ READY & VERIFIED");
+      lines.push(`- **Details:** ${check.details}`);
+      lines.push(`- **Forged-Receipt Negative Test:** ${check.forgedReceiptTestPassed ? "PASSED" : "FAILED"}`);
+      if (check.forgedJournalTestPassed !== undefined) lines.push(`- **Rehashed Forged-Journal Negative Test:** ${check.forgedJournalTestPassed ? "PASSED" : "FAILED"}`);
+    } else {
+      lines.push("- **Status:** ❌ FAILED");
+      lines.push(`- **Details:** ${check.details}`);
     }
+    lines.push("");
   }
 
-  if (allUnproven.size > 0) {
+  const acceptance = report.acceptance ?? {};
+  if (Object.keys(acceptance).length > 0) {
+    lines.push("## Acceptance criteria (NOT MEASURABLE offline)");
     lines.push("");
+    lines.push("> `acceptance.json` is not an acceptance verdict here. Scripted offline evidence cannot satisfy live criteria.");
+    lines.push("");
+    for (const [key, a] of Object.entries(acceptance)) {
+      const name = key === "scenario-2" ? "1v1" : "2v2";
+      lines.push(`- **${name}:** offline ${a.offline.passed}/${a.offline.total} (${a.offline.measurement}), live ${a.live.passed}/${a.live.total} (${a.live.measurement}); ${a.notProvenCriteria.length} criteria NOT PROVEN${a.failingCriteria.length > 0 ? `; FAIL: ${a.failingCriteria.join(", ")}` : ""}`);
+    }
+    lines.push("");
+  }
+
+  const allUnproven = new Set<string>();
+  for (const res of Object.values(report.scenarios)) for (const code of res.unprovenReasons) allUnproven.add(code);
+  if (allUnproven.size > 0) {
     lines.push("## Documented Missing Evidence / Gaps (Fail-Closed Policy)");
     lines.push("");
     lines.push("> [!NOTE]");
-    lines.push(
-      "> These checks are truthfully documented as NOT PROVEN. Offline simulated fixtures cannot fabricate live Paper server metrics or genuine LLM cognition.",
-    );
+    lines.push("> These checks are truthfully documented as NOT PROVEN. Offline simulated fixtures cannot fabricate live Paper server metrics or genuine LLM cognition.");
     lines.push("");
-    for (const code of allUnproven) {
-      lines.push(`- \`${code}\``);
-    }
+    for (const code of allUnproven) lines.push(`- \`${code}\``);
+    lines.push("");
   }
 
-  if (report.allErrors.length > 0) {
+  if (contradictions.length > 0) {
+    lines.push("## ❌ Contradictory Evidence Rejected");
     lines.push("");
+    for (const c of contradictions) lines.push(`- ${c}`);
+    lines.push("");
+  }
+  if (incomplete.length > 0) {
+    lines.push("## ⚠️ Required Verification Incomplete");
+    lines.push("");
+    for (const c of incomplete) lines.push(`- ${c}`);
+    lines.push("");
+  }
+  if (report.allErrors.length > 0) {
     lines.push("## ❌ Verification Failures & Errors");
     lines.push("");
-    for (const err of report.allErrors) {
-      lines.push(`- ${err}`);
-    }
+    for (const err of report.allErrors) lines.push(`- ${err}`);
+    lines.push("");
   }
 
-  lines.push("");
   lines.push("---");
   lines.push("*Generated by Minecraft AI Civilization Offline Acceptance CI Verifier.*");
-
   return lines.join("\n");
 }

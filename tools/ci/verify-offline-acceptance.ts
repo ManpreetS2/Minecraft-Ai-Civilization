@@ -3,6 +3,8 @@ import { appendFileSync, mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
   checkJournalCliIntegration,
+  classifyOutcome,
+  type JournalCliCheckResult,
   formatMarkdownSummary,
   verifyOfflineScenario,
   type OverallAcceptanceReport,
@@ -82,53 +84,44 @@ Options:
   );
 
   const scenarios: Record<string, ScenarioVerificationResult> = {};
-  const allErrors: string[] = [];
+  const journalCliChecks: Record<string, JournalCliCheckResult> = {};
 
-  // Verify Scenario 2 (1v1)
-  console.log(`[CI-Verifier] Inspecting 1v1 artifacts at: ${scenario2Dir}`);
-  const res2 = verifyOfflineScenario({
-    artifactDir: resolve(cwd, scenario2Dir),
-    expectedCount: 2,
-    expectedSha: testedSha,
-  });
-  scenarios["scenario-2"] = res2;
-  if (!res2.passed) {
-    allErrors.push(...res2.errors.map((e) => `[Scenario-2] ${e}`));
+  // Each scenario is verified AND journal-cross-checked independently. A failure in one never masks or substitutes for the other.
+  const targets = [
+    { key: "scenario-2", label: "1v1", dir: scenario2Dir, count: 2 as const },
+    { key: "scenario-4", label: "2v2", dir: scenario4Dir, count: 4 as const },
+  ];
+  for (const t of targets) {
+    console.log(`[CI-Verifier] Inspecting ${t.label} artifacts at: ${t.dir}`);
+    scenarios[t.key] = verifyOfflineScenario({
+      artifactDir: resolve(cwd, t.dir),
+      expectedCount: t.count,
+      expectedSha: testedSha,
+    });
+  }
+  for (const t of targets) {
+    console.log(`[CI-Verifier] Running the real journal CLI controls for ${t.label}...`);
+    journalCliChecks[t.key] = checkJournalCliIntegration(cwd, resolve(cwd, t.dir), testedSha);
   }
 
-  // Verify Scenario 4 (2v2)
-  console.log(`[CI-Verifier] Inspecting 2v2 artifacts at: ${scenario4Dir}`);
-  const res4 = verifyOfflineScenario({
-    artifactDir: resolve(cwd, scenario4Dir),
-    expectedCount: 4,
-    expectedSha: testedSha,
-  });
-  scenarios["scenario-4"] = res4;
-  if (!res4.passed) {
-    allErrors.push(...res4.errors.map((e) => `[Scenario-4] ${e}`));
-  }
-
-  // Check Codex Journal CLI Integration
-  console.log(
-    "[CI-Verifier] Checking Codex journal CLI integration (PR #58 / Release candidate)...",
-  );
-  const journalCliCheck = checkJournalCliIntegration(cwd, resolve(cwd, scenario2Dir), testedSha);
-
-  const journalPassed =
-    journalCliCheck.status === "READY" &&
-    journalCliCheck.executed === true &&
-    journalCliCheck.forgedReceiptTestPassed === true;
-  if (!journalPassed)
-    allErrors.push(`Journal CLI was not successfully exercised: ${journalCliCheck.details}`);
-  const passed = res2.passed && res4.passed && journalPassed;
+  const outcome = classifyOutcome({ scenarios, journalCliChecks });
+  const passed = outcome.status === "OFFLINE_STRUCTURAL_PASS";
 
   const report: OverallAcceptanceReport = {
     passed,
+    status: outcome.status,
+    paperExecution: "NOT PROVEN",
     testedSha,
     system: systemInfo,
     scenarios,
-    journalCliCheck,
-    allErrors,
+    journalCliCheck: journalCliChecks["scenario-2"]!,
+    journalCliChecks,
+    contradictions: outcome.contradictions,
+    incomplete: outcome.incomplete,
+    acceptance: Object.fromEntries(
+      Object.entries(scenarios).flatMap(([k, r]) => (r.acceptance ? [[k, r.acceptance] as const] : [])),
+    ),
+    allErrors: outcome.allErrors,
   };
 
   const markdownSummary = formatMarkdownSummary(report);
@@ -163,10 +156,10 @@ Options:
   console.log("\n" + markdownSummary + "\n");
 
   if (!passed) {
-    console.error("[CI-Verifier] ❌ Offline acceptance verification FAILED.");
+    console.error(`[CI-Verifier] ❌ ${outcome.status}: offline verification did NOT pass (genuine Paper execution is NOT PROVEN regardless).`);
     process.exit(1);
   } else {
-    console.log("[CI-Verifier] ✅ Offline acceptance verification PASSED.");
+    console.log("[CI-Verifier] ✅ Offline structural checks PASSED. Genuine Paper execution is NOT PROVEN.");
     process.exit(0);
   }
 }

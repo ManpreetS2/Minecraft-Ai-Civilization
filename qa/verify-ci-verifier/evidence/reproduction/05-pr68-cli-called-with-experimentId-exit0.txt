@@ -1,0 +1,13 @@
+{
+  "verdict": "NOT PROVEN",
+  "failures": [],
+  "unproven": [
+    "Independent evidence validator pending",
+    "External authenticity NOT PROVEN: all artifacts can be replaced consistently without an independently verified external anchor; journal matching does not authenticate Paper execution",
+    "Original journal lacks embedded source/repository attribution; caller descriptor is a binding declaration, not an independent source anchor"
+  ],
+  "journalConsistent": true,
+  "status": "JOURNAL CONSISTENT",
+  "authenticatedLiveExecution": false,
+  "exitCode": 0
+}

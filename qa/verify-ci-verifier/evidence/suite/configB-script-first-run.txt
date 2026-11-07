@@ -1,0 +1,59 @@
+Preparing worktree (detached HEAD 4feef20)
+(node:59496) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:59810) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+candidate=4feef20622eb29ff85f7be122214630a84edac33 overlay=e754370efa7f23bc56f01a15830d1ff7618600ee harness=034e1913f673f2c30055b88ba48fdda3b83bce15 node=v22.12.0 platform=darwin/x64 bundles=<scratch>/wt/qaB/artifacts/v1
+
+ RUN  v3.2.7 <scratch>/wt/qaB/qa-independent/verify-ci-verifier
+
+ ✓ test/integration-and-honesty.test.ts (13 tests | 1 skipped) 21553ms
+   ✓ journal CLI integration (requires PR #68's tools/v1-integration/journal-cli-main.ts) > [ROOT CAUSE] PR #70's invocation omits experimentId, so PR #68's CLI rejects an UNTOUCHED real bundle  1159ms
+   ✓ journal CLI integration (requires PR #68's tools/v1-integration/journal-cli-main.ts) > [CHARACTERISATION] PR #70's own helper reports FAILED on a good, untouched #68 bundle  1133ms
+   ✓ journal CLI integration (requires PR #68's tools/v1-integration/journal-cli-main.ts) > [GAP] PR #70's helper should report READY on a good, untouched #68 bundle (it needs to pass the experimentId)  1013ms
+   ✓ journal CLI integration (requires PR #68's tools/v1-integration/journal-cli-main.ts) > [GAP] a FAILED journal check (here: a forged receipt) must fail the CI step, not exit 0 / PASSED  3123ms
+   ✓ journal CLI integration (requires PR #68's tools/v1-integration/journal-cli-main.ts) > [GAP] the journal cross-check must run for BOTH scenarios (the 2v2 bundle is currently never cross-checked)  3217ms
+   ✓ journal CLI integration (requires PR #68's tools/v1-integration/journal-cli-main.ts) > [CHARACTERISATION] today exactly ONE journal cross-check call is made for two scenarios  3442ms
+   ✓ journal CLI integration (requires PR #68's tools/v1-integration/journal-cli-main.ts) > forgedReceiptTestPassed claim > [GAP] 'forgery rejected' may only be claimed after a forged input was actually fed to the CLI and rejected (>=2 calls)  301ms
+   ✓ honest reporting of incomplete checks > the summary prominently lists the Paper / live-model gaps as NOT PROVEN and never claims live execution  3012ms
+   ✓ honest reporting of incomplete checks > [HONESTY-LOW] the headline should not read an unqualified PASSED while a gate is NOT RUN / FAILED  2491ms
+   ✓ honest reporting of incomplete checks > [HONESTY-LOW] the report should surface that acceptance.json is 0/30 offline 'NOT MEASURABLE' (and lists FAIL criteria) next to a PASSED headline  2367ms
+ ↓ test/workflow-facts.test.ts (10 tests | 10 skipped)
+ ✓ test/tamper-matrix.test.ts (67 tests) 33492ms
+   ✓ control > an untouched real 2-citizen bundle is JOURNAL CONSISTENT under PR #68's CLI when called with its experimentId  999ms
+   ✓ control > an untouched real 4-citizen bundle is JOURNAL CONSISTENT under PR #68's CLI when called with its experimentId  1019ms
+   ✓ T01 [2v] rehashed journal: observation worldChanges position moved > L2: PR #68's journal cross-check rejects it  1031ms
+   ✓ T01 [4v] rehashed journal: observation worldChanges position moved > L2: PR #68's journal cross-check rejects it  1029ms
+   ✓ T02 rehashed journal: attempt target changed > L2: PR #68's journal cross-check rejects it  1172ms
+   ✓ T03 rehashed journal: observation flipped to successReported=false, verified=false > L2: PR #68's journal cross-check rejects it  1401ms
+   ✓ T04 [2v] rehashed journal: citizen identities swapped between gpt-a#1 and claude-a#1 (attempt and observation) > L2: PR #68's journal cross-check rejects it  1454ms
+   ✓ T04 [4v] rehashed journal: citizen identities swapped between gpt-a#1 and claude-a#1 (attempt and observation) > L2: PR #68's journal cross-check rejects it  1149ms
+   ✓ T05 [2v] manifest + receipt citizenIds swapped between two actions (journal untouched) > L2: PR #68's journal cross-check rejects it  921ms
+   ✓ T05 [4v] manifest + receipt citizenIds swapped between two actions (journal untouched) > L2: PR #68's journal cross-check rejects it  922ms
+   ✓ T06 receipt reference replaced with another existing receipt > L2: PR #68's journal cross-check rejects it  955ms
+   ✓ T07 [2v] receipt CONTENT forged (ids kept; inventoryAfter=9, worldChanges emptied) > L2: PR #68's journal cross-check rejects it  916ms
+   ✓ T07 [4v] receipt CONTENT forged (ids kept; inventoryAfter=9, worldChanges emptied) > L2: PR #68's journal cross-check rejects it  920ms
+   ✓ T08 receipt sourceSha changed to a different SHA > L2: PR #68's journal cross-check rejects it  908ms
+   ✓ T09 referenced receipt file deleted > L2: PR #68's journal cross-check rejects it  1227ms
+   ✓ T10 manifest.sourceReceipts[0].sha256 altered > L2: PR #68's journal cross-check rejects it  1103ms
+   ✓ T11 manifest action duplicated over another (new attemptId, same receipt) > L2: PR #68's journal cross-check rejects it  1013ms
+   ✓ T12 rehashed journal: gpt-a#3 replaced by a clone of #1 (fresh attemptId, inventory 0->1) > L2: PR #68's journal cross-check rejects it  1222ms
+   ✓ T13 [2v] one action removed everywhere (manifest + journal pair) > L2: PR #68's journal cross-check rejects it  1263ms
+   ✓ T13 [4v] one action removed everywhere (manifest + journal pair) > L2: PR #68's journal cross-check rejects it  1091ms
+   ✓ T14 evidence sources disagree: manifest says delta=9, observedSuccess=false; journal says otherwise > L2: PR #68's journal cross-check rejects it  1160ms
+   ✓ T15 [2v] source SHA differs: manifest only > L2: PR #68's journal cross-check rejects it  1041ms
+   ✓ T15 [4v] source SHA differs: manifest only > L2: PR #68's journal cross-check rejects it  1284ms
+   ✓ T16 source SHA differs: original journal start row (rehashed) vs manifest > L2: PR #68's journal cross-check rejects it  1055ms
+   ✓ T20 simulated presented as authenticated: manifest.mode = paper-live > L2: PR #68's journal cross-check rejects it  1054ms
+   ✓ T22 simulated presented as authenticated: acceptance.json claims live 37/37 VERIFIED (a published artifact) > [GAP] neither PR #70 nor PR #68's journal check rejects it  962ms
+   ✓ T23 simulated presented as authenticated: validator environment = 'Authenticated Paper live server' > [GAP] neither PR #70 nor PR #68's journal check rejects it  984ms
+   ✓ T24 UNPROVEN_PAPER_AUTHENTICITY gap code silently removed from the validator report > [GAP] neither PR #70 nor PR #68's journal check rejects it  989ms
+   ✓ T25 [2v] journal row tampered WITHOUT recomputing the hash chain > L2: PR #68's journal cross-check rejects it  964ms
+   ✓ T25 [4v] journal row tampered WITHOUT recomputing the hash chain > L2: PR #68's journal cross-check rejects it  950ms
+   ✓ T26 COHERENT forgery: journal + receipt worldChanges edited, journal rehashed, receipt sha256 re-pinned > [LIMITATION BY DESIGN] PR #68's journal check also reports a coherent forgery as consistent  982ms
+
+ Test Files  2 passed | 1 skipped (3)
+      Tests  79 passed | 11 skipped (90)
+   Start at  18:55:35
+   Duration  56.57s (transform 218ms, setup 108ms, collect 238ms, tests 55.04s, environment 0ms, prepare 211ms)
+
