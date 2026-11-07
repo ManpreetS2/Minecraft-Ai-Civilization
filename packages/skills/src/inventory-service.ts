@@ -23,6 +23,7 @@ import { minecraftKnowledge } from "@civ/minecraft-knowledge";
 import { navigationBackend } from "@civ/minecraft-adapter";
 import { Vec3 as Vec3Class } from "vec3";
 import type { Bot } from "mineflayer";
+import { cancelledResult, openWindowBounded, WindowOpenError } from "./window-open.js";
 import type { SkillContext } from "./context.js";
 import { ItemReservationBook } from "./inventory-reservations.js";
 import { expectedDropItems } from "./drop-mapping.js";
@@ -574,12 +575,21 @@ export async function depositItem(
   }
   const citizenBefore = countItem(ctx, name);
   try {
-    const chest = await ctx.bot.openContainer(block);
+    if (ctx.signal?.aborted) return cancelledResult(started, "deposit cancelled before the chest opened");
+    const chest = await openWindowBounded(ctx, () => ctx.bot.openContainer(block), started);
+    if (ctx.signal?.aborted) {
+      chest.close();
+      return cancelledResult(started, "deposit cancelled after the chest opened");
+    }
     const containerBefore = containerCounts(chest)[name] ?? 0;
     const stack = ctx.bot.inventory.items().find((item) => item.name === name);
     if (!stack) {
       chest.close();
       return fail("ITEM_NOT_FOUND", `No ${name} in inventory`, Date.now() - started, true);
+    }
+    if (ctx.signal?.aborted) {
+      chest.close();
+      return cancelledResult(started, "deposit cancelled before moving items");
     }
     await chest.deposit(stack.type, null, Math.min(want, stack.count));
     const containerAfter = containerCounts(chest)[name] ?? 0;
@@ -604,6 +614,9 @@ export async function depositItem(
       Date.now() - started,
     );
   } catch (error) {
+    if (error instanceof WindowOpenError) {
+      return fail(error.code, error.message, Date.now() - started, error.code === "TIMEOUT");
+    }
     return fail("CONTAINER_BUSY", error instanceof Error ? error.message : String(error), Date.now() - started, true);
   }
 }
@@ -629,12 +642,21 @@ export async function withdrawItem(
   }
   const citizenBefore = countItem(ctx, name);
   try {
-    const chest = await ctx.bot.openContainer(block);
+    if (ctx.signal?.aborted) return cancelledResult(started, "withdraw cancelled before the chest opened");
+    const chest = await openWindowBounded(ctx, () => ctx.bot.openContainer(block), started);
+    if (ctx.signal?.aborted) {
+      chest.close();
+      return cancelledResult(started, "withdraw cancelled after the chest opened");
+    }
     const containerBefore = containerCounts(chest)[name] ?? 0;
     const stack = chest.containerItems().find((item) => item.name === name);
     if (!stack) {
       chest.close();
       return fail("ITEM_NOT_FOUND", `Container has no ${name}`, Date.now() - started, true);
+    }
+    if (ctx.signal?.aborted) {
+      chest.close();
+      return cancelledResult(started, "withdraw cancelled before moving items");
     }
     await chest.withdraw(stack.type, null, Math.min(count, stack.count));
     const containerAfter = containerCounts(chest)[name] ?? 0;
@@ -648,6 +670,9 @@ export async function withdrawItem(
     ctx.events?.emit(createEvent("ItemWithdrawn", { item: name, count: gained }, ctx.citizenId));
     return ok({ item: name, count: gained, citizenAfter, containerAfter }, Date.now() - started);
   } catch (error) {
+    if (error instanceof WindowOpenError) {
+      return fail(error.code, error.message, Date.now() - started, error.code === "TIMEOUT");
+    }
     return fail("WITHDRAW_FAILED", error instanceof Error ? error.message : String(error), Date.now() - started, true);
   }
 }

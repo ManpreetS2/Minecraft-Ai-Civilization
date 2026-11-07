@@ -6,6 +6,7 @@ import type { SkillContext } from "./context.js";
 import { findBlock } from "./observe.js";
 import { countItem } from "./inventory-service.js";
 import { lookAtPosition } from "./look.js";
+import { cancelledResult, openWindowBounded, waitForSignal, WindowOpenError } from "./window-open.js";
 
 const FURNACES = ["furnace", "smoker", "blast_furnace"];
 const FUELS = ["lava_bucket", "coal_block", "blaze_rod", "coal", "charcoal", "dried_kelp_block", "oak_planks", "spruce_planks", "birch_planks", "stick"];
@@ -79,6 +80,7 @@ export async function smeltItem(
     signal: ctx.signal,
   });
   if (!move.success) return move;
+  if (ctx.signal?.aborted) return cancelledResult(started, "smelting cancelled");
   const block = ctx.bot.blockAt(
     new Vec3Class(Math.floor(found.data.position.x), Math.floor(found.data.position.y), Math.floor(found.data.position.z)),
   );
@@ -94,17 +96,38 @@ export async function smeltItem(
   }
   let furnace: FurnaceWindow | undefined;
   try {
-    furnace = (await ctx.bot.openFurnace(block)) as unknown as FurnaceWindow;
+    if (ctx.signal?.aborted) return cancelledResult(started, "smelting cancelled before the furnace opened");
+    furnace = await openWindowBounded(
+      ctx,
+      () => Promise.resolve(ctx.bot.openFurnace(block) as unknown as FurnaceWindow),
+      started,
+    );
+    if (ctx.signal?.aborted) {
+      furnace.close();
+      return cancelledResult(started, "smelting cancelled before loading the furnace");
+    }
     await furnace.putInput(inType, null, count);
     if (!furnace.fuelItem()) {
+      if (ctx.signal?.aborted) {
+        furnace.close();
+        return cancelledResult(started, "smelting cancelled before adding fuel");
+      }
       const units = Math.min(countItem(ctx, fuel), fuelUnitsNeeded(fuel, count));
       await furnace.putFuel(fuelType, null, units);
     }
     const deadline = Date.now() + Math.min(ctx.timeoutMs ?? 30_000, 25_000);
     while (Date.now() < deadline) {
+      if (ctx.signal?.aborted) {
+        furnace.close();
+        return cancelledResult(started, "smelting cancelled while waiting for output");
+      }
       const out = furnace.outputItem();
       if (out && out.count >= 1) break;
-      await new Promise((resolve) => setTimeout(resolve, 400));
+      await waitForSignal(ctx.signal, 400);
+    }
+    if (ctx.signal?.aborted) {
+      furnace.close();
+      return cancelledResult(started, "smelting cancelled before taking output");
     }
     const produced = furnace.outputItem();
     if (!produced || produced.count < 1) {
@@ -112,6 +135,7 @@ export async function smeltItem(
       return fail("SMELT_FAILED", `${inName} did not produce ${outName} in time`, Date.now() - started, true);
     }
     await furnace.takeOutput();
+    // The output is already in the inventory. Report that result even if cancellation arrives now.
     if (furnace.inputItem() && furnace.takeInput) await furnace.takeInput();
     if (furnace.fuelItem() && furnace.takeFuel) await furnace.takeFuel();
     furnace.close();
@@ -120,6 +144,9 @@ export async function smeltItem(
       furnace?.close();
     } catch {
       // ignore
+    }
+    if (error instanceof WindowOpenError) {
+      return fail(error.code, error.message, Date.now() - started, error.code === "TIMEOUT");
     }
     return fail("SMELT_FAILED", error instanceof Error ? error.message : String(error), Date.now() - started, true);
   }

@@ -113,7 +113,8 @@ export async function executeStructure(
     const intent = { purpose: entry.purpose ?? "shelter_blueprint" };
     const placed = await placeBlock(ctx, entry.block, pos, intent);
     if (!placed.success) {
-      return fail(placed.code === "PURPOSELESS_PLACEMENT" ? placed.code : "BUILD_BLOCKED", placed.error, Date.now() - started, true, {
+      const interruption = placed.code === "PURPOSELESS_PLACEMENT" || placed.code === "CANCELLED" || placed.code === "INTERRUPTED" || placed.code === "CURFEW_STOP";
+      return fail(interruption ? placed.code : "BUILD_BLOCKED", placed.error, Date.now() - started, interruption ? placed.retryable : true, {
         block: entry.block,
         position: pos,
       });

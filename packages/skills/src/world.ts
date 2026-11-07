@@ -5,6 +5,7 @@ import { Vec3 as Vec3Class } from "vec3";
 import type { SkillContext } from "./context.js";
 import { findBlock } from "./observe.js";
 import { lookAtPosition } from "./look.js";
+import { cancelledResult } from "./window-open.js";
 import {
   evaluateFunctionalPlacement,
   isFunctionalItem,
@@ -268,6 +269,7 @@ export async function placeBlock(
     signal: ctx.signal,
   });
   if (!move.success) return move;
+  if (ctx.signal?.aborted) return cancelledResult(started, "placement cancelled");
   const existing = bot.blockAt(dest);
   const expectedName = name.replace(/^minecraft:/, "");
   if (existing && !knowledge.isReplaceable(existing.name) && existing.name !== "air") {
@@ -287,9 +289,12 @@ export async function placeBlock(
   try {
     await bot.equip(item, "hand");
   } catch (error) {
+    if (ctx.signal?.aborted) return cancelledResult(started, "placement cancelled during equip");
     return fail("EQUIP_FAILED", error instanceof Error ? error.message : String(error), Date.now() - started, true);
   }
+  if (ctx.signal?.aborted) return cancelledResult(started, "placement cancelled before facing the cell");
   await lookAtPosition(ctx, position);
+  if (ctx.signal?.aborted) return cancelledResult(started, "placement cancelled before placing");
 
   const neighbors = [
     dest.offset(0, -1, 0),
@@ -302,6 +307,7 @@ export async function placeBlock(
   let placed = false;
   let lastError = "no supporting neighbor";
   for (const n of neighbors) {
+    if (ctx.signal?.aborted) return cancelledResult(started, "placement cancelled before placing");
     const nb = bot.blockAt(n);
     if (!nb || knowledge.isReplaceable(nb.name) || nb.name === "air" || nb.name === "cave_air") continue;
     try {

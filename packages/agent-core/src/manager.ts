@@ -50,6 +50,7 @@ import {
 } from "./task-recovery.js";
 import { listDiscoveredSites, visibleShoresFromWorld } from "./discovered-sites.js";
 import { bindActionEvidence, type ActionEvidenceSink } from "./action-evidence.js";
+import { actionBoundaryFor } from "./action-boundary.js";
 import { bodyContext, completeVerifiedTransfer, completionMemoryForTask, executePlan } from "./executor.js";
 import { deriveSettlementInventory, type SettlementInventoryView } from "./inventory-view.js";
 import { SettlementRuntime } from "./settlement-runtime.js";
@@ -81,6 +82,8 @@ type RuntimeCitizen = {
   record: CitizenRecord;
   body: MinecraftBody;
   busy: boolean;
+  /** True until the current physical action has lost permission to mutate, even if busy was cleared. */
+  actionLive?: boolean;
   abort?: AbortController;
   lastLlmAt: number;
   /** A decision of this citizen's own is pending. Used only with a cognitionRouter. */
@@ -182,7 +185,11 @@ export class AgentManager {
       if (event.type === "CitizenDied") this.handleDeathEvent(event);
       if (event.type === "CitizenBodyDied") this.handleBodyDied(event);
       if (event.type === "CitizenRespawned") this.handleRespawned(event);
-      if (event.type === "CitizenDisconnected" || event.type === "CitizenKicked") this.cancelCognition(event.citizenId ?? "", event.type);
+      if (event.type === "CitizenDisconnected" || event.type === "CitizenKicked") {
+        this.cancelCognition(event.citizenId ?? "", event.type);
+        const disconnected = this.citizens.get(event.citizenId ?? "");
+        if (disconnected) cancelCitizenWork(disconnected);
+      }
       if (event.type === "CitizenSpawned") this.resumeCognition(event.citizenId ?? "");
       if (event.type === "ItemTransferred" || event.type === "ItemDropped") this.notePendingDrop(event);
     });
@@ -510,7 +517,7 @@ export class AgentManager {
     citizen.record.hunger = observation.food;
     citizen.record.status = observation.spawned ? "online" : citizen.body.connected ? "connecting" : "offline";
 
-    if (citizen.busy || !observation.spawned) {
+    if (citizen.busy || citizen.actionLive || !observation.spawned) {
       if (
         citizen.busy &&
         observation.spawned &&
@@ -731,11 +738,19 @@ export class AgentManager {
     if (!ctx) return;
 
     citizen.busy = true;
+    citizen.actionLive = true;
     citizen.abort = new AbortController();
-    ctx.signal = citizen.abort.signal;
 
     const taskStarted = Date.now();
-    const taskWork = executePlan(ctx, plan, this.store, this.events, this.runtime)
+    const taskWork = actionBoundaryFor(citizen.body)
+      .run(
+        plan.action,
+        (signal) => {
+          ctx.signal = signal;
+          return executePlan(ctx, plan, this.store, this.events, this.runtime);
+        },
+        { signal: citizen.abort.signal, timeoutMs: ctx.timeoutMs ?? 22_000 },
+      )
       .then((result) => {
         lastTaskMs = Date.now() - taskStarted;
         if (!this.ops.canWrite()) return;
@@ -805,6 +820,7 @@ export class AgentManager {
         );
       })
       .finally(() => {
+        citizen.actionLive = false;
         citizen.busy = false;
       });
     void this.ops.track(taskWork);

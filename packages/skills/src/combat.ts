@@ -3,6 +3,7 @@ import type { SkillContext } from "./context.js";
 import { flee, moveTo } from "./movement.js";
 import { pickupDroppedItem } from "./inventory-service.js";
 import { equipItem } from "./inventory-service.js";
+import { cancelledResult, waitForSignal } from "./window-open.js";
 
 const WEAPONS = [
   "netherite_sword",
@@ -240,6 +241,10 @@ export async function huntAnimal(
     const live = ctx.bot.entities[target.id];
     const presence = classifyEntityPresence(ctx.bot.entities, live ?? target);
     if (presence !== "PRESENT") break;
+    if (ctx.signal?.aborted) {
+      ctx.body.clearTrackedEntity();
+      return cancelledResult(started, "hunt cancelled");
+    }
     if (!live) break;
     const pos = live.position;
     if (!pos) break;
@@ -247,9 +252,17 @@ export async function huntAnimal(
     if (here && here.distanceTo(pos) > 3) {
       await moveTo(ctx, { x: pos.x, y: pos.y, z: pos.z }, 2.4);
       if (classifyEntityPresence(ctx.bot.entities, ctx.bot.entities[target.id] ?? target) !== "PRESENT") break;
+      if (ctx.signal?.aborted) {
+        ctx.body.clearTrackedEntity();
+        return cancelledResult(started, "hunt cancelled");
+      }
     }
     try {
       await ctx.bot.lookAt(pos.offset(0, 0.6, 0), true);
+      if (ctx.signal?.aborted) {
+        ctx.body.clearTrackedEntity();
+        return cancelledResult(started, "hunt cancelled before the next attack");
+      }
       ctx.bot.attack(live);
     } catch (error) {
       const gone = classifyEntityPresence(ctx.bot.entities, ctx.bot.entities[target.id] ?? target);
@@ -257,7 +270,7 @@ export async function huntAnimal(
       ctx.body.clearTrackedEntity();
       return fail("ATTACK_FAILED", error instanceof Error ? error.message : String(error), Date.now() - started, true);
     }
-    await new Promise((resolve) => setTimeout(resolve, 400));
+    await waitForSignal(ctx.signal, 400);
   }
   const endPresence = classifyEntityPresence(ctx.bot.entities, ctx.bot.entities[target.id] ?? target);
   const killed = endPresence !== "PRESENT";

@@ -37,6 +37,7 @@ import { equipForBlock } from "./tools.js";
 import { placeBlock } from "./world.js";
 import { digUnlessAborted } from "./dig-abort.js";
 import { lookAtPosition } from "./look.js";
+import { openWindowBounded, WindowOpenError } from "./window-open.js";
 import type { PlacementIntent } from "./placement.js";
 
 export type BuildSession = {
@@ -411,11 +412,16 @@ export async function advanceBlueprintBuild(
       continue;
     }
     if (session.stage === "FINAL_VALIDATION") {
-      const report = await validateBuiltStructure(ctx, session, opts?.liveValidate !== false);
+      const report = await validateBuiltStructure(ctx, session, opts?.liveValidate !== false, started);
       session.failures = report.failures;
+      if (report.interrupted) {
+        return fail(report.interrupted, "Build interrupted; progress is persisted", Date.now() - started, report.interrupted !== "CANCELLED", {
+          session,
+        });
+      }
       if (!report.ok) {
-        session.status = "BLOCKED";
         const code = (report.failures[0] ?? "STRUCTURE_INCOMPLETE") as ErrorCode;
+        session.status = "BLOCKED";
         return fail(code, `Structure validation failed: ${report.failures.join(",")}`, Date.now() - started, true, {
           session,
           failures: report.failures,
@@ -443,6 +449,13 @@ export async function advanceBlueprintBuild(
       structureId: session.blueprintId,
     });
     if (!placed.success) {
+      if (placed.code === "CANCELLED" || placed.code === "INTERRUPTED" || placed.code === "CURFEW_STOP") {
+        return fail(placed.code, placed.error, Date.now() - started, placed.retryable, {
+          block: next.item,
+          position: next.position,
+          session,
+        });
+      }
       session.status = "BLOCKED";
       return fail(placed.code === "PURPOSELESS_PLACEMENT" ? placed.code : "BUILD_BLOCKED", placed.error, Date.now() - started, true, {
         block: next.item,
@@ -471,7 +484,8 @@ export async function validateBuiltStructure(
   ctx: SkillContext,
   session: BuildSession,
   live = true,
-): Promise<{ ok: boolean; failures: StructureValidationCode[]; entered?: boolean; exited?: boolean; usedWorkstation?: boolean }> {
+  budgetStarted = Date.now(),
+): Promise<{ ok: boolean; failures: StructureValidationCode[]; interrupted?: "CANCELLED" | "INTERRUPTED" | "CURFEW_STOP"; entered?: boolean; exited?: boolean; usedWorkstation?: boolean }> {
   const failures: StructureValidationCode[] = [];
   if (!session.origin) return { ok: false, failures: ["STRUCTURE_INCOMPLETE"] };
   const expanded = expandedFromSession(session);
@@ -512,13 +526,19 @@ export async function validateBuiltStructure(
     try {
       const reachable = await navigationBackend().navigateToInteractWithBlock(ctx.bot, chestPos, { timeoutMs: ctx.timeoutMs ?? 12_000, signal: ctx.signal });
       const block = ctx.bot.blockAt(new Vec3Class(chestPos.x, chestPos.y, chestPos.z));
+      if (ctx.signal?.aborted) return { ok: false, failures, interrupted: "CANCELLED", entered, exited: false, usedWorkstation };
       if (!reachable.success || !block || block.name !== "chest") failures.push("WORKSTATION_UNREACHABLE");
       else {
-        const container = await ctx.bot.openContainer(block);
+        const container = await openWindowBounded(ctx, () => ctx.bot.openContainer(block), budgetStarted);
         try { container.containerItems(); usedWorkstation = true; }
         finally { container.close(); }
       }
-    } catch { failures.push("WORKSTATION_UNREACHABLE"); }
+    } catch (error) {
+      if (error instanceof WindowOpenError && error.code === "CANCELLED") {
+        return { ok: false, failures, interrupted: "CANCELLED", entered, exited: false, usedWorkstation };
+      }
+      failures.push("WORKSTATION_UNREACHABLE");
+    }
   }
 
   const movedOut = await moveTo(ctx, { x: approach.x + 0.5, y: approach.y, z: approach.z + 0.5 }, 1.6);

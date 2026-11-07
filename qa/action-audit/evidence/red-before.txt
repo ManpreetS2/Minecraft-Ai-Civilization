@@ -1,0 +1,86 @@
+
+ RUN  v3.2.7 /Users/manpreetsingh/.t3/worktrees/Minecraft-Ai-Civilization/fix-skill-cancellation
+
+ ✓ qa/action-audit/test/source-facts.test.ts (12 tests) 23ms
+stdout | qa/action-audit/test/coverage.test.ts > coverage table matches the source > summary (printed for the report)
+COVERAGE {"protected":{"files":7,"calls":40},"hypothetical":{"files":5,"calls":14},"defect":{"files":4,"calls":27},"not-a-bot":{"files":1,"calls":1},"body-owned":{"files":1,"calls":4},"operator":{"files":8,"calls":19}} total_calls=105
+
+ ❯ qa/action-audit/test/coverage.test.ts (3 tests | 1 failed) 23ms
+   × coverage table matches the source > every mutating call site in production code is in the table, with the same count 18ms
+     → expected { …(27) } to deeply equal { …(26) }
+   ✓ coverage table matches the source > the table has no duplicate files and every defect row names a finding 2ms
+   ✓ coverage table matches the source > summary (printed for the report) 1ms
+(node:77887) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:77886) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+stdout | qa/action-audit/test/defects.test.ts > AUD-F1 smeltItem keeps working after cancellation > characterisation: measured behaviour after abort
+AUD-F1 smelt: abort at t0; skill returned after 989 ms with success=true; mutations after abort: furnace.takeOutput@+687ms
+
+stdout | qa/action-audit/test/defects.test.ts > AUD-C1 chest transfer ignores cancellation after navigation > characterisation: the deposit still lands after the abort
+AUD-C1 deposit: abort during openContainer; result success=true; mutations after abort: chest.deposit(cobblestonex2)@+141ms
+
+ ✓ qa/action-audit/test/native-boundary.test.ts (11 tests) 4639ms
+   ✓ native boundary vs the confirmed defects (real skills) > AUD-F1: no furnace operation after abort, and the call returns promptly  1132ms
+   ✓ native boundary vs the confirmed defects (real skills) > AUD-C1: no chest mutation after abort  467ms
+   ✓ native boundary vs the confirmed defects (real skills) > AUD-C2: a window that never opens is abandoned at the deadline, the next action runs, the orphan cannot mutate  1056ms
+   ✓ native boundary vs the confirmed defects (real skills) > AUD-P1: no block is placed after abort  405ms
+   ✓ native boundary vs the confirmed defects (real skills) > AUD-H1: no attack after abort  1305ms
+stdout | qa/action-audit/test/defects.test.ts > AUD-C2 openContainer has no timeout, so a window that never opens hangs the skill forever > characterisation: still pending after abort and a generous wait
+AUD-C2 deposit: window never opens; settled after abort + 900 ms (ctx.timeoutMs=300): false
+
+stdout | qa/action-audit/test/defects.test.ts > AUD-P1 placeBlock only checks the signal during navigation > characterisation: the block is placed after the abort
+AUD-P1 placeBlock: abort during equip (150 ms); result success=true; mutations after abort: equip@+91ms, placeBlock@+93ms
+
+stdout | qa/action-audit/test/defects.test.ts > AUD-P2 a cancelled placement is reported as BUILD_BLOCKED by executeStructure > characterisation: aborted before the first block
+AUD-P2 executeStructure(aborted): success=false code=BUILD_BLOCKED
+
+stdout | qa/action-audit/test/defects.test.ts > AUD-H1 huntAnimal never checks the signal > characterisation: attacks continue until the skill's own deadline
+AUD-H1 huntAnimal: abort at +500 ms; skill returned after 1110 ms; attacks after abort: 2
+
+ ✓ qa/action-audit/test/defects.test.ts (13 tests) 9247ms
+   ✓ AUD-F1 smeltItem keeps working after cancellation > characterisation: measured behaviour after abort  1181ms
+   ✓ AUD-F1 smeltItem keeps working after cancellation > [DEFECT AUD-F1] no furnace operation happens after the signal aborts  1131ms
+   ✓ AUD-F1 smeltItem keeps working after cancellation > [DEFECT AUD-F1] the skill returns promptly (not after the polling deadline) once aborted  1111ms
+   ✓ AUD-C2 openContainer has no timeout, so a window that never opens hangs the skill forever > characterisation: still pending after abort and a generous wait  964ms
+   ✓ AUD-C2 openContainer has no timeout, so a window that never opens hangs the skill forever > [DEFECT AUD-C2] the skill settles within its own timeoutMs when the window never opens  906ms
+   ✓ AUD-H1 huntAnimal never checks the signal > characterisation: attacks continue until the skill's own deadline  1612ms
+   ✓ AUD-H1 huntAnimal never checks the signal > [DEFECT AUD-H1] no attack is issued after the signal aborts  1610ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  qa/action-audit/test/coverage.test.ts > coverage table matches the source > every mutating call site in production code is in the table, with the same count
+AssertionError: expected { …(27) } to deeply equal { …(26) }
+
+- Expected
++ Received
+
+@@ -10,10 +10,11 @@
+    "packages/minecraft-adapter/src/hazard-nav.ts": 4,
+    "packages/minecraft-adapter/src/local-escape.ts": 14,
+    "packages/minecraft-adapter/src/minecraft-body.ts": 4,
+    "packages/minecraft-adapter/src/pathing.ts": 4,
+    "packages/minecraft-adapter/src/step-jump.ts": 11,
++   "packages/skills/src/blueprint-build.ts": 1,
+    "packages/skills/src/climb.ts": 6,
+    "packages/skills/src/combat.ts": 5,
+    "packages/skills/src/dig-abort.ts": 2,
+    "packages/skills/src/doors.ts": 1,
+    "packages/skills/src/farm.ts": 2,
+
+ ❯ qa/action-audit/test/coverage.test.ts:9:21
+      7|   it("every mutating call site in production code is in the table, wit…
+      8|     const table = Object.fromEntries(COVERAGE.map((row) => [row.file, …
+      9|     expect(scanned).toEqual(table);
+       |                     ^
+     10|   });
+     11| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed | 3 passed (4)
+      Tests  1 failed | 38 passed (39)
+   Start at  17:55:21
+   Duration  11.22s (transform 1.20s, setup 604ms, collect 2.60s, tests 13.93s, environment 4ms, prepare 538ms)
+
