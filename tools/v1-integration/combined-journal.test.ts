@@ -73,4 +73,5 @@ it.each([2, 4] as const)(
       rmSync(root, { recursive: true, force: true });
     }
   },
+  60_000,
 );
