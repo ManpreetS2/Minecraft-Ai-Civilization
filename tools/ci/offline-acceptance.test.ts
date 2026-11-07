@@ -288,6 +288,14 @@ describe("Offline Acceptance Artifact Verifier", () => {
     }
   });
 
+  it("computes journal row hash consistently without the hash property", () => {
+    const baseRow = { seq: 1, kind: "start", previousHash: "", data: "test" };
+    const hash1 = computeJournalRowHash(baseRow);
+    const hash2 = computeJournalRowHash({ ...baseRow, hash: "dummy-hash" });
+    expect(hash1).toBe(hash2);
+    expect(hash1).toMatch(/^[a-f0-9]{64}$/);
+  });
+
   it("accepts a valid 1v1 (2-citizen) offline artifact bundle", () => {
     buildOfflineArtifactFixture(tempDir, { count: 2 });
     const result = verifyOfflineScenario({
