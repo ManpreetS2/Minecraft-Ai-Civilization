@@ -78,6 +78,24 @@ importers:
         specifier: ^3.25.76
         version: 3.25.76
 
+  experiments/gate-a-provider-readiness:
+    dependencies:
+      '@civ/agent-core':
+        specifier: workspace:*
+        version: link:../../packages/agent-core
+      '@civ/cognition':
+        specifier: workspace:*
+        version: link:../../packages/cognition
+      '@civ/memory':
+        specifier: workspace:*
+        version: link:../../packages/memory
+      '@civ/minecraft-adapter':
+        specifier: workspace:*
+        version: link:../../packages/minecraft-adapter
+      '@civ/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
+
   packages/agent-core:
     dependencies:
       '@civ/cognition':

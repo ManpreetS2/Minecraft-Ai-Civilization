@@ -1,0 +1,199 @@
+{
+  "sourceSha": "72a5a6671601136c807e39433e618ebecfc7552d",
+  "timestamp": "2026-11-07T03:59:48.688Z",
+  "totalTests": 24,
+  "passed": 21,
+  "failed": 0,
+  "notProven": 3,
+  "results": [
+    {
+      "id": "SEC3-01",
+      "section": "independence",
+      "title": "GPT routes only to OpenAI adapter",
+      "status": "PASS",
+      "details": "Verified POST to /v1/responses with Bearer key and structured schema; zero Claude traffic.",
+      "latencyMs": 3137
+    },
+    {
+      "id": "SEC3-02",
+      "section": "independence",
+      "title": "Claude routes only to Anthropic adapter",
+      "status": "PASS",
+      "details": "Verified POST to /v1/messages via createClaudeSdkTransport; zero OpenAI traffic.",
+      "latencyMs": 3042
+    },
+    {
+      "id": "SEC3-03",
+      "section": "independence",
+      "title": "Separate authorized world knowledge and memories",
+      "status": "PASS",
+      "details": "Gated store reads ensure private memories never leak across citizen prompt boundaries.",
+      "latencyMs": 3053
+    },
+    {
+      "id": "SEC3-04",
+      "section": "independence",
+      "title": "Private messages cannot leak between citizens",
+      "status": "PASS",
+      "details": "Actor-private events and community scoped announcements strictly filtered.",
+      "latencyMs": 3051
+    },
+    {
+      "id": "SEC3-05",
+      "section": "independence",
+      "title": "Decisions independently recorded with correct provider provenance",
+      "status": "PASS",
+      "details": "Store LLMDecisionMade events and registry DecisionEvidence record exact family and adapter.",
+      "latencyMs": 3047
+    },
+    {
+      "id": "SEC3-06",
+      "section": "independence",
+      "title": "A delayed GPT response cannot affect Claude",
+      "status": "PASS",
+      "details": "Per-citizen llmBusy concurrency allows Claude to complete while GPT is suspended in flight.",
+      "latencyMs": 3044
+    },
+    {
+      "id": "SEC3-07",
+      "section": "independence",
+      "title": "A delayed Claude response cannot affect GPT",
+      "status": "PASS",
+      "details": "Per-citizen llmBusy concurrency allows GPT to complete while Claude is suspended in flight.",
+      "latencyMs": 3042
+    },
+    {
+      "id": "SEC3-08",
+      "section": "independence",
+      "title": "Restart preserves memory without copying another citizen's session",
+      "status": "PASS",
+      "details": "Distinguishes disk SQLite store and disk JSON session store persistence from in-process reopen.",
+      "latencyMs": 6110
+    },
+    {
+      "id": "SEC3-09",
+      "section": "independence",
+      "title": "Citizen death or shutdown rejects stale model responses",
+      "status": "PASS",
+      "details": "Epoch increment on body death and session cancellation discard late replies.",
+      "latencyMs": 3118
+    },
+    {
+      "id": "SEC3-10",
+      "section": "independence",
+      "title": "Successive decision cycles without swapping identities",
+      "status": "PASS",
+      "details": "Multi-cycle deliberation maintains stable roster identity and provider attribution.",
+      "latencyMs": 3108
+    },
+    {
+      "id": "SEC4-01",
+      "section": "budgets_and_faults",
+      "title": "Concurrency limits",
+      "status": "PASS",
+      "details": "maxConcurrency ceiling prevents simultaneous admissions, refusing excess requests.",
+      "latencyMs": 3040
+    },
+    {
+      "id": "SEC4-02",
+      "section": "budgets_and_faults",
+      "title": "Request counts",
+      "status": "PASS",
+      "details": "maxRequestsPerRun enforces hard ceiling; subsequent requests refused before dispatch.",
+      "latencyMs": 3062
+    },
+    {
+      "id": "SEC4-03",
+      "section": "budgets_and_faults",
+      "title": "Token accounting",
+      "status": "PASS",
+      "details": "Reported token usage tracked per citizen and verified against usage reports.",
+      "latencyMs": 3037
+    },
+    {
+      "id": "SEC4-04",
+      "section": "budgets_and_faults",
+      "title": "Estimated versus confirmed charges",
+      "status": "PASS",
+      "details": "Conservative pre-request reservation settles to exact price-table cost upon 200 OK.",
+      "latencyMs": 3035
+    },
+    {
+      "id": "SEC4-05",
+      "section": "budgets_and_faults",
+      "title": "Unknown usage",
+      "status": "PASS",
+      "details": "Missing/null usage permanently closes the gate fail-closed with unverified hold.",
+      "latencyMs": 3035
+    },
+    {
+      "id": "SEC4-06",
+      "section": "budgets_and_faults",
+      "title": "Retry accounting",
+      "status": "PASS",
+      "details": "Retries tracked individually and charged against quota.",
+      "latencyMs": 3038
+    },
+    {
+      "id": "SEC4-07",
+      "section": "budgets_and_faults",
+      "title": "Timeouts",
+      "status": "PASS",
+      "details": "Timed out request aborts cleanly, holds attempt cost, and frees slot for next tick.",
+      "latencyMs": 3123
+    },
+    {
+      "id": "SEC4-08",
+      "section": "budgets_and_faults",
+      "title": "Rate limits",
+      "status": "PASS",
+      "details": "429 with retry-after waits, refunds attempt, and retries; 429 without retry-after fails immediately.",
+      "latencyMs": 4025
+    },
+    {
+      "id": "SEC4-09",
+      "section": "budgets_and_faults",
+      "title": "Provider outages",
+      "status": "PASS",
+      "details": "5xx server errors backoff and retry up to maxRetries, then skip without crashing.",
+      "latencyMs": 3034
+    },
+    {
+      "id": "SEC4-10",
+      "section": "budgets_and_faults",
+      "title": "Cancellation during retries",
+      "status": "PASS",
+      "details": "Cancelling during backoff sleep stops subsequent dispatch and refunds unsent reservations.",
+      "latencyMs": 3116
+    },
+    {
+      "id": "SEC4-11",
+      "section": "budgets_and_faults",
+      "title": "Budget exhaustion & Fallback honesty",
+      "status": "PASS",
+      "details": "Exhausted spend fails closed; heuristic fallback attributed honestly; zero cross-family model swapping.",
+      "latencyMs": 3060
+    },
+    {
+      "id": "LIVE-01",
+      "section": "unverified_live",
+      "title": "Live OpenAI API acceptance",
+      "status": "NOT PROVEN",
+      "details": "Offline harness uses simulated HTTP responses. Live API acceptance requires authorized paid platform API key."
+    },
+    {
+      "id": "LIVE-02",
+      "section": "unverified_live",
+      "title": "Live Anthropic API acceptance",
+      "status": "NOT PROVEN",
+      "details": "Offline harness uses simulated HTTP responses through createClaudeSdkTransport. Live API acceptance requires authorized console API key."
+    },
+    {
+      "id": "LIVE-03",
+      "section": "unverified_live",
+      "title": "Live Paper server physical survival mechanics",
+      "status": "NOT PROVEN",
+      "details": "Offline harness uses verified mock bodies. Real Mineflayer bot connection to Paper 1.21.6 build #48 required for live survival trial."
+    }
+  ]
+}
