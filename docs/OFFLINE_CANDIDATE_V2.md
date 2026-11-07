@@ -102,3 +102,20 @@ pnpm exec eslint apps/orchestrator/src/construction-experiment-guard.ts apps/orc
 ```
 
 Failure and replay logs are in `docs/evidence/offline-v2/ci-followup/`. Hosted cross-platform checks must rerun on this follow-up; the earlier full local results above remain evidence for their stated earlier source. Live-authenticity vulnerabilities are unchanged and unaccepted.
+
+
+## Windows audit follow-up
+
+The Windows smoke job on `764436cb6a62882e1d631ed46cf31918e8d0fd92` reached cancellation QA and failed the strict coverage comparison. The scanner returned Windows backslashes as keys, and the POSIX-only `/testing/` check included a testing helper as production. This is separate from the Ubuntu protected-path policy issue.
+
+Implementation `792f7c017d2243eb74df16b08aada21eee7cf3eb` derives repository-relative paths with node:path.relative and normalizes separators before both exclusion and key generation. The coverage table and strict equality assertion remain unchanged. A new regression covers Windows spellings and a temporary production/test-helper tree, ensuring production calls remain counted while test helpers are excluded.
+
+Local commands (all exit 0):
+
+```sh
+pnpm exec vitest run --config qa/action-audit/vitest.config.ts --maxWorkers=1 --no-file-parallelism
+pnpm exec tsc --noEmit -p qa/action-audit/tsconfig.json
+pnpm exec eslint qa/action-audit/src/coverage.ts qa/action-audit/test/coverage.test.ts
+```
+
+Cancellation/audit: 49 passed, 0 failed, 0 skipped. Logs and the original Windows failure are under `docs/evidence/offline-v2/windows-followup/`. Hosted Windows verification remains pending on the new head. Runtime behavior and the unresolved live-authenticity security gate are unchanged.
