@@ -1,10 +1,10 @@
 import { beforeEach, afterEach, expect, it } from "vitest";
-import { EventBus, type SimEvent } from "../../../packages/shared/src/index.js";
-import { executePlan } from "../../../packages/agent-core/src/executor.js";
-import { createActionBoundary } from "../../../packages/agent-core/src/action-boundary.js";
-import { rig } from "../support/manager-rig.js";
-import { installInstantNavigation, sleep } from "../support/offline-body.js";
-import { installSlowChest } from "../support/slow-world.js";
+import { EventBus, type SimEvent } from "@civ/shared";
+import { executePlan } from "./executor.js";
+import { createActionBoundary } from "./action-boundary.js";
+import { rig } from "../../../qa/v78/support/manager-rig.js";
+import { installInstantNavigation, sleep } from "../../../qa/v78/support/offline-body.js";
+import { installSlowChest } from "../../../qa/v78/support/slow-world.js";
 let restore: () => void;
 beforeEach(() => { restore = installInstantNavigation(); });
 afterEach(() => restore());
