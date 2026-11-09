@@ -1,3 +1,5 @@
+import { AsyncLocalStorage } from "node:async_hooks";
+import { captureActionOwnership } from "./action-boundary.js";
 import type { MinecraftBody } from "@civ/minecraft-adapter";
 import { executeReturnHome, navigationBackend, shouldBlacklistTarget, findReachableInteractionPosition } from "@civ/minecraft-adapter";
 import {
@@ -216,13 +218,45 @@ function finishGatherEvidence(
   });
 }
 
+const executionGenerations = new WeakMap<object, object>();
+const executionScope = new AsyncLocalStorage<() => boolean>();
+function executionIsCurrent(ctx: SkillContext): boolean {
+  return !ctx.signal?.aborted && (executionScope.getStore()?.() ?? true);
+}
+function abandonedObservation(ctx: SkillContext, events: EventBus, action: string, result: ActionResult): ActionResult {
+  events.emit(createEvent("SystemIncident", {
+    kind: "AbandonedActionObservation", action, reconciliation: "PENDING",
+    observedResult: result, authoritativeStorageUpdated: false,
+  }, ctx.citizenId));
+  return fail("CANCELLED", "Action ownership ended; observed effects require reconciliation", result.durationMs, false);
+}
 export async function executePlan(
+  ctx: SkillContext, plan: PlannedTask, store: CivilizationStore, events: EventBus,
+  baseRuntime = new SettlementRuntime(),
+): Promise<ActionResult> {
+  const generation = {};
+  executionGenerations.set(ctx.bot, generation);
+  const ownsBoundary = captureActionOwnership();
+  let active = true;
+  const isActionCurrent = () => active && executionGenerations.get(ctx.bot) === generation && ownsBoundary();
+  try {
+    return await executionScope.run(
+      isActionCurrent,
+      () => executeOwnedPlan({ ...ctx, isActionCurrent }, plan, store, events, baseRuntime),
+    );
+  } finally {
+    active = false;
+  }
+}
+
+async function executeOwnedPlan(
   ctx: SkillContext,
   plan: PlannedTask,
   store: CivilizationStore,
   events: EventBus,
   baseRuntime = new SettlementRuntime(),
 ): Promise<ActionResult> {
+  if (!executionIsCurrent(ctx)) return fail("CANCELLED", "Action is no longer current", 0, false);
   if (!store.isOpen()) return fail("CANCELLED", "Application storage is closed; construction cannot continue", 0, false);
   // Community mode: project state and reservations live in a per-community runtime bound to the authenticated caller.
   let runtime = baseRuntime;
@@ -568,6 +602,10 @@ export async function executePlan(
     throw error;
   }
   finishGatherEvidence(evidence, attemptId, ctx, beforeInventory, hungerBefore, result);
+
+  if (!executionIsCurrent(ctx)) {
+    return abandonedObservation(ctx, events, gated.action, result);
+  }
 
   const foodMeta = foodResultMeta(result);
   events.emit(
@@ -1076,6 +1114,7 @@ async function depositToSettlement(
   }
   const expectedRevision = containerObservationToken(ctx, store, chest);
   const result = await depositItems(ctx, undefined, chest);
+  if (!executionIsCurrent(ctx)) return abandonedObservation(ctx, events, "depositItems", result);
   runtime.claims.release("container", cellClaimKey(chest.x, chest.y, chest.z), ctx.citizenId);
   if (result.success) {
     // Container contents are restricted to the actual readers, not every community
@@ -1121,6 +1160,7 @@ async function withdrawItemsNamed(
   if (!access.success) return access;
   const expectedRevision = containerObservationToken(ctx, store, chest);
   const result = await withdrawItems(ctx, itemName, count, chest);
+  if (!executionIsCurrent(ctx)) return abandonedObservation(ctx, events, "withdrawItems", result);
   if (result.success) {
     if (store.hasCommunities()) {
       recordObservedContents(ctx, store, chest, result.data.contents, expectedRevision);

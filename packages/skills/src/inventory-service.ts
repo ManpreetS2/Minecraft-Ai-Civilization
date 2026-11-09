@@ -478,7 +478,7 @@ export async function pickupDroppedItem(
   let reached = 0;
   const origin = ctx.bot.entity?.position;
   for (const entity of found.slice(0, 8)) {
-    if (ctx.signal?.aborted) break;
+    if ((ctx.signal?.aborted || ctx.isActionCurrent?.() === false)) break;
     const pos = entity.position;
     if (!pos) continue;
     const dist = origin ? origin.distanceTo(pos) : 99;
@@ -575,9 +575,9 @@ export async function depositItem(
   }
   const citizenBefore = countItem(ctx, name);
   try {
-    if (ctx.signal?.aborted) return cancelledResult(started, "deposit cancelled before the chest opened");
+    if ((ctx.signal?.aborted || ctx.isActionCurrent?.() === false)) return cancelledResult(started, "deposit cancelled before the chest opened");
     const chest = await openWindowBounded(ctx, () => ctx.bot.openContainer(block), started);
-    if (ctx.signal?.aborted) {
+    if ((ctx.signal?.aborted || ctx.isActionCurrent?.() === false)) {
       chest.close();
       return cancelledResult(started, "deposit cancelled after the chest opened");
     }
@@ -587,7 +587,7 @@ export async function depositItem(
       chest.close();
       return fail("ITEM_NOT_FOUND", `No ${name} in inventory`, Date.now() - started, true);
     }
-    if (ctx.signal?.aborted) {
+    if ((ctx.signal?.aborted || ctx.isActionCurrent?.() === false)) {
       chest.close();
       return cancelledResult(started, "deposit cancelled before moving items");
     }
@@ -601,7 +601,10 @@ export async function depositItem(
       return fail("DEPOSIT_FAILED", `Deposit of ${name} did not move items (citizen ${citizenBefore}->${citizenAfter}, chest ${containerBefore}->${containerAfter})`, Date.now() - started, true);
     }
     ctx.events?.emit(
-      createEvent("ItemDeposited", { item: name, count: depositedCitizen, position: found.data.position }, ctx.citizenId),
+      createEvent((ctx.signal?.aborted || ctx.isActionCurrent?.() === false) ? "SystemIncident" : "ItemDeposited", {
+        ...((ctx.signal?.aborted || ctx.isActionCurrent?.() === false) ? { kind: "AbandonedTransferObservation", reconciliation: "PENDING", direction: "deposit" } : {}),
+        item: name, count: depositedCitizen, citizenAfter, containerAfter, position: found.data.position,
+      }, ctx.citizenId),
     );
     return ok(
       {
@@ -642,9 +645,9 @@ export async function withdrawItem(
   }
   const citizenBefore = countItem(ctx, name);
   try {
-    if (ctx.signal?.aborted) return cancelledResult(started, "withdraw cancelled before the chest opened");
+    if ((ctx.signal?.aborted || ctx.isActionCurrent?.() === false)) return cancelledResult(started, "withdraw cancelled before the chest opened");
     const chest = await openWindowBounded(ctx, () => ctx.bot.openContainer(block), started);
-    if (ctx.signal?.aborted) {
+    if ((ctx.signal?.aborted || ctx.isActionCurrent?.() === false)) {
       chest.close();
       return cancelledResult(started, "withdraw cancelled after the chest opened");
     }
@@ -654,16 +657,20 @@ export async function withdrawItem(
       chest.close();
       return fail("ITEM_NOT_FOUND", `Container has no ${name}`, Date.now() - started, true);
     }
-    if (ctx.signal?.aborted) {
+    if ((ctx.signal?.aborted || ctx.isActionCurrent?.() === false)) {
       chest.close();
       return cancelledResult(started, "withdraw cancelled before moving items");
     }
     await chest.withdraw(stack.type, null, Math.min(count, stack.count));
     const containerAfter = containerCounts(chest)[name] ?? 0;
-    if (ctx.signal?.aborted) {
+    if ((ctx.signal?.aborted || ctx.isActionCurrent?.() === false)) {
       const citizenAfter = countItem(ctx, name);
       const gained = citizenAfter - citizenBefore;
       chest.close();
+      ctx.events?.emit(createEvent("SystemIncident", {
+        kind: "AbandonedTransferObservation", reconciliation: "PENDING", direction: "withdraw",
+        item: name, citizenBefore, citizenAfter, containerBefore, containerAfter,
+      }, ctx.citizenId));
       // Items that already moved are reported on the result. Do not emit ItemWithdrawn once the signal has
       // aborted: the boundary may already have recorded TIMEOUT, and a later success event would contradict it.
       if (gained > 0) {
@@ -678,7 +685,10 @@ export async function withdrawItem(
     if (gained <= 0 || removed <= 0) {
       return fail("VERIFY_FAILED", `Withdraw of ${name} did not move items`, Date.now() - started, true);
     }
-    ctx.events?.emit(createEvent("ItemWithdrawn", { item: name, count: gained }, ctx.citizenId));
+    ctx.events?.emit(createEvent((ctx.signal?.aborted || ctx.isActionCurrent?.() === false) ? "SystemIncident" : "ItemWithdrawn", {
+      ...((ctx.signal?.aborted || ctx.isActionCurrent?.() === false) ? { kind: "AbandonedTransferObservation", reconciliation: "PENDING", direction: "withdraw" } : {}),
+      item: name, count: gained, citizenAfter, containerAfter,
+    }, ctx.citizenId));
     return ok({ item: name, count: gained, citizenAfter, containerAfter }, Date.now() - started);
   } catch (error) {
     if (error instanceof WindowOpenError) {

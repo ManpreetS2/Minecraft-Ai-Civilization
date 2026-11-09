@@ -7,6 +7,8 @@ export type SkillContext = {
   body: MinecraftBody;
   bot: Bot;
   signal?: AbortSignal;
+  /** Executor generation ownership; observations may outlive this permission. */
+  isActionCurrent?: () => boolean;
   events?: EventBus;
   citizenId?: string;
   timeoutMs?: number;

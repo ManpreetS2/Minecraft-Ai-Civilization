@@ -25,7 +25,7 @@ export default tseslint.config(
     },
   },
   {
-    files: ["qa/v69/**/*.ts"],
+    files: ["qa/v69/**/*.ts", "qa/v78/**/*.ts"],
     rules: {
       "@typescript-eslint/no-explicit-any": "off",
       "no-constant-condition": "off",

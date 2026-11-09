@@ -28,6 +28,12 @@ interface Owner {
 }
 
 const owners = new AsyncLocalStorage<Owner>();
+
+/** Snapshot the current action owner; late continuations retain this owner. */
+export function captureActionOwnership(): () => boolean {
+  const owner = owners.getStore();
+  return () => owner === undefined || owner.active;
+}
 const guarded = new WeakSet<object>();
 const boundaries = new WeakMap<object, ActionBoundary>();
 const emitterGeneration = new WeakMap<object, number>();
