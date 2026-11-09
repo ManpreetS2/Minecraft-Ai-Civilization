@@ -256,7 +256,6 @@ async function executeOwnedPlan(
   events: EventBus,
   baseRuntime = new SettlementRuntime(),
 ): Promise<ActionResult> {
-  if (!executionIsCurrent(ctx)) return fail("CANCELLED", "Action is no longer current", 0, false);
   if (!store.isOpen()) return fail("CANCELLED", "Application storage is closed; construction cannot continue", 0, false);
   // Community mode: project state and reservations live in a per-community runtime bound to the authenticated caller.
   let runtime = baseRuntime;

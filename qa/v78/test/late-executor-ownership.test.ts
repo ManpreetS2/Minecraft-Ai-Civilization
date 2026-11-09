@@ -9,7 +9,7 @@ let restore: () => void;
 beforeEach(() => { restore = installInstantNavigation(); });
 afterEach(() => restore());
 for (const action of ["withdrawItems", "depositItems"] as const) {
-  for (const mode of ["timeout", "superseded"] as const) {
+  for (const mode of ["timeout", "superseded", "disconnect"] as const) {
     it(`${action}: ${mode} preserves physical transfers as pending observations without overwriting newer stock`, async () => {
       const r = rig(); const bus = new EventBus(); const events: SimEvent[] = []; bus.on(e => events.push(e));
       const st = r.store.getSettlement(); st.storage = { x: 4, y: 64, z: 4 }; st.storageContents = { bread: 4 }; r.store.saveSettlement(st);
@@ -19,9 +19,14 @@ for (const action of ["withdrawItems", "depositItems"] as const) {
       const ctx = { body: r.body, bot: r.bot as never, events: bus, citizenId: r.id, timeoutMs: 22_000 };
       const plan = { action, task: "withdraw_food", source: "planner", reason: "qa", target: "chest" } as never;
       let work: Promise<unknown>;
-      if (mode === "timeout") {
+      if (mode !== "superseded") {
+        const disconnected = new AbortController();
+        if (mode === "disconnect") {
+          r.bot.once("end", () => disconnected.abort());
+          setTimeout(() => r.bot.emit("end", "socket closed"), 60);
+        }
         const boundary = createActionBoundary(() => r.bot._client);
-        const result = await boundary.run(action, signal => executePlan({ ...ctx, signal }, plan, r.store, bus), { timeoutMs: 60 });
+        const result = await boundary.run(action, signal => executePlan({ ...ctx, signal }, plan, r.store, bus), { timeoutMs: mode === "timeout" ? 60 : 2000, signal: disconnected.signal });
         expect(result.success).toBe(false);
         work = Promise.resolve();
       } else {
@@ -41,3 +46,21 @@ for (const action of ["withdrawItems", "depositItems"] as const) {
     });
   }
 }
+
+it("a repeated withdrawal commits fresh stock while an older transfer remains pending", async () => {
+  const r = rig(); const bus = new EventBus();
+  const st = r.store.getSettlement(); st.storage = { x: 4, y: 64, z: 4 }; st.storageContents = { bread: 4 }; r.store.saveSettlement(st);
+  r.bot.blocks.set("4,64,4", { name: "chest" });
+  const oldChest = installSlowChest(r.bot, { item: "bread", type: 7, stock: 4, withdrawMs: 450 });
+  const ctx = { body: r.body, bot: r.bot as never, events: bus, citizenId: r.id, timeoutMs: 22_000 };
+  const plan = { action: "withdrawItems", task: "withdraw_food", source: "planner", target: "chest" } as never;
+  const old = executePlan(ctx, plan, r.store, bus);
+  await sleep(60);
+  installSlowChest(r.bot, { item: "bread", type: 7, stock: 8, withdrawMs: 5 });
+  expect((await executePlan(ctx, plan, r.store, bus)).success).toBe(true);
+  expect(r.store.getSettlement().storageContents).toEqual({ bread: 7 });
+  expect((await old).success).toBe(false);
+  expect(oldChest.stock).toBe(3);
+  expect(r.bot.count("bread")).toBe(2);
+  expect(r.store.getSettlement().storageContents).toEqual({ bread: 7 });
+});
