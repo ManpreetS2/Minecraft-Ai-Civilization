@@ -688,6 +688,7 @@ export function verifyOfflineScenario(options: VerifyScenarioOptions): ScenarioV
       sourceSha?: string;
       runId?: string;
       experimentId?: string;
+      attribution?: { runId?: string };
       summary?: {
         totalAttemptedActions?: number;
         verifiedActions?: number;
@@ -725,7 +726,7 @@ export function verifyOfflineScenario(options: VerifyScenarioOptions): ScenarioV
       );
     }
 
-    const reportRunId = String(report.runId ?? report.experimentId ?? "");
+    const reportRunId = String(report.runId ?? report.attribution?.runId ?? report.experimentId ?? "");
     if (reportRunId !== runId) {
       errors.push(
         `gemini-validator-report runId mismatch: expected '${runId}', got '${reportRunId}'`,

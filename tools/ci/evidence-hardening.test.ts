@@ -217,3 +217,14 @@ describe("per-scenario journal CLI controls on the committed real bundles (real 
     expect(verifyOfflineScenario({ artifactDir: d, expectedCount: 4, expectedSha: shaOf(d) }).passed).toBe(false);
   });
 });
+
+for (const field of ["top-level", "attribution"] as const) {
+  it(`rejects a foreign ${field} report run id when experiment and run identities differ`, () => {
+    const dir = fresh(2);
+    const report = readJson<{ runId?: string; attribution?: { runId?: string } }>(dir, "gemini-validator-report.json");
+    if (field === "top-level") report.runId = "foreign-run";
+    else report.attribution = { ...report.attribution, runId: "foreign-run" };
+    writeJson(dir, "gemini-validator-report.json", report);
+    expect(l1(dir, 2).passed).toBe(false);
+  });
+}
