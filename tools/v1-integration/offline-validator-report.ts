@@ -13,18 +13,20 @@ export function writeOfflineValidatorReport(input: {
   outputDirectory: string;
   bundle: RunBundle;
   journalPath: string;
+  experimentId?: string;
   finalInventories?: Record<string, Record<string, number>>;
 }): { report: ValidationReport; summary: string } {
   const rawLines = readFileSync(input.journalPath, "utf8")
     .split(/\r?\n/)
     .filter((line) => line.trim().length > 0);
   const adapted = adaptRecorderJournal(rawLines);
-  const bridged = bridgeV1RunBundle(input.bundle as unknown as V1RunBundle);
+  const experimentId = input.experimentId ?? adapted.journalRows.find((row) => row.kind === "start")?.experimentId;
+  const bridged = bridgeV1RunBundle(input.bundle as unknown as V1RunBundle, { experimentId });
   // Hash-chain over the full operator journal; adapter rows remain for typed action audits.
   // Filtered adapter lines alone would break contiguous seq/hash linkage (Mission 006 wiring).
   const report = validateExperimentEvidence({
     manifest: bridged.manifest,
-    experimentId: input.bundle.runId,
+    experimentId,
     sourceSha: input.bundle.sourceSha,
     runId: input.bundle.runId,
     citizens: input.bundle.citizens.map((c) => c.id),

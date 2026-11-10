@@ -94,7 +94,7 @@ export interface V1BridgeResult {
  * Strictly checks genuine source-backed values for EVERY manifest field.
  * Fails closed without synthesizing defaults.
  */
-export function bridgeV1RunBundle(bundle: V1RunBundle): V1BridgeResult {
+export function bridgeV1RunBundle(bundle: V1RunBundle, identity: { experimentId?: string } = {}): V1BridgeResult {
   const notProven: MissingEvidenceItem[] = [];
   const gaps: string[] = [];
   const journalRows: JournalRow[] = [];
@@ -383,7 +383,7 @@ export function bridgeV1RunBundle(bundle: V1RunBundle): V1BridgeResult {
     }));
 
     manifest = {
-      experimentId: bundle.runId,
+      experimentId: identity.experimentId ?? bundle.runId,
       sourceSha: bundle.sourceSha,
       stage,
       durationMinutes,

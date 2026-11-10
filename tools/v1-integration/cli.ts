@@ -295,6 +295,7 @@ async function main() {
     JSON.stringify({ ...verdict, evidenceJournalSha256: result.evidenceJournalSha256 }, null, 2),
   );
   const gemini = writeOfflineValidatorReport({
+    experimentId: `off${count}`,
     outputDirectory: output,
     bundle: manifest,
     journalPath: result.evidenceJournalPath!,
