@@ -76,7 +76,7 @@ describe("a direct withdrawItem whose action is abandoned while the click is in 
 describe("production call sites of the chest skills (tripwire: a NEW call site must be classified before the first Paper trial)", () => {
   const root = join(process.cwd(), "packages");
   const walk = (d: string, out: string[] = []): string[] => { for (const f of readdirSync(d)) { const p = join(d, f); if (statSync(p).isDirectory()) { if (f !== "node_modules") walk(p, out); } else if (/\.ts$/.test(f) && !/\.test\.ts$/.test(f)) out.push(p); } return out; };
-  const sites = walk(root).flatMap((f) => readFileSync(f, "utf8").split("\n").flatMap((l, i) => (/\b(depositItems?|withdrawItems?)\(/.test(l) && !/^\s*(export )?(async )?function|^\s*\/\//.test(l) && !/^\s*return (depositItems|withdrawItems)\(ctx/.test(l) ? [`${f.slice(root.length + 1)}`] : [])));
+  const sites = walk(root).flatMap((f) => readFileSync(f, "utf8").split("\n").flatMap((l, _i) => (/\b(depositItems?|withdrawItems?)\(/.test(l) && !/^\s*(export )?(async )?function|^\s*\/\//.test(l) && !/^\s*return (depositItems|withdrawItems)\(ctx/.test(l) ? [`${f.slice(root.length + 1)}`] : [])));
   const uniq = [...new Set(sites)].sort();
   it("the set of production files that call the chest skills is exactly the reviewed set", () => {
     expect(uniq).toEqual([
