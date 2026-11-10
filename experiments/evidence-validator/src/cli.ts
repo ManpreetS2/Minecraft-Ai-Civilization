@@ -143,6 +143,24 @@ Options:
 
   // Run validation
   const report = validateExperimentEvidence(input);
+
+  // QA67-L5 / QA75-L5: Headline status for simulated or unattested journal must stay NOT_PROVEN in CLI output
+  if (
+    report.overallStatus === "VERIFIED" &&
+    report.mode === "offline_simulated"
+  ) {
+    if (!report.notProven.some((item) => item.code === "UNPROVEN_PAPER_AUTHENTICITY")) {
+      report.notProven.push({
+        code: "UNPROVEN_PAPER_AUTHENTICITY",
+        description:
+          "Unproven Paper authenticity: offline simulated execution lacks verified Paper server cryptographic attestation.",
+        missingFields: ["sourceAttestation"],
+      });
+    }
+    report.overallStatus = "NOT_PROVEN";
+    report.summary.notProvenChecksCount = report.notProven.length;
+  }
+
   const jsonReport = formatJsonReport(report);
   const humanReport = formatHumanReport(report);
 

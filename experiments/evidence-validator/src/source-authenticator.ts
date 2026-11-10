@@ -62,9 +62,40 @@ export function buildCanonicalAttestationPayload(params: CanonicalAttestationPar
 
 const ED25519_SPKI_PREFIX = Buffer.from("302a300506032b6570032100", "hex");
 
+export const SMALL_ORDER_POINTS = new Set([
+  "0000000000000000000000000000000000000000000000000000000000000000",
+  "0100000000000000000000000000000000000000000000000000000000000000",
+  "26e8958fc2b227b045c3f489f2ef98f0d5dfac05d3c63339b13802886d53fc05",
+  "c7176a703d4dd84fba3c0b760d10670f2a2053fa2c39ccc64ec7fd7792ac037a",
+  "0000000000000000000000000000000000000000000000000000000000000080",
+  "0100000000000000000000000000000000000000000000000000000000000080",
+  "26e8958fc2b227b045c3f489f2ef98f0d5dfac05d3c63339b13802886d53fc85",
+  "c7176a703d4dd84fba3c0b760d10670f2a2053fa2c39ccc64ec7fd7792ac03fa",
+  "ecffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f",
+  "ecffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+]);
+
+function assertValidEd25519KeyBytes(rawBytes: Buffer): void {
+  if (rawBytes.length !== 32) {
+    throw new Error(`Invalid Ed25519 key length: expected 32 bytes, got ${rawBytes.length}`);
+  }
+  const hex = rawBytes.toString("hex").toLowerCase();
+  if (SMALL_ORDER_POINTS.has(hex)) {
+    throw new Error(`Invalid Ed25519 public key: degenerate or small-order public key rejected (${hex.slice(0, 8)}...).`);
+  }
+  // Check non-canonical y >= 2^255 - 19
+  const p = (1n << 255n) - 19n;
+  const yBytes = Buffer.from(rawBytes);
+  yBytes[31] = yBytes[31]! & 0x7f; // clear sign bit
+  const y = BigInt("0x" + Buffer.from(yBytes).reverse().toString("hex"));
+  if (y >= p) {
+    throw new Error("Invalid Ed25519 public key: non-canonical y-coordinate.");
+  }
+}
+
 /**
  * Parses an Ed25519 public key from PEM string, raw 32-byte hex, or KeyObject.
- * Rejects private keys and unsupported key types (RSA, ECDSA).
+ * Rejects private keys, small-order points, and unsupported key types (RSA, ECDSA).
  */
 export function parseEd25519PublicKey(keyInput: string | KeyObject): KeyObject {
   let keyObj: KeyObject;
@@ -79,6 +110,8 @@ export function parseEd25519PublicKey(keyInput: string | KeyObject): KeyObject {
     if (keyInput.asymmetricKeyType !== "ed25519") {
       throw new Error(`Unsupported key type '${keyInput.asymmetricKeyType}'; Ed25519 required.`);
     }
+    const spkiDer = keyInput.export({ format: "der", type: "spki" });
+    assertValidEd25519KeyBytes(spkiDer.subarray(12));
     return keyInput;
   }
 
@@ -89,22 +122,30 @@ export function parseEd25519PublicKey(keyInput: string | KeyObject): KeyObject {
 
   if (trimmed.startsWith("-----BEGIN PUBLIC KEY-----")) {
     keyObj = createPublicKey(trimmed);
+    const spkiDer = keyObj.export({ format: "der", type: "spki" });
+    assertValidEd25519KeyBytes(spkiDer.subarray(12));
   } else if (/^[0-9a-fA-F]{64}$/.test(trimmed)) {
     // Raw 32-byte hex string (64 characters)
     const rawBytes = Buffer.from(trimmed, "hex");
+    assertValidEd25519KeyBytes(rawBytes);
     const spkiDer = Buffer.concat([ED25519_SPKI_PREFIX, rawBytes]);
     keyObj = createPublicKey({ key: spkiDer, format: "der", type: "spki" });
   } else if (/^[A-Za-z0-9+/]{43}=?$/.test(trimmed)) {
     // Raw 32-byte base64 string
     const rawBytes = Buffer.from(trimmed, "base64");
     if (rawBytes.length === 32) {
+      assertValidEd25519KeyBytes(rawBytes);
       const spkiDer = Buffer.concat([ED25519_SPKI_PREFIX, rawBytes]);
       keyObj = createPublicKey({ key: spkiDer, format: "der", type: "spki" });
     } else {
       keyObj = createPublicKey(keyInput);
+      const spkiDer = keyObj.export({ format: "der", type: "spki" });
+      assertValidEd25519KeyBytes(spkiDer.subarray(12));
     }
   } else {
     keyObj = createPublicKey(keyInput);
+    const spkiDer = keyObj.export({ format: "der", type: "spki" });
+    assertValidEd25519KeyBytes(spkiDer.subarray(12));
   }
 
   if (keyObj.type !== "public") {
@@ -164,6 +205,14 @@ export function parseEd25519Signature(sigInput: string): {
     return {
       sigBuffer: null,
       error: `Invalid Ed25519 signature length: expected 64 bytes, got ${sigBuffer.length} bytes.`,
+    };
+  }
+
+  const rHex = sigBuffer.subarray(0, 32).toString("hex").toLowerCase();
+  if (SMALL_ORDER_POINTS.has(rHex)) {
+    return {
+      sigBuffer: null,
+      error: `Invalid Ed25519 signature: degenerate small-order commitment R point (${rHex.slice(0, 8)}...).`,
     };
   }
 
@@ -344,31 +393,17 @@ export function verifySourceAttestation(
       );
     }
     const elapsedSampled = attestation.lastServerTick - attestation.firstServerTick;
-    if (attestation.totalServerTicks < elapsedSampled) {
+    if (attestation.totalServerTicks !== elapsedSampled) {
       sessionBound = false;
       reasons.push(
-        `Attestation total server ticks contradiction: totalServerTicks (${attestation.totalServerTicks}) is less than sampled tick progression (${elapsedSampled}).`,
+        `Attestation total server ticks contradiction: totalServerTicks (${attestation.totalServerTicks}) does not equal sampled tick progression (${elapsedSampled}).`,
       );
     }
-    // Allow at most 1 minute (1200 ticks at 20 TPS) tolerance between sample boundary and total server ticks
-    if (Math.abs(attestation.totalServerTicks - elapsedSampled) > 1200) {
+    if (args.totalServerTicks !== undefined && attestation.totalServerTicks !== args.totalServerTicks) {
       sessionBound = false;
       reasons.push(
-        `Attestation total server ticks contradiction: totalServerTicks (${attestation.totalServerTicks}) contradicts sampled span (${elapsedSampled}).`,
+        `Attestation total server ticks mismatch: observed ${args.totalServerTicks}, but attestation binds to ${attestation.totalServerTicks}.`,
       );
-    }
-    if (args.totalServerTicks !== undefined) {
-      if (attestation.totalServerTicks < args.totalServerTicks) {
-        sessionBound = false;
-        reasons.push(
-          `Attestation total server ticks contradiction: totalServerTicks (${attestation.totalServerTicks}) is less than journal observed ticks (${args.totalServerTicks}).`,
-        );
-      } else if (Math.abs(attestation.totalServerTicks - args.totalServerTicks) > 1200) {
-        sessionBound = false;
-        reasons.push(
-          `Attestation total server ticks mismatch: observed ${args.totalServerTicks}, but attestation binds to ${attestation.totalServerTicks}.`,
-        );
-      }
     }
   }
 
@@ -389,6 +424,59 @@ export function verifySourceAttestation(
       reasons.push(
         `Attestation timestamp contradiction: endedAt ('${attestation.endedAt}') must be after startedAt ('${attestation.startedAt}').`,
       );
+    } else {
+      const durationSec = (endTime - startTime) / 1000;
+      if (attestation.totalServerTicks !== undefined && attestation.totalServerTicks > 0) {
+        const tickRate = attestation.totalServerTicks / durationSec;
+        if (tickRate > 20.5) {
+          sessionBound = false;
+          reasons.push(
+            `Attestation tick rate contradiction: ${attestation.totalServerTicks} ticks in ${durationSec.toFixed(1)}s (${tickRate.toFixed(1)} TPS) exceeds physical 20 TPS ceiling.`,
+          );
+        }
+      }
+      if (args.rawJournalLines && args.rawJournalLines.length > 0) {
+        let firstJournalAt: number | undefined;
+        let lastJournalAt: number | undefined;
+        for (const line of args.rawJournalLines) {
+          const t = line.trim();
+          if (!t) continue;
+          try {
+            const parsed = JSON.parse(t);
+            if (parsed.at) {
+              const ms = new Date(parsed.at).getTime();
+              if (!isNaN(ms)) {
+                if (firstJournalAt === undefined) firstJournalAt = ms;
+                lastJournalAt = ms;
+              }
+            }
+          } catch {
+            // ignore
+          }
+        }
+        if (firstJournalAt !== undefined && lastJournalAt !== undefined) {
+          const WINDOW_SKEW_TOLERANCE_MS = 5000;
+          if (startTime > firstJournalAt + WINDOW_SKEW_TOLERANCE_MS) {
+            sessionBound = false;
+            reasons.push(
+              `Attestation signed window start (${attestation.startedAt}) begins after journal timeline (${new Date(firstJournalAt).toISOString()}) by more than ${WINDOW_SKEW_TOLERANCE_MS / 1000}s allowed skew.`,
+            );
+          }
+          if (endTime < lastJournalAt - WINDOW_SKEW_TOLERANCE_MS) {
+            sessionBound = false;
+            reasons.push(
+              `Attestation signed window end (${attestation.endedAt}) ends before journal timeline (${new Date(lastJournalAt).toISOString()}) by more than ${WINDOW_SKEW_TOLERANCE_MS / 1000}s allowed skew.`,
+            );
+          }
+          const journalSpanMs = lastJournalAt - firstJournalAt;
+          if (endTime - startTime < journalSpanMs - WINDOW_SKEW_TOLERANCE_MS) {
+            sessionBound = false;
+            reasons.push(
+              `Attestation signed window duration (${durationSec.toFixed(1)}s) cannot contain journal duration (${(journalSpanMs / 1000).toFixed(1)}s).`,
+            );
+          }
+        }
+      }
     }
   }
 
@@ -420,11 +508,20 @@ export function verifySourceAttestation(
     authorityTrusted = false;
     reasons.push("Attestation missing signing authority declaration.");
   } else {
+    if (args.trustedAuthorities !== undefined) {
+      if (!args.trustedAuthorities.includes(attestation.signingAuthority)) {
+        authorityTrusted = false;
+        reasons.push(
+          `Signing authority '${attestation.signingAuthority}' is not in the trustedAuthorities allow-list.`,
+        );
+      }
+    }
+
     let keyInput: string | KeyObject | undefined;
-    if (args.trustedKeys) {
+    if (args.trustedKeys && authorityTrusted) {
       if (args.trustedKeys instanceof Map) {
         keyInput = args.trustedKeys.get(attestation.signingAuthority);
-      } else {
+      } else if (Object.hasOwn(args.trustedKeys, attestation.signingAuthority)) {
         keyInput = args.trustedKeys[attestation.signingAuthority];
       }
     }

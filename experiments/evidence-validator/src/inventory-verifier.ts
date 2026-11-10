@@ -52,7 +52,7 @@ export function auditInventoryConservation(args: {
     }
   }
 
-  // 3. Reconcile with final observed inventories
+  // 3. Reconcile with final observed inventories bidirectionally
   const finalInventories = args.citizenFinalInventories ?? {};
   for (const [citizenId, observedInv] of Object.entries(finalInventories)) {
     const calculatedInv = citizenLedger[citizenId] ?? {};
@@ -66,6 +66,28 @@ export function auditInventoryConservation(args: {
           amount: excess,
           type: "SPONTANEOUS_GAIN",
           description: `Citizen '${citizenId}' holds ${observedCount}x '${item}', but verified actions only account for ${calculatedCount}x (+${excess} spontaneous gain)`,
+        });
+      } else if (calculatedCount > observedCount) {
+        const deficit = calculatedCount - observedCount;
+        discrepancies.push({
+          citizenId,
+          item,
+          amount: deficit,
+          type: "UNEXPLAINED_LOSS",
+          description: `Citizen '${citizenId}' ledger records ${calculatedCount}x '${item}', but physical final inventory only contains ${observedCount}x (-${deficit} discrepancy)`,
+        });
+      }
+    }
+
+    // Check items in ledger that have positive count but are completely missing from observed inventory
+    for (const [item, calculatedCount] of Object.entries(calculatedInv)) {
+      if (calculatedCount > 0 && !Object.hasOwn(observedInv, item)) {
+        discrepancies.push({
+          citizenId,
+          item,
+          amount: calculatedCount,
+          type: "UNEXPLAINED_LOSS",
+          description: `Citizen '${citizenId}' ledger records ${calculatedCount}x '${item}', but physical final inventory contains none (-${calculatedCount} discrepancy)`,
         });
       }
     }

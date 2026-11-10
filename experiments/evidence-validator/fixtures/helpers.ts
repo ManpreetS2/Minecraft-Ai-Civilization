@@ -99,8 +99,18 @@ export class JournalBuilder {
   private previousHash = "";
   private readonly lines: string[] = [];
   private readonly rows: JournalRow[] = [];
+  private currentTimeMs: number;
 
-  constructor(private readonly experimentId = "exp-2v2-demo-001") {
+  constructor(
+    private readonly experimentId = "exp-2v2-demo-001",
+    baseTime?: string | number,
+  ) {
+    this.currentTimeMs =
+      baseTime !== undefined
+        ? typeof baseTime === "number"
+          ? baseTime
+          : Date.parse(baseTime)
+        : Date.parse("2026-11-05T12:00:00.000Z");
     this.append({
       kind: "start",
       recordingAudience: "operator_only",
@@ -110,10 +120,12 @@ export class JournalBuilder {
 
   append(payload: Record<string, unknown>): this {
     this.seq += 1;
+    const duration = typeof payload.durationMs === "number" ? payload.durationMs : 0;
+    this.currentTimeMs += duration;
     const rowObj = {
       experimentId: this.experimentId,
       seq: this.seq,
-      at: new Date(Date.now() + this.seq * 1000).toISOString(),
+      at: payload.at ?? new Date(this.currentTimeMs).toISOString(),
       previousHash: this.previousHash,
       ...payload,
     };

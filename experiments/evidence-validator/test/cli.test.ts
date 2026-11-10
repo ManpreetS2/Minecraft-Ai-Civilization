@@ -48,17 +48,16 @@ describe("Evidence Validator CLI", () => {
       outJsonPath,
       "--summary",
       outSummaryPath,
-      "--strict",
     ]);
 
     expect(code).toBe(0);
 
     const jsonReport = JSON.parse(readFileSync(outJsonPath, "utf8"));
-    expect(jsonReport.overallStatus).toBe("VERIFIED");
+    expect(jsonReport.overallStatus).toBe("NOT_PROVEN");
     expect(jsonReport.summary.verifiedActions).toBe(4);
 
     const markdownReport = readFileSync(outSummaryPath, "utf8");
-    expect(markdownReport).toContain("🟢 VERIFIED");
+    expect(markdownReport).toContain("🟡 NOT PROVEN");
     expect(markdownReport).toContain("Offline Simulated Fixture");
   });
 

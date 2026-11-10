@@ -92,7 +92,7 @@ describe("Phase 2 — Simulated vs. Real Paper Tick Distinction", () => {
         endedAt: rows[rows.length - 1]!.at,
         firstServerTick: 1000,
         lastServerTick: serverTick - 100,
-        totalServerTicks: 72000,
+        totalServerTicks: serverTick - 100 - 1000,
       },
       kp1.privateKeyPem,
     );
@@ -114,7 +114,7 @@ describe("Phase 2 — Simulated vs. Real Paper Tick Distinction", () => {
         endedAt: rows[rows.length - 1]!.at,
         firstServerTick: 1000,
         lastServerTick: serverTick - 100,
-        totalServerTicks: 72000,
+        totalServerTicks: serverTick - 100 - 1000,
         evidenceDigest: digest1,
         sourceSha: manifest.sourceSha,
       },

@@ -1,3 +1,4 @@
+import { journalAttemptSchema } from "./schemas.js";
 import { verifyHashChain } from "./hash-chain-verifier.js";
 import { verifySingleAction } from "./action-verifier.js";
 import { auditInformationBoundaries, buildDirectory } from "./information-verifier.js";
@@ -14,6 +15,7 @@ import type {
   OverallValidationStatus,
   SimulationMode,
   ValidationReport,
+  WorldBlockChange,
 } from "./types.js";
 import type {
   EventStreamItem,
@@ -21,6 +23,46 @@ import type {
   PersistentFactItem,
   ValidatedManifest,
 } from "./schemas.js";
+
+/** Compare JSON row content, ignoring only root-level hash fields verified from raw lines. */
+function sameJournalRow(raw: Record<string, unknown>, parsed: Record<string, unknown>): boolean {
+  try {
+    return canonicalJournalRow(raw) === canonicalJournalRow(parsed);
+  } catch {
+    // Non-JSON caller values must fail binding rather than normalize into signed JSON.
+    return false;
+  }
+}
+
+function canonicalJournalRow(row: Record<string, unknown>): string {
+  const content = { ...row };
+  delete content.hash;
+  delete content.previousHash;
+  if (content.kind === "action_observation") {
+    // These consumers treat absent collections as empty. Keep that existing API default.
+    for (const key of ["beforeInventory", "afterInventory"]) {
+      if (content[key] === undefined) content[key] = {};
+    }
+    for (const key of ["worldChanges", "authorizedRecipients"]) {
+      if (content[key] === undefined) content[key] = [];
+    }
+  }
+  return JSON.stringify(canonicalJson(content));
+}
+
+function canonicalJson(value: unknown): unknown {
+  if (value === null || typeof value === "string" || typeof value === "boolean") return value;
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (Array.isArray(value)) return value.map(canonicalJson);
+  if (typeof value === "object" && value !== null &&
+      (Object.getPrototypeOf(value) === Object.prototype || Object.getPrototypeOf(value) === null)) {
+    return Object.fromEntries(Object.entries(value)
+      .filter(([, entry]) => entry !== undefined)
+      .sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0)
+      .map(([key, entry]) => [key, canonicalJson(entry)]));
+  }
+  throw new Error("Journal row contains a non-JSON value");
+}
 
 export type ValidatorInput = {
   manifest?: ValidatedManifest;
@@ -82,21 +124,299 @@ export function validateExperimentEvidence(input: ValidatorInput): ValidationRep
     });
   }
 
-  // 3. Build known citizen set from manifest (Phase 2: detect phantom citizens)
-  const knownCitizenIds: Set<string> | undefined = input.manifest
-    ? new Set(input.manifest.citizens.map((c: { id: string }) => c.id))
-    : undefined;
+  // 3. Process Journal Rows & Resolve Identities
+  let journalRows: JournalRow[] = input.journalRows ?? [];
+  const rawParsed: Array<Record<string, unknown>> = [];
+  if (input.rawJournalLines && input.rawJournalLines.length > 0) {
+    for (const line of input.rawJournalLines) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+      try {
+        rawParsed.push(JSON.parse(trimmed));
+      } catch {
+        // syntax error handled by hash chain
+      }
+    }
+  }
 
-  // 3. Process Journal Rows
-  const journalRows: JournalRow[] = input.journalRows ?? [];
+  // QA67-M4 / QA75-M2 / QA75-M3: caller-supplied journalRows vs rawJournalLines bidirectional binding
+  if (rawParsed.length > 0) {
+    if (journalRows.length !== rawParsed.length) {
+      violations.push({
+        code: "RAW_JOURNAL_ROW_MISMATCH",
+        description: `journalRows count (${journalRows.length}) does not match rawJournalLines count (${rawParsed.length}). Signed rows must not be omitted or injected.`,
+        severity: "ERROR",
+      });
+    }
+
+    for (let i = 0; i < rawParsed.length; i++) {
+      const raw = rawParsed[i]!;
+      const row = journalRows[i];
+      if (!row) {
+        violations.push({
+          code: "RAW_JOURNAL_ROW_MISMATCH",
+          citizenId: raw.citizenId as string | undefined,
+          description: `Raw journal line seq ${raw.seq} (${raw.kind}) is omitted from journalRows.`,
+          severity: "ERROR",
+        });
+        continue;
+      }
+
+      const rowAny = row as unknown as Record<string, unknown>;
+
+      // Bind the complete row, including identity, roster, optional and future fields.
+      const diverges = !sameJournalRow(raw, rowAny);
+
+      if (diverges) {
+        violations.push({
+          code: "RAW_JOURNAL_ROW_MISMATCH",
+          citizenId: (raw.citizenId as string) ?? (rowAny.citizenId as string),
+          description: `journalRow seq ${row.seq} (${row.kind}) diverges from signed rawJournalLines evidence.`,
+          severity: "ERROR",
+        });
+      }
+    }
+
+    // Downstream decisions use authenticated raw values, never a divergent caller copy.
+    journalRows = rawParsed as unknown as JournalRow[];
+  }
+
+  // Start rows for identity resolution
+  const startRows = journalRows.filter((r): r is Extract<JournalRow, { kind: "start" }> => r.kind === "start");
+  const startRow = startRows[0];
+  const rawStartRows = rawParsed.filter((r) => r.kind === "start");
+  const allStartRows: Array<Record<string, unknown>> = [...startRows, ...rawStartRows];
+
+  // QA67-M1 / QA75-M2: Identity Resolution & Conflict Detection
+  // 1. Multiple conflicting start rows in journal rows or raw lines
+  if (allStartRows.length > 1) {
+    const startShas = new Set(allStartRows.map((r) => r.sourceSha).filter(Boolean));
+    const startRuns = new Set(allStartRows.map((r) => r.runId).filter(Boolean));
+    if (startShas.size > 1) {
+      violations.push({
+        code: "SOURCE_IDENTITY_CONFLICT",
+        description: `Multiple journal start rows contain conflicting sourceSha values: ${Array.from(startShas).join(", ")}`,
+        severity: "ERROR",
+      });
+    }
+    if (startRuns.size > 1) {
+      violations.push({
+        code: "RUN_ID_CONFLICT",
+        description: `Multiple journal start rows contain conflicting runId values: ${Array.from(startRuns).join(", ")}`,
+        severity: "ERROR",
+      });
+    }
+  }
+
+  // 2. Conflicting experimentIds across rows in the journal (journalRows + rawParsed)
+  const journalExpIds = new Set<string>();
+  for (const r of journalRows) if (r.experimentId) journalExpIds.add(r.experimentId);
+  for (const r of rawParsed) if (typeof r.experimentId === "string") journalExpIds.add(r.experimentId);
+  if (journalExpIds.size > 1) {
+    violations.push({
+      code: "EXPERIMENT_ID_CONFLICT",
+      description: `Journal rows contain conflicting experimentIds mid-stream: ${Array.from(journalExpIds).join(", ")}`,
+      severity: "ERROR",
+    });
+  }
+
+  // 3. Caller sourceSha validation (must be valid 40-hex lowercase)
+  if (input.sourceSha !== undefined) {
+    if (
+      !/^[a-f0-9]{40}$/.test(input.sourceSha) ||
+      input.sourceSha === "0000000000000000000000000000000000000000"
+    ) {
+      violations.push({
+        code: "INVALID_SOURCE_SHA",
+        description: `Caller sourceSha is invalid (must be 40 lowercase hex characters): '${input.sourceSha}'`,
+        severity: "ERROR",
+      });
+    }
+  }
+
+  // 4. Source SHA conflict detection across inputs
+  const definedShas = new Map<string, string>();
+  if (startRow?.sourceSha && /^[a-f0-9]{40}$/.test(startRow.sourceSha)) {
+    definedShas.set("journal start", startRow.sourceSha);
+  }
+  if (input.manifest?.sourceSha && /^[a-f0-9]{40}$/.test(input.manifest.sourceSha)) {
+    definedShas.set("manifest", input.manifest.sourceSha);
+  }
+  if (
+    input.sourceSha &&
+    /^[a-f0-9]{40}$/.test(input.sourceSha) &&
+    input.sourceSha !== "0000000000000000000000000000000000000000"
+  ) {
+    definedShas.set("caller", input.sourceSha);
+  }
+  const uniqueShas = new Set(definedShas.values());
+  if (uniqueShas.size > 1) {
+    const details = Array.from(definedShas.entries())
+      .map(([k, v]) => `${k}=${v}`)
+      .join(", ");
+    violations.push({
+      code: "SOURCE_IDENTITY_CONFLICT",
+      description: `Conflicting sourceSha across inputs: ${details}`,
+      severity: "ERROR",
+    });
+  }
+
+  // 5. Experiment ID conflict detection across inputs
+  const journalExp = startRow?.experimentId ?? journalRows[0]?.experimentId;
+  const definedExps = new Map<string, string>();
+  if (journalExp) definedExps.set("journal", journalExp);
+  if (input.manifest?.experimentId) definedExps.set("manifest", input.manifest.experimentId);
+  if (input.experimentId) definedExps.set("caller", input.experimentId);
+  const uniqueExps = new Set(definedExps.values());
+  if (uniqueExps.size > 1) {
+    const details = Array.from(definedExps.entries())
+      .map(([k, v]) => `${k}=${v}`)
+      .join(", ");
+    violations.push({
+      code: "EXPERIMENT_ID_CONFLICT",
+      description: `Conflicting experimentId across inputs: ${details}`,
+      severity: "ERROR",
+    });
+  }
+
+  // 6. Run ID conflict detection across inputs
+  const definedRuns = new Map<string, string>();
+  for (const s of allStartRows) {
+    if (s.runId && typeof s.runId === "string") {
+      definedRuns.set(`journal start seq ${s.seq ?? 1}`, s.runId);
+    }
+  }
+  if (input.runId) definedRuns.set("caller", input.runId);
+  const uniqueRuns = new Set(definedRuns.values());
+  if (uniqueRuns.size > 1) {
+    const details = Array.from(definedRuns.entries())
+      .map(([k, v]) => `${k}=${v}`)
+      .join(", ");
+    violations.push({
+      code: "RUN_ID_CONFLICT",
+      description: `Conflicting runId across inputs: ${details}`,
+      severity: "ERROR",
+    });
+  }
+
+  // 7. Citizens / Roster conflict detection
+  const manifestRoster = input.manifest
+    ? input.manifest.citizens.map((c: { id: string }) => c.id)
+    : undefined;
+  const startRoster =
+    startRow?.citizens && startRow.citizens.length > 0 ? startRow.citizens : undefined;
+  const callerRoster = input.citizens && input.citizens.length > 0 ? input.citizens : undefined;
+
+  if (startRoster && callerRoster) {
+    const s1 = new Set<string>(startRoster);
+    const s2 = new Set<string>(callerRoster);
+    if (s1.size !== s2.size || [...s1].some((c) => !s2.has(c))) {
+      violations.push({
+        code: "ROSTER_CONFLICT",
+        description: `Journal start roster ([${startRoster.join(", ")}]) conflicts with caller roster ([${callerRoster.join(", ")}]).`,
+        severity: "ERROR",
+      });
+    }
+  }
+  if (startRoster && manifestRoster) {
+    const s1 = new Set<string>(startRoster);
+    const s2 = new Set<string>(manifestRoster);
+    if (s1.size !== s2.size || [...s1].some((c) => !s2.has(c))) {
+      violations.push({
+        code: "ROSTER_CONFLICT",
+        description: `Journal start roster ([${startRoster.join(", ")}]) conflicts with manifest roster ([${manifestRoster.join(", ")}]).`,
+        severity: "ERROR",
+      });
+    }
+  }
+  if (manifestRoster && callerRoster) {
+    const s1 = new Set<string>(manifestRoster);
+    const s2 = new Set<string>(callerRoster);
+    if (s1.size !== s2.size || [...s1].some((c) => !s2.has(c))) {
+      violations.push({
+        code: "ROSTER_CONFLICT",
+        description: `Manifest roster ([${manifestRoster.join(", ")}]) conflicts with caller roster ([${callerRoster.join(", ")}]).`,
+        severity: "ERROR",
+      });
+    }
+  }
+
+  // Known citizen IDs set
+  const knownCitizenIds: Set<string> | undefined = manifestRoster
+    ? new Set(manifestRoster)
+    : startRoster
+      ? new Set(startRoster)
+      : callerRoster
+        ? new Set(callerRoster)
+        : undefined;
+
+  // QA75-M2: Check phantom citizen actions in raw parsed evidence
+  if (knownCitizenIds) {
+    for (const r of rawParsed) {
+      if ((r.kind === "action_attempt" || r.kind === "action_observation") && r.citizenId) {
+        const cId = r.citizenId as string;
+        if (!knownCitizenIds.has(cId)) {
+          if (!violations.some((v) => v.code === "PHANTOM_CITIZEN_ACTION" && v.citizenId === cId)) {
+            violations.push({
+              code: "PHANTOM_CITIZEN_ACTION",
+              citizenId: cId,
+              description: `action from citizen '${cId}' in raw evidence who is not registered in the authorized roster.`,
+              severity: "ERROR",
+            });
+          }
+        }
+      }
+    }
+  }
+
+  // Resolve effective identities
+  const effectiveSourceSha =
+    startRow?.sourceSha ??
+    input.manifest?.sourceSha ??
+    (input.sourceSha && /^[a-f0-9]{40}$/.test(input.sourceSha) ? input.sourceSha : undefined) ??
+    "0000000000000000000000000000000000000000";
+
+  const effectiveExperimentId =
+    journalExp ??
+    input.manifest?.experimentId ??
+    input.experimentId ??
+    "unspecified_experiment";
+
+  const effectiveRunId =
+    startRow?.runId ??
+    input.runId ??
+    input.manifest?.experimentId ??
+    effectiveExperimentId;
+
+  // QA67-R1: Expected values for attestation verification MUST bind to manifest/journal, NEVER caller alone!
+  const expectedSourceShaForAttestation =
+    startRow?.sourceSha ??
+    input.manifest?.sourceSha ??
+    (uniqueShas.size > 1 ? undefined : (input.sourceSha && /^[a-f0-9]{40}$/.test(input.sourceSha) ? input.sourceSha : undefined));
+
+  const expectedExperimentIdForAttestation =
+    journalExp ??
+    input.manifest?.experimentId ??
+    (uniqueExps.size > 1 ? undefined : input.experimentId);
+
+  // 3b. Process Action Records from Journal Rows
   const pendingAttempts = new Map<string, ActionAttemptEvidence>();
-  // Phase 2: track seen attempt IDs to detect duplicates
   const seenAttemptIds = new Set<string>();
   const actionVerifications: ActionVerificationResult[] = [];
+  const citizenLastInventory = new Map<string, Record<string, number>>();
 
   for (const row of journalRows) {
     if (row.kind === "action_attempt") {
-      // Phase 2: detect duplicate attemptId
+      // Raw rows remain authoritative, but do not bypass the parser's decision-source enum.
+      if (!journalAttemptSchema.shape.decisionSource.safeParse(row.decisionSource).success) {
+        violations.push({
+          code: "INVALID_ACTION_DECISION_SOURCE",
+          citizenId: row.citizenId,
+          description: "Signed action_attempt has an unsupported decisionSource.",
+          severity: "ERROR",
+        });
+        continue;
+      }
       if (seenAttemptIds.has(row.attemptId)) {
         violations.push({
           code: "DUPLICATE_ATTEMPT_ID",
@@ -106,15 +426,26 @@ export function validateExperimentEvidence(input: ValidatorInput): ValidationRep
         });
       }
       seenAttemptIds.add(row.attemptId);
-      // Phase 2: detect citizen not in manifest
+
       if (knownCitizenIds && !knownCitizenIds.has(row.citizenId)) {
         violations.push({
           code: "PHANTOM_CITIZEN_ACTION",
           citizenId: row.citizenId,
-          description: `action_attempt from citizen '${row.citizenId}' who is not registered in the experiment manifest.`,
+          description: `action_attempt from citizen '${row.citizenId}' who is not registered in the authorized roster.`,
           severity: "ERROR",
         });
       }
+
+      // QA67-M6: refuse model-provenance claims when transport is scripted
+      if (startRow?.decisionTransport === "scripted-in-process" && row.decisionSource === "model") {
+        violations.push({
+          code: "TRANSPORT_SOURCE_CONTRADICTION",
+          citizenId: row.citizenId,
+          description: `Action attempt '${row.attemptId}' claims decisionSource 'model', but journal start row specifies decisionTransport 'scripted-in-process'.`,
+          severity: "ERROR",
+        });
+      }
+
       pendingAttempts.set(row.attemptId, {
         citizenId: row.citizenId,
         attemptId: row.attemptId,
@@ -128,6 +459,38 @@ export function validateExperimentEvidence(input: ValidatorInput): ValidationRep
         timestamp: row.at,
       });
     } else if (row.kind === "action_observation") {
+      if (knownCitizenIds && !knownCitizenIds.has(row.citizenId)) {
+        violations.push({
+          code: "PHANTOM_CITIZEN_ACTION",
+          citizenId: row.citizenId,
+          description: `action_observation from citizen '${row.citizenId}' who is not registered in the authorized roster.`,
+          severity: "ERROR",
+        });
+      }
+
+      // QA67-M7: Per-citizen inventory continuity
+      const lastInv = citizenLastInventory.get(row.citizenId);
+      if (lastInv !== undefined) {
+        const beforeInv = row.beforeInventory ?? {};
+        const allKeys = new Set([...Object.keys(lastInv), ...Object.keys(beforeInv)]);
+        let match = true;
+        for (const k of allKeys) {
+          if ((lastInv[k] ?? 0) !== (beforeInv[k] ?? 0)) {
+            match = false;
+            break;
+          }
+        }
+        if (!match) {
+          violations.push({
+            code: "INVENTORY_CONTINUITY_DISRUPTION",
+            citizenId: row.citizenId,
+            description: `Citizen '${row.citizenId}' observation '${row.attemptId}' beforeInventory does not match previous observation afterInventory.`,
+            severity: "ERROR",
+          });
+        }
+      }
+      citizenLastInventory.set(row.citizenId, { ...(row.afterInventory ?? {}) });
+
       const attempt = pendingAttempts.get(row.attemptId);
       if (!attempt) {
         violations.push({
@@ -141,19 +504,30 @@ export function validateExperimentEvidence(input: ValidatorInput): ValidationRep
 
       pendingAttempts.delete(row.attemptId);
 
+      const matchingRawObs = rawParsed.find((p) => p.seq === row.seq);
       const observation: ActionObservationEvidence = {
         citizenId: row.citizenId,
         attemptId: row.attemptId,
-        successReported: row.successReported,
-        verified: row.verified,
-        beforeInventory: row.beforeInventory,
-        afterInventory: row.afterInventory,
-        position: row.position,
+        successReported:
+          matchingRawObs?.successReported !== undefined
+            ? Boolean(matchingRawObs.successReported)
+            : Boolean(row.successReported),
+        verified:
+          matchingRawObs?.verified !== undefined
+            ? Boolean(matchingRawObs.verified)
+            : Boolean(row.verified),
+        beforeInventory:
+          ((matchingRawObs?.beforeInventory ?? row.beforeInventory ?? {}) as Record<string, number>),
+        afterInventory:
+          ((matchingRawObs?.afterInventory ?? row.afterInventory ?? {}) as Record<string, number>),
+        position:
+          ((matchingRawObs?.position ?? row.position) as { x: number; y: number; z: number } | undefined),
         hungerBefore: row.hungerBefore,
         hungerAfter: row.hungerAfter,
         healthBefore: row.healthBefore,
         healthAfter: row.healthAfter,
-        worldChanges: row.worldChanges,
+        worldChanges:
+          ((matchingRawObs?.worldChanges ?? row.worldChanges ?? []) as unknown as WorldBlockChange[]),
         authorizedRecipients: row.authorizedRecipients,
         failureCode: row.failureCode,
         timestamp: row.at,
@@ -216,35 +590,30 @@ export function validateExperimentEvidence(input: ValidatorInput): ValidationRep
     });
   }
 
-  // 4. Resolve identity & source SHA from manifest, caller inputs, or journal start row
-  const startRow = journalRows.find((r) => r.kind === "start");
-  const effectiveSourceSha =
-    (input.sourceSha && /^[a-f0-9]{40}$/.test(input.sourceSha) ? input.sourceSha : undefined) ??
-    (input.manifest?.sourceSha && /^[a-f0-9]{40}$/.test(input.manifest.sourceSha)
-      ? input.manifest.sourceSha
-      : undefined) ??
-    (startRow?.sourceSha && /^[a-f0-9]{40}$/.test(startRow.sourceSha)
-      ? startRow.sourceSha
-      : undefined) ??
-    "0000000000000000000000000000000000000000";
-
-  const effectiveExperimentId =
-    (input.experimentId && input.experimentId.trim() ? input.experimentId.trim() : undefined) ??
-    (input.manifest?.experimentId && input.manifest.experimentId.trim()
-      ? input.manifest.experimentId.trim()
-      : undefined) ??
-    (startRow?.experimentId && startRow.experimentId.trim()
-      ? startRow.experimentId.trim()
-      : undefined) ??
-    "unspecified_experiment";
-
-  const effectiveRunId =
-    (input.runId && input.runId.trim() ? input.runId.trim() : undefined) ??
-    (startRow?.runId && startRow.runId.trim() ? startRow.runId.trim() : undefined) ??
-    (input.manifest?.experimentId && input.manifest.experimentId.trim()
-      ? input.manifest.experimentId.trim()
-      : undefined) ??
-    effectiveExperimentId;
+  // QA75-L1: Compare final journal observations against physical final inventories
+  if (input.finalInventories) {
+    for (const [citizenId, finalPhysical] of Object.entries(input.finalInventories)) {
+      const lastObsInv = citizenLastInventory.get(citizenId);
+      if (lastObsInv !== undefined) {
+        const allKeys = new Set([...Object.keys(lastObsInv), ...Object.keys(finalPhysical)]);
+        let match = true;
+        for (const k of allKeys) {
+          if ((lastObsInv[k] ?? 0) !== (finalPhysical[k] ?? 0)) {
+            match = false;
+            break;
+          }
+        }
+        if (!match) {
+          violations.push({
+            code: "INVENTORY_CONTINUITY_DISRUPTION",
+            citizenId,
+            description: `Citizen '${citizenId}' final journal observation inventory does not match physical final inventory.`,
+            severity: "ERROR",
+          });
+        }
+      }
+    }
+  }
 
   // Duration & Tick Audit
   const claimedMinutes = input.manifest?.durationMinutes ?? 0;
@@ -252,21 +621,24 @@ export function validateExperimentEvidence(input: ValidatorInput): ValidationRep
     claimedDurationMinutes: claimedMinutes,
     journalRows,
     sourceAttestation: input.sourceAttestation,
-    experimentId: effectiveExperimentId,
+    experimentId: expectedExperimentIdForAttestation,
     trustedAuthorities: input.trustedAuthorities,
     trustedKeys: input.trustedKeys,
     expectedSourceSha:
-      effectiveSourceSha !== "0000000000000000000000000000000000000000"
-        ? effectiveSourceSha
+      expectedSourceShaForAttestation &&
+      expectedSourceShaForAttestation !== "0000000000000000000000000000000000000000"
+        ? expectedSourceShaForAttestation
         : undefined,
     rawJournalLines: input.rawJournalLines,
   });
 
-  // Mission 006: Run mode upgraded to real_minecraft ONLY with proven server attestation
+  // Mission 006 / QA75-L2: Run mode upgraded to real_minecraft ONLY with proven server attestation and zero ERROR violations
+  const hasErrorViolations = violations.some((v) => v.severity === "ERROR");
   if (
     durationAudit.serverTickProven &&
     durationAudit.sourceAttestationAudit?.proven &&
-    durationAudit.durationComplete
+    durationAudit.durationComplete &&
+    !hasErrorViolations
   ) {
     mode = "real_minecraft";
   } else if (input.manifest?.paths.runRoot.includes("live")) {
@@ -358,6 +730,22 @@ export function validateExperimentEvidence(input: ValidatorInput): ValidationRep
   const failedActions = actionVerifications.filter((v) => v.status === "FAILED").length;
   const interruptedActions = actionVerifications.filter((v) => v.status === "INTERRUPTED").length;
 
+  // If live execution is claimed or live path configured, fail closed if unproven
+  const claimsLive =
+    Boolean(input.manifest?.paths.runRoot.includes("live")) ||
+    startRow?.mode === "live" ||
+    (input.sourceAttestation !== undefined && input.sourceAttestation.sourceType === "paper_server_attested");
+  if (claimsLive && (!durationAudit.sourceAttestationAudit?.proven || mode !== "real_minecraft")) {
+    if (!notProven.some((item) => item.code === "UNPROVEN_PAPER_AUTHENTICITY")) {
+      notProven.push({
+        code: "UNPROVEN_PAPER_AUTHENTICITY",
+        description:
+          "Experiment claims live Minecraft execution, but Paper server authenticity and continuous tick progression are not proven.",
+        missingFields: ["sourceAttestation"],
+      });
+    }
+  }
+
   let overallStatus: OverallValidationStatus;
   if (violations.length > 0) {
     overallStatus = "VIOLATIONS_DETECTED";
@@ -367,11 +755,16 @@ export function validateExperimentEvidence(input: ValidatorInput): ValidationRep
     overallStatus = "VERIFIED";
   }
 
-  const citizenList = input.manifest?.citizens.map((c: { id: string }) => c.id) ??
-    (input.citizens && input.citizens.length > 0 ? input.citizens : undefined) ??
-    (startRow?.citizens && startRow.citizens.length > 0 ? startRow.citizens : undefined) ?? [
+  const citizenList =
+    (startRoster && startRoster.length > 0 ? startRoster : undefined) ??
+    (manifestRoster && manifestRoster.length > 0 ? manifestRoster : undefined) ??
+    callerRoster ?? [
       ...new Set(actionVerifications.map((v) => v.citizenId)),
     ];
+
+  if (mode === "real_minecraft" && violations.some((v) => v.severity === "ERROR")) {
+    mode = "offline_simulated";
+  }
 
   const report: ValidationReport = {
     version: "1.0.0",

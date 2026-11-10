@@ -38,7 +38,32 @@ export function auditDurationAndTicks(args: {
   let serverTickRegressed = false;
   let serverTickGapDetected = false;
 
-  for (const row of args.journalRows) {
+  interface AuditedRow {
+    seq: number;
+    at: string;
+    kind: string;
+    durationMs?: number;
+    measuredTps?: number | null;
+    serverGameTick?: number | null;
+    completedDuration?: boolean;
+  }
+
+  const rowsToAudit: AuditedRow[] = [];
+  if (args.rawJournalLines && args.rawJournalLines.length > 0) {
+    for (const line of args.rawJournalLines) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+      try {
+        rowsToAudit.push(JSON.parse(trimmed) as AuditedRow);
+      } catch {
+        // syntax error handled elsewhere
+      }
+    }
+  } else {
+    rowsToAudit.push(...(args.journalRows as AuditedRow[]));
+  }
+
+  for (const row of rowsToAudit) {
     const rowTime = new Date(row.at).getTime();
     if (isNaN(rowTime)) {
       reasons.push(`Invalid timestamp found in journal row seq ${row.seq}: '${row.at}'`);
@@ -55,19 +80,17 @@ export function auditDurationAndTicks(args: {
     lastSeq = row.seq;
 
     if (row.kind === "tick") {
-      totalDurationMs += row.durationMs;
+      if (typeof row.durationMs === "number") {
+        totalDurationMs += row.durationMs;
+      }
       tickCount++;
 
-      if (row.measuredTps !== undefined && row.measuredTps !== null) {
+      if (typeof row.measuredTps === "number") {
         tpsSum += row.measuredTps;
         tpsCount++;
       }
 
-      if (
-        "serverGameTick" in row &&
-        row.serverGameTick !== undefined &&
-        row.serverGameTick !== null
-      ) {
+      if (typeof row.serverGameTick === "number") {
         const tick = row.serverGameTick;
         if (firstServerGameTick === undefined) {
           firstServerGameTick = tick;
@@ -91,9 +114,9 @@ export function auditDurationAndTicks(args: {
 
   // Calculate wall duration from timestamps
   let wallDurationMs = 0;
-  if (args.journalRows.length >= 2) {
-    const firstTime = new Date(args.journalRows[0]!.at).getTime();
-    const lastTime = new Date(args.journalRows[args.journalRows.length - 1]!.at).getTime();
+  if (rowsToAudit.length >= 2) {
+    const firstTime = new Date(rowsToAudit[0]!.at).getTime();
+    const lastTime = new Date(rowsToAudit[rowsToAudit.length - 1]!.at).getTime();
     if (!isNaN(firstTime) && !isNaN(lastTime)) {
       wallDurationMs = Math.max(0, lastTime - firstTime);
     }
@@ -131,12 +154,21 @@ export function auditDurationAndTicks(args: {
   const tpsEvidencePresent = tpsCount > 0;
 
   // Shutdown evidence check (Phase C, Mission 007)
-  const shutdownRow = args.journalRows.find((r) => r.kind === "shutdown");
+  const shutdownRow = rowsToAudit.find((r) => r.kind === "shutdown");
   const hasShutdownEvidence = Boolean(shutdownRow) || Boolean(args.sourceAttestation?.endedAt);
 
   // Evaluate Server Ticks Progression & Authenticity
   if (serverTickCount > 0) {
     const elapsedServerTicks = (lastServerGameTick ?? 0) - (firstServerGameTick ?? 0);
+
+    const minTicks =
+      args.claimedDurationMinutes > 0
+        ? args.claimedDurationMinutes * TICKS_PER_MINUTE_AT_20TPS * 0.95
+        : MINIMUM_PAPER_TICKS_FOR_60MIN;
+    const minSamples =
+      args.claimedDurationMinutes >= 60
+        ? 10
+        : Math.min(10, Math.max(2, Math.floor(args.claimedDurationMinutes / 6)));
 
     if (serverTickRegressed) {
       reasons.push(
@@ -146,16 +178,13 @@ export function auditDurationAndTicks(args: {
       reasons.push(
         "Server game tick gap detected: a jump > 5 minutes in serverGameTick values indicates the Paper server was paused or the evidence was spliced",
       );
-    } else if (args.claimedDurationMinutes >= 60 && serverTickCount < 10) {
+    } else if (args.claimedDurationMinutes > 0 && serverTickCount < minSamples) {
       reasons.push(
         `Insufficient server tick samples: only ${serverTickCount} serverGameTick observation(s) provided. Continuous server progression cannot be proven from isolated samples.`,
       );
-    } else if (
-      args.claimedDurationMinutes >= 60 &&
-      elapsedServerTicks < MINIMUM_PAPER_TICKS_FOR_60MIN
-    ) {
+    } else if (args.claimedDurationMinutes > 0 && elapsedServerTicks < minTicks) {
       reasons.push(
-        `Insufficient Paper tick progression: elapsed server game ticks (${elapsedServerTicks}) deficit for 60-minute requirement (expected ~72,000, minimum allowed: ${MINIMUM_PAPER_TICKS_FOR_60MIN})`,
+        `Insufficient Paper tick progression: elapsed server game ticks (${elapsedServerTicks}) deficit for ${args.claimedDurationMinutes}-minute requirement (expected ~${args.claimedDurationMinutes * TICKS_PER_MINUTE_AT_20TPS}, minimum allowed: ${minTicks})`,
       );
     } else if (!attestationAudit.proven) {
       // P0 FIX: Missing or unverified attestation MUST NOT allow serverTickProven = true!
@@ -169,18 +198,22 @@ export function auditDurationAndTicks(args: {
     reasons.push("Missing server game tick evidence for live Paper demonstration claim");
   }
 
-  // Strict 60-Minute Duration Check
+  // Strict Duration Check
   const targetMs = args.claimedDurationMinutes * 60_000;
   let durationComplete = false;
 
-  if (args.claimedDurationMinutes >= 60) {
+  if (args.claimedDurationMinutes > 0) {
     if (isLiveClaim && wallDurationMs < targetMs) {
       reasons.push(
         `Live wall duration deficit: claimed ${args.claimedDurationMinutes} minutes, but elapsed wall time is only ${(wallDurationMs / 60_000).toFixed(2)} minutes (${wallDurationMs} ms vs required ${targetMs} ms). A live Paper demonstration cannot substitute simulated tick duration for elapsed wall time.`,
       );
     } else if (provenDurationMs < targetMs) {
+      const extra =
+        args.claimedDurationMinutes >= 60
+          ? " A 58.8-minute run cannot be accepted as a completed 60-minute demonstration."
+          : "";
       reasons.push(
-        `Simulation duration deficit: claimed ${args.claimedDurationMinutes} minutes, but evidence only proves ${provenDurationMinutes} minutes (${provenDurationMs} ms vs required ${targetMs} ms). A 58.8-minute run cannot be accepted as a completed 60-minute demonstration.`,
+        `Simulation duration deficit: claimed ${args.claimedDurationMinutes} minutes, but evidence only proves ${provenDurationMinutes} minutes (${provenDurationMs} ms vs required ${targetMs} ms).${extra}`,
       );
     } else {
       durationComplete = true;
@@ -212,14 +245,6 @@ export function auditDurationAndTicks(args: {
           "Absent TPS metrics: live Paper demonstration requires explicit server performance / TPS observations.",
         );
       }
-    }
-  } else if (args.claimedDurationMinutes > 0) {
-    if (provenDurationMs < targetMs) {
-      reasons.push(
-        `Simulation duration deficit: claimed ${args.claimedDurationMinutes} minutes, but evidence only proves ${provenDurationMinutes} minutes (${provenDurationMs} ms vs expected ${targetMs} ms)`,
-      );
-    } else {
-      durationComplete = true;
     }
   }
 

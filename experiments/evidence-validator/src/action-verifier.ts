@@ -11,13 +11,15 @@ function getCount(inv: Record<string, number>, key: string): number {
 }
 
 function computeInventoryDelta(
-  before: Record<string, number>,
-  after: Record<string, number>,
+  before: Record<string, number> | undefined,
+  after: Record<string, number> | undefined,
 ): Record<string, number> {
+  const b = before ?? {};
+  const a = after ?? {};
   const delta: Record<string, number> = {};
-  const allKeys = new Set([...Object.keys(before), ...Object.keys(after)]);
+  const allKeys = new Set([...Object.keys(b), ...Object.keys(a)]);
   for (const key of allKeys) {
-    const diff = getCount(after, key) - getCount(before, key);
+    const diff = getCount(a, key) - getCount(b, key);
     if (diff !== 0) {
       delta[key] = diff;
     }
@@ -76,6 +78,28 @@ export function verifySingleAction(
       reasons.push(
         `Timestamp anachronism: observation timestamp (${observation.timestamp}) precedes attempt timestamp (${attempt.timestamp})`,
       );
+      return {
+        attemptId: attempt.attemptId,
+        citizenId: attempt.citizenId,
+        action: attempt.action,
+        decisionEventId: attempt.decisionEventId,
+        decisionSource: attempt.decisionSource,
+        status: "CORRUPTED",
+        classification: "unverified_assertion",
+        chain: {
+          worldEventProven: false,
+          legitimatelyObserved: false,
+          legitimateBelief: false,
+          decisionDocumented: true,
+          actionAttempted: true,
+          physicalOutcomeVerified: false,
+        },
+        physicalDeltas: {
+          inventoryDelta: invDelta,
+          worldChangesCount: observation.worldChanges.length,
+        },
+        reasons,
+      };
     }
   }
 
