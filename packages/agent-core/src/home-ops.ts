@@ -179,6 +179,17 @@ export async function executeHouseholdStorage(
   return executeStorage(ctx, store, events, runtime, "household", action, itemName, count);
 }
 
+function storageActionCurrent(ctx: SkillContext): boolean {
+  return !ctx.signal?.aborted && ctx.isActionCurrent?.() !== false;
+}
+function abandonedStorage(ctx: SkillContext, events: EventBus, action: string, result: ActionResult): ActionResult {
+  events.emit(createEvent("SystemIncident", {
+    kind: "AbandonedActionObservation", action, reconciliation: "PENDING",
+    observedResult: result, authoritativeStorageUpdated: false,
+  }, ctx.citizenId));
+  return fail("CANCELLED", "Home storage action ended; observed transfers require reconciliation", result.durationMs, false);
+}
+
 async function executeStorage(
   ctx: SkillContext,
   store: CivilizationStore,
@@ -207,6 +218,7 @@ async function executeStorage(
   try {
     if (action === "deposit") {
       const result = await depositItems(ctx, itemName, chest);
+      if (!storageActionCurrent(ctx)) return abandonedStorage(ctx, events, "depositItems", result);
       if (result.success) {
         events.emit(
           createEvent("ItemDeposited", { count: result.data.deposited, contents: result.data.contents, position: chest, access: purpose }, ctx.citizenId),
@@ -218,12 +230,15 @@ async function executeStorage(
       return fail("INVALID_ARGUMENT", "Withdraw requires an item name", 0, false);
     }
     const result = await withdrawItems(ctx, itemName, count, chest);
+    if (!storageActionCurrent(ctx)) return abandonedStorage(ctx, events, "withdrawItems", result);
     if (result.success) {
       events.emit(createEvent("ItemWithdrawn", { item: itemName, count: result.data.count, position: chest, access: purpose }, ctx.citizenId));
     }
     return result;
   } finally {
-    runtime.claims.release("container", cellClaimKey(chest.x, chest.y, chest.z), ctx.citizenId);
+    if (storageActionCurrent(ctx)) {
+      runtime.claims.release("container", cellClaimKey(chest.x, chest.y, chest.z), ctx.citizenId);
+    }
   }
 }
 
