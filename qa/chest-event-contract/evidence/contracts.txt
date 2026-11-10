@@ -1,0 +1,127 @@
+RUN  v3.2.7 /private/tmp/chest-events-review/qa/chest-event-contract
+
+(node:48606) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+stdout | test/events.test.ts > desired contract: personal deposit has exactly one success event
+{
+  purpose: 'personal',
+  action: 'deposit',
+  successPayloads: [
+    {
+      item: 'cobblestone',
+      count: 4,
+      citizenAfter: 0,
+      containerAfter: 4,
+      position: [Object]
+    },
+    {
+      count: 4,
+      contents: [Object],
+      position: [Object],
+      access: 'personal'
+    }
+  ]
+}
+
+stdout | test/events.test.ts > desired contract: personal withdraw has exactly one success event
+{
+  purpose: 'personal',
+  action: 'withdraw',
+  successPayloads: [
+    {
+      item: 'cobblestone',
+      count: 1,
+      citizenAfter: 1,
+      containerAfter: 3
+    },
+    {
+      item: 'cobblestone',
+      count: 1,
+      position: [Object],
+      access: 'personal'
+    }
+  ]
+}
+
+stdout | test/events.test.ts > desired contract: household deposit has exactly one success event
+{
+  purpose: 'household',
+  action: 'deposit',
+  successPayloads: [
+    {
+      item: 'cobblestone',
+      count: 4,
+      citizenAfter: 0,
+      containerAfter: 4,
+      position: [Object]
+    },
+    {
+      count: 4,
+      contents: [Object],
+      position: [Object],
+      access: 'household'
+    }
+  ]
+}
+
+ ❯ test/events.test.ts (8 tests | 4 failed) 5789ms
+   × desired contract: personal deposit has exactly one success event 306ms
+     → expected [ …(2) ] to have a length of 1 but got 2
+   × desired contract: personal withdraw has exactly one success event 77ms
+     → expected [ …(2) ] to have a length of 1 but got 2
+   × desired contract: household deposit has exactly one success event 67ms
+     → expected [ …(2) ] to have a length of 1 but got 2
+   × desired contract: household withdraw has exactly one success event 24ms
+     → expected false to be true // Object.is equality
+   ✓ cancel deposit: zero success events, pending facts and conserved physical items  1330ms
+   ✓ cancel withdraw: zero success events, pending facts and conserved physical items  1322ms
+   ✓ timeout deposit: zero success events, pending facts and conserved physical items  1326ms
+   ✓ timeout withdraw: zero success events, pending facts and conserved physical items  1334ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/events.test.ts > desired contract: personal deposit has exactly one success event
+ FAIL  test/events.test.ts > desired contract: personal withdraw has exactly one success event
+ FAIL  test/events.test.ts > desired contract: household deposit has exactly one success event
+AssertionError: expected [ …(2) ] to have a length of 1 but got 2
+
+- Expected
++ Received
+
+- 1
++ 2
+
+ ❯ test/events.test.ts:17:25
+     15|       console.log({ purpose, action, successPayloads: successes.map(e …
+     16|       expect(h.r.bot.count("cobblestone") + h.chest.stock).toBe(4);
+     17|       expect(successes).toHaveLength(1);
+       |                         ^
+     18|     });
+     19|   }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯
+
+ FAIL  test/events.test.ts > desired contract: household withdraw has exactly one success event
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ test/events.test.ts:13:126
+     11|     it(`desired contract: ${purpose} ${action} has exactly one success…
+     12|       const h = homeRig({ purpose, item: "cobblestone", type: 4, chest…
+     13|       expect((await h.run(`${action}_${purpose}`, action === "deposit"…
+       |                                                                                                                              ^
+     14|       const successes = h.seen.filter(e => e.type === (action === "dep…
+     15|       console.log({ purpose, action, successPayloads: successes.map(e …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/4]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  4 failed | 4 passed (8)
+   Start at  16:34:32
+   Duration  15.26s (transform 4.21s, setup 536ms, collect 6.08s, tests 5.79s, environment 0ms, prepare 725ms)

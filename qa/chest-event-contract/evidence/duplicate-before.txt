@@ -1,0 +1,11 @@
+RUN  v3.2.7 /private/tmp/chest-events-review/qa/v88
+
+(node:47649) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ test/qa88-home-controls.test.ts (4 tests) 3507ms
+   ✓ personal chest, no abandonment > deposit_personal: success, at least one ItemDeposited, one ActionCompleted, chest and inventory agree, claim released  2943ms
+
+ Test Files  1 passed (1)
+      Tests  4 passed (4)
+   Start at  16:33:45
+   Duration  16.99s (transform 6.46s, setup 241ms, collect 10.84s, tests 3.51s, environment 0ms, prepare 416ms)

@@ -1,0 +1,23 @@
+RUN  v3.2.7 /private/tmp/chest-events-review/qa/v88
+
+(node:48928) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+stdout | defects/qa88-home-storage.test.ts > [QA88-M1] the personal/household chest path (home-ops.executeStorage) is not covered by PR #88's abandoned-transfer gate > deposit_personal: after the boundary returned TIMEOUT, no success event for the abandoned transfer is emitted
+QA88-M1 deposit_personal managerSaw=TIMEOUT eventsAfterReturn=SystemIncident,SystemIncident,SystemIncident chestStock=4 inventory=0
+
+stdout | defects/qa88-home-storage.test.ts > [QA88-M1] the personal/household chest path (home-ops.executeStorage) is not covered by PR #88's abandoned-transfer gate > withdraw_personal: after the boundary returned TIMEOUT, no success event for the abandoned transfer is emitted
+QA88-M1 withdraw_personal managerSaw=TIMEOUT eventsAfterReturn=SystemIncident,SystemIncident,SystemIncident chestStock=3 inventory=1
+
+stdout | defects/qa88-home-storage.test.ts > [QA88-M1] the personal/household chest path (home-ops.executeStorage) is not covered by PR #88's abandoned-transfer gate > deposit_household: after the boundary returned TIMEOUT, no success event for the abandoned transfer is emitted
+QA88-M1 deposit_household managerSaw=TIMEOUT eventsAfterReturn=SystemIncident,SystemIncident,SystemIncident chestStock=4 inventory=0
+
+ ✓ defects/qa88-home-storage.test.ts (4 tests) 15155ms
+   ✓ [QA88-M1] the personal/household chest path (home-ops.executeStorage) is not covered by PR #88's abandoned-transfer gate > deposit_personal: after the boundary returned TIMEOUT, no success event for the abandoned transfer is emitted  4512ms
+   ✓ [QA88-M1] the personal/household chest path (home-ops.executeStorage) is not covered by PR #88's abandoned-transfer gate > withdraw_personal: after the boundary returned TIMEOUT, no success event for the abandoned transfer is emitted  3563ms
+   ✓ [QA88-M1] the personal/household chest path (home-ops.executeStorage) is not covered by PR #88's abandoned-transfer gate > deposit_household: after the boundary returned TIMEOUT, no success event for the abandoned transfer is emitted  3546ms
+   ✓ [QA88-M1] the personal/household chest path (home-ops.executeStorage) is not covered by PR #88's abandoned-transfer gate > deposit_personal: the abandoned executor must not release a container claim that a NEWER action of the same citizen has refreshed  3531ms
+
+ Test Files  1 passed (1)
+      Tests  4 passed (4)
+   Start at  16:34:51
+   Duration  22.88s (transform 3.60s, setup 302ms, collect 5.54s, tests 15.15s, environment 0ms, prepare 452ms)

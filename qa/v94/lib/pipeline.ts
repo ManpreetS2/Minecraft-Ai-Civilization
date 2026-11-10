@@ -11,14 +11,14 @@ export function artDir(which: "cand" | "base", name: "scenario-2" | "scenario-4"
   if (!root) throw new Error(`${which === "cand" ? "QA67_ART" : "QA67_BASE_ART"} is not set (run via scripts/run-on-candidate.sh)`);
   return join(root, name);
 }
-export interface Loaded { dir: string; bundle: Record<string, any>; rows: Row[]; rawText: string; finals: Record<string, Record<string, number>>; report: Record<string, any> }
+export interface Loaded { dir: string; bundle: Record<string, unknown>; rows: Row[]; rawText: string; finals: Record<string, Record<string, number>>; report: Record<string, unknown> }
 export function load(dir: string): Loaded {
   const bundle = JSON.parse(readFileSync(join(dir, "manifest.json"), "utf8"));
   const report = JSON.parse(readFileSync(join(dir, "gemini-validator-report.json"), "utf8"));
   const rawText = readFileSync(join(dir, "operator.jsonl"), "utf8");
-  return { dir, bundle, rows: readRows(join(dir, "operator.jsonl")), rawText, finals: report.inventoryAudit.citizenFinalInventories, report };
+  return { dir, bundle, rows: readRows(join(dir, "operator.jsonl")), rawText, finals: (report as { inventoryAudit: { citizenFinalInventories: Record<string, Record<string, number>> } }).inventoryAudit.citizenFinalInventories, report };
 }
-export function runPipeline(L: Loaded, o: { rows?: Row[]; rawLines?: string[]; bundle?: Record<string, any>; finals?: Record<string, Record<string, number>>; seal?: boolean } = {}) {
+export function runPipeline(L: Loaded, o: { rows?: Row[]; rawLines?: string[]; bundle?: Record<string, unknown>; finals?: Record<string, Record<string, number>>; seal?: boolean } = {}) {
   const tmp = mkdtempSync(join(tmpdir(), "qa67-"));
   const journalPath = join(tmp, "operator.jsonl");
   let lines: string[];
