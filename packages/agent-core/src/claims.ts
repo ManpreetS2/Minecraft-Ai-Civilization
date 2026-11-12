@@ -98,20 +98,30 @@ export class ReservationBook {
 
 export class ClaimBoard {
   private readonly claims = new Map<string, TaskClaim>();
+  private readonly acquisitionIds = new WeakMap<TaskClaim, string>();
 
   tryClaim(kind: string, key: string, ownerId: string, ttlMs = 90_000, now = Date.now()): boolean {
     this.expire(now);
     const id = claimId(kind, key);
     const existing = this.claims.get(id);
     if (existing && existing.ownerId !== ownerId) return false;
-    this.claims.set(id, {
-      id,
-      kind,
-      key,
-      ownerId,
-      createdAt: existing?.createdAt ?? now,
-      expiresAt: now + ttlMs,
-    });
+    const claim = { id, kind, key, ownerId, createdAt: existing?.createdAt ?? now, expiresAt: now + ttlMs };
+    this.acquisitionIds.set(claim, crypto.randomUUID());
+    this.claims.set(id, claim);
+    return true;
+  }
+
+  /** Every acquisition, including a same-owner refresh, gets a new identity. */
+  acquire(kind: string, key: string, ownerId: string, ttlMs = 90_000, now = Date.now()): string | undefined {
+    if (!this.tryClaim(kind, key, ownerId, ttlMs, now)) return undefined;
+    return this.acquisitionIds.get(this.claims.get(claimId(kind, key))!);
+  }
+
+  releaseAcquisition(kind: string, key: string, ownerId: string, acquisitionId: string): boolean {
+    const id = claimId(kind, key);
+    const current = this.claims.get(id);
+    if (!current || current.ownerId !== ownerId || this.acquisitionIds.get(current) !== acquisitionId) return false;
+    this.claims.delete(id);
     return true;
   }
 

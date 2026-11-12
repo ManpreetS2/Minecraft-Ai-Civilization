@@ -212,7 +212,9 @@ async function executeStorage(
       access: purpose,
     });
   }
-  if (ctx.citizenId && !runtime.claims.tryClaim("container", cellClaimKey(chest.x, chest.y, chest.z), ctx.citizenId, 30_000)) {
+  const claimKey = cellClaimKey(chest.x, chest.y, chest.z);
+  const acquisitionId = ctx.citizenId ? runtime.claims.acquire("container", claimKey, ctx.citizenId, 30_000) : undefined;
+  if (ctx.citizenId && !acquisitionId) {
     return fail("CONTAINER_BUSY", "Chest is in use", 0, true, { position: chest });
   }
   try {
@@ -236,8 +238,8 @@ async function executeStorage(
     }
     return result;
   } finally {
-    if (storageActionCurrent(ctx)) {
-      runtime.claims.release("container", cellClaimKey(chest.x, chest.y, chest.z), ctx.citizenId);
+    if (ctx.citizenId && acquisitionId) {
+      runtime.claims.releaseAcquisition("container", claimKey, ctx.citizenId, acquisitionId);
     }
   }
 }

@@ -1,0 +1,6 @@
+test exit=0 (2633 passed, 2 skipped)
+typecheck exit=0
+typecheck:tools exit=0
+typecheck:evidence-validator exit=0
+lint exit=0 (rerun after QA fixture lint annotations)
+build exit=0

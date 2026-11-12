@@ -40,3 +40,31 @@ describe("task claims", () => {
     expect(board.ownerOf("block", "1,70,1", 0)).toBeUndefined();
   });
 });
+
+
+describe("container acquisition identities", () => {
+  it("releases the cancelled acquisition and lets another citizen acquire immediately", () => {
+    const board = new ClaimBoard();
+    const token = board.acquire("container", "chest", "old", 30_000, 0)!;
+    expect(board.releaseAcquisition("container", "chest", "old", token)).toBe(true);
+    expect(board.acquire("container", "chest", "other", 30_000, 1)).toBeDefined();
+  });
+  it("never releases a same-owner refresh, a newer generation, or a different owner", () => {
+    for (const replacement of ["same", "different"]) {
+      const board = new ClaimBoard();
+      const old = board.acquire("container", "chest", "same", 10, 0)!;
+      const next = board.acquire("container", "chest", replacement, 100, replacement === "same" ? 1 : 11)!;
+      expect(next).not.toBe(old);
+      expect(board.releaseAcquisition("container", "chest", "same", old)).toBe(false);
+      expect(board.ownerOf("container", "chest", 12)).toBe(replacement);
+      expect(board.releaseAcquisition("container", "chest", replacement, next)).toBe(true);
+    }
+  });
+  it("also invalidates tokens when legacy tryClaim refreshes the same owner", () => {
+    const board = new ClaimBoard();
+    const old = board.acquire("container", "chest", "same", 100, 0)!;
+    board.tryClaim("container", "chest", "same", 100, 1);
+    expect(board.releaseAcquisition("container", "chest", "same", old)).toBe(false);
+    expect(board.releaseAcquisition("container", "chest", "other", old)).toBe(false);
+  });
+});
