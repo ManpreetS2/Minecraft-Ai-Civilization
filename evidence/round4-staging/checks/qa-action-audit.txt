@@ -1,0 +1,54 @@
+
+ RUN  v3.2.7 C:/Users/sh1ft/codex-round4-staging
+
+stdout | qa/action-audit/test/defects.test.ts > AUD-F1 smeltItem keeps working after cancellation > characterisation: measured behaviour after abort
+AUD-F1 smelt: abort at t0; skill returned after 1 ms with success=false; mutations after abort: none
+
+stdout | qa/action-audit/test/defects.test.ts > AUD-C1 chest transfer ignores cancellation after navigation > characterisation: the deposit still lands after the abort
+AUD-C1 deposit: abort during openContainer; result success=false; mutations after abort: none
+
+stdout | qa/action-audit/test/defects.test.ts > AUD-C2 openContainer has no timeout, so a window that never opens hangs the skill forever > characterisation: still pending after abort and a generous wait
+AUD-C2 deposit: window never opens; settled after abort + 900 ms (ctx.timeoutMs=300): true
+
+stdout | qa/action-audit/test/defects.test.ts > AUD-P1 placeBlock only checks the signal during navigation > characterisation: the block is placed after the abort
+AUD-P1 placeBlock: abort during equip (150 ms); result success=false; mutations after abort: equip@+93ms
+
+stdout | qa/action-audit/test/defects.test.ts > AUD-P2 a cancelled placement is reported as BUILD_BLOCKED by executeStructure > characterisation: aborted before the first block
+AUD-P2 executeStructure(aborted): success=false code=CANCELLED
+
+stdout | qa/action-audit/test/defects.test.ts > AUD-H1 huntAnimal never checks the signal > characterisation: attacks continue until the skill's own deadline
+AUD-H1 huntAnimal: abort at +500 ms; skill returned after 14 ms; attacks after abort: 0
+
+ ✓ qa/action-audit/test/defects.test.ts (22 tests) 8419ms
+   ✓ AUD-F1 smeltItem keeps working after cancellation > characterisation: measured behaviour after abort  341ms
+   ✓ AUD-C2 openContainer has no timeout, so a window that never opens hangs the skill forever > characterisation: still pending after abort and a generous wait  1000ms
+   ✓ AUD-C2 openContainer has no timeout, so a window that never opens hangs the skill forever > the skill settles within its own timeoutMs when the window never opens  910ms
+   ✓ AUD-H1 huntAnimal never checks the signal > characterisation: attacks continue until the skill's own deadline  526ms
+   ✓ AUD-H1 huntAnimal never checks the signal > no attack is issued after the signal aborts  525ms
+   ✓ successful actions and late resolutions > smelts when the furnace is not cancelled  317ms
+   ✓ successful actions and late resolutions > closes a window that opens after cancellation and does not deposit  326ms
+   ✓ successful actions and late resolutions > hunts successfully when the animal is removed by the attack  3471ms
+ ✓ qa/action-audit/test/native-boundary.test.ts (11 tests) 4429ms
+   ✓ native boundary vs the confirmed defects (real skills) > AUD-F1: no furnace operation after abort, and the call returns promptly  1060ms
+   ✓ native boundary vs the confirmed defects (real skills) > AUD-C1: no chest mutation after abort  386ms
+   ✓ native boundary vs the confirmed defects (real skills) > AUD-C2: a window that opens after the deadline is not used, and the next action can run  1026ms
+   ✓ native boundary vs the confirmed defects (real skills) > AUD-P1: no block is placed after abort  430ms
+   ✓ native boundary vs the confirmed defects (real skills) > AUD-H1: no attack after abort  1232ms
+ ✓ qa/action-audit/test/source-facts.test.ts (12 tests) 23ms
+ ✓ qa/action-audit/test/remaining-gaps.test.ts (19 tests) 17312ms
+   ✓ AUD-X1 craft retry can run a second recipe while the first is still crafting > does not start a second craft when the first recipe times out  6958ms
+   ✓ AUD-X1 craft retry can run a second recipe while the first is still crafting > returns promptly on cancellation and does not let the in-flight craft mutate afterwards  7057ms
+   ✓ AUD-X1 craft retry can run a second recipe while the first is still crafting > crafts once when the recipe finishes and nobody cancels  710ms
+   ✓ AUD-X2 crafting-table placement continues after cancellation > places the table when the citizen is not interrupted  559ms
+   ✓ sleep is bounded and honours cancellation > does not enter the bed after cancellation, and returns promptly  563ms
+   ✓ sleep is bounded and honours cancellation > settles when the server never confirms sleep  308ms
+stdout | qa/action-audit/test/coverage.test.ts > coverage table matches the source > summary (printed for the report)
+COVERAGE {"protected":{"files":14,"calls":61},"partial":{"files":3,"calls":21},"not-a-bot":{"files":1,"calls":1},"body-owned":{"files":1,"calls":4},"operator":{"files":8,"calls":19}} total_calls=106
+
+ ✓ qa/action-audit/test/coverage.test.ts (4 tests) 31ms
+
+ Test Files  5 passed (5)
+      Tests  68 passed (68)
+   Start at  11:49:45
+   Duration  23.33s (transform 4.30s, setup 496ms, collect 11.24s, tests 30.21s, environment 1ms, prepare 1.71s)
+

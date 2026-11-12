@@ -1,0 +1,27 @@
+
+ RUN  v3.2.7 C:/Users/sh1ft/codex-round4-staging/qa/v86
+
+ ✓ test/adv86-controls.test.ts (27 tests) 332ms
+ ✓ test/adv86-scenarios.test.ts (18 tests) 105ms
+stdout | test/canonical-binding.test.ts > every populated parsed row field except derived root hashes is bound, without changing authenticated action results
+{ boundFieldMutations: 638 }
+
+ ✓ test/canonical-binding.test.ts (7 tests) 3316ms
+   ✓ every populated parsed row field except derived root hashes is bound, without changing authenticated action results  3253ms
+ ✓ test/adv86-replay.test.ts (24 tests) 5544ms
+   ✓ QA75-L5 replay: CLI headline (real CLI processes) > journal-only run on the simulated sample: NOT_PROVEN, offline_simulated, a report really exists  1764ms
+   ✓ QA75-L5 replay: CLI headline (real CLI processes) > run WITH manifest, facts, inventories and events on the simulated sample: NOT_PROVEN (headline capped), with the verified-action count intact and the markdown saying so  1676ms
+   ✓ QA75-L5 replay: CLI headline (real CLI processes) > the cap does not hide REAL violations: a corrupted journal through the CLI is not downgraded to NOT_PROVEN  1771ms
+stdout | test/adv86-performance.test.ts > binding cost > 2000 tick rows + the rich action set validate in < 3000 ms and remain real_minecraft/VERIFIED
+PERF rows=2020 ms=67 mode=real_minecraft status=VERIFIED
+
+stdout | test/adv86-performance.test.ts > binding cost > 10000 tick rows + the rich action set validate in < 20000 ms and remain real_minecraft/VERIFIED
+PERF rows=10020 ms=219 mode=real_minecraft status=VERIFIED
+
+ ✓ test/adv86-performance.test.ts (2 tests) 381ms
+
+ Test Files  5 passed (5)
+      Tests  78 passed (78)
+   Start at  11:47:56
+   Duration  7.63s (transform 447ms, setup 371ms, collect 1.65s, tests 9.68s, environment 1ms, prepare 1.26s)
+

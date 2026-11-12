@@ -1,0 +1,67 @@
+
+> minecraft-ai-civilization@0.1.0 test:ai C:\Users\sh1ft\codex-round4-staging
+> vitest run packages/cognition manager-citizen-routing manager-physical-integration manager-roster-start independent-offline-runtime
+
+
+ RUN  v3.2.7 C:/Users/sh1ft/codex-round4-staging
+
+ ✓ packages/cognition/src/openai-schema-regression.test.ts (40 tests) 39ms
+ ✓ packages/cognition/src/openai-retry.test.ts (44 tests) 68ms
+ ✓ packages/cognition/src/openai-usage-regression.test.ts (16 tests) 142ms
+ ✓ packages/cognition/src/routing/preflight.test.ts (26 tests) 43ms
+ ✓ packages/cognition/src/routing/mixed-provider-faults.test.ts (7 tests) 383ms
+ ✓ packages/cognition/src/cloud-admission-adversarial.test.ts (24 tests) 800ms
+   ✓ cloud spend admission (mock-only) > never exceeds the allowance across randomized in-bound workloads  531ms
+ ✓ packages/cognition/src/cloud-budget-regression.test.ts (9 tests) 10ms
+ ✓ packages/cognition/src/learning.test.ts (9 tests) 95ms
+ ✓ packages/cognition/src/inference-queue-regression.test.ts (4 tests) 7ms
+ ✓ packages/cognition/src/cognition.test.ts (8 tests) 10ms
+ ✓ packages/cognition/src/routing/claude-sdk-transport.contract.test.ts (90 tests) 1231ms
+   ✓ no real network > the live transport is reachable only through its own import path, and no production code imports it  605ms
+ ✓ packages/cognition/src/cloud-fallback-regression.test.ts (8 tests) 26ms
+ ✓ packages/cognition/src/openai-config-regression.test.ts (42 tests) 25ms
+ ✓ packages/cognition/src/v2.test.ts (21 tests) 90ms
+ ✓ packages/cognition/src/openai-responses.test.ts (23 tests) 199ms
+ ✓ packages/cognition/src/routing/citizen-routing.test.ts (100 tests) 638ms
+ ✓ packages/agent-core/src/manager-citizen-routing.test.ts (18 tests) 2564ms
+   ✓ AgentManager routes each citizen to its own session > four citizens decide through four sessions, and each decision returns to its own citizen  439ms
+ ✓ packages/agent-core/src/manager-roster-start.test.ts (7 tests) 3070ms
+   ✓ explicit independent citizen startup > connects the supplied stable roster rather than Atlas/Maya and preserves the experiment run ID  3046ms
+stdout | packages/agent-core/src/manager-physical-integration.test.ts > real manager/planner/executor physical capabilities (offline only) > 2 empty-start bodies gather/eat and execute independent family mock choices
+{"scenario":"manager-physical-capabilities","count":2,"mode":"offline","trace":[{"id":"gpt-a","action":"gatherFood","source":"reflex","success":true,"food":7,"inventory":[{"name":"sweet_berries","count":2}]},{"id":"claude-a","action":"gatherFood","source":"reflex","success":true,"food":7,"inventory":[{"name":"sweet_berries","count":2}]},{"id":"gpt-a","action":"eatFood","source":"reflex","success":true,"food":9,"inventory":[{"name":"sweet_berries","count":1}]},{"id":"claude-a","action":"eatFood","source":"reflex","success":true,"food":9,"inventory":[{"name":"sweet_berries","count":1}]},{"id":"gpt-a","action":"mineBlock","source":"llm","success":true,"food":9,"inventory":[{"name":"sweet_berries","count":1},{"name":"oak_log","count":1}]},{"id":"claude-a","action":"craftItem","source":"llm","success":true,"food":9,"inventory":[{"name":"sweet_berries","count":1},{"name":"oak_planks","count":3},{"name":"stick","count":2},{"name":"wooden_pickaxe","count":1}]}],"globalSettlementIsolation":"BLOCKED: run separate executor isolation reproducer","humanInterventions":0,"unmodeled":["live physics","hostiles","night survival","real model decisions"]}
+
+stdout | packages/agent-core/src/manager-physical-integration.test.ts > real manager/planner/executor physical capabilities (offline only) > 4 empty-start bodies gather/eat and execute independent family mock choices
+{"scenario":"manager-physical-capabilities","count":4,"mode":"offline","trace":[{"id":"gpt-a","action":"gatherFood","source":"reflex","success":true,"food":7,"inventory":[{"name":"sweet_berries","count":2}]},{"id":"gpt-b","action":"gatherFood","source":"reflex","success":true,"food":7,"inventory":[{"name":"sweet_berries","count":2}]},{"id":"claude-a","action":"gatherFood","source":"reflex","success":true,"food":7,"inventory":[{"name":"sweet_berries","count":2}]},{"id":"claude-b","action":"gatherFood","source":"reflex","success":true,"food":7,"inventory":[{"name":"sweet_berries","count":2}]},{"id":"gpt-a","action":"eatFood","source":"reflex","success":true,"food":9,"inventory":[{"name":"sweet_berries","count":1}]},{"id":"gpt-b","action":"eatFood","source":"reflex","success":true,"food":9,"inventory":[{"name":"sweet_berries","count":1}]},{"id":"claude-a","action":"eatFood","source":"reflex","success":true,"food":9,"inventory":[{"name":"sweet_berries","count":1}]},{"id":"claude-b","action":"eatFood","source":"reflex","success":true,"food":9,"inventory":[{"name":"sweet_berries","count":1}]},{"id":"gpt-a","action":"mineBlock","source":"llm","success":true,"food":9,"inventory":[{"name":"sweet_berries","count":1},{"name":"oak_log","count":1}]},{"id":"gpt-b","action":"mineBlock","source":"llm","success":true,"food":9,"inventory":[{"name":"sweet_berries","count":1},{"name":"oak_log","count":1}]},{"id":"claude-a","action":"craftItem","source":"llm","success":true,"food":9,"inventory":[{"name":"sweet_berries","count":1},{"name":"oak_planks","count":3},{"name":"stick","count":2},{"name":"wooden_pickaxe","count":1}]},{"id":"claude-b","action":"craftItem","source":"llm","success":true,"food":9,"inventory":[{"name":"sweet_berries","count":1},{"name":"oak_planks","count":3},{"name":"stick","count":2},{"name":"wooden_pickaxe","count":1}]}],"globalSettlementIsolation":"BLOCKED: run separate executor isolation reproducer","humanInterventions":0,"unmodeled":["live physics","hostiles","night survival","real model decisions"]}
+
+ ✓ packages/agent-core/src/manager-physical-integration.test.ts (7 tests) 16122ms
+   ✓ real manager/planner/executor physical capabilities (offline only) > 2 empty-start bodies gather/eat and execute independent family mock choices  6219ms
+   ✓ real manager/planner/executor physical capabilities (offline only) > 4 empty-start bodies gather/eat and execute independent family mock choices  5983ms
+   ✓ real manager/planner/executor physical capabilities (offline only) > restart preserves real SQLite private history and independent session identities alongside persistent simulated bodies  1617ms
+   ✓ real manager/planner/executor physical capabilities (offline only) > a failed Claude inference does not stop either body's verified hunger recovery or the GPT decision  1477ms
+   ✓ real manager/planner/executor physical capabilities (offline only) > two rival bodies contest one observable bush without duplicating its drop or crediting both  436ms
+   ✓ real manager/planner/executor physical capabilities (offline only) > does not import the prepared World-Lab house catalog into an unrelated community's fallback planning  374ms
+pnpm : stderr | apps/orchestrator/src/independent-offline-runtime.test.ts > scripted 1 GPT vs 1 Claude integrated 
+offline 1v1 > starts identities, verifies survival, keeps secrets, restarts, and shuts down with no network
+At line:2 char:193
++ ... e(':','-'); pnpm run $gate *> artifacts/round4-checks/$name.txt; "$ga ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (stderr | apps/o...with no network:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[store] skipped write after close: appendEvent
+
+stderr | apps/orchestrator/src/independent-offline-runtime.test.ts > scripted 1 GPT vs 1 Claude integrated offline 1v1 
+> a late cognition callback after shutdown cannot write closed SQLite or throw
+[store] skipped write after close: late-llm
+
+ ✓ apps/orchestrator/src/independent-offline-runtime.test.ts (11 tests) 41267ms
+   ✓ independent offline composition and normal manager startup > normal start creates 2 bodies and real planning executes routed survival choices  9268ms
+   ✓ independent offline composition and normal manager startup > normal start creates 4 bodies and real planning executes routed survival choices  12143ms
+   ✓ scripted 1 GPT vs 1 Claude integrated offline 1v1 > starts identities, verifies survival, keeps secrets, restarts, and shuts down with no network  16766ms
+   ✓ scripted 1 GPT vs 1 Claude integrated offline 1v1 > a late cognition callback after shutdown cannot write closed SQLite or throw  3045ms
+
+ Test Files  20 passed (20)
+      Tests  514 passed (514)
+   Start at  11:48:17
+   Duration  48.38s (transform 7.61s, setup 2.88s, collect 42.36s, tests 66.83s, environment 4ms, prepare 10.04s)
+

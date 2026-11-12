@@ -1,0 +1,10 @@
+
+ RUN  v3.2.7 C:/Users/sh1ft/codex-round4-staging/qa/provenance-controls
+
+ ✓ test/provenance-negative-controls.test.ts (26 tests) 224ms
+
+ Test Files  1 passed (1)
+      Tests  26 passed (26)
+   Start at  11:57:13
+   Duration  2.62s (transform 1.03s, setup 588ms, collect 946ms, tests 224ms, environment 0ms, prepare 336ms)
+

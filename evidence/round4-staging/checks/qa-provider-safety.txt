@@ -1,0 +1,10 @@
+
+ RUN  v3.2.7 C:/Users/sh1ft/codex-round4-staging
+
+ ✓ qa/provider-safety/test/boundaries.test.ts (10 tests) 53ms
+
+ Test Files  1 passed (1)
+      Tests  10 passed (10)
+   Start at  11:50:10
+   Duration  6.23s (transform 1.87s, setup 108ms, collect 5.43s, tests 53ms, environment 0ms, prepare 264ms)
+

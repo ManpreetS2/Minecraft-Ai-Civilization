@@ -1,0 +1,73 @@
+
+ RUN  v3.2.7 C:/Users/sh1ft/codex-round4-staging/qa/v103
+
+stdout | defects/qa103-defects.test.ts > [QA103-L1] a cooperative cancel (caller abort; the skill returns inside the grace) leaves the container claim held > after a prompt abort has fully unwound, the container claim is no longer held by the cancelled action (another citizen can use the chest)
+QA103-L1 result= CANCELLED claimOwnerAfterUnwind= none
+
+stdout | defects/qa103-defects.test.ts > [QA103-L2] a cancellation that moved NOTHING is reported as a PENDING reconciliation > a signal already aborted before the action starts: no AbandonedActionObservation with reconciliation PENDING (there is nothing to reconcile)
+QA103-L2 pending incidents for a no-op cancel: [{"kind":"AbandonedActionObservation","observedSuccess":false},{"kind":"AbandonedActionObservation","observedSuccess":false}]
+
+ ❯ defects/qa103-defects.test.ts (2 tests | 1 failed) 940ms
+   ✓ [QA103-L1] a cooperative cancel (caller abort; the skill returns inside the grace) leaves the container claim held > after a prompt abort has fully unwound, the container claim is no longer held by the cancelled action (another citizen can use the chest)  619ms
+   × [QA103-L2] a cancellation that moved NOTHING is reported as a PENDING reconciliation > a signal already aborted before the action starts: no AbandonedActionObservation with reconciliation PENDING (there is nothing to reconcile) 320ms
+     → expected [ { …(5) }, { …(5) } ] to deeply equal []
+pnpm : 
+At line:2 char:291
++ ... ,'v103')) { pnpm exec vitest run -c qa/$suite/vitest.defects.config.t ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  defects/qa103-defects.test.ts > [QA103-L2] a cancellation that moved NOTHING is reported as a PENDING 
+reconciliation > a signal already aborted before the action starts: no AbandonedActionObservation with reconciliation 
+PENDING (there is nothing to reconcile)
+AssertionError: expected [ { …(5) }, { …(5) } ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   {
++     "action": "depositItems",
++     "authoritativeStorageUpdated": false,
++     "kind": "AbandonedActionObservation",
++     "observedResult": {
++       "code": "CANCELLED",
++       "details": undefined,
++       "durationMs": 0,
++       "error": "Operation cancelled",
++       "retryable": false,
++       "success": false,
++     },
++     "reconciliation": "PENDING",
++   },
++   {
++     "action": "depositItems",
++     "authoritativeStorageUpdated": false,
++     "kind": "AbandonedActionObservation",
++     "observedResult": {
++       "code": "CANCELLED",
++       "details": undefined,
++       "durationMs": 0,
++       "error": "Home storage action ended; observed transfers require reconciliation",
++       "retryable": false,
++       "success": false,
++     },
++     "reconciliation": "PENDING",
++   },
++ ]
+
+ ❯ defects/qa103-defects.test.ts:31:21
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 1 passed (2)
+   Start at  11:50:22
+   Duration  7.13s (transform 2.08s, setup 126ms, collect 5.49s, tests 940ms, environment 0ms, prepare 237ms)
+

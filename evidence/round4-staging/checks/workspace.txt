@@ -1,0 +1,447 @@
+
+ RUN  v3.2.7 C:/Users/sh1ft/codex-round4-staging
+
+ ✓ tools/v1-integration/scenario.test.ts (4 tests) 23980ms
+   ✓ offline composition scenario > routes 2 citizens through scripted models and preserves private memory after reopening disposable SQLite  7504ms
+   ✓ offline composition scenario > routes 4 citizens through scripted models and preserves private memory after reopening disposable SQLite  13409ms
+   ✓ offline composition scenario > exposes the lower composition root createBody trust boundary without network access  3062ms
+pnpm : stderr | apps/orchestrator/src/independent-offline-runtime.test.ts > scripted 1 GPT vs 1 Claude integrated 
+offline 1v1 > starts identities, verifies survival, keeps secrets, restarts, and shuts down with no network
+At line:2 char:341
++ ...  -Append }; pnpm exec vitest run --maxWorkers=2 *> artifacts/round4-c ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (stderr | apps/o...with no network:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[store] skipped write after close: appendEvent
+
+ ✓ tools/ci/evidence-hardening.test.ts (66 tests) 10263ms
+   ✓ PR #72 tamper matrix on real bundles > every class the original audit found accepted (13 of 26) is now rejected on both real bundles  1223ms
+   ✓ per-scenario journal CLI controls on the committed real bundles (real subprocesses) > 1v1: 2 citizens / 6 attempts / 6 observations: positive, missing-evidence and forged-evidence controls  2501ms
+   ✓ per-scenario journal CLI controls on the committed real bundles (real subprocesses) > 2v2: 4 citizens / 12 attempts / 12 observations: positive, missing-evidence and forged-evidence controls  2407ms
+stderr | apps/orchestrator/src/independent-offline-runtime.test.ts > scripted 1 GPT vs 1 Claude integrated offline 1v1 
+> a late cognition callback after shutdown cannot write closed SQLite or throw
+[store] skipped write after close: late-llm
+
+ ✓ apps/orchestrator/src/independent-offline-runtime.test.ts (11 tests) 41332ms
+   ✓ independent offline composition and normal manager startup > normal start creates 2 bodies and real planning executes routed survival choices  9292ms
+   ✓ independent offline composition and normal manager startup > normal start creates 4 bodies and real planning executes routed survival choices  12109ms
+   ✓ scripted 1 GPT vs 1 Claude integrated offline 1v1 > starts identities, verifies survival, keeps secrets, restarts, and shuts down with no network  16817ms
+   ✓ scripted 1 GPT vs 1 Claude integrated offline 1v1 > a late cognition callback after shutdown cannot write closed SQLite or throw  3078ms
+ ✓ tools/v1-integration/preflight.test.ts (10 tests) 2988ms
+   ✓ read-only preflight blocks unsafe startup > accepts matching offline configuration and records binary versions  399ms
+   ✓ read-only preflight blocks unsafe startup > refuses port before startup callback  359ms
+   ✓ read-only preflight blocks unsafe startup > refuses provider before startup callback  317ms
+   ✓ read-only preflight blocks unsafe startup > refuses body before startup callback  300ms
+   ✓ read-only preflight blocks unsafe startup > refuses host before startup callback  318ms
+   ✓ read-only preflight blocks unsafe startup > refuses sha before startup callback  349ms
+   ✓ read-only preflight blocks unsafe startup > refuses output before startup callback  330ms
+   ✓ read-only preflight blocks unsafe startup > refuses mode before startup callback  331ms
+stderr | tools/v1-integration/combined-cancellation.test.ts > discards actual delayed provider replies after citizen 
+death and manager shutdown while preserving memory
+[shutdown] drain incomplete: attempted=4 remaining=2 timedOut=true
+
+ ✓ tools/v1-integration/combined-cancellation.test.ts (2 tests) 11845ms
+   ✓ reopens partial construction after cancellation during delayed navigation without late placement  590ms
+   ✓ discards actual delayed provider replies after citizen death and manager shutdown while preserving memory  11253ms
+ ✓ packages/cognition/src/routing/claude-sdk-transport.contract.test.ts (90 tests) 882ms
+ ✓ packages/agent-core/src/sec001-independent-review.test.ts (74 tests) 8247ms
+   ✓ community membership timing reaches the model-facing context > a citizen who joins after an announcement never receives it  397ms
+   ✓ audience, class and observer boundaries through the real manager > another citizen's model reasoning, goals and refused actions stay out of cognition  340ms
+   ✓ audience, class and observer boundaries through the real manager > speech reaches only citizens within hearing, attributed to the real speaker, never over server chat  399ms
+   ✓ audience, class and observer boundaries through the real manager > instructions inside reported speech stay labelled unverified on the memory and fact paths too  309ms
+   ✓ quarantine cannot be escaped through copies and imports > rows imported after the migration marker stay quarantined across repeated restarts, and migration is idempotent  740ms
+   ✓ KnowledgeProvenance.review operator boundary > no production path can reach review: no model tool, HTTP route or orchestrator caller  340ms
+ ✓ packages/agent-core/src/planner.test.ts (49 tests) 250ms
+ ✓ packages/minecraft-adapter/src/pathing-lifecycle.test.ts (48 tests) 110ms
+ ✓ tools/ci/offline-acceptance.test.ts (16 tests) 1880ms
+ ✓ packages/agent-core/src/ops-recovery.test.ts (29 tests) 2070ms
+   ✓ OPS-001 stuck-stop: navigation STUCK / TIMEOUT never turns into fake progress > mineBlock: a STUCK approach is returned as-is, blacklists the target, and never digs  410ms
+   ✓ OPS-001 stuck-stop: navigation STUCK / TIMEOUT never turns into fake progress > a gather that keeps failing is eventually told to back off instead of looping forever  435ms
+   ✓ OPS-001 failure recovery: executor failure paths > bot.dig throwing a non-Error value becomes a DIG_FAILED result (no throw), no event, no claim left behind  587ms
+stderr | packages/agent-core/src/ops-persistence.test.ts > OPS-001 restart: crash (no close) and in-flight writes > 
+writes through safeWrite after shutdown are refused and never reach disk
+[store] skipped write after close: late-meta
+
+ ✓ packages/agent-core/src/ops-persistence.test.ts (18 tests) 1491ms
+ ✓ packages/agent-core/src/knowledge-provenance.test.ts (19 tests) 1240ms
+   ✓ owner policy: fail-closed provenance and per-record recovery > constructor interruption rolls back provenance DDL, flags, audit and marker; closes its handle and recovers  640ms
+ ✓ packages/agent-core/src/ops-cancellation.test.ts (18 tests) 1393ms
+ ✓ packages/agent-core/src/construction-production-path.test.ts (15 tests) 289ms
+ ✓ packages/agent-core/src/home-ops.test.ts (10 tests) 911ms
+ ✓ tools/v1-integration/evidence-contract.test.ts (50 tests) 493ms
+stderr | packages/agent-core/src/community-container-contents.test.ts > executor uses observed contents, not global 
+stock > does not let a delayed stale withdrawal erase a newer observation
+[executor] stale container observation discarded
+
+ ✓ packages/agent-core/src/manager-citizen-routing.test.ts (18 tests) 3484ms
+   ✓ AgentManager routes each citizen to its own session > four citizens decide through four sessions, and each decision returns to its own citizen  501ms
+   ✓ AgentManager routes each citizen to its own session > a timeout in one citizen is skipped for that citizen only, and it can think again  304ms
+   ✓ T3 1v1 and restart routing acceptance (body/planner mocked) > restores private history, model session identity and attributed usage after SQLite restart  434ms
+ ✓ packages/agent-core/src/community-container-contents.test.ts (13 tests) 2824ms
+   ✓ concurrent chest observers > lets exactly one of two database connections win the same token  2376ms
+ ✓ packages/cognition/src/cloud-admission-adversarial.test.ts (24 tests) 771ms
+   ✓ cloud spend admission (mock-only) > never exceeds the allowance across randomized in-bound workloads  513ms
+ ✓ apps/orchestrator/src/construction-path-isolation.test.ts (73 tests) 2065ms
+ ✓ packages/agent-core/src/dispatch-integrity.test.ts (16 tests) 317ms
+ ✓ packages/agent-core/src/citizen-context-2v2.test.ts (27 tests) 43ms
+ ✓ packages/minecraft-adapter/src/body-connection-lifecycle.test.ts (21 tests) 176ms
+ ✓ packages/agent-core/src/community-physical-state.test.ts (22 tests) 526ms
+ ✓ packages/psychology/src/scenarios.test.ts (9 tests) 326ms
+ ✓ packages/agent-core/src/build-structure-intention.test.ts (10 tests) 158ms
+ ✓ packages/agent-core/src/activity-choice.test.ts (15 tests) 134ms
+ ✓ packages/agent-core/src/sec001-quarantine-durability-qa.test.ts (8 tests) 4630ms
+   ✓ Independent SEC-001 quarantine durability and provenance QA > filters quarantined facts before applying the reader retrieval limit  534ms
+   ✓ Independent SEC-001 quarantine durability and provenance QA > a shared source key is quarantined per recipient without hiding its authorized owner's fact  547ms
+   ✓ Independent SEC-001 quarantine durability and provenance QA > source_event_id makes a non-event-key fact eligible for source authorization during migration  530ms
+   ✓ Independent SEC-001 quarantine durability and provenance QA > explicit source identity overrides a misleading authorized-looking fact key  521ms
+   ✓ Independent SEC-001 quarantine durability and provenance QA > SECURITY REGRESSION: rerunning quarantine must exclude a later memory copied from already-flagged poison  477ms
+   ✓ Independent SEC-001 quarantine durability and provenance QA > SECURITY REGRESSION: a completed migration marker must not authorize subsequently imported source-linked poison  616ms
+   ✓ Independent SEC-001 quarantine durability and provenance QA > dry-run reports are read-only even when they propose additional quarantine  663ms
+   ✓ Independent SEC-001 quarantine durability and provenance QA > a newly inserted suspicion keeps its classification; the known kind defect requires replacement  742ms
+ ✓ packages/agent-core/src/sec001-migration-qa.test.ts (12 tests) 7637ms
+   ✓ Independent SEC-001 authentic legacy SQLite migration QA > starts without SEC schema; migrates a COPY, preserves audit rows and backs up all historical content  569ms
+   ✓ Independent SEC-001 authentic legacy SQLite migration QA > keeps authorized private/directed history; flags unauthorized, missing-source and unaudienced public facts  518ms
+   ✓ Independent SEC-001 authentic legacy SQLite migration QA > persists flags, source references, deliveries and audit contents across two reopen/migration passes  542ms
+   ✓ Independent SEC-001 authentic legacy SQLite migration QA > SECURITY REGRESSION: unverified non-event observed facts require quarantine rather than automatic trust  489ms
+   ✓ Independent SEC-001 authentic legacy SQLite migration QA > SECURITY CONTRACT GAP: provenance-free paraphrased poisoned memories must not remain model-eligible  491ms
+   ✓ Independent SEC-001 authentic legacy SQLite migration QA > SECURITY REGRESSION: same-key suspicion replacement must update trust classification  478ms
+   ✓ Independent SEC-001 authentic legacy SQLite migration QA > SECURITY CONTRACT GAP: an authorized historical source key cannot authenticate unrelated secret fact content  630ms
+   ✓ Independent SEC-001 authentic legacy SQLite migration QA > cannot shed quarantine by overwriting a flagged key with a fresh ID  690ms
+   ✓ Independent SEC-001 authentic legacy SQLite migration QA > preserves public announcements, directed speech and explicit cross-community sharing without widening the source  767ms
+   ✓ Independent SEC-001 authentic legacy SQLite migration QA > membership removal flags community-derived facts but preserves private and directed historical knowledge  704ms
+   ✓ Independent SEC-001 authentic legacy SQLite migration QA > records authorized speech as an attributed conversation (not proof of the speaker's claim)  868ms
+   ✓ Independent SEC-001 authentic legacy SQLite migration QA > SECURITY CONTRACT GAP: a reported claim needs a trust classification distinct from an undifferentiated observed fact  890ms
+ ✓ packages/agent-core/src/sec001-migration-recovery-qa.test.ts (7 tests) 4331ms
+   ✓ Independent SEC-001 migration fault/recovery QA > fails closed when VACUUM backup encounters a real SQLite destination error; no quarantine marker or data loss  938ms
+   ✓ Independent SEC-001 migration fault/recovery QA > rolls all flag inserts back on a SQLite trigger abort mid-transaction, then retries on reopen  939ms
+   ✓ Independent SEC-001 migration fault/recovery QA > recovers idempotently after flags commit but before the completion marker is written  640ms
+   ✓ Independent SEC-001 migration fault/recovery QA > backup includes committed WAL rows even while another connection keeps the WAL open  443ms
+   ✓ Independent SEC-001 migration fault/recovery QA > aborts before flagging if the dry-run report cannot be written, retaining a usable backup  459ms
+   ✓ Independent SEC-001 migration fault/recovery QA > completes provenance backfill on reopen after the completion marker commits but backfill aborts  457ms
+   ✓ Independent SEC-001 migration fault/recovery QA > can restore a migration backup to another disposable database and reapply quarantine without losing audit content  452ms
+ ✓ packages/agent-core/src/untrusted-model-output.test.ts (37 tests) 4485ms
+ ✓ packages/agent-core/src/sec001-migration-manager-qa.test.ts (5 tests) 2541ms
+   ✓ Independent migrated SQLite -> actual manager cognition QA > migrated flagged fact and exact-derived memory cannot reach manager cognition, including after restart  678ms
+   ✓ Independent migrated SQLite -> actual manager cognition QA > SECURITY REGRESSION: unverified legacy non-event poison must not reach actual manager memory  468ms
+   ✓ Independent migrated SQLite -> actual manager cognition QA > SECURITY CONTRACT GAP: paraphrased historical poison must not reach actual manager memory  446ms
+   ✓ Independent migrated SQLite -> actual manager cognition QA > SECURITY REGRESSION: suspicion replacement must not inherit manager observed-fact eligibility  483ms
+   ✓ Independent migrated SQLite -> actual manager cognition QA > correctly flagged poison is absent for the other reader and private memory ownership remains separate  466ms
+ ✓ packages/agent-core/src/sec001-round3.test.ts (14 tests) 1214ms
+ ✓ packages/agent-core/src/sec001-round2.test.ts (20 tests) 1365ms
+ ✓ packages/agent-core/src/sec001-manager.test.ts (38 tests) 3636ms
+   ✓ same-community announcements (criterion 2) > a citizen's own choice reaches every member of its community through the real manager path, and no one else  452ms
+   ✓ voluntary cross-community sharing (criterion 3) > a citizen may tell a rival it has met about a line it was shown; only that community receives it  310ms
+ ✓ packages/agent-core/src/sec001-audience.test.ts (8 tests) 827ms
+ ✓ packages/agent-core/src/downstream-prompt-isolation.test.ts (13 tests) 1508ms
+ ✓ packages/cognition/src/routing/citizen-routing.test.ts (100 tests) 457ms
+ ✓ packages/minecraft-adapter/src/hazard-nav.test.ts (15 tests) 23ms
+ ✓ packages/skills/src/bootstrap-progression.test.ts (11 tests) 42ms
+ ✓ packages/skills/src/survival-gauntlet.test.ts (9 tests) 4155ms
+   ✓ Mission 017 survival gauntlet > scenario 3 — hunger recovery requires observable evidence  1612ms
+   ✓ Mission 017 survival gauntlet > scenario 4 — farming reports zero invented yield  1928ms
+   ✓ Mission 017 survival gauntlet > scenario 7 — unreachable destination fails without false arrival  416ms
+ ✓ packages/session-isolation/src/adapters.test.ts (25 tests) 43ms
+ ✓ packages/skills/src/mineflayer-fish-cycle.test.ts (15 tests) 3289ms
+   ✓ two independent mineflayer clients > times out one bot without retracting the other  1119ms
+   ✓ two independent mineflayer clients > does not claim a catch from a late particle after timeout  1166ms
+ ✓ packages/minecraft-adapter/src/recovery-waits.test.ts (21 tests) 23ms
+ ✓ packages/minecraft-adapter/src/step-jump.test.ts (17 tests) 13ms
+ ✓ packages/skills/src/dig-abort.test.ts (11 tests) 259ms
+ ✓ packages/cognition/src/openai-responses.test.ts (23 tests) 147ms
+ ✓ packages/shared/src/demo-identity.test.ts (14 tests) 28ms
+ ✓ packages/skills/src/fish-quota.test.ts (19 tests) 90ms
+ ✓ packages/minecraft-knowledge/src/knowledge.test.ts (22 tests) 30ms
+ ✓ packages/shared/src/event-audience.test.ts (36 tests) 32ms
+ ✓ packages/skills/src/mine.test.ts (22 tests) 15ms
+ ✓ packages/session-isolation/src/cancellation.test.ts (18 tests) 39ms
+ ✓ packages/session-isolation/src/isolation.test.ts (19 tests) 34ms
+stdout | packages/skills/src/craft-e2e-empty-start.test.ts > deterministic resource capability seeds (fake Mineflayer only) > seed 17 verifies an empty-start tool and stone chain
+{"scenario":"empty-start-capability","seed":17,"mode":"offline-fixture","humanInterventions":0,"suppliedInventory":[],"finalInventory":[{"name":"oak_planks","count":3},{"name":"stick","count":2},{"name":"wooden_pickaxe","count":1},{"name":"cobblestone","count":1}],"verifiedWorldModifications":[{"name":"crafting_table","position":{"x":5,"y":64,"z":5}}],"digs":["oak_log","oak_log","oak_log","stone"],"crafts":[{"result":"oak_planks","crafts":1,"withTable":false},{"result":"stick","crafts":1,"withTable":false},{"result":"oak_planks","crafts":1,"withTable":false},{"result":"crafting_table","crafts":1,"withTable":false},{"result":"oak_planks","crafts":1,"withTable":false},{"result":"wooden_pickaxe","crafts":1,"withTable":true}],"modelDecisions":0,"skillRequests":["obtain wooden_pickaxe","collect stone"],"health":[20,20],"hunger":[20,20],"deaths":0,"unmodeled":["hostiles","server physics","provider decisions","hunger progression"]}
+
+ ✓ apps/orchestrator/src/independent-offline-default-deny.test.ts (19 tests) 29983ms
+   ✓ offline composition is default-deny for model transports > a refused call leaves nothing running: a valid call afterwards still starts normally  3038ms
+   ✓ valid scripted runtimes still work > 2 citizens: GPT and Claude are answered from the script and nothing else is touched  10044ms
+   ✓ valid scripted runtimes still work > 4 citizens: GPT and Claude are answered from the script and nothing else is touched  12897ms
+   ✓ valid scripted runtimes still work > a scripted failure is reported as that citizen's failure, not retried onto a network  3711ms
+stdout | packages/skills/src/craft-e2e-empty-start.test.ts > deterministic resource capability seeds (fake Mineflayer only) > seed 41 verifies an empty-start tool and stone chain
+{"scenario":"empty-start-capability","seed":41,"mode":"offline-fixture","humanInterventions":0,"suppliedInventory":[],"finalInventory":[{"name":"oak_planks","count":3},{"name":"stick","count":2},{"name":"wooden_pickaxe","count":1},{"name":"cobblestone","count":1}],"verifiedWorldModifications":[{"name":"crafting_table","position":{"x":5,"y":64,"z":5}}],"digs":["oak_log","oak_log","oak_log","stone"],"crafts":[{"result":"oak_planks","crafts":1,"withTable":false},{"result":"stick","crafts":1,"withTable":false},{"result":"oak_planks","crafts":1,"withTable":false},{"result":"crafting_table","crafts":1,"withTable":false},{"result":"oak_planks","crafts":1,"withTable":false},{"result":"wooden_pickaxe","crafts":1,"withTable":true}],"modelDecisions":0,"skillRequests":["obtain wooden_pickaxe","collect stone"],"health":[20,20],"hunger":[20,20],"deaths":0,"unmodeled":["hostiles","server physics","provider decisions","hunger progression"]}
+
+ ✓ packages/agent-core/src/homes.test.ts (8 tests) 506ms
+stdout | packages/skills/src/craft-e2e-empty-start.test.ts > deterministic resource capability seeds (fake Mineflayer only) > seed 99 verifies an empty-start tool and stone chain
+{"scenario":"empty-start-capability","seed":99,"mode":"offline-fixture","humanInterventions":0,"suppliedInventory":[],"finalInventory":[{"name":"oak_planks","count":3},{"name":"stick","count":2},{"name":"wooden_pickaxe","count":1},{"name":"cobblestone","count":1}],"verifiedWorldModifications":[{"name":"crafting_table","position":{"x":7,"y":64,"z":3}}],"digs":["oak_log","oak_log","oak_log","stone"],"crafts":[{"result":"oak_planks","crafts":1,"withTable":false},{"result":"stick","crafts":1,"withTable":false},{"result":"oak_planks","crafts":1,"withTable":false},{"result":"crafting_table","crafts":1,"withTable":false},{"result":"oak_planks","crafts":1,"withTable":false},{"result":"wooden_pickaxe","crafts":1,"withTable":true}],"modelDecisions":0,"skillRequests":["obtain wooden_pickaxe","collect stone"],"health":[20,20],"hunger":[20,20],"deaths":0,"unmodeled":["hostiles","server physics","provider decisions","hunger progression"]}
+
+ ✓ packages/skills/src/craft-e2e-empty-start.test.ts (9 tests) 32638ms
+   ✓ CRAFT-001 offline bootstrap from an empty inventory > staged chain: logs -> planks -> sticks -> crafting table (placed) -> wooden pickaxe, with inventory deltas at every step  3723ms
+   ✓ CRAFT-001 offline bootstrap from an empty inventory > obtainItem(wooden_pickaxe) from an empty inventory gathers, crafts, places a table, uses the table window  5539ms
+   ✓ CRAFT-001 offline bootstrap from an empty inventory > is idempotent: a second obtainItem with the pickaxe held changes nothing  5196ms
+   ✓ CRAFT-001 offline bootstrap from an empty inventory > surfaces a rejected craft instead of reporting a pickaxe  824ms
+   ✓ deterministic resource capability seeds (fake Mineflayer only) > seed 17 verifies an empty-start tool and stone chain  6029ms
+   ✓ deterministic resource capability seeds (fake Mineflayer only) > seed 41 verifies an empty-start tool and stone chain  5464ms
+   ✓ deterministic resource capability seeds (fake Mineflayer only) > seed 99 verifies an empty-start tool and stone chain  5696ms
+ ✓ packages/shared/src/observer.test.ts (10 tests) 60ms
+ ✓ packages/cognition/src/openai-usage-regression.test.ts (16 tests) 151ms
+ ✓ packages/agent-core/src/autonomous-survival-cycle.test.ts (9 tests) 197ms
+ ✓ packages/agent-core/src/construction-mission004-audit.test.ts (7 tests) 48ms
+ ✓ packages/agent-core/src/pr16-review.test.ts (5 tests) 1333ms
+   ✓ deferred bulletin delivery > a share names the line the model was shown, even if an earlier line was withdrawn while it was thinking  619ms
+ ✓ packages/cognition/src/routing/preflight.test.ts (26 tests) 40ms
+ ✓ packages/agent-core/src/demo-identity.test.ts (4 tests) 635ms
+   ✓ Mission 012 — personality persistence > traits persist through restart and are not silently rerolled  409ms
+ ✓ packages/skills/src/farm.test.ts (11 tests) 2060ms
+   ✓ workFarmPlot verified progress > does not report success when tilling cannot reach the plot  391ms
+   ✓ workFarmPlot verified progress > treats an already-planted immature plot as idle success  1660ms
+ ✓ packages/agent-core/src/autonomy-precedence.test.ts (12 tests) 267ms
+ ✓ packages/skills/src/collect-inventory-delta.test.ts (8 tests) 1507ms
+   ✓ collectResource inventory-delta verification > stacked drop: a 3-item drop is one stack of 3 and collected is the delta (3), not the stack total  396ms
+   ✓ collectResource inventory-delta verification > delayed drop: an item arriving after the dig (within the poll window) is still counted  435ms
+stderr | packages/agent-core/src/community-construction-runtime.test.ts > per-community construction runtime > reports 
+persisted:false and does not claim success when the SQLite write fails
+[community-construction] write failed: disk I/O error
+
+stderr | packages/agent-core/src/community-construction-runtime.test.ts > per-community construction runtime > reports 
+persisted:false and does not claim success when the SQLite write fails
+[community-construction] write failed: disk I/O error
+
+ ✓ packages/agent-core/src/community-construction-runtime.test.ts (6 tests) 3320ms
+   ✓ per-community construction runtime > lets two communities build simultaneously without sharing or overwriting project state  721ms
+   ✓ per-community construction runtime > restores each community's own project after a SQLite restart  1198ms
+   ✓ per-community construction runtime > rejects a stale handle after the citizen leaves its community, and never reads another community's row  433ms
+   ✓ per-community construction runtime > reports persisted:false and does not claim success when the SQLite write fails  432ms
+   ✓ legacy single-settlement persistence honesty > still persists to the settlement row and reports it  525ms
+ ✓ packages/skills/src/harvest-truth.test.ts (8 tests) 4501ms
+   ✓ harvestCropAt / harvestPlot yield truthfulness > reports verified yield only from inventory deltas  644ms
+   ✓ harvestCropAt / harvestPlot yield truthfulness > keeps cropBroken true when drops are not collected  406ms
+   ✓ harvestCropAt / harvestPlot yield truthfulness > does not count existing inventory wheat as new yield  2071ms
+   ✓ harvestCropAt / harvestPlot yield truthfulness > reports replant success after verified harvest  688ms
+   ✓ harvestCropAt / harvestPlot yield truthfulness > keeps harvest success when replant fails after crop break  688ms
+ ✓ packages/agent-core/src/experiment-evidence.test.ts (11 tests) 189ms
+ ✓ packages/session-isolation/src/persistence.test.ts (14 tests) 310ms
+ ✓ packages/agent-core/src/gather-fallback.test.ts (6 tests) 1781ms
+   ✓ gather_wood excavation fallback verifies the EXPECTED item > real gain: fallback dig that drops an oak_log is success, +1 oak_log, one ResourceCollected(count 1)  789ms
+   ✓ mine_stone claim-contended fallback applies the same possession gate > real gain: cobblestone drop is success with ResourceCollected(cobblestone, 1) and the rival's claim is untouched  304ms
+stdout | packages/agent-core/src/manager-physical-integration.test.ts > real manager/planner/executor physical capabilities (offline only) > 2 empty-start bodies gather/eat and execute independent family mock choices
+{"scenario":"manager-physical-capabilities","count":2,"mode":"offline","trace":[{"id":"gpt-a","action":"gatherFood","source":"reflex","success":true,"food":7,"inventory":[{"name":"sweet_berries","count":2}]},{"id":"claude-a","action":"gatherFood","source":"reflex","success":true,"food":7,"inventory":[{"name":"sweet_berries","count":2}]},{"id":"gpt-a","action":"eatFood","source":"reflex","success":true,"food":9,"inventory":[{"name":"sweet_berries","count":1}]},{"id":"claude-a","action":"eatFood","source":"reflex","success":true,"food":9,"inventory":[{"name":"sweet_berries","count":1}]},{"id":"gpt-a","action":"mineBlock","source":"llm","success":true,"food":9,"inventory":[{"name":"sweet_berries","count":1},{"name":"oak_log","count":1}]},{"id":"claude-a","action":"craftItem","source":"llm","success":true,"food":9,"inventory":[{"name":"sweet_berries","count":1},{"name":"oak_planks","count":3},{"name":"stick","count":2},{"name":"wooden_pickaxe","count":1}]}],"globalSettlementIsolation":"BLOCKED: run separate executor isolation reproducer","humanInterventions":0,"unmodeled":["live physics","hostiles","night survival","real model decisions"]}
+
+ ✓ packages/agent-core/src/independent-qa-community-isolation.test.ts (9 tests) 34353ms
+   ✓ QA: personal inventory must not become the legacy settlement_first stock > Regression: gathering berries raises settlement_first.food (0 -> 2)  892ms
+   ✓ QA: personal inventory must not become the legacy settlement_first stock > Regression: chopping and crafting raise settlement_first.wood and .tools from personal inventory  6613ms
+   ✓ QA: personal inventory must not become the legacy settlement_first stock > Regression: the leaked stock is written to SQLite and survives a manager restart  445ms
+   ✓ QA: nothing one community knows reaches the other's provider prompt > private locations and inventories stay in their owner's prompts across gathering, crafting and restart  11811ms
+   ✓ QA: nothing one community knows reaches the other's provider prompt > each prompt describes only its own inventory, not the rival's crafted tools  6218ms
+   ✓ QA: event provenance > every observed event names a real actor and task results stay actor-private  6153ms
+   ✓ legacy single-settlement compatibility > still aggregates physically gathered personal food when communities are absent  305ms
+   ✓ authenticated executor workstation creation > records a physically placed table only for its creator and preserves legacy rows  1625ms
+stdout | packages/agent-core/src/manager-physical-integration.test.ts > real manager/planner/executor physical capabilities (offline only) > 4 empty-start bodies gather/eat and execute independent family mock choices
+{"scenario":"manager-physical-capabilities","count":4,"mode":"offline","trace":[{"id":"gpt-a","action":"gatherFood","source":"reflex","success":true,"food":7,"inventory":[{"name":"sweet_berries","count":2}]},{"id":"gpt-b","action":"gatherFood","source":"reflex","success":true,"food":7,"inventory":[{"name":"sweet_berries","count":2}]},{"id":"claude-a","action":"gatherFood","source":"reflex","success":true,"food":7,"inventory":[{"name":"sweet_berries","count":2}]},{"id":"claude-b","action":"gatherFood","source":"reflex","success":true,"food":7,"inventory":[{"name":"sweet_berries","count":2}]},{"id":"gpt-a","action":"eatFood","source":"reflex","success":true,"food":9,"inventory":[{"name":"sweet_berries","count":1}]},{"id":"gpt-b","action":"eatFood","source":"reflex","success":true,"food":9,"inventory":[{"name":"sweet_berries","count":1}]},{"id":"claude-a","action":"eatFood","source":"reflex","success":true,"food":9,"inventory":[{"name":"sweet_berries","count":1}]},{"id":"claude-b","action":"eatFood","source":"reflex","success":true,"food":9,"inventory":[{"name":"sweet_berries","count":1}]},{"id":"gpt-a","action":"mineBlock","source":"llm","success":true,"food":9,"inventory":[{"name":"sweet_berries","count":1},{"name":"oak_log","count":1}]},{"id":"gpt-b","action":"mineBlock","source":"llm","success":true,"food":9,"inventory":[{"name":"sweet_berries","count":1},{"name":"oak_log","count":1}]},{"id":"claude-a","action":"craftItem","source":"llm","success":true,"food":9,"inventory":[{"name":"sweet_berries","count":1},{"name":"oak_planks","count":3},{"name":"stick","count":2},{"name":"wooden_pickaxe","count":1}]},{"id":"claude-b","action":"craftItem","source":"llm","success":true,"food":9,"inventory":[{"name":"sweet_berries","count":1},{"name":"oak_planks","count":3},{"name":"stick","count":2},{"name":"wooden_pickaxe","count":1}]}],"globalSettlementIsolation":"BLOCKED: run separate executor isolation reproducer","humanInterventions":0,"unmodeled":["live physics","hostiles","night survival","real model decisions"]}
+
+ ✓ packages/agent-core/src/manager-physical-integration.test.ts (7 tests) 18180ms
+   ✓ real manager/planner/executor physical capabilities (offline only) > 2 empty-start bodies gather/eat and execute independent family mock choices  7577ms
+   ✓ real manager/planner/executor physical capabilities (offline only) > 4 empty-start bodies gather/eat and execute independent family mock choices  6281ms
+   ✓ real manager/planner/executor physical capabilities (offline only) > restart preserves real SQLite private history and independent session identities alongside persistent simulated bodies  1867ms
+   ✓ real manager/planner/executor physical capabilities (offline only) > a failed Claude inference does not stop either body's verified hunger recovery or the GPT decision  1516ms
+   ✓ real manager/planner/executor physical capabilities (offline only) > two rival bodies contest one observable bush without duplicating its drop or crediting both  466ms
+   ✓ real manager/planner/executor physical capabilities (offline only) > does not import the prepared World-Lab house catalog into an unrelated community's fallback planning  440ms
+ ✓ packages/agent-core/src/gather-possession.test.ts (6 tests) 3730ms
+   ✓ gather_wood possession vs excavation > control: a dig that drops a log is success with +1 oak_log, and physicalWorkComplete  471ms
+   ✓ gather_wood possession vs excavation > F11: no ResourceCollected when the verified path fails (nothing entered inventory)  1476ms
+   ✓ gather_wood possession vs excavation > excavation without an inventory gain is not success, workComplete, a ResourceCollected event, or a completion memory  1381ms
+ ✓ packages/minecraft-adapter/src/ops-body-lock.test.ts (23 tests | 2 skipped) 891ms
+   ✓ OPS-001 BodyLock crash recovery > a lock left behind by a CRASHED process (dead pid) is taken over on restart  308ms
+ ✓ packages/cognition/src/routing/mixed-provider-faults.test.ts (7 tests) 350ms
+ ✓ packages/agent-core/src/property-safety.test.ts (7 tests) 528ms
+ ✓ packages/minecraft-adapter/src/navigation-arrival.test.ts (17 tests) 11ms
+ ✓ packages/skills/src/collect.test.ts (12 tests) 2417ms
+   ✓ collectResource inventory truthfulness > succeeds only when the expected item enters inventory  417ms
+   ✓ collectResource inventory truthfulness > fails ITEM_NOT_FOUND when the block is removed but no drop is collected  1322ms
+ ✓ packages/agent-core/src/experiment-preflight.test.ts (32 tests) 477ms
+ ✓ packages/agent-core/src/workstations-community.test.ts (9 tests) 220ms
+ ✓ packages/agent-core/src/bootstrap-decision-cycle.test.ts (3 tests) 278ms
+ ✓ packages/agent-core/src/t3-sec001-boundaries.test.ts (10 tests) 192ms
+ ✓ packages/minecraft-knowledge/src/recipes-121.test.ts (12 tests) 20ms
+ ✓ packages/agent-core/src/wait-inside-home.test.ts (9 tests) 9ms
+ ✓ packages/minecraft-adapter/src/movement-protocol.test.ts (13 tests) 947ms
+   ✓ installed protocol serialization (no live server) > serializes full input, loaded and tick-end packets for 1.21.6  318ms
+   ✓ installed protocol serialization (no live server) > serializes full input, loaded and tick-end packets for 1.21.11  350ms
+ ✓ packages/agent-core/src/persistent-fact-provenance.test.ts (12 tests) 154ms
+ ✓ packages/skills/src/fish.test.ts (11 tests) 18ms
+ ✓ packages/minecraft-knowledge/src/build-preflight.test.ts (10 tests) 17ms
+ ✓ packages/agent-core/src/action-boundary.test.ts (8 tests) 333ms
+ ✓ packages/agent-core/src/home-discovery.test.ts (9 tests) 198ms
+ ✓ packages/psychology/src/psychology.test.ts (9 tests) 71ms
+ ✓ packages/shared/src/directives.test.ts (10 tests) 13ms
+ ✓ packages/minecraft-adapter/src/server-commands.test.ts (16 tests) 420ms
+ ✓ packages/agent-core/src/task-recovery.test.ts (9 tests) 71ms
+ ✓ packages/session-isolation/src/guards.test.ts (9 tests) 71ms
+ ✓ packages/skills/src/collect-drop-mapping.test.ts (9 tests) 4615ms
+   ✓ collectResource drop-to-possession mapping > does not count an unrelated oak_sapling pickup as a log  1308ms
+   ✓ collectResource drop-to-possession mapping > fails when stone is broken and nothing is picked up  1320ms
+   ✓ collectResource drop-to-possession mapping > a pre-existing coal stack is not mistaken for a new acquisition when nothing drops  1323ms
+ ✓ packages/minecraft-adapter/src/return-home-nav.test.ts (6 tests) 6ms
+ ✓ apps/orchestrator/src/world-lab-one-citizen-guard.test.ts (10 tests) 13ms
+ ✓ packages/cognition/src/cloud-budget-regression.test.ts (9 tests) 10ms
+ ✓ packages/agent-core/src/construction-persistence-reliability.test.ts (4 tests) 127ms
+ ✓ packages/minecraft-adapter/src/ops-stuck-stop.test.ts (10 tests) 8ms
+ ✓ packages/shared/src/bulletin-2v2-contract.test.ts (9 tests) 16ms
+ ✓ packages/minecraft-knowledge/src/structures.test.ts (7 tests) 9ms
+ ✓ packages/agent-core/src/independent-qa-chest-contents.test.ts (7 tests) 202ms
+ ✓ packages/shared/src/shared.test.ts (8 tests) 47ms
+ ✓ packages/agent-core/src/goal-dispatch.test.ts (9 tests) 18ms
+ ✓ packages/agent-core/src/construction-mission003.test.ts (8 tests) 39ms
+ ✓ packages/skills/src/world.test.ts (4 tests) 103ms
+ ✓ packages/minecraft-adapter/src/travel-home.test.ts (9 tests) 7ms
+ ✓ packages/minecraft-adapter/src/home-arrival.test.ts (24 tests) 18ms
+ ✓ packages/minecraft-knowledge/src/ores.test.ts (9 tests) 10ms
+ ✓ packages/minecraft-adapter/src/obstacle-detour.test.ts (3 tests) 11ms
+ ✓ apps/orchestrator/src/off13-qa39-regressions.test.ts (17 tests) 2049ms
+   ✓ QA: the live gate (controls that must keep passing) > refuses a forged or replayed handoff  373ms
+   ✓ QA: further controls > refuses an 8.3 short-name spelling of a path inside the protected world (when the volume has short names)  533ms
+ ✓ packages/skills/src/placement.test.ts (10 tests) 7ms
+ ✓ packages/agent-core/src/curfew-runtime.test.ts (7 tests) 9ms
+ ✓ test-support/offline-network-guard.test.ts (6 tests) 5812ms
+   ✓ offline network guard > fails a test that swallows a blocked attempt (checked in a child vitest run)  5557ms
+ ✓ packages/skills/src/gather.test.ts (4 tests) 418ms
+   ✓ mineBlock verifies the world change > fails when the log is still present after dig  409ms
+ ✓ packages/minecraft-adapter/src/home-lifecycle.test.ts (9 tests) 23ms
+ ✓ packages/skills/src/eat-food.test.ts (6 tests) 2149ms
+   ✓ eatFood verifies hunger recovery > succeeds only when food is consumed and hunger rises  1249ms
+   ✓ eatFood verifies hunger recovery > fails VERIFY_FAILED when consume is a no-op  881ms
+ ✓ packages/minecraft-adapter/src/execution-engine.test.ts (9 tests) 11ms
+ ✓ packages/skills/src/inventory-service.test.ts (6 tests) 208ms
+ ✓ packages/agent-core/src/storage-community-access.test.ts (8 tests) 83ms
+ ✓ packages/memory/src/audience-observers.test.ts (8 tests) 7ms
+ ✓ packages/agent-core/src/site-and-delivery-boundaries.test.ts (5 tests) 204ms
+stderr | packages/agent-core/src/store.test.ts > CivilizationStore > safeWrite and safeRead refuse work after close 
+without throwing
+[store] skipped write after close: late
+
+ ✓ packages/agent-core/src/store.test.ts (5 tests) 380ms
+ ✓ packages/agent-core/src/available-homes.test.ts (6 tests) 289ms
+ ✓ packages/agent-core/src/craft-e2e-planner-loop.test.ts (1 test) 5535ms
+   ✓ CRAFT-001 planner->executor loop from an empty inventory > reaches a wooden_pickaxe in a bounded number of ticks, each tick's claim matching the real inventory  5530ms
+ ✓ packages/agent-core/src/operation-tracker.test.ts (4 tests) 54ms
+ ✓ packages/minecraft-adapter/src/local-escape.test.ts (6 tests) 10ms
+ ✓ test-support/late-chest-completion.test.ts (7 tests) 7367ms
+   ✓ withdrawItems: timeout preserves physical transfers as pending observations without overwriting newer stock  1368ms
+   ✓ withdrawItems: superseded preserves physical transfers as pending observations without overwriting newer stock  923ms
+   ✓ withdrawItems: disconnect preserves physical transfers as pending observations without overwriting newer stock  1214ms
+   ✓ depositItems: timeout preserves physical transfers as pending observations without overwriting newer stock  1247ms
+   ✓ depositItems: superseded preserves physical transfers as pending observations without overwriting newer stock  966ms
+   ✓ depositItems: disconnect preserves physical transfers as pending observations without overwriting newer stock  1175ms
+   ✓ a repeated withdrawal commits fresh stock while an older transfer remains pending  471ms
+ ✓ packages/minecraft-knowledge/src/construction-blueprint-rules.test.ts (11 tests) 10ms
+ ✓ apps/orchestrator/src/fish-test-guard.test.ts (6 tests) 6ms
+ ✓ packages/society/src/society.test.ts (7 tests) 7ms
+ ✓ packages/minecraft-adapter/src/movement-sync.test.ts (5 tests) 7ms
+ ✓ packages/minecraft-adapter/src/interaction.test.ts (4 tests) 12ms
+ ✓ packages/skills/src/obtain.test.ts (5 tests) 278ms
+ ✓ tools/ci/journal-execution.test.ts (2 tests) 8985ms
+   ✓ executes the real journal CLI and its forged/missing controls without mutating original artifacts  4995ms
+   ✓ refuses to report verification success when the real journal CLI rejects the input  3987ms
+ ✓ packages/agent-core/src/manager-roster-start.test.ts (7 tests) 3165ms
+   ✓ explicit independent citizen startup > connects the supplied stable roster rather than Atlas/Maya and preserves the experiment run ID  3086ms
+ ✓ tools/v1-integration/journal-cross-check.test.ts (27 tests) 806ms
+ ✓ apps/orchestrator/src/pr48-review-escapes.test.ts (4 tests) 56ms
+ ✓ tools/v1-integration/combined-journal.test.ts (2 tests) 23232ms
+   ✓ cross-checks 2 citizens' actual recorded actions without replacing IDs  8750ms
+   ✓ cross-checks 4 citizens' actual recorded actions without replacing IDs  14480ms
+ ✓ packages/agent-core/src/executor-community-storage.test.ts (5 tests) 320ms
+ ✓ apps/orchestrator/src/runtime-sqlite-launch.test.ts (10 tests) 350ms
+ ✓ packages/shared/src/visibility-2v2-contract.test.ts (19 tests) 9ms
+ ✓ packages/agent-core/src/claims.test.ts (7 tests) 8ms
+ ✓ packages/agent-core/src/build-structure.test.ts (3 tests) 15ms
+ ✓ packages/minecraft-adapter/src/shared-auto-jump.test.ts (1 test) 13ms
+ ✓ packages/agent-core/src/workstations.test.ts (5 tests) 288ms
+ ✓ packages/minecraft-adapter/src/terrain-memory.test.ts (3 tests) 9ms
+ ✓ packages/agent-core/src/execution-engine.test.ts (4 tests) 343ms
+ ✓ packages/agent-core/src/executor-food.test.ts (6 tests) 9ms
+ ✓ packages/minecraft-adapter/src/start-following.test.ts (9 tests) 9ms
+ ✓ packages/agent-core/src/community-audit-guard.test.ts (3 tests) 336ms
+ ✓ packages/skills/src/combat.test.ts (2 tests) 981ms
+   ✓ combat live-entity narrowing > attacks the live hostile entity and reports death without calling it out of range  974ms
+ ✓ packages/agent-core/src/planner-food-backoff.test.ts (3 tests) 145ms
+ ✓ packages/skills/src/mechanics.test.ts (3 tests) 425ms
+   ✓ recipe existence vs craftability > does not treat missing ingredients as an unknown recipe  421ms
+ ✓ packages/agent-core/src/recipes.test.ts (6 tests) 234ms
+ ✓ packages/memory/src/store.test.ts (2 tests) 192ms
+ ✓ packages/skills/src/optional-work.test.ts (3 tests) 6ms
+ ✓ packages/minecraft-adapter/src/enter-home.test.ts (2 tests) 5ms
+ ✓ packages/skills/src/shared-drop-conservation.test.ts (2 tests) 138ms
+ ✓ packages/skills/src/gauntlet.test.ts (4 tests) 13ms
+ ✓ packages/memory/src/retrieval.test.ts (3 tests) 5ms
+ ✓ packages/agent-core/src/executor-community-construction.test.ts (2 tests) 1059ms
+   ✓ executor construction community scoping > legacy single-settlement mode still persists the project (test sensitivity)  621ms
+   ✓ executor construction community scoping > community mode leaves the shared settlement row untouched  436ms
+ ✓ packages/minecraft-adapter/src/connection-health.test.ts (3 tests) 6ms
+ ✓ packages/minecraft-adapter/src/path-recovery.test.ts (4 tests) 8ms
+ ✓ packages/agent-core/src/failure-backoff.test.ts (2 tests) 5ms
+ ✓ packages/agent-core/src/construction-evidence.test.ts (2 tests) 18ms
+ ✓ packages/minecraft-knowledge/src/experiment-version-compatibility.test.ts (3 tests) 324ms
+ ✓ packages/shared/src/entity-target.test.ts (4 tests) 4ms
+ ✓ packages/memory/src/events.test.ts (3 tests) 6ms
+ ✓ packages/agent-core/src/projects.test.ts (2 tests) 9ms
+ ✓ packages/minecraft-adapter/src/navigation.test.ts (2 tests) 4ms
+ ✓ packages/shared/src/colony-world.test.ts (2 tests) 5ms
+ ✓ packages/skills/src/execution-engine.test.ts (4 tests) 154ms
+ ✓ packages/agent-core/src/dev-reset.test.ts (2 tests) 14ms
+ ✓ packages/cognition/src/learning.test.ts (9 tests) 109ms
+ ✓ packages/cognition/src/v2.test.ts (21 tests) 68ms
+ ✓ tools/v1-integration/integrated-chest-adapter.test.ts (1 test) 223ms
+ ✓ tools/v1-acceptance/engine.test.ts (9 tests) 91ms
+ ✓ packages/cognition/src/openai-retry.test.ts (44 tests) 68ms
+ ✓ packages/cognition/src/openai-schema-regression.test.ts (40 tests) 39ms
+ ✓ packages/cognition/src/openai-config-regression.test.ts (42 tests) 28ms
+ ✓ apps/orchestrator/src/two-fish-test-guard.test.ts (7 tests) 8ms
+ ✓ apps/orchestrator/src/construction-live-boundaries.test.ts (29 tests) 580ms
+ ✓ apps/orchestrator/src/construction-experiment-guard.test.ts (14 tests) 10ms
+ ✓ apps/orchestrator/src/mine-test-guard.test.ts (6 tests) 7ms
+ ✓ apps/orchestrator/src/world-lab-one-citizen-sequence.test.ts (5 tests) 11ms
+ ✓ apps/orchestrator/src/http-server-origin.test.ts (4 tests) 117ms
+ ✓ packages/cognition/src/cloud-fallback-regression.test.ts (8 tests) 27ms
+ ✓ tools/v1-integration/experiment-identity.test.ts (4 tests) 55ms
+ ✓ tools/v1-integration/manifest.test.ts (13 tests) 11ms
+ ✓ packages/agent-core/src/action-evidence.test.ts (1 test) 172ms
+ ✓ packages/cognition/src/cognition.test.ts (8 tests) 12ms
+ ✓ apps/orchestrator/src/home-test-guard.test.ts (5 tests) 7ms
+ ✓ tools/v1-integration/validator-adapter.test.ts (6 tests) 6ms
+ ✓ packages/cognition/src/inference-queue-regression.test.ts (4 tests) 7ms
+ ✓ tools/v1-integration/branches.test.ts (2 tests) 6ms
+ ✓ tools/v1-integration/regressions.test.ts (5 tests) 5ms
+ ✓ apps/orchestrator/src/farm-test-guard.test.ts (4 tests) 6ms
+ ✓ apps/orchestrator/src/two-probe-test-guard.test.ts (3 tests) 4ms
+ ✓ packages/minecraft-knowledge/src/property.test.ts (3 tests) 4ms
+ ✓ packages/agent-core/src/bootstrap-wood-lists.test.ts (19 tests) 10ms
+ ✓ packages/agent-core/src/inventory-view.test.ts (2 tests) 5ms
+ ✓ packages/agent-core/src/planner-log-items.test.ts (10 tests) 109ms
+ ✓ packages/agent-core/src/site.test.ts (2 tests) 4ms
+ ✓ packages/minecraft-adapter/src/death.test.ts (1 test) 8ms
+ ✓ packages/skills/src/furnace.test.ts (2 tests) 4ms
+ ✓ packages/agent-core/src/blueprint.test.ts (2 tests) 5ms
+ ✓ packages/agent-core/src/shelter.test.ts (1 test) 5ms
+ ✓ packages/agent-core/src/construction-water.test.ts (1 test) 3ms
+ ✓ packages/skills/src/blueprint-clear-site-safety.test.ts (1 test) 9ms
+ ✓ packages/memory/src/memory.test.ts (1 test) 5ms
+ ✓ packages/agent-core/src/transfer.test.ts (1 test) 3ms
+ ✓ packages/skills/src/skills.test.ts (1 test) 3ms
+ ✓ packages/minecraft-adapter/src/body-lock.test.ts (2 tests) 3ms
+ ✓ apps/orchestrator/src/construction-case-policy.test.ts (1 test) 4ms
+stdout | test-support/home-storage-cancellation.test.ts > [QA88-M1] the personal/household chest path (home-ops.executeStorage) is not covered by PR #88's abandoned-transfer gate > deposit_personal: after the boundary returned TIMEOUT, no success event for the abandoned transfer is emitted
+QA88-M1 deposit_personal managerSaw=TIMEOUT eventsAfterReturn=SystemIncident,SystemIncident,SystemIncident chestStock=4 inventory=0
+
+stdout | test-support/home-storage-cancellation.test.ts > [QA88-M1] the personal/household chest path (home-ops.executeStorage) is not covered by PR #88's abandoned-transfer gate > withdraw_personal: after the boundary returned TIMEOUT, no success event for the abandoned transfer is emitted
+QA88-M1 withdraw_personal managerSaw=TIMEOUT eventsAfterReturn=SystemIncident,SystemIncident,SystemIncident chestStock=3 inventory=1
+
+stdout | test-support/home-storage-cancellation.test.ts > [QA88-M1] the personal/household chest path (home-ops.executeStorage) is not covered by PR #88's abandoned-transfer gate > deposit_household: after the boundary returned TIMEOUT, no success event for the abandoned transfer is emitted
+QA88-M1 deposit_household managerSaw=TIMEOUT eventsAfterReturn=SystemIncident,SystemIncident,SystemIncident chestStock=4 inventory=0
+
+ ✓ test-support/home-storage-cancellation.test.ts (4 tests) 14330ms
+   ✓ [QA88-M1] the personal/household chest path (home-ops.executeStorage) is not covered by PR #88's abandoned-transfer gate > deposit_personal: after the boundary returned TIMEOUT, no success event for the abandoned transfer is emitted  3672ms
+   ✓ [QA88-M1] the personal/household chest path (home-ops.executeStorage) is not covered by PR #88's abandoned-transfer gate > withdraw_personal: after the boundary returned TIMEOUT, no success event for the abandoned transfer is emitted  3559ms
+   ✓ [QA88-M1] the personal/household chest path (home-ops.executeStorage) is not covered by PR #88's abandoned-transfer gate > deposit_household: after the boundary returned TIMEOUT, no success event for the abandoned transfer is emitted  3538ms
+   ✓ [QA88-M1] the personal/household chest path (home-ops.executeStorage) is not covered by PR #88's abandoned-transfer gate > deposit_personal: the abandoned executor must not release a container claim that a NEWER action of the same citizen has refreshed  3559ms
+
+ Test Files  221 passed (221)
+      Tests  2639 passed | 2 skipped (2641)
+   Start at  11:51:16
+   Duration  464.08s (transform 10.63s, setup 19.37s, collect 309.44s, tests 392.97s, environment 50ms, prepare 84.87s)
+

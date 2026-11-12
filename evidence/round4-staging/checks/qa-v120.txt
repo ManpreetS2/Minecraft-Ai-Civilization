@@ -1,0 +1,56 @@
+
+ RUN  v3.2.7 C:/Users/sh1ft/codex-round4-staging/qa/v120
+
+ ✓ test/qa120-validator-glue.test.ts (25 tests) 1198ms
+ ✓ test/qa120-ci-identity.test.ts (42 tests) 27030ms
+   ✓ 1v1: report run identity (runId vs experimentId vs attribution.runId) > control: the untouched real bundle is accepted with NOT_PROVEN / offline_simulated honesty intact  757ms
+   ✓ 1v1: report run identity (runId vs experimentId vs attribution.runId) > new-style report (experimentId = journal id, runId only in attribution) is accepted  399ms
+   ✓ 1v1: report run identity (runId vs experimentId vs attribution.runId) > attribution removed from a new-style report FAILS CLOSED (experimentId never silently stands in for runId)  771ms
+   ✓ 1v1: report run identity (runId vs experimentId vs attribution.runId) > attribution.runId foreign while top-level runId is the CORRECT run id is rejected (the ?? chain must not hide it)  444ms
+   ✓ 1v1: report run identity (runId vs experimentId vs attribution.runId) > top-level runId correct, attribution correct, experimentId foreign is rejected  332ms
+   ✓ 1v1: report run identity (runId vs experimentId vs attribution.runId) > attribution.runId foreign while experimentId equals the right run id is rejected  470ms
+   ✓ 1v1: report run identity (runId vs experimentId vs attribution.runId) > attribution.runId null / empty / whitespace / case-changed / suffixed is rejected  2862ms
+   ✓ 1v1: report run identity (runId vs experimentId vs attribution.runId) > type-confused attribution.runId (array stringifying to the run id) is rejected  816ms
+   ✓ 1v1: report run identity (runId vs experimentId vs attribution.runId) > attribution citizens swapped / extra / missing are rejected  1239ms
+   ✓ 1v1: report run identity (runId vs experimentId vs attribution.runId) > manifest runId changed alone (report/journal/receipts keep the original) is rejected  356ms
+   ✓ 1v1: report run identity (runId vs experimentId vs attribution.runId) > journal experiment id changed in the manifest configuration only is rejected  343ms
+   ✓ 1v1: receipts and honest output > a missing pinned receipt file is rejected  308ms
+   ✓ 1v1: receipts and honest output > two actions pointing at the same receipt file are rejected  366ms
+   ✓ 1v1: receipts and honest output > honesty mutations are each rejected: VERIFIED, real_minecraft mode, authentic environment, proven duration, proven attestation, gap code removed  1768ms
+   ✓ 1v1: receipts and honest output > verdict.json promoted to PASS/VERIFIED is rejected  640ms
+   ✓ 2v2: report run identity (runId vs experimentId vs attribution.runId) > new-style report (experimentId = journal id, runId only in attribution) is accepted  317ms
+   ✓ 2v2: report run identity (runId vs experimentId vs attribution.runId) > attribution removed from a new-style report FAILS CLOSED (experimentId never silently stands in for runId)  423ms
+   ✓ 2v2: report run identity (runId vs experimentId vs attribution.runId) > top-level runId correct, attribution correct, experimentId foreign is rejected  326ms
+   ✓ 2v2: report run identity (runId vs experimentId vs attribution.runId) > attribution.runId null / empty / whitespace / case-changed / suffixed is rejected  2067ms
+   ✓ 2v2: report run identity (runId vs experimentId vs attribution.runId) > type-confused attribution.runId (array stringifying to the run id) is rejected  710ms
+   ✓ 2v2: report run identity (runId vs experimentId vs attribution.runId) > top-level runId contradicting a CORRECT attribution.runId is rejected  434ms
+   ✓ 2v2: report run identity (runId vs experimentId vs attribution.runId) > attribution citizens swapped / extra / missing are rejected  1821ms
+   ✓ 2v2: report run identity (runId vs experimentId vs attribution.runId) > manifest runId changed alone (report/journal/receipts keep the original) is rejected  438ms
+   ✓ 2v2: report run identity (runId vs experimentId vs attribution.runId) > journal experiment id changed in the manifest configuration only is rejected  331ms
+   ✓ 2v2: receipts and honest output > every receipt deleted and every pin removed (so nothing is missing) is rejected  328ms
+   ✓ 2v2: receipts and honest output > two actions pointing at the same receipt file are rejected  311ms
+   ✓ 2v2: receipts and honest output > a receipt whose content is swapped with another citizen's receipt (both re-pinned) is rejected  339ms
+   ✓ 2v2: receipts and honest output > a forged receipt whose pin was NOT updated is rejected  309ms
+   ✓ 2v2: receipts and honest output > honesty mutations are each rejected: VERIFIED, real_minecraft mode, authentic environment, proven duration, proven attestation, gap code removed  3092ms
+   ✓ 2v2: receipts and honest output > verdict.json promoted to PASS/VERIFIED is rejected  1054ms
+ ✓ test/qa120-chest-conservation.test.ts (14 tests) 55885ms
+   ✓ settlement chest: deadline x lag sweep > withdrawItems, server slot-sync lag 0 ms: every deadline conserves bread and never claims an unsuccessful transfer  6864ms
+   ✓ settlement chest: deadline x lag sweep > withdrawItems, server slot-sync lag 80 ms: every deadline conserves bread and never claims an unsuccessful transfer  7649ms
+   ✓ settlement chest: deadline x lag sweep > depositItems, server slot-sync lag 0 ms: every deadline conserves bread and never claims an unsuccessful transfer  6691ms
+   ✓ settlement chest: deadline x lag sweep > depositItems, server slot-sync lag 80 ms: every deadline conserves bread and never claims an unsuccessful transfer  7278ms
+   ✓ home chest (personal and household): deadline sweep > personal withdrawItems: every deadline conserves bread; an unsuccessful result emits no success event  5285ms
+   ✓ home chest (personal and household): deadline sweep > personal depositItems: every deadline conserves bread; an unsuccessful result emits no success event  5281ms
+   ✓ home chest (personal and household): deadline sweep > household withdrawItems: every deadline conserves bread; an unsuccessful result emits no success event  5588ms
+   ✓ home chest (personal and household): deadline sweep > household depositItems: every deadline conserves bread; an unsuccessful result emits no success event  5536ms
+   ✓ cancellation by the caller (abort signal) and by disconnect never silently commit or lose items > withdrawItems / abort-before-click: bread is conserved, no completion event, authoritative stock untouched  737ms
+   ✓ cancellation by the caller (abort signal) and by disconnect never silently commit or lose items > withdrawItems / abort-mid-window: bread is conserved, no completion event, authoritative stock untouched  1033ms
+   ✓ cancellation by the caller (abort signal) and by disconnect never silently commit or lose items > withdrawItems / disconnect-mid-window: bread is conserved, no completion event, authoritative stock untouched  1067ms
+   ✓ cancellation by the caller (abort signal) and by disconnect never silently commit or lose items > depositItems / abort-before-click: bread is conserved, no completion event, authoritative stock untouched  727ms
+   ✓ cancellation by the caller (abort signal) and by disconnect never silently commit or lose items > depositItems / abort-mid-window: bread is conserved, no completion event, authoritative stock untouched  1066ms
+   ✓ cancellation by the caller (abort signal) and by disconnect never silently commit or lose items > depositItems / disconnect-mid-window: bread is conserved, no completion event, authoritative stock untouched  1076ms
+
+ Test Files  3 passed (3)
+      Tests  81 passed (81)
+   Start at  11:55:07
+   Duration  83.66s (transform 10.53s, setup 1.37s, collect 20.30s, tests 84.11s, environment 1ms, prepare 4.47s)
+

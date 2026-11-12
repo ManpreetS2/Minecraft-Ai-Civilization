@@ -1,0 +1,23 @@
+
+ RUN  v3.2.7 C:/Users/sh1ft/codex-round4-staging/qa/v103
+
+ ✓ test/qa103-callsites.test.ts (2 tests) 4ms
+ ✓ test/qa103-home.test.ts (18 tests) 33714ms
+   ✓ abandoned by deadline (window confirms after the 250 ms grace): no false success, no stale claim release, pending reconciliation > deposit_personal: TIMEOUT; no success event, no ActionCompleted; a PENDING incident that carries the REAL observed result  3543ms
+   ✓ abandoned by deadline (window confirms after the 250 ms grace): no false success, no stale claim release, pending reconciliation > withdraw_personal: TIMEOUT; no success event, no ActionCompleted; a PENDING incident that carries the REAL observed result  3545ms
+   ✓ abandoned by deadline (window confirms after the 250 ms grace): no false success, no stale claim release, pending reconciliation > deposit_household: TIMEOUT; no success event, no ActionCompleted; a PENDING incident that carries the REAL observed result  3545ms
+   ✓ abandoned by deadline (window confirms after the 250 ms grace): no false success, no stale claim release, pending reconciliation > no store write: the settlement row and the home membership are byte-identical before and after an abandoned transfer  3545ms
+   ✓ abandoned by deadline (window confirms after the 250 ms grace): no false success, no stale claim release, pending reconciliation > a refreshed lease of the SAME citizen is not released by the stale frame, and is released normally by the newer action (queued behind it on the same boundary)  1197ms
+   ✓ abandoned by deadline (window confirms after the 250 ms grace): no false success, no stale claim release, pending reconciliation > a claim taken by ANOTHER citizen after expiry is never released by the stale frame (ClaimBoard owner check)  3549ms
+   ✓ abandoned by the CALLER (disconnect / death / shutdown): the transfer that landed stays visible and is not reported as a success > deposit_personal: abort mid-window -> CANCELLED, no success event, pending incident with the observed result  3184ms
+   ✓ abandoned by the CALLER (disconnect / death / shutdown): the transfer that landed stays visible and is not reported as a success > withdraw_personal: abort mid-window -> CANCELLED, no success event, pending incident with the observed result  3191ms
+   ✓ abandoned by the CALLER (disconnect / death / shutdown): the transfer that landed stays visible and is not reported as a success > deposit_household: abort mid-window -> CANCELLED, no success event, pending incident with the observed result  3173ms
+   ✓ abandoned by the CALLER (disconnect / death / shutdown): the transfer that landed stays visible and is not reported as a success > a signal that is ALREADY aborted when the action is scheduled: nothing moves and no transfer event is emitted  311ms
+   ✓ [QA103-I1] duplicate pending records for one abandoned transfer (characterisation) > an abandoned deposit leaves TWO AbandonedActionObservation records: one with the real transfer (home-ops) and one wrapping the already-CANCELLED result (executor tail gate); a reconciler must de-duplicate by action/attempt  3544ms
+   ✓ each abandonment signal is independently sufficient (executePlan without the boundary) > a NEWER executePlan generation on the same bot (signal never aborted): the older frame is abandoned: no success event and it does not release the newer frame's lease  389ms
+
+ Test Files  2 passed (2)
+      Tests  20 passed (20)
+   Start at  11:48:23
+   Duration  38.79s (transform 1.72s, setup 173ms, collect 4.57s, tests 33.72s, environment 0ms, prepare 444ms)
+

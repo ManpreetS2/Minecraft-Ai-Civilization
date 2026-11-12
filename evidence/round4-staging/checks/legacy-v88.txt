@@ -1,0 +1,135 @@
+
+ RUN  v3.2.7 C:/Users/sh1ft/codex-round4-staging/qa/v88
+
+ ❯ test/qa88-direct-callers.test.ts (8 tests | 1 failed) 772ms
+   ✓ a direct depositItem whose action is abandoned while the click is in flight > reports success: the items DID move. It is a physical-truth success, never an action completion: the data matches the chest and inventory exactly 285ms
+   ✓ a direct depositItem whose action is abandoned while the click is in flight > emits NO success event; the only event is a pending SystemIncident carrying the counts (so no consumer can count it as an accepted transfer) 124ms
+   ✓ a direct depositItem whose action is abandoned while the click is in flight > control: without abandonment the same call emits exactly one ItemDeposited and no incident 77ms
+   ✓ a direct depositItem whose action is abandoned while the click is in flight > abandonment BEFORE the click starts: nothing moves, CANCELLED, no event (the gate is real, not cosmetic) 2ms
+   ✓ a direct depositItem whose action is abandoned while the click is in flight > the deposit wrapper `depositItems` stops after the first abandoned success: it never starts a transfer for the NEXT item 121ms
+   ✓ a direct withdrawItem whose action is abandoned while the click is in flight > success with the physically moved count; incident only; conservation holds 110ms
+   × production call sites of the chest skills (tripwire: a NEW call site must be classified before the first Paper trial) > the set of production files that call the chest skills is exactly the reviewed set 16ms
+     → expected [ 'agent-core\src\executor.ts', …(6) ] to deeply equal [ 'agent-core/src/executor.ts', …(6) ]
+   ✓ production call sites of the chest skills (tripwire: a NEW call site must be classified before the first Paper trial) > the runtime orchestrator never calls them directly; only live-*-test/demo harnesses do 32ms
+ ✓ test/qa88-contract.test.ts (4 tests) 2834ms
+   ✓ physical inventory truth after an unsuccessful (CANCELLED/TIMEOUT) chest action > the window click is already on the wire BEFORE the deadline, so the transfer cannot be un-sent (why `bread === 0` is not a valid requirement)  802ms
+   ✓ physical inventory truth after an unsuccessful (CANCELLED/TIMEOUT) chest action > conservation is the invariant: citizen bread + chest bread = 4 before, during the grace, and after, whatever the result code says  653ms
+   ✓ physical inventory truth after an unsuccessful (CANCELLED/TIMEOUT) chest action > RECOMMENDED CONTRACT, clause by clause, on the QA78 scenario (unsuccessful result)  712ms
+   ✓ physical inventory truth after an unsuccessful (CANCELLED/TIMEOUT) chest action > and the click that has NOT yet been sent when permission ends is never sent (the requirement that does hold): deadline 5 ms, window 120 ms  666ms
+ ❯ test/qa88-reachability.test.ts (10 tests | 2 failed) 5040ms
+   ✓ QA78-L2b (a throwing write during the cancel-retrieve) is NOT reachable with the real protocol client > real minecraft-protocol Client.write after end() neither throws nor emits an error event 200ms
+   ✓ QA78-L2b (a throwing write during the cancel-retrieve) is NOT reachable with the real protocol client > QA78-L2d: mineflayer assigns bot._client only when the bot is created (loader.js), so a client swap under a running cast does not occur in production 84ms
+   × QA78-L3 (global timer wrapper / escape hatches): production reachability > L3a: no installed dependency uses util.promisify(setTimeout|setInterval|setImmediate), so the wrapper's lost promisify.custom cannot be hit 31ms
+     → Cannot read properties of undefined (reading 'trim')
+   ✓ QA78-L3 (global timer wrapper / escape hatches): production reachability > L3b: the production action callback is an async function, so it cannot throw synchronously and skip the boundary's `finally` (timer wrapper cannot leak that way) 1ms
+   × QA78-L3 (global timer wrapper / escape hatches): production reachability > L3c: production source contains no process.nextTick / queueMicrotask, and no floating `void bot.`/`void ctx.bot.` calls; the only setImmediate is a promise resolver 185ms
+     → expected [ Array(1) ] to deeply equal []
+   ✓ QA78-L3 (global timer wrapper / escape hatches): production reachability > L3c: process-level handlers exist only in the live-mechanics test/demo harnesses, so an escaped refusal WOULD terminate the production orchestrator (hence the importance of there being no such path) 143ms
+   ✓ QA78-L4 (a listener registered during an action cannot be removed after the action ended): reachable only for a SLOW unwind > control: an action that unwinds inside the 250 ms grace removes its own listener (no leak) — the normal cooperative case 253ms
+   ✓ QA78-L4 (a listener registered during an action cannot be removed after the action ended): reachable only for a SLOW unwind > a navigation that unwinds AFTER the grace leaks one listener per abandoned action (characterisation of the reachable case: pathing.ts registers `end/kicked/death/respawn` handlers)  839ms
+   ✓ QA78-L4 (a listener registered during an action cannot be removed after the action ended): reachable only for a SLOW unwind > source fact: production pathing registers and removes its bot listeners in the same function's try/finally (so only the slow-unwind case above can leak) 2ms
+   ✓ QA78-L2a (abort before the bobber is bound leaves the cast out): consequence on a server that toggles the rod > cancel at 10 ms (before bind): the line stays out; the NEXT fishing action's first use_item RETRIEVES instead of casting, so that action finds no bobber (one wasted action, self-healing)  3296ms
+ ❯ test/qa88-home-controls.test.ts (4 tests | 1 failed) 988ms
+   ✓ personal chest, no abandonment > deposit_personal: success, at least one ItemDeposited, one ActionCompleted, chest and inventory agree, claim released  388ms
+   ✓ personal chest, no abandonment > withdraw_personal: success, at least one ItemWithdrawn, chest 4->3, inventory 0->1 210ms
+   ✓ household chest, no abandonment > deposit_household: success, at least one ItemDeposited, one ActionCompleted, chest and inventory agree, claim released 234ms
+   × [QA88-I1] duplicate success events on every chest transfer (pre-existing, not caused by PR #88) > a normal personal deposit emits ItemDeposited twice: once from the skill (depositItem) and once from home-ops.executeStorage 154ms
+     → expected [ { type: 'ItemDeposited', …(2) } ] to have a length of 2 but got 1
+pnpm : 
+At line:2 char:38
++ ... ','v88')) { pnpm exec vitest run -c qa/$suite/vitest.config.ts --maxW ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/qa88-direct-callers.test.ts > production call sites of the chest skills (tripwire: a NEW call site must be 
+classified before the first Paper trial) > the set of production files that call the chest skills is exactly the 
+reviewed set
+AssertionError: expected [ 'agent-core\src\executor.ts', …(6) ] to deeply equal [ 'agent-core/src/executor.ts', …(6) ]
+
+- Expected
++ Received
+
+  [
+-   "agent-core/src/executor.ts",
+-   "agent-core/src/home-ops.ts",
+-   "skills/src/farm.ts",
+-   "skills/src/fish-quota.ts",
+-   "skills/src/fish.ts",
+-   "skills/src/inventory.ts",
+-   "skills/src/mine.ts",
++   "agent-core\\src\\executor.ts",
++   "agent-core\\src\\home-ops.ts",
++   "skills\\src\\farm.ts",
++   "skills\\src\\fish-quota.ts",
++   "skills\\src\\fish.ts",
++   "skills\\src\\inventory.ts",
++   "skills\\src\\mine.ts",
+  ]
+
+ ❯ test/qa88-direct-callers.test.ts:82:18
+     80|   const uniq = [...new Set(sites)].sort();
+     81|   it("the set of production files that call the chest skills is exactl…
+     82|     expect(uniq).toEqual([
+       |                  ^
+     83|       "agent-core/src/executor.ts",     // settlement chest: GUARDED b…
+     84|       "agent-core/src/home-ops.ts",     // personal + household chest:…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯
+
+ FAIL  test/qa88-home-controls.test.ts > [QA88-I1] duplicate success events on every chest transfer (pre-existing, not 
+caused by PR #88) > a normal personal deposit emits ItemDeposited twice: once from the skill (depositItem) and once 
+from home-ops.executeStorage
+AssertionError: expected [ { type: 'ItemDeposited', …(2) } ] to have a length of 2 but got 1
+
+- Expected
++ Received
+
+- 2
++ 1
+
+ ❯ test/qa88-home-controls.test.ts:39:62
+     37|     const h = homeRig({ purpose: "personal", item: "cobblestone", type…
+     38|     await h.run("deposit_personal", "depositItems", 10_000, "cobblesto…
+     39|     expect(h.seen.filter((e) => e.type === "ItemDeposited")).toHaveLen…
+       |                                                              ^
+     40|   });
+     41| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/4]⎯
+
+ FAIL  test/qa88-reachability.test.ts > QA78-L3 (global timer wrapper / escape hatches): production reachability > 
+L3a: no installed dependency uses util.promisify(setTimeout|setInterval|setImmediate), so the wrapper's lost 
+promisify.custom cannot be hit
+TypeError: Cannot read properties of undefined (reading 'trim')
+ ❯ test/qa88-reachability.test.ts:39:21
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/4]⎯
+
+ FAIL  test/qa88-reachability.test.ts > QA78-L3 (global timer wrapper / escape hatches): production reachability > 
+L3c: production source contains no process.nextTick / queueMicrotask, and no floating `void bot.`/`void ctx.bot.` 
+calls; the only setImmediate is a promise resolver
+AssertionError: expected [ Array(1) ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   "packages\\shared\\src\\event-loop.ts:34: return new Promise((resolve) => setImmediate(resolve));",
++ ]
+
+ ❯ test/qa88-reachability.test.ts:51:72
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/4]⎯
+
+
+ Test Files  3 failed | 1 passed (4)
+      Tests  4 failed | 22 passed (26)
+   Start at  11:49:39
+   Duration  17.17s (transform 3.22s, setup 340ms, collect 16.06s, tests 9.63s, environment 1ms, prepare 1.29s)
+

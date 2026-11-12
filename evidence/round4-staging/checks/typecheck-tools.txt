@@ -1,0 +1,4 @@
+
+> minecraft-ai-civilization@0.1.0 typecheck:tools C:\Users\sh1ft\codex-round4-staging
+> tsc -p tools/tsconfig.json
+

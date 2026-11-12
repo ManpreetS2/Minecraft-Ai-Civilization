@@ -1,0 +1,204 @@
+
+ RUN  v3.2.7 C:/Users/sh1ft/codex-round4-staging/qa/v67
+
+stdout | test/adv67-ticks.test.ts > 1,200-tick tolerance: what the signed total_server_ticks check really enforces > characterises the accepted band around the sampled span (signed first/last always equal to the journal samples)
+TOLERANCE_TABLE (signed total - sampled span -> attestation proven) {"0":true,"1":false,"2":false,"600":false,"1199":false,"1200":false,"1201":false,"2400":false,"6000":false,"72000":false,"-1":false}
+
+stdout | test/adv67-ticks.test.ts > 1,200-tick tolerance: what the signed total_server_ticks check really enforces > an HONEST wider signed window (start/stop outside the first/last samples) is rejected beyond +1200: the constant is not derived from the sampling interval
+HONEST_WINDOW_PLUS_2_INTERVALS proven= false [
+  'Attestation total server ticks contradiction: totalServerTicks (74400) does not equal sampled tick progression (72000).'
+]
+
+stdout | test/adv67-ticks.test.ts > 1,200-tick tolerance: what the signed total_server_ticks check really enforces > tolerance is independent of the sampling interval: with 5-minute samples (allowed up to 6000 ticks) +1200 is still the band
+FIVE_MIN_SAMPLES exact= true +1200= false durationComplete= false [
+  'Capture session interrupted: detected 12 unrecorded time gap(s) exceeding 60s in live event timeline.',
+  'Detected 12 unrecorded time gap(s) exceeding 60s in event timeline'
+]
+
+stdout | test/adv67-ticks.test.ts > signed wall-clock timestamps: what is and is not verified > [QA67-M3] a signed capture window that cannot contain the journal's 60 minutes / 72,000 ticks must not be proven (window = 1 second)
+WINDOW_1S proven= false mode= offline_simulated status= VIOLATIONS_DETECTED
+
+stdout | test/adv67-provenance.test.ts > genuine offline 2-citizen journal (scenario-2) > [QA67-L4] the report's experimentId is the journal's experimentId (every journal row says one thing; the report must not say another)
+REPORT_EXPERIMENT_ID off2 JOURNAL_EXPERIMENT_ID off2 RUN_ID fixture-2-a14113b2dfe8
+
+stdout | test/adv67-ticks.test.ts > signed wall-clock timestamps: what is and is not verified > [QA67-M3] a signed window that does not overlap the journal at all (a year earlier / in the future) must not be proven
+WINDOW_SHIFT -365 days proven= false
+WINDOW_SHIFT 400 days proven= false
+
+stdout | test/adv67-ticks.test.ts > signed wall-clock timestamps: what is and is not verified > journal wall-clock, not the signed window, gates a live claim: a 2-minute journal cannot satisfy 60 minutes even with a 60-minute signed window
+TICK_SPRINT_2MIN mode= offline_simulated durationComplete= false [
+  'Live wall duration deficit: claimed 60 minutes, but elapsed wall time is only 2.00 minutes (120000 ms vs required 3600000 ms). A live Paper demonstration cannot substitute simulated tick duration for elapsed wall time.'
+]
+
+stdout | test/adv67-provenance.test.ts > genuine offline 2-citizen journal (scenario-2) > [QA67-M7] a forged attempt+observation for a citizen NOT in the roster is flagged
+GHOST_CITIZEN codes= [
+  'PHANTOM_CITIZEN_ACTION',
+  'PHANTOM_CITIZEN_ACTION',
+  'PHANTOM_CITIZEN_ACTION',
+  'CORRUPTED_ACTION_EVIDENCE'
+] status= VIOLATIONS_DETECTED
+
+stdout | test/adv67-provenance.test.ts > genuine offline 2-citizen journal (scenario-2) > [QA67-M7] a forged self-consistent extra gather (+1 log) that the citizen's physical final inventory does not contain is flagged (ledger 4 vs inventory 3)
+FORGED_EXTRA_GATHER status= VIOLATIONS_DETECTED codes= [ 'CORRUPTED_ACTION_EVIDENCE', 'INVENTORY_CONTINUITY_DISRUPTION' ]
+
+stdout | test/adv67-provenance.test.ts > genuine offline 2-citizen journal (scenario-2) > [QA67-M7] an observation whose before-inventory does not continue the citizen's previous after-inventory is flagged (no teleporting inventories)
+INVENTORY_DISCONTINUITY status= VIOLATIONS_DETECTED codes= [ 'INVENTORY_CONTINUITY_DISRUPTION' ]
+
+stdout | test/adv67-ticks.test.ts > missing / sparse / gapped evidence never becomes proof of uninterrupted Paper execution > 68,399 elapsed ticks (just under the 95% floor) => rejected; 68,400 accepted (by design: <=3 min of server pause tolerated)
+FLOOR 68399 real= false  68400 real= true
+
+stdout | test/adv67-provenance.test.ts > genuine offline 2-citizen journal (scenario-2) > [QA67-M6] relabelling a scripted attempt 'model' while the start row says decisionTransport=scripted-in-process is a contradiction and must be flagged
+RELABEL_MODEL status= VIOLATIONS_DETECTED codes= [ 'TRANSPORT_SOURCE_CONTRADICTION' ] sources= [ 'planner', 'model', 'scripted' ]
+
+stdout | test/adv67-ticks.test.ts > claimed duration < 60 minutes weakens the tick requirements (stale-server / frozen-server probes) > [QA67-M5] a 59-minute live claim whose server tick is FROZEN (every sample = 5000) must not be proven as uninterrupted Paper execution
+FROZEN_SERVER_59MIN mode= offline_simulated status= VIOLATIONS_DETECTED tickProven= false [
+  'Insufficient server tick samples: only 1 serverGameTick observation(s) provided. Continuous server progression cannot be proven from isolated samples.'
+]
+
+stdout | test/adv67-ticks.test.ts > claimed duration < 60 minutes weakens the tick requirements (stale-server / frozen-server probes) > [QA67-M5] a 30-minute live claim with only 25 ticks of server progress over 30 wall-minutes must not be proven
+SLOW_SERVER_30MIN mode= offline_simulated tickProven= false
+
+stdout | test/adv67-provenance.test.ts > genuine offline 2-citizen journal (scenario-2) > [QA67-L1] an observation timestamped BEFORE its attempt is a violation (anachronism)
+ANACHRONISM status= VIOLATIONS_DETECTED codes= [ 'CORRUPTED_ACTION_EVIDENCE', 'SPONTANEOUS_GAIN' ] verified= 5 reasons= [
+  'Timestamp anachronism: observation timestamp (2000-01-01T00:00:00.000Z) precedes attempt timestamp (2026-11-12T19:47:16.945Z)'
+]
+
+stdout | test/adv67-ticks.test.ts > missing / invalid timestamps never create proof > Paper ticks sampled only in the first 10% of the run, then 54 minutes of tick-less filler rows, with an honest signed window covering only the sampled part, must not prove 60 uninterrupted minutes
+NULL_FILLER mode= offline_simulated status= VIOLATIONS_DETECTED reasons= [
+  'Server game tick gap detected: a jump > 5 minutes in serverGameTick values indicates the Paper server was paused or the evidence was spliced'
+]
+
+ ✓ test/adv67-ticks.test.ts (28 tests) 208ms
+stdout | test/adv67-provenance.test.ts > genuine offline 4-citizen journal (scenario-4) > [QA67-L4] the report's experimentId is the journal's experimentId (every journal row says one thing; the report must not say another)
+REPORT_EXPERIMENT_ID off4 JOURNAL_EXPERIMENT_ID off4 RUN_ID fixture-4-a14113b2dfe8
+
+stdout | test/adv67-provenance.test.ts > genuine offline 4-citizen journal (scenario-4) > [QA67-M7] a forged attempt+observation for a citizen NOT in the roster is flagged
+GHOST_CITIZEN codes= [
+  'PHANTOM_CITIZEN_ACTION',
+  'PHANTOM_CITIZEN_ACTION',
+  'PHANTOM_CITIZEN_ACTION',
+  'CORRUPTED_ACTION_EVIDENCE'
+] status= VIOLATIONS_DETECTED
+
+stdout | test/adv67-provenance.test.ts > genuine offline 4-citizen journal (scenario-4) > [QA67-M7] a forged self-consistent extra gather (+1 log) that the citizen's physical final inventory does not contain is flagged (ledger 4 vs inventory 3)
+FORGED_EXTRA_GATHER status= VIOLATIONS_DETECTED codes= [ 'CORRUPTED_ACTION_EVIDENCE', 'INVENTORY_CONTINUITY_DISRUPTION' ]
+
+stdout | test/adv67-provenance.test.ts > genuine offline 4-citizen journal (scenario-4) > [QA67-M7] an observation whose before-inventory does not continue the citizen's previous after-inventory is flagged (no teleporting inventories)
+INVENTORY_DISCONTINUITY status= VIOLATIONS_DETECTED codes= [ 'INVENTORY_CONTINUITY_DISRUPTION' ]
+
+stdout | test/adv67-provenance.test.ts > genuine offline 4-citizen journal (scenario-4) > [QA67-M6] relabelling a scripted attempt 'model' while the start row says decisionTransport=scripted-in-process is a contradiction and must be flagged
+RELABEL_MODEL status= VIOLATIONS_DETECTED codes= [ 'TRANSPORT_SOURCE_CONTRADICTION' ] sources= [ 'planner', 'model', 'scripted' ]
+
+stdout | test/adv67-provenance.test.ts > genuine offline 4-citizen journal (scenario-4) > [QA67-L1] an observation timestamped BEFORE its attempt is a violation (anachronism)
+ANACHRONISM status= VIOLATIONS_DETECTED codes= [ 'CORRUPTED_ACTION_EVIDENCE', 'SPONTANEOUS_GAIN' ] verified= 11 reasons= [
+  'Timestamp anachronism: observation timestamp (2000-01-01T00:00:00.000Z) precedes attempt timestamp (2026-11-12T19:47:30.506Z)'
+]
+
+ ✓ test/adv67-provenance.test.ts (42 tests) 444ms
+stdout | test/adv67-identity.test.ts > shipped offline pipeline (real scenario-2 journal): conflicting identities > [QA67-M1] bundle.sourceSha != journal start.sourceSha is flagged
+ID bundleSha!=startSha  report.sourceSha= a14113b2dfe80a39ec35e77a7a5627e25d0b6ddb flagged= true
+
+stdout | test/adv67-identity.test.ts > shipped offline pipeline (real scenario-2 journal): conflicting identities > [QA67-M1] journal start.sourceSha != bundle.sourceSha (journal edited, chain re-sealed) is flagged
+ID startSha!=bundleSha  report.sourceSha= aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa flagged= true
+
+stdout | test/adv67-identity.test.ts > shipped offline pipeline (real scenario-2 journal): conflicting identities > [QA67-M1] bundle.runId != journal start.runId is flagged
+ID bundleRun!=startRun  report.runId= fixture-2-a14113b2dfe8 flagged= true
+
+stdout | test/adv67-identity.test.ts > shipped offline pipeline (real scenario-2 journal): conflicting identities > [QA67-M1] journal start.runId != bundle.runId (re-sealed) is flagged
+ID startRun!=bundleRun  report.runId= fixture-9-other flagged= true
+
+stdout | test/adv67-identity.test.ts > shipped offline pipeline (real scenario-2 journal): conflicting identities > [QA67-M1] a journal whose rows carry DIFFERENT experimentIds mid-stream (spliced run, re-sealed) is flagged
+ID mixed row experimentId flagged= true
+
+stdout | test/adv67-identity.test.ts > shipped offline pipeline (real scenario-2 journal): conflicting identities > [QA67-M1] a second 'start' row carrying another sourceSha/runId (re-sealed injection) is flagged
+ID second start row report.sourceSha= a14113b2dfe80a39ec35e77a7a5627e25d0b6ddb flagged= true
+
+stdout | test/adv67-identity.test.ts > shipped offline pipeline (real scenario-2 journal): conflicting identities > [QA67-M1] journal start.citizens != bundle citizens (a ghost roster entry) is flagged
+ID roster ghost in start  report.citizens= [ 'gpt-a', 'claude-a', 'ghost' ] flagged= true
+
+stdout | test/adv67-identity.test.ts > shipped offline pipeline (real scenario-2 journal): conflicting identities > bundle citizens != journal start.citizens (citizen dropped from the bundle) is flagged (by the bridge, as a missing-evidence item)
+ID bundle drops citizen  report.citizens= [ 'gpt-a', 'claude-a' ] flagged= true
+
+stdout | test/adv67-identity.test.ts > shipped offline pipeline (real scenario-2 journal): conflicting identities > a malformed (non-40-hex / uppercase) bundle sourceSha must not silently fall back to the journal's value
+ID malformed bundle sha  report.sourceSha= a14113b2dfe80a39ec35e77a7a5627e25d0b6ddb flagged= true [ 'INVALID_SOURCE_SHA' ]
+
+stdout | test/adv67-identity.test.ts > library API (validateExperimentEvidence): precedence of conflicting inputs > [QA67-M1] caller sourceSha B vs manifest A vs start A is flagged, not silently resolved
+LIB caller sourceSha B vs manifest A vs start A -> {"sha":"aaaaaa","exp":"exp-qa67-live","run":"run-start","cit":["gpt_atlas"]} flagged= true
+
+stdout | test/adv67-identity.test.ts > library API (validateExperimentEvidence): precedence of conflicting inputs > [QA67-M1] manifest sourceSha B vs start A (no caller) is flagged, not silently resolved
+LIB manifest sourceSha B vs start A (no caller) -> {"sha":"aaaaaa","exp":"exp-qa67-live","run":"run-start","cit":["gpt_atlas"]} flagged= true
+
+stdout | test/adv67-identity.test.ts > library API (validateExperimentEvidence): precedence of conflicting inputs > [QA67-M1] caller experimentId vs manifest/start experimentId is flagged, not silently resolved
+LIB caller experimentId vs manifest/start experimentId -> {"sha":"aaaaaa","exp":"exp-qa67-live","run":"run-start","cit":["gpt_atlas"]} flagged= true
+
+stdout | test/adv67-identity.test.ts > library API (validateExperimentEvidence): precedence of conflicting inputs > [QA67-M1] caller runId vs start runId is flagged, not silently resolved
+LIB caller runId vs start runId -> {"sha":"aaaaaa","exp":"exp-qa67-live","run":"run-start","cit":["gpt_atlas"]} flagged= true
+
+stdout | test/adv67-identity.test.ts > library API (validateExperimentEvidence): precedence of conflicting inputs > [QA67-M1] caller citizens vs start citizens vs manifest roster is flagged, not silently resolved
+LIB caller citizens vs start citizens vs manifest roster -> {"sha":"aaaaaa","exp":"exp-qa67-live","run":"run-start","cit":["gpt_atlas"]} flagged= true
+
+stdout | test/adv67-identity.test.ts > library API (validateExperimentEvidence): precedence of conflicting inputs > [QA67-M1] an invalid caller sourceSha (39 hex / uppercase) is reported, not silently ignored in favour of the manifest
+LIB invalid caller sha "aaaaaaaa" -> aaaaaaaa flagged= true
+LIB invalid caller sha "AAAAAAAA" -> aaaaaaaa flagged= true
+LIB invalid caller sha "unknown" -> aaaaaaaa flagged= true
+LIB invalid caller sha "00000000" -> aaaaaaaa flagged= true
+
+stdout | test/adv67-identity.test.ts > library API (validateExperimentEvidence): precedence of conflicting inputs > a valid-looking zero SHA placeholder still appears when NO source identity is available (documented residual)
+LIB no source identity -> report.sourceSha = 9945f02f38e14a7d63b3eed66279d191ad06ad3d
+
+stdout | test/adv67-identity.test.ts > attestation identity vs manifest / start row / caller > [QA67-R1 REGRESSION vs base] attestation binds sha X, caller input says X, but manifest AND journal start row say Y => must not be real_minecraft
+ATT_SHA_X caller=X manifest=Y start=Y -> mode= offline_simulated status= VIOLATIONS_DETECTED report.sourceSha= 9945f02f
+
+stdout | test/adv67-identity.test.ts > attestation identity vs manifest / start row / caller > [QA67-R1 REGRESSION vs base] attestation binds experiment 'OTHER', caller input says OTHER, manifest/start row say EXP => must not be real_minecraft
+ATT_EXP caller=OTHER manifest=EXP start=EXP -> mode= offline_simulated status= VIOLATIONS_DETECTED report.experimentId= exp-qa67-live
+
+ ✓ test/adv67-identity.test.ts (25 tests) 115ms
+stdout | test/adv67-trust-root.test.ts > trust root: key parsing > [QA67-L3] trustedAuthorities allow-list: an authority NOT in the allow-list must not be proven (dead-parameter probe)
+TRUSTED_AUTHORITIES_PROBE proven= false
+
+stdout | test/adv67-trust-root.test.ts > trust root: degenerate keys and signatures > [QA67-M2] a small-order trust-root key must not let anyone forge a signature (identity point, R=identity, S=0)
+SMALL_ORDER_IDENTITY signatureValid= false proven= false [
+  "Failed to parse trusted public key for authority 'paper-qa67-authority': Invalid Ed25519 public key: degenerate or small-order public key rejected (01000000...).",
+  'Invalid Ed25519 signature: degenerate small-order commitment R point (01000000...).'
+]
+
+stdout | test/adv67-trust-root.test.ts > trust root: degenerate keys and signatures > [QA67-M2] a small-order trust-root key (order 2) must not verify a forged signature
+SMALL_ORDER_2 signatureValid= false
+
+stdout | test/adv67-trust-root.test.ts > payload integrity: every signed field is covered > unsigned-field injection: control characters in signed text fields are not rejected (canonical-encoding hygiene probe)
+NEWLINE_IN_SIGNED_FIELD proven= true
+
+stdout | test/adv67-trust-root.test.ts > end-to-end consequence of a degenerate trust root > [QA67-M2] with an identity-point trust root, a signature forged WITHOUT any private key must not yield real_minecraft
+FORGED_E2E mode= offline_simulated status= VIOLATIONS_DETECTED attestationProven= false
+
+stdout | test/adv67-trust-root.test.ts > end-to-end consequence of a degenerate trust root > [QA67-M2] parseEd25519PublicKey must not accept the identity point, the order-2 point or the all-zero encoding as a public key
+DEGENERATE_KEYS_ACCEPTED 0 of 3
+
+ ✓ test/adv67-trust-root.test.ts (30 tests) 594ms
+   ✓ trust root: key parsing > rejects RSA, P-256 and secret-key material as trust root  509ms
+stdout | test/adv67-e2e.test.ts > caller-supplied rows vs raw lines (library API integrity) > [QA67-M4] journalRows that do not correspond to rawJournalLines are rejected (forged rows + genuine chain)
+DECOUPLED_ROWS hashChainValid= true status= VIOLATIONS_DETECTED violations= [ 'RAW_JOURNAL_ROW_MISMATCH' ]
+
+stdout | test/adv67-e2e.test.ts > caller-supplied rows vs raw lines (library API integrity) > [QA67-M4] genuine 2-minute /tick-sprint capture (signed) + journalRows whose timestamps are stretched to 60 minutes is not real_minecraft
+TICK_SPRINT_DECOUPLED mode= offline_simulated status= VIOLATIONS_DETECTED hashChainValid= true [
+  'Attestation tick rate contradiction: 72000 ticks in 120.0s (600.0 TPS) exceeds physical 20 TPS ceiling.',
+  'Live wall duration deficit: claimed 60 minutes, but elapsed wall time is only 2.00 minutes (120000 ms vs required 3600000 ms). A live Paper demonstration cannot substitute simulated tick duration for elapsed wall time.'
+]
+
+stdout | test/adv67-control.test.ts > control: a fully consistent signed 60-minute Paper capture > is the only configuration in this harness that reaches real_minecraft
+CONTROL VERIFIED real_minecraft true true [] [] []
+
+ ✓ test/adv67-control.test.ts (1 test) 16ms
+stdout | test/adv67-e2e.test.ts > validator CLI on genuine and tampered journals > [QA67-L5] the CLI headline status for a simulated, unattested journal is not VERIFIED (it must stay NOT PROVEN for Paper execution)
+CLI_GENUINE_OFFLINE status= NOT_PROVEN mode= offline_simulated strictExit= 2
+
+ ✓ test/adv67-e2e.test.ts (24 tests) 6170ms
+   ✓ validator CLI on genuine and tampered journals > genuine scripted journal: simulated mode, no attestation, no proven ticks, hash chain valid, scripted preserved  1198ms
+   ✓ validator CLI on genuine and tampered journals > [QA67-L5] the CLI headline status for a simulated, unattested journal is not VERIFIED (it must stay NOT PROVEN for Paper execution)  2567ms
+   ✓ validator CLI on genuine and tampered journals > tampered journal: hash-chain violation reported  2292ms
+
+ Test Files  6 passed (6)
+      Tests  150 passed (150)
+   Start at  11:48:11
+   Duration  8.92s (transform 333ms, setup 353ms, collect 1.20s, tests 7.55s, environment 1ms, prepare 1.16s)
+

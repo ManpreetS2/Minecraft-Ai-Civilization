@@ -1,0 +1,4 @@
+v78 exit=1
+v88 exit=1
+defects-v88 exit=0
+defects-v103 exit=1

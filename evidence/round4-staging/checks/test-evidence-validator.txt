@@ -1,0 +1,112 @@
+
+> minecraft-ai-civilization@0.1.0 test:evidence-validator C:\Users\sh1ft\codex-round4-staging
+> vitest run --config experiments/evidence-validator/vitest.config.mjs
+
+
+ RUN  v3.2.7 C:/Users/sh1ft/codex-round4-staging
+
+ ✓ experiments/evidence-validator/test/action-verifier.test.ts (8 tests) 7ms
+ ✓ experiments/evidence-validator/test/v1-integration-bridge.test.ts (6 tests) 10ms
+ ✓ experiments/evidence-validator/test/phase2-adversarial-regressions.test.ts (14 tests) 13ms
+ ✓ experiments/evidence-validator/test/information-verifier.test.ts (5 tests) 5ms
+ ✓ experiments/evidence-validator/test/phase2-v1-bridge-scenario.test.ts (3 tests) 10ms
+ ✓ experiments/evidence-validator/test/phase2-adversarial-authenticity.test.ts (9 tests) 11ms
+ ✓ experiments/evidence-validator/test/phase2-tampering-matrix.test.ts (21 tests) 42ms
+ ✓ experiments/evidence-validator/test/validator.test.ts (2 tests) 24ms
+ ✓ experiments/evidence-validator/test/phase2-recorder-adapter.test.ts (10 tests) 28ms
+ ✓ experiments/evidence-validator/test/negative-cases.test.ts (11 tests) 29ms
+ ✓ experiments/evidence-validator/test/phase2-partial-histories.test.ts (10 tests) 33ms
+ ✓ experiments/evidence-validator/test/phase2-adversarial.test.ts (8 tests) 41ms
+ ✓ experiments/evidence-validator/test/phase2-paper-tick.test.ts (8 tests) 114ms
+ ✓ experiments/evidence-validator/test/phase2-crypto-verification.test.ts (15 tests) 158ms
+ ✓ experiments/evidence-validator/test/duration-verifier.test.ts (3 tests) 9ms
+ ✓ experiments/evidence-validator/test/phase2-incomplete-attestation.test.ts (7 tests) 16ms
+ ✓ experiments/evidence-validator/test/inventory-verifier.test.ts (3 tests) 5ms
+ ✓ experiments/evidence-validator/test/phase2-runtime-recorder-integration.test.ts (2 tests) 58ms
+ ✓ experiments/evidence-validator/test/scripted-evidence-validation.test.ts (12 tests) 339ms
+   ✓ Scripted Action Validation and Evidence Attribution > 3. Report Identity and Signed Fields > rejects unsupported key types (RSA, ECDSA) used as trust roots  316ms
+ ✓ experiments/evidence-validator/test/smoke.test.ts (1 test) 10ms
+stdout | experiments/evidence-validator/test/cli.test.ts > Evidence Validator CLI > prints help and exits with code 0 on --help
+
+Antigravity Experiment Evidence Validator CLI
+
+Usage:
+  pnpm exec tsx experiments/evidence-validator/src/cli.ts [options]
+
+Options:
+  --manifest <path>      Path to experiment manifest JSON
+  --journal <path>       Path to operator evidence journal JSONL
+  --events <path>        Path to events stream JSON or JSONL
+  --facts <path>         Path to citizen persistent facts JSON
+  --deliveries <path>    Path to citizen event deliveries JSON
+  --inventories <path>   Path to final inventories JSON
+  --output <path>        Output file for machine-readable JSON report
+  --summary <path>       Output file for human-readable Markdown summary
+  --strict               Exit with code 2 if overall status is NOT_PROVEN or VIOLATIONS_DETECTED
+  --help                 Show this help message
+
+
+stdout | experiments/evidence-validator/test/cli.test.ts > Evidence Validator CLI > processes manifest and journal files and outputs JSON and Markdown reports
+[validator] JSON report written to: C:\Users\sh1ft\AppData\Local\Temp\validator-cli-test-Wd9wJU\report.json
+[validator] Markdown summary written to: C:\Users\sh1ft\AppData\Local\Temp\validator-cli-test-Wd9wJU\summary.md
+[validator] Result: NOT_PROVEN (Verified: 4, Violations: 0)
+
+stdout | experiments/evidence-validator/test/cli.test.ts > Evidence Validator CLI > exits with code 2 on --strict when violations exist
+# Experiment Evidence Validation Report: exp-2v2-demo-001
+
+**Overall Status:** 🔴 VIOLATIONS DETECTED | **Environment:** 🔬 Offline Simulated Fixture (Not a live Minecraft demo claim)
+**Generated At:** 2026-11-12T19:49:27.049Z
+**Source SHA:** `9945f02f38e14a7d63b3eed66279d191ad06ad3d`
+**Citizens:** gpt_atlas, gpt_maya, claude_theo, claude_ava
+**Communities:** north_cove, south_vale
+
+> [!NOTE]
+> This report evaluates an **offline simulated test fixture**. Passing checks demonstrate verification capability and negative regression defense; they do **not** claim a successful live Minecraft demonstration on a Paper server.
+
+## Summary Metrics
+
+| Metric | Value |
+| :--- | :--- |
+| **Total Attempted Actions** | 0 |
+| **Physically Verified Actions** | 0 |
+| **Unverified Action Claims** | 0 |
+| **Failed Actions** | 0 |
+| **Interrupted Actions** | 0 |
+| **Observed Facts** | 0 |
+| **Communicated Claims** | 0 |
+| **Privacy Violations** | 0 |
+| **Inventory Discrepancies** | 0 |
+| **Hash Chain Integrity** | INVALID / TAMPERED |
+| **Duration & Tick Proof** | DEFICIT / UNPROVEN |
+
+## ⚠️ Detected Violations
+
+| Code | Citizen | Description | Severity |
+| :--- | :--- | :--- | :--- |
+| `DURATION_EVIDENCE_DEFICIT` | global | Simulation duration deficit: claimed 60 minutes, but evidence only proves 0 minutes (0 ms vs required 3600000 ms). A 58.8-minute run cannot be accepted as a completed 60-minute demonstration.; Missing tick evidence: no tick events recorded in evidence log; Absent TPS metrics: no server performance / TPS observations documented | **ERROR** |
+
+## ❓ Unproven Checks (Missing Evidence)
+
+| Code | Description | Missing Fields |
+| :--- | :--- | :--- |
+| `NO_HASH_CHAIN_EVIDENCE` | Cryptographic operator journal hash chain not supplied | `rawJournalLines` |
+
+## Duration & Performance Audit
+
+- **Claimed Duration:** 60 minutes
+- **Proven Duration:** 0 minutes (0 ms)
+- **Recorded Ticks:** 0
+- **Average Tick Duration:** 0 ms
+- **Average Measured TPS:** none recorded
+- **Duration Deficit Details:** Simulation duration deficit: claimed 60 minutes, but evidence only proves 0 minutes (0 ms vs required 3600000 ms). A 58.8-minute run cannot be accepted as a completed 60-minute demonstration.; Missing tick evidence: no tick events recorded in evidence log; Absent TPS metrics: no server performance / TPS observations documented
+
+---
+*Report generated by Google Antigravity Evidence Validator (redacted, offline verification).*
+
+ ✓ experiments/evidence-validator/test/cli.test.ts (3 tests) 76ms
+
+ Test Files  21 passed (21)
+      Tests  161 passed (161)
+   Start at  11:49:23
+   Duration  3.72s (transform 3.42s, setup 3.37s, collect 9.69s, tests 1.04s, environment 5ms, prepare 11.34s)
+

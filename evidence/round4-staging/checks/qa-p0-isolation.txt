@@ -1,0 +1,27 @@
+
+ RUN  v3.2.7 C:/Users/sh1ft/codex-round4-staging/qa/p0-isolation
+
+ ✓ test/p0-knowledge-isolation.test.ts (49 tests) 13025ms
+   ✓ P0-1 unobserved chest transfer does not reach another citizen's beliefs > ItemDeposited by ada with no visibility label is invisible to bea, cal and dee in the real manager prompt and fact stores  488ms
+   ✓ P0-1 unobserved chest transfer does not reach another citizen's beliefs > ResourceTransferred by ada with no visibility label is invisible to bea, cal and dee in the real manager prompt and fact stores  319ms
+   ✓ P0-1 unobserved chest transfer does not reach another citizen's beliefs > ResourceTransferred by ada with observer_only is invisible to bea, cal and dee in the real manager prompt and fact stores  348ms
+   ✓ P0-1 unobserved chest transfer does not reach another citizen's beliefs > ItemTransferCompleted by ada with observer_only is invisible to bea, cal and dee in the real manager prompt and fact stores  339ms
+   ✓ P0-2 undisclosed rival coordinates never enter another community's prompt or site list > coordinates in a south community announcement reach south only; north prompts stay clean  415ms
+   ✓ P0-2 undisclosed rival coordinates never enter another community's prompt or site list > sharing ONE bulletin line with ada discloses only a line cal actually chose, never his other announcement  664ms
+   ✓ P0-3 private messages reach only the recipients actually reached > a partial whisper (client delivered to ada only) gives bea no conversation event, fact or prompt line  350ms
+   ✓ P0-3 private messages reach only the recipients actually reached > a private say to a rival is not heard by either speaker's or hearer's teammate  383ms
+   ✓ P0-4 speech allegations are never promoted into verified facts > the same allegation repeated by two different speakers is still only heard claims (repetition is not corroboration)  321ms
+   ✓ P0-5 another citizen's memory, narrative and summary do not cross citizens or reopened sessions > reopening the database as a fresh manager gives ada none of bea's facts  469ms
+   ✓ P0-6 restart does not expose operator or rival knowledge > operator-only and unlabeled events never appear in any citizen prompt, before or after a restart  752ms
+   ✓ P0-6 restart does not expose operator or rival knowledge > south's community announcement stays out of north prompts after a restart with: COMMUNITIES_JSON dropped  563ms
+   ✓ P0-6 restart does not expose operator or rival knowledge > south's community announcement stays out of north prompts after a restart with: COMMUNITIES_JSON empty array  530ms
+   ✓ P0-6 restart does not expose operator or rival knowledge > south's community announcement stays out of north prompts after a restart with: COMMUNITIES_JSON invalid JSON  543ms
+   ✓ P0-6 restart does not expose operator or rival knowledge > south's community announcement stays out of north prompts after a restart with: ada claimed by the rival (conflict)  575ms
+   ✓ P0-6 restart does not expose operator or rival knowledge > south's community announcement stays out of north prompts after a restart with: rival community renamed  731ms
+   ✓ P0-6 restart does not expose operator or rival knowledge > south's community announcement stays out of north prompts after a restart with: everyone placed in one new community  493ms
+
+ Test Files  1 passed (1)
+      Tests  49 passed (49)
+   Start at  11:56:36
+   Duration  34.08s (transform 12.23s, setup 143ms, collect 19.25s, tests 13.03s, environment 0ms, prepare 434ms)
+

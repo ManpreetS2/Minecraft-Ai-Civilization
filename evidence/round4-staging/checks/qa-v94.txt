@@ -1,0 +1,16 @@
+
+ RUN  v3.2.7 C:/Users/sh1ft/codex-round4-staging/qa/v94
+
+stdout | test/adv94-canonical.test.ts > exhaustive leaf mutation: every populated value at every depth of every row is bound > 1338 (leaf change/delete) mutations: every one yields RAW_JOURNAL_ROW_MISMATCH (except the documented root-default no-ops) and never a real_minecraft report
+QA94 leaf mutations total= 1338 survivors= 10 unexpected= 0
+
+ ✓ test/adv94-canonical.test.ts (27 tests) 11899ms
+   ✓ exhaustive leaf mutation: every populated value at every depth of every row is bound > 1338 (leaf change/delete) mutations: every one yields RAW_JOURNAL_ROW_MISMATCH (except the documented root-default no-ops) and never a real_minecraft report  9390ms
+   ✓ exhaustive leaf mutation: every populated value at every depth of every row is bound > adding an unexpected key at EVERY object level of every row is rejected  1251ms
+   ✓ unexpected (non-JSON / exotic) values in the caller's parsed rows > each exotic value, placed in a numeric field, a string field, an inventory leaf and an array element, is rejected as a mismatch without throwing and never reaches real_minecraft  656ms
+
+ Test Files  1 passed (1)
+      Tests  27 passed (27)
+   Start at  11:47:39
+   Duration  14.16s (transform 812ms, setup 295ms, collect 1.10s, tests 11.90s, environment 0ms, prepare 473ms)
+

@@ -1,0 +1,103 @@
+
+ RUN  v3.2.7 C:/Users/sh1ft/codex-round4-staging/qa/v78
+
+ ✓ test/qa78-protections74.test.ts (12 tests) 15261ms
+   ✓ craftItem (AUD-X1): abort sweep > abort at 0/20/60/120/250 ms into a 900 ms craft: prompt CANCELLED, exactly one craft started, no planks consumed after the abort  6141ms
+   ✓ craftItem (AUD-X1): abort sweep > control: an uninterrupted craft completes exactly once  708ms
+   ✓ doors (AUD-X3): abort sweep > openDoor: abort at 0/20/60/120/180 ms into a 200 ms look: no activateBlock after the abort, prompt CANCELLED  2659ms
+   ✓ sleep: abort sweep and deadline > abort at 0/20/60/150/300 ms of a 400 ms sleep request: prompt return, the citizen is never left in the bed  3133ms
+   ✓ sleep: abort sweep and deadline > a sleep that never confirms settles with TIMEOUT and does not quit the client  314ms
+   ✓ hazard bridge (AUD-X4): abort sweep > abort at 0/30/90/150/230 ms across a 150 ms equip + 150 ms look: nothing is placed after the abort and the cell stays air unless already placed  2281ms
+stdout | test/qa78-lifecycle.test.ts > chest withdraw: abort at every offset (skill level) > control: if the abort lands while the citizen inventory is still syncing after withdraw() returned, a transfer that already happened is still reported as success (hypothesis that it would be CANCELLED was NOT confirmed)
+QA78-L1 chestStock= 2 inventoryAfterSettle= 2 result= success
+
+stdout | test/qa78-lifecycle.test.ts > blocked-construction recovery (production advanceBlueprintBuild on the repository's controlled harness) > basic_shelter_v1: an abort on ANY navigation call 1..7 of live validation leaves IN_PROGRESS, and a JSON-reloaded session then completes
+LIVE_VALIDATION_BASELINE basic_shelter_v1 success COMPLETE []
+
+stdout | test/qa78-lifecycle.test.ts > blocked-construction recovery (production advanceBlueprintBuild on the repository's controlled harness) > workshop_cabin_v1: an abort on ANY navigation call 1..7 of live validation leaves IN_PROGRESS, and a JSON-reloaded session then completes
+LIVE_VALIDATION_BASELINE workshop_cabin_v1 WORKSTATION_UNREACHABLE BLOCKED ["WORKSTATION_UNREACHABLE"]
+
+ ❯ test/qa78-lifecycle.test.ts (14 tests | 1 failed) 22497ms
+   ✓ furnace: abort at every offset (direct, and through the production packet guard) > control: without abort the production smelt succeeds and recovers input and fuel (takeInput/takeFuel still run)  1021ms
+   ✓ furnace: abort at every offset (direct, and through the production packet guard) > direct: no furnace click STARTS after abort at any of 18 offsets, and a collected ingot is always reported as success  4867ms
+   ✓ furnace: abort at every offset (direct, and through the production packet guard) > through the packet guard: the result never contradicts the inventory (ingot <=> success) at any of 18 offsets, and no click reaches the wire after the owner is inactive  7712ms
+   ✓ furnace: abort at every offset (direct, and through the production packet guard) > an abort that lands during takeOutput or takeInput returns success, never re-runs the smelt, and a RETRY would not double-smelt (one ingot total)  1757ms
+   ✓ chest withdraw: abort at every offset (skill level) > control: no abort -> success, exactly one ItemWithdrawn, chest and inventory agree 139ms
+   ✓ chest withdraw: abort at every offset (skill level) > with an immediate inventory sync: result and inventory agree at every offset; no ItemWithdrawn after the abort  2509ms
+   ✓ chest withdraw: abort at every offset (skill level) > control: if the abort lands while the citizen inventory is still syncing after withdraw() returned, a transfer that already happened is still reported as success (hypothesis that it would be CANCELLED was NOT confirmed)  575ms
+   ✓ blocked-construction recovery (production advanceBlueprintBuild on the repository's controlled harness) > basic_shelter_v1: an abort on ANY navigation call 1..7 of live validation leaves IN_PROGRESS, and a JSON-reloaded session then completes 28ms
+   ✓ blocked-construction recovery (production advanceBlueprintBuild on the repository's controlled harness) > basic_shelter_v1: REAL failures still BLOCK at each navigation step (PATH_BLOCKED on call k, never aborted): the fix does not hide genuine failures 12ms
+   ✓ blocked-construction recovery (production advanceBlueprintBuild on the repository's controlled harness) > workshop_cabin_v1: an abort on ANY navigation call 1..7 of live validation leaves IN_PROGRESS, and a JSON-reloaded session then completes 17ms
+   ✓ blocked-construction recovery (production advanceBlueprintBuild on the repository's controlled harness) > workshop_cabin_v1: REAL failures still BLOCK at each navigation step (PATH_BLOCKED on call k, never aborted): the fix does not hide genuine failures 14ms
+   ✓ blocked-construction recovery (production advanceBlueprintBuild on the repository's controlled harness) > a navigation result coded INTERRUPTED (no abort) also leaves the session IN_PROGRESS and retryable 3ms
+   ✓ blocked-construction recovery (production advanceBlueprintBuild on the repository's controlled harness) > a real failure earlier in the same validation followed by a cancel stays IN_PROGRESS, and the NEXT clean run clears the stale failure list 4ms
+   × production call chain with the PRODUCTION default grace (250 ms): a withdraw that completes inside the grace is reported once, consistently > withdraw via executePlan, 60 ms deadline, 120 ms window: the manager sees ONE outcome and no event follows it 3837ms
+     → expected 1 to be +0 // Object.is equality
+ ✓ test/qa78-fishing-cleanup.test.ts (17 tests) 7193ms
+   ✓ fishing cleanup: one retrieve, bites after abort are inert > control: cancel with a bound bobber casts once and sends exactly ONE retrieve use_item, before the boundary returns  600ms
+   ✓ fishing cleanup: one retrieve, bites after abort are inert > a metadata bite storm (20 bites over 0-380 ms after abort) adds NO use_item beyond the one retrieve  1187ms
+   ✓ fishing cleanup: one retrieve, bites after abort are inert > a splash bite storm (20 bites over 0-380 ms after abort) adds NO use_item beyond the one retrieve  1241ms
+   ✓ fishing cleanup: one retrieve, bites after abort are inert > a both bite storm (20 bites over 0-380 ms after abort) adds NO use_item beyond the one retrieve  1177ms
+   ✓ fishing cleanup: one retrieve, bites after abort are inert > a bite emitted in the same synchronous turn as abort() is also inert (no second use_item)  402ms
+   ✓ fishing cleanup: one retrieve, bites after abort are inert > deadline abandonment (boundary timeout, not a caller abort) also retrieves exactly once and detaches  570ms
+   ✓ fishing cleanup: one retrieve, bites after abort are inert > two citizens: aborting A leaves B fishing; A's stale bite does not reel B and B's own bite still reels B  455ms
+   ✓ the cleanup permit is scoped: named packet only, expiring, not inherited > the permit is capped at MAX_CLEANUP_MS (500 ms) even if the caller asks for 10 s  674ms
+ ❯ test/qa78-timers.test.ts (8 tests | 1 failed) 10715ms
+   ✓ QA69-L3: a refused write inside a timer armed DURING the action no longer crashes the process (child processes, production boundary) > timer created during the action, firing after the owner is inactive: process survives, nothing reaches the wire  1649ms
+   ✓ QA69-L3: a refused write inside a timer armed DURING the action no longer crashes the process (child processes, production boundary) > interval created during the action: at most the pre-abort tick reaches the wire, process survives  1363ms
+   ✓ QA69-L3: a refused write inside a timer armed DURING the action no longer crashes the process (child processes, production boundary) > ONLY LATE_WRITE_REFUSED is swallowed: any other error thrown in an action timer still reaches uncaughtException  1495ms
+   ✓ QA69-L3: a refused write inside a timer armed DURING the action no longer crashes the process (child processes, production boundary) > real mineflayer digging plugin: abandon WITH stopDigging and WITHOUT stopDigging both exit 0 with the late swing refused  5778ms
+   ✓ timer wrapper lifecycle (in-process, production boundary) > globals are wrapped only while an action runs, and restored to the exact original functions afterwards 2ms
+   ✓ timer wrapper lifecycle (in-process, production boundary) > overlapping actions on two bodies, finishing in either order, restore only after the LAST one and never leave a wrapper behind 247ms
+   ✓ timer wrapper lifecycle (in-process, production boundary) > restored after a skill that rejects, after a deadline abandonment, and after a caller abort 93ms
+   × timer wrapper lifecycle (in-process, production boundary) > an action's own timers behave normally: arguments are forwarded, clearTimeout cancels, unref() works, the callback `this` is preserved 86ms
+     → expected 1 to be greater than or equal to 2
+pnpm : 
+At line:2 char:38
++ ... ','v88')) { pnpm exec vitest run -c qa/$suite/vitest.config.ts --maxW ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/qa78-lifecycle.test.ts > production call chain with the PRODUCTION default grace (250 ms): a withdraw that 
+completes inside the grace is reported once, consistently > withdraw via executePlan, 60 ms deadline, 120 ms window: 
+the manager sees ONE outcome and no event follows it
+AssertionError: expected 1 to be +0 // Object.is equality
+
+- Expected
++ Received
+
+- 0
++ 1
+
+ ❯ test/qa78-lifecycle.test.ts:243:87
+    241|     const types = seen.map((e) => e.type);
+    242|     if (result.success) { expect(types).toContain("ItemWithdrawn"); ex…
+    243|     else { expect(types).not.toContain("ItemWithdrawn"); expect(r.bot.…
+       |                                                                                       ^
+    244|   });
+    245| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  test/qa78-timers.test.ts > timer wrapper lifecycle (in-process, production boundary) > an action's own timers 
+behave normally: arguments are forwarded, clearTimeout cancels, unref() works, the callback `this` is preserved
+AssertionError: expected 1 to be greater than or equal to 2
+ ❯ test/qa78-timers.test.ts:88:53
+     86|     expect(seen.slice(0, 2)).toEqual(["x", 7]);
+     87|     expect(seen).not.toContain("SHOULD_NOT_RUN");
+     88|     expect(seen.filter((s) => s === "tick").length).toBeGreaterThanOrE…
+       |                                                     ^
+     89|     void LATE_WRITE_REFUSED;
+     90|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  2 failed | 2 passed (4)
+      Tests  2 failed | 49 passed (51)
+   Start at  11:48:59
+   Duration  37.54s (transform 3.31s, setup 331ms, collect 5.42s, tests 55.67s, environment 1ms, prepare 988ms)
+

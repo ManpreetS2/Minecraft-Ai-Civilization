@@ -1,0 +1,5 @@
+v120 exit=0
+p0-isolation exit=0
+provenance-controls exit=0
+defects-v120 exit=1
+defects-provenance-controls exit=1

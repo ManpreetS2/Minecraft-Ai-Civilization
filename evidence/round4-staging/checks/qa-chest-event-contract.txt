@@ -1,0 +1,91 @@
+
+ RUN  v3.2.7 C:/Users/sh1ft/codex-round4-staging/qa/chest-event-contract
+
+stdout | test/events.test.ts > desired contract: personal deposit has exactly one success event
+{
+  purpose: 'personal',
+  action: 'deposit',
+  successPayloads: [
+    {
+      item: 'cobblestone',
+      count: 4,
+      citizenBefore: 4,
+      citizenAfter: 0,
+      containerBefore: 0,
+      containerAfter: 4,
+      position: [Object],
+      access: 'personal',
+      contents: [Object]
+    }
+  ]
+}
+
+stdout | test/events.test.ts > desired contract: personal withdraw has exactly one success event
+{
+  purpose: 'personal',
+  action: 'withdraw',
+  successPayloads: [
+    {
+      item: 'cobblestone',
+      count: 1,
+      citizenBefore: 0,
+      citizenAfter: 1,
+      containerBefore: 4,
+      containerAfter: 3,
+      position: [Object],
+      access: 'personal',
+      contents: [Object]
+    }
+  ]
+}
+
+ ✓ test/observations.test.ts (6 tests) 333ms
+stdout | test/events.test.ts > desired contract: household deposit has exactly one success event
+{
+  purpose: 'household',
+  action: 'deposit',
+  successPayloads: [
+    {
+      item: 'cobblestone',
+      count: 4,
+      citizenBefore: 4,
+      citizenAfter: 0,
+      containerBefore: 0,
+      containerAfter: 4,
+      position: [Object],
+      access: 'household',
+      contents: [Object]
+    }
+  ]
+}
+
+stdout | test/events.test.ts > desired contract: household withdraw has exactly one success event
+{
+  purpose: 'household',
+  action: 'withdraw',
+  successPayloads: [
+    {
+      item: 'cobblestone',
+      count: 1,
+      citizenBefore: 0,
+      citizenAfter: 1,
+      containerBefore: 4,
+      containerAfter: 3,
+      position: [Object],
+      access: 'household',
+      contents: [Object]
+    }
+  ]
+}
+
+ ✓ test/events.test.ts (8 tests) 5880ms
+   ✓ cancel deposit: zero success events, pending facts and conserved physical items  1350ms
+   ✓ cancel withdraw: zero success events, pending facts and conserved physical items  1352ms
+   ✓ timeout deposit: zero success events, pending facts and conserved physical items  1366ms
+   ✓ timeout withdraw: zero success events, pending facts and conserved physical items  1352ms
+
+ Test Files  2 passed (2)
+      Tests  14 passed (14)
+   Start at  11:49:03
+   Duration  12.31s (transform 2.97s, setup 173ms, collect 11.81s, tests 6.21s, environment 0ms, prepare 370ms)
+

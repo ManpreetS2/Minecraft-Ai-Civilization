@@ -1,0 +1,75 @@
+
+ RUN  v3.2.7 C:/Users/sh1ft/codex-round4-staging/qa/v120
+
+ ❯ defects/qa120-defects.test.ts (4 tests | 4 failed) 1106ms
+   × 1v1 identity coercion > QA120-L1: a single-element array top-level runId must not satisfy the run id (String(['x']) === 'x') 130ms
+     → expected true to be false // Object.is equality
+   × 1v1 identity coercion > QA120-L2: a hostile non-string attribution.runId must be reported as an error, not crash the verifier (String({toString:'x'}) throws) 178ms
+     → expected TypeError: Cannot convert object to primi… to be undefined
+   × 2v2 identity coercion > QA120-L1: a single-element array top-level runId must not satisfy the run id (String(['x']) === 'x') 475ms
+     → expected true to be false // Object.is equality
+   × 2v2 identity coercion > QA120-L2: a hostile non-string attribution.runId must be reported as an error, not crash the verifier (String({toString:'x'}) throws) 321ms
+     → expected TypeError: Cannot convert object to primi… to be undefined
+ ✓ defects/qa120-duplicate-events.test.ts (2 tests) 789ms
+   ✓ withdrawItems > QA120-D1: one completed physical transfer (success path, generous deadline) emits exactly one ItemWithdrawn  526ms
+pnpm : 
+At line:2 char:581
++ ... ntrols')) { pnpm exec vitest run -c qa/$suite/vitest.defects.config.t ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  defects/qa120-defects.test.ts > 1v1 identity coercion > QA120-L1: a single-element array top-level runId must 
+not satisfy the run id (String(['x']) === 'x')
+ FAIL  defects/qa120-defects.test.ts > 2v2 identity coercion > QA120-L1: a single-element array top-level runId must 
+not satisfy the run id (String(['x']) === 'x')
+AssertionError: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ defects/qa120-defects.test.ts:12:35
+     10|       const d = fresh(count); const run = String(readJson(d, "manifest…
+     11|       const r = readJson(d, "gemini-validator-report.json"); r.runId =…
+     12|       expect(l1(d, count).passed).toBe(false);
+       |                                   ^
+     13|     });
+     14|     it("QA120-L2: a hostile non-string attribution.runId must be repor…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯
+
+ FAIL  defects/qa120-defects.test.ts > 1v1 identity coercion > QA120-L2: a hostile non-string attribution.runId must 
+be reported as an error, not crash the verifier (String({toString:'x'}) throws)
+ FAIL  defects/qa120-defects.test.ts > 2v2 identity coercion > QA120-L2: a hostile non-string attribution.runId must 
+be reported as an error, not crash the verifier (String({toString:'x'}) throws)
+AssertionError: expected TypeError: Cannot convert object to primi… to be undefined
+
+- Expected: 
+undefined
+
++ Received: 
+TypeError {
+  "message": "Cannot convert object to primitive value",
+}
+
+ ❯ defects/qa120-defects.test.ts:19:21
+     17|       let out: ReturnType<typeof l1> | undefined; let threw: unknown;
+     18|       try { out = l1(d, count); } catch (e) { threw = e; }
+     19|       expect(threw).toBeUndefined(); expect(out?.passed).toBe(false);
+       |                     ^
+     20|     });
+     21|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/4]⎯
+
+
+ Test Files  1 failed | 1 passed (2)
+      Tests  4 failed | 2 passed (6)
+   Start at  11:57:19
+   Duration  21.78s (transform 13.06s, setup 356ms, collect 19.70s, tests 1.90s, environment 1ms, prepare 1.03s)
+

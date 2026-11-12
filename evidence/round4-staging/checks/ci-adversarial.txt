@@ -1,0 +1,65 @@
+
+ RUN  v3.2.7 C:/Users/sh1ft/codex-round4-staging/qa/verify-ci-verifier
+
+ ✓ test/integration-and-honesty.test.ts (24 tests) 91877ms
+   ✓ journal CLI integration: independent real-subprocess controls PER scenario > [CLI behaviour] calling PR #68's CLI without the experimentId still rejects an untouched bundle (the bug PR #73 fixed in the caller)  392ms
+   ✓ journal CLI integration: independent real-subprocess controls PER scenario > 1v1 (2 citizens, 6 original attempts and observations) > positive, missing-evidence and forged-evidence controls all execute and behave on an untouched real bundle  2212ms
+   ✓ journal CLI integration: independent real-subprocess controls PER scenario > 1v1 (2 citizens, 6 original attempts and observations) > the control result records the citizen and original attempt/observation counts read from the journal itself  2055ms
+   ✓ journal CLI integration: independent real-subprocess controls PER scenario > 1v1 (2 citizens, 6 original attempts and observations) > a forged receipt makes the helper report FAILED (never READY)  2006ms
+   ✓ journal CLI integration: independent real-subprocess controls PER scenario > 1v1 (2 citizens, 6 original attempts and observations) > a journal with the wrong original attempt count makes the helper report FAILED  2029ms
+   ✓ journal CLI integration: independent real-subprocess controls PER scenario > 2v2 (4 citizens, 12 original attempts and observations) > positive, missing-evidence and forged-evidence controls all execute and behave on an untouched real bundle  2959ms
+   ✓ journal CLI integration: independent real-subprocess controls PER scenario > 2v2 (4 citizens, 12 original attempts and observations) > the control result records the citizen and original attempt/observation counts read from the journal itself  4506ms
+   ✓ journal CLI integration: independent real-subprocess controls PER scenario > 2v2 (4 citizens, 12 original attempts and observations) > a forged receipt makes the helper report FAILED (never READY)  2912ms
+   ✓ journal CLI integration: independent real-subprocess controls PER scenario > 2v2 (4 citizens, 12 original attempts and observations) > a journal with the wrong original attempt count makes the helper report FAILED  2846ms
+   ✓ journal CLI integration: independent real-subprocess controls PER scenario > both scenarios are cross-checked independently by the wrapper and both are recorded  5938ms
+   ✓ journal CLI integration: independent real-subprocess controls PER scenario > a failed required check produces a NONZERO exit: forged 1v1 only (2v2 stays READY, independently)  7262ms
+   ✓ journal CLI integration: independent real-subprocess controls PER scenario > a failed required check produces a NONZERO exit: forged 2v2 only (1v1 stays READY, independently)  5742ms
+   ✓ journal CLI integration: independent real-subprocess controls PER scenario > a stub CLI that always says 'consistent' (exit 0) can never earn the forgery claim  2030ms
+   ✓ process exit codes and honest top-level status > untouched real bundles: exit 0, status OFFLINE_STRUCTURAL_PASS, Paper execution NOT PROVEN  5293ms
+   ✓ process exit codes and honest top-level status > the headline never reads as live acceptance for synthetic evidence  5195ms
+   ✓ process exit codes and honest top-level status > the report separates the four states explicitly  4661ms
+   ✓ process exit codes and honest top-level status > criteria that remain NOT MEASURABLE are reported, with the failing criteria named  4641ms
+   ✓ process exit codes and honest top-level status > contradictory evidence is REJECTED with its own status, headline and nonzero exit (acceptance.json claims live 37/37)  4607ms
+   ✓ process exit codes and honest top-level status > an unprovable/incomplete verification is reported as INCOMPLETE with a nonzero exit (2v2 evidence missing)  2724ms
+   ✓ process exit codes and honest top-level status > removing an action everywhere is rejected as CONTRADICTORY: the unedited validator report still lists it  5209ms
+   ✓ process exit codes and honest top-level status > a pinned receipt file that is missing is an ordinary structural VERIFICATION_FAILED, nonzero (not called contradictory)  4646ms
+   ✓ process exit codes and honest top-level status > a journal edited without recomputing its hash chain is rejected, nonzero (the real CLI also rejects it, so it is CONTRADICTORY)  5909ms
+   ✓ process exit codes and honest top-level status > the Paper / live-model gaps are listed as NOT PROVEN and live execution is never claimed  6101ms
+ ✓ test/workflow-facts.test.ts (12 tests) 11ms
+ ✓ test/tamper-matrix.test.ts (64 tests) 23099ms
+   ✓ control > an untouched real 2-citizen bundle is JOURNAL CONSISTENT under PR #68's CLI when called with its experimentId  423ms
+   ✓ control > an untouched real 4-citizen bundle is JOURNAL CONSISTENT under PR #68's CLI when called with its experimentId  870ms
+   ✓ T01 [2v] rehashed journal: observation worldChanges position moved > L2: PR #68's journal cross-check rejects it  507ms
+   ✓ T01 [4v] rehashed journal: observation worldChanges position moved > L2: PR #68's journal cross-check rejects it  473ms
+   ✓ T02 rehashed journal: attempt target changed > L2: PR #68's journal cross-check rejects it  392ms
+   ✓ T03 rehashed journal: observation flipped to successReported=false, verified=false > L2: PR #68's journal cross-check rejects it  362ms
+   ✓ T04 [2v] rehashed journal: citizen identities swapped between gpt-a#1 and claude-a#1 (attempt and observation) > L2: PR #68's journal cross-check rejects it  340ms
+   ✓ T04 [4v] rehashed journal: citizen identities swapped between gpt-a#1 and claude-a#1 (attempt and observation) > L2: PR #68's journal cross-check rejects it  444ms
+   ✓ T05 [2v] manifest + receipt citizenIds swapped between two actions (journal untouched) > L2: PR #68's journal cross-check rejects it  411ms
+   ✓ T05 [4v] manifest + receipt citizenIds swapped between two actions (journal untouched) > L2: PR #68's journal cross-check rejects it  427ms
+   ✓ T06 receipt reference replaced with another existing receipt > L2: PR #68's journal cross-check rejects it  355ms
+   ✓ T07 [2v] receipt CONTENT forged (ids kept; inventoryAfter=9, worldChanges emptied) > L2: PR #68's journal cross-check rejects it  388ms
+   ✓ T07 [4v] receipt CONTENT forged (ids kept; inventoryAfter=9, worldChanges emptied) > L2: PR #68's journal cross-check rejects it  513ms
+   ✓ T08 receipt sourceSha changed to a different SHA > L2: PR #68's journal cross-check rejects it  501ms
+   ✓ T09 referenced receipt file deleted > L2: PR #68's journal cross-check rejects it  436ms
+   ✓ T10 manifest.sourceReceipts[0].sha256 altered > L2: PR #68's journal cross-check rejects it  451ms
+   ✓ T11 manifest action duplicated over another (new attemptId, same receipt) > L2: PR #68's journal cross-check rejects it  356ms
+   ✓ T12 rehashed journal: gpt-a#3 replaced by a clone of #1 (fresh attemptId, inventory 0->1) > L2: PR #68's journal cross-check rejects it  567ms
+   ✓ T13 [2v] one action removed everywhere (manifest + journal pair) > L2: PR #68's journal cross-check rejects it  1086ms
+   ✓ T13 [4v] one action removed everywhere (manifest + journal pair) > L1: PR #70 verifier rejects it  336ms
+   ✓ T13 [4v] one action removed everywhere (manifest + journal pair) > L2: PR #68's journal cross-check rejects it  1392ms
+   ✓ T14 evidence sources disagree: manifest says delta=9, observedSuccess=false; journal says otherwise > L2: PR #68's journal cross-check rejects it  1388ms
+   ✓ T15 [2v] source SHA differs: manifest only > L2: PR #68's journal cross-check rejects it  827ms
+   ✓ T15 [4v] source SHA differs: manifest only > L2: PR #68's journal cross-check rejects it  707ms
+   ✓ T16 source SHA differs: original journal start row (rehashed) vs manifest > L2: PR #68's journal cross-check rejects it  759ms
+   ✓ T20 simulated presented as authenticated: manifest.mode = paper-live > L2: PR #68's journal cross-check rejects it  821ms
+   ✓ T22 simulated presented as authenticated: acceptance.json claims live 37/37 VERIFIED (a published artifact) > L1: PR #70 verifier rejects it  369ms
+   ✓ T25 [2v] journal row tampered WITHOUT recomputing the hash chain > L2: PR #68's journal cross-check rejects it  967ms
+   ✓ T25 [4v] journal row tampered WITHOUT recomputing the hash chain > L2: PR #68's journal cross-check rejects it  1095ms
+   ✓ T26 COHERENT forgery: journal + receipt worldChanges edited, journal rehashed, receipt sha256 re-pinned > [LIMITATION BY DESIGN] PR #68's journal check also reports a coherent forgery as consistent  920ms
+
+ Test Files  3 passed (3)
+      Tests  100 passed (100)
+   Start at  11:50:28
+   Duration  116.87s (transform 175ms, setup 209ms, collect 258ms, tests 114.99s, environment 1ms, prepare 626ms)
+
