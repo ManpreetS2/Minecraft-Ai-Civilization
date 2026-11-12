@@ -603,7 +603,9 @@ export async function depositItem(
     ctx.events?.emit(
       createEvent((ctx.signal?.aborted || ctx.isActionCurrent?.() === false) ? "SystemIncident" : "ItemDeposited", {
         ...((ctx.signal?.aborted || ctx.isActionCurrent?.() === false) ? { kind: "AbandonedTransferObservation", reconciliation: "PENDING", direction: "deposit" } : {}),
-        item: name, count: depositedCitizen, citizenAfter, containerAfter, position: found.data.position,
+        item: name, count: depositedCitizen, citizenBefore, citizenAfter, containerBefore, containerAfter,
+          position: found.data.position, access: ctx.storageAccess,
+          contents: { [name]: containerAfter },
       }, ctx.citizenId),
     );
     return ok(
@@ -687,7 +689,9 @@ export async function withdrawItem(
     }
     ctx.events?.emit(createEvent((ctx.signal?.aborted || ctx.isActionCurrent?.() === false) ? "SystemIncident" : "ItemWithdrawn", {
       ...((ctx.signal?.aborted || ctx.isActionCurrent?.() === false) ? { kind: "AbandonedTransferObservation", reconciliation: "PENDING", direction: "withdraw" } : {}),
-      item: name, count: gained, citizenAfter, containerAfter,
+      item: name, count: gained, citizenBefore, citizenAfter, containerBefore, containerAfter,
+      position: found.data.position, access: ctx.storageAccess,
+      contents: { [name]: containerAfter },
     }, ctx.citizenId));
     return ok({ item: name, count: gained, citizenAfter, containerAfter }, Date.now() - started);
   } catch (error) {

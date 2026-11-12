@@ -343,6 +343,8 @@ async function executeOwnedPlan(
     case "withdrawItems":
       if (plan.task === "withdraw_personal") {
         result = await executePersonalStorage(ctx, store, events, runtime, "withdraw", plan.item ?? "bread", plan.count ?? 1);
+      } else if (plan.task === "withdraw_household") {
+        result = await executeHouseholdStorage(ctx, store, events, runtime, "withdraw", plan.item ?? "bread", plan.count ?? 1);
       } else {
         result = await withdrawFood(ctx, store, events);
       }
@@ -1112,7 +1114,7 @@ async function depositToSettlement(
     return { success: false, code: "CONTAINER_BUSY", error: "Chest is in use", durationMs: 0, retryable: true };
   }
   const expectedRevision = containerObservationToken(ctx, store, chest);
-  const result = await depositItems(ctx, undefined, chest);
+  const result = await depositItems({ ...ctx, storageAccess: "communal" }, undefined, chest);
   if (!executionIsCurrent(ctx)) return abandonedObservation(ctx, events, "depositItems", result);
   runtime.claims.release("container", cellClaimKey(chest.x, chest.y, chest.z), ctx.citizenId);
   if (result.success) {
@@ -1126,9 +1128,7 @@ async function depositToSettlement(
       settlement.storageContents = result.data.contents;
       store.saveSettlement(settlement);
     }
-    events.emit(
-      createEvent("ItemDeposited", { count: result.data.deposited, contents: result.data.contents, position: chest }, ctx.citizenId),
-    );
+    // Physical transfer events belong to inventory-service; ActionCompleted belongs here.
   }
   return result;
 }
@@ -1158,7 +1158,7 @@ async function withdrawItemsNamed(
   const access = assertMayUseChest(store, ctx.citizenId, chest, "communal", ctx.bot.game?.dimension);
   if (!access.success) return access;
   const expectedRevision = containerObservationToken(ctx, store, chest);
-  const result = await withdrawItems(ctx, itemName, count, chest);
+  const result = await withdrawItems({ ...ctx, storageAccess: "communal" }, itemName, count, chest);
   if (!executionIsCurrent(ctx)) return abandonedObservation(ctx, events, "withdrawItems", result);
   if (result.success) {
     if (store.hasCommunities()) {
@@ -1168,7 +1168,7 @@ async function withdrawItemsNamed(
       settlement.storageContents = result.data.contents;
       store.saveSettlement(settlement);
     }
-    events.emit(createEvent("ItemWithdrawn", { item: itemName, count: result.data.count, position: chest }, ctx.citizenId));
+    // inventory-service already emitted the physical observation.
   } else if (
     store.hasCommunities() &&
     (result.code === "ITEM_NOT_FOUND" || result.code === "VERIFY_FAILED")

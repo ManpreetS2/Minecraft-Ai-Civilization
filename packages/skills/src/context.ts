@@ -10,6 +10,8 @@ export type SkillContext = {
   /** Executor generation ownership; observations may outlive this permission. */
   isActionCurrent?: () => boolean;
   events?: EventBus;
+  /** Authorized caller context for physical chest observations; never inferred from a model. */
+  storageAccess?: "personal" | "household" | "communal";
   citizenId?: string;
   timeoutMs?: number;
   skipBlock?: (position: { x: number; y: number; z: number }) => boolean;

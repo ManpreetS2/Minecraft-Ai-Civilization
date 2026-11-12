@@ -219,23 +219,15 @@ async function executeStorage(
   }
   try {
     if (action === "deposit") {
-      const result = await depositItems(ctx, itemName, chest);
+      const result = await depositItems({ ...ctx, storageAccess: purpose }, itemName, chest);
       if (!storageActionCurrent(ctx)) return abandonedStorage(ctx, events, "depositItems", result);
-      if (result.success) {
-        events.emit(
-          createEvent("ItemDeposited", { count: result.data.deposited, contents: result.data.contents, position: chest, access: purpose }, ctx.citizenId),
-        );
-      }
       return result;
     }
     if (!itemName) {
       return fail("INVALID_ARGUMENT", "Withdraw requires an item name", 0, false);
     }
-    const result = await withdrawItems(ctx, itemName, count, chest);
+    const result = await withdrawItems({ ...ctx, storageAccess: purpose }, itemName, count, chest);
     if (!storageActionCurrent(ctx)) return abandonedStorage(ctx, events, "withdrawItems", result);
-    if (result.success) {
-      events.emit(createEvent("ItemWithdrawn", { item: itemName, count: result.data.count, position: chest, access: purpose }, ctx.citizenId));
-    }
     return result;
   } finally {
     if (ctx.citizenId && acquisitionId) {
