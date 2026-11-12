@@ -11,8 +11,12 @@ describe("chest-skill call sites (reviewed set) and the home-storage gate", () =
   });
   it("in home-ops every success event for a transfer is emitted only after a current-action check, and the claim release is conditional", () => {
     const src = readFileSync(join(root, "agent-core/src/home-ops.ts"), "utf8");
-    expect(src).toMatch(/await depositItems\([^)]*\);\s*if \(!storageActionCurrent\(ctx\)\) return abandonedStorage[\s\S]*?createEvent\("ItemDeposited"/);
-    expect(src).toMatch(/await withdrawItems\([^)]*\);\s*if \(!storageActionCurrent\(ctx\)\) return abandonedStorage[\s\S]*?createEvent\("ItemWithdrawn"/);
+    expect(src).toMatch(/await depositItems\([^)]*\);\s*if \(!storageActionCurrent\(ctx\)\) return abandonedStorage/);
+    expect(src).toMatch(/await withdrawItems\([^)]*\);\s*if \(!storageActionCurrent\(ctx\)\) return abandonedStorage/);
+    expect(src).not.toMatch(/createEvent\("Item(?:Deposited|Withdrawn)"/);
+    const physical = readFileSync(join(root, "skills/src/inventory-service.ts"), "utf8");
+    expect(physical).toContain('"ItemDeposited"');
+    expect(physical).toContain('"ItemWithdrawn"');
     expect(src).toMatch(/finally \{\s*if \(ctx.citizenId && acquisitionId\) \{\s*runtime\.claims\.releaseAcquisition/);
   });
 });
