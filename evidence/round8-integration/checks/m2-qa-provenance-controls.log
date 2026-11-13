@@ -1,0 +1,58 @@
+
+ RUN  v3.2.7 C:/Users/sh1ft/codex-round8-integration/qa/provenance-controls
+
+ ❯ test/provenance-negative-controls.test.ts (26 tests | 2 failed) 146ms
+   ✓ [ENFORCED] replay, relabel and signature binding > control: the synthetic signed rich run is real_minecraft/VERIFIED (so the rejections below are meaningful) 16ms
+   ✓ [ENFORCED] replay, relabel and signature binding > a genuine attestation bound to ANOTHER experiment id is never authentic for this journal 6ms
+   ✓ [ENFORCED] replay, relabel and signature binding > a journal relabelled to another experiment id (rows rewritten and re-sealed) no longer matches the signed digest 6ms
+   ✓ [ENFORCED] replay, relabel and signature binding > one row changed after signing (digest mismatch) is never authentic 7ms
+   ✓ [ENFORCED] replay, relabel and signature binding > an attestation whose signed window ends before the journal's last row is never authentic 5ms
+   ✓ [ENFORCED] replay, relabel and signature binding > a trusted authority name bound to someone else's key, or an unknown authority, is never authentic 4ms
+   ✓ [ENFORCED] clumsy fabrication and interrupted capture are caught even when SIGNED > a phantom gather (verified, but the inventory never changed) is a violation, never authentic 4ms
+   ✓ [ENFORCED] clumsy fabrication and interrupted capture are caught even when SIGNED > a broken inventory chain between two observations of one citizen is a violation 4ms
+   ✓ [ENFORCED] clumsy fabrication and interrupted capture are caught even when SIGNED > a missing stretch of tick samples (21 minutes with no capture) cannot reach 60 minutes 4ms
+   ✓ [ENFORCED] clumsy fabrication and interrupted capture are caught even when SIGNED > a capture interrupted at 10 minutes and then honestly signed is not a 60-minute run 3ms
+   ✓ [ENFORCED] clumsy fabrication and interrupted capture are caught even when SIGNED > a server game tick that goes backwards (restart / splice) is not authentic 4ms
+   ✓ [ENFORCED] clumsy fabrication and interrupted capture are caught even when SIGNED > two runs spliced into one re-sealed journal produce identity/continuity violations 8ms
+   ✓ [UNIMPLEMENTED] defenses PR #119 specifies that the current validator does not have (documented today's behaviour: accepted) > G1 plausible fabricated physical journal written by the harness (50 consistent actions, no server witness): today the signed run is real_minecraft/VERIFIED 10ms
+   ✓ [UNIMPLEMENTED] defenses PR #119 specifies that the current validator does not have (documented today's behaviour: accepted) > G2 a genuine attestation replayed as a second run (no used-session registry): today the signed run is accepted both times 7ms
+   ✓ [UNIMPLEMENTED] defenses PR #119 specifies that the current validator does not have (documented today's behaviour: accepted) > G2 attestation session id differs from the provisioned session: the caller cannot even state the expected session (ValidatorInput has no such field): today the signed run is accepted 4ms
+   ✓ [UNIMPLEMENTED] defenses PR #119 specifies that the current validator does not have (documented today's behaviour: accepted) > G3 correct key and digest, journal declares a DIFFERENT world (start-row world fingerprint contradicts the manifest world seed): today the signed run is real_minecraft/VERIFIED 5ms
+   ✓ [UNIMPLEMENTED] defenses PR #119 specifies that the current validator does not have (documented today's behaviour: accepted) > G4 no session_seal / shutdown row: a crash-truncated journal re-signed at its digest: today the signed run is real_minecraft/VERIFIED 4ms
+   ✓ [UNIMPLEMENTED] defenses PR #119 specifies that the current validator does not have (documented today's behaviour: accepted) > G4 a single end-of-run signature: no periodic checkpoints exist or are required for a 60-minute run: today the signed run is real_minecraft/VERIFIED 4ms
+   ✓ [UNIMPLEMENTED] defenses PR #119 specifies that the current validator does not have (documented today's behaviour: accepted) > G6 every decision claims decisionSource 'model' but there are no provider receipts anywhere: today the signed run is real_minecraft/VERIFIED 4ms
+   × [UNIMPLEMENTED] defenses PR #119 specifies that the current validator does not have (documented today's behaviour: accepted) > G8 two citizens joined under the SAME Minecraft UUID (join rows are not a concept the validator knows): today the signed run is real_minecraft/VERIFIED 11ms
+     → expected 'offline_simulated' to be 'real_minecraft' // Object.is equality
+   × [UNIMPLEMENTED] defenses PR #119 specifies that the current validator does not have (documented today's behaviour: accepted) > G8 citizen ids swapped against their join UUIDs (atlas acts under maya's UUID): today the signed run is real_minecraft/VERIFIED 5ms
+     → expected 'offline_simulated' to be 'real_minecraft' // Object.is equality
+   ✓ [UNIMPLEMENTED] defenses PR #119 specifies that the current validator does not have (documented today's behaviour: accepted) > the public ValidatorInput has no expected-session / world / UUID / receipt input at all: extra constraints are silently ignored 5ms
+   ✓ [FIRST-SMOKE] the unauthenticated scripted Paper observation never becomes evidence-grade > the same scripted journal without any attestation is offline_simulated and never VERIFIED, and says why 3ms
+   ✓ [FIRST-SMOKE] the unauthenticated scripted Paper observation never becomes evidence-grade > a journal that CLAIMS live mode with 60 minutes of plausible server ticks but no signature is still offline_simulated 3ms
+   ✓ [FIRST-SMOKE] the unauthenticated scripted Paper observation never becomes evidence-grade > a signature-shaped artifact under an EMPTY trust root, or under a trust entry that is not the signer's key, is never authentic (the caller owns the trust root) 8ms
+   ✓ [FIRST-SMOKE] the unauthenticated scripted Paper observation never becomes evidence-grade > evidence-grade is only reachable with BOTH a trusted signature and the 60-minute tick evidence: a signed 1-minute smoke is not 60-minute evidence 2ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/provenance-negative-controls.test.ts > [UNIMPLEMENTED] defenses PR #119 specifies that the current validator does not have (documented today's behaviour: accepted) > G8 two citizens joined under the SAME Minecraft UUID (join rows are not a concept the validator knows): today the signed run is real_minecraft/VERIFIED
+ FAIL  test/provenance-negative-controls.test.ts > [UNIMPLEMENTED] defenses PR #119 specifies that the current validator does not have (documented today's behaviour: accepted) > G8 citizen ids swapped against their join UUIDs (atlas acts under maya's UUID): today the signed run is real_minecraft/VERIFIED
+AssertionError: expected 'offline_simulated' to be 'real_minecraft' // Object.is equality
+
+Expected: "real_minecraft"
+Received: "offline_simulated"
+
+ ❯ test/provenance-negative-controls.test.ts:89:22
+     87|     it(`${s.gap} ${s.name}: today the signed run is ${s.today}`, () =>…
+     88|       const r = s.run();
+     89|       expect(r.mode).toBe("real_minecraft"); expect(r.overallStatus).t…
+       |                      ^
+     90|     });
+     91|   }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 24 passed (26)
+   Start at  10:46:26
+   Duration  1.23s (transform 180ms, setup 75ms, collect 301ms, tests 146ms, environment 0ms, prepare 216ms)
+

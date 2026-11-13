@@ -1,0 +1,11 @@
+
+ RUN  v3.2.7 C:/Users/sh1ft/codex-round8-integration/qa/round5-security
+
+ ✓ defects/receipt-suppression.test.ts (1 test) 1111ms
+   ✓ QA154-M1: a withdraw whose container+inventory sync lags the confirmation and is abandoned at confirmation time must still leave a physical receipt (or the transfer must not happen)  1110ms
+
+ Test Files  1 passed (1)
+      Tests  1 passed (1)
+   Start at  10:47:46
+   Duration  4.88s (transform 1.31s, setup 73ms, collect 3.24s, tests 1.11s, environment 0ms, prepare 199ms)
+

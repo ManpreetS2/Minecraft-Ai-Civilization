@@ -1,0 +1,72 @@
+
+> minecraft-ai-civilization@0.1.0 test:security C:\Users\sh1ft\codex-round8-integration
+> vitest run sec001 knowledge-provenance downstream-prompt-isolation persistent-fact-provenance citizen-context-2v2 bulletin-2v2 visibility-2v2 untrusted-model-output pr16-review http-server-origin workstations-community storage-community-access
+
+
+ RUN  v3.2.7 C:/Users/sh1ft/codex-round8-integration
+
+ ✓ packages/agent-core/src/t3-sec001-boundaries.test.ts (10 tests) 67ms
+ ✓ packages/agent-core/src/workstations-community.test.ts (9 tests) 178ms
+ ✓ packages/agent-core/src/persistent-fact-provenance.test.ts (12 tests) 86ms
+ ✓ apps/orchestrator/src/http-server-origin.test.ts (4 tests) 83ms
+ ✓ packages/agent-core/src/knowledge-provenance.test.ts (19 tests) 1193ms
+   ✓ owner policy: fail-closed provenance and per-record recovery > constructor interruption rolls back provenance DDL, flags, audit and marker; closes its handle and recovers  516ms
+ ✓ packages/agent-core/src/sec001-audience.test.ts (8 tests) 1211ms
+ ✓ packages/agent-core/src/storage-community-access.test.ts (8 tests) 57ms
+ ✓ packages/agent-core/src/citizen-context-2v2.test.ts (27 tests) 35ms
+ ✓ packages/shared/src/bulletin-2v2-contract.test.ts (9 tests) 17ms
+ ✓ packages/shared/src/visibility-2v2-contract.test.ts (19 tests) 5ms
+ ✓ packages/agent-core/src/sec001-round3.test.ts (14 tests) 2321ms
+ ✓ packages/agent-core/src/sec001-round2.test.ts (20 tests) 2365ms
+ ✓ packages/agent-core/src/pr16-review.test.ts (5 tests) 755ms
+ ✓ packages/agent-core/src/downstream-prompt-isolation.test.ts (13 tests) 1385ms
+ ✓ packages/agent-core/src/sec001-manager.test.ts (38 tests) 3602ms
+   ✓ same-community announcements (criterion 2) > a citizen's own choice reaches every member of its community through the real manager path, and no one else  440ms
+   ✓ voluntary cross-community sharing (criterion 3) > a citizen may tell a rival it has met about a line it was shown; only that community receives it  310ms
+ ✓ packages/agent-core/src/sec001-migration-recovery-qa.test.ts (7 tests) 6414ms
+   ✓ Independent SEC-001 migration fault/recovery QA > fails closed when VACUUM backup encounters a real SQLite destination error; no quarantine marker or data loss  1094ms
+   ✓ Independent SEC-001 migration fault/recovery QA > rolls all flag inserts back on a SQLite trigger abort mid-transaction, then retries on reopen  947ms
+   ✓ Independent SEC-001 migration fault/recovery QA > recovers idempotently after flags commit but before the completion marker is written  1101ms
+   ✓ Independent SEC-001 migration fault/recovery QA > backup includes committed WAL rows even while another connection keeps the WAL open  783ms
+   ✓ Independent SEC-001 migration fault/recovery QA > aborts before flagging if the dry-run report cannot be written, retaining a usable backup  722ms
+   ✓ Independent SEC-001 migration fault/recovery QA > completes provenance backfill on reopen after the completion marker commits but backfill aborts  935ms
+   ✓ Independent SEC-001 migration fault/recovery QA > can restore a migration backup to another disposable database and reapply quarantine without losing audit content  830ms
+ ✓ packages/agent-core/src/sec001-quarantine-durability-qa.test.ts (8 tests) 6961ms
+   ✓ Independent SEC-001 quarantine durability and provenance QA > filters quarantined facts before applying the reader retrieval limit  1096ms
+   ✓ Independent SEC-001 quarantine durability and provenance QA > a shared source key is quarantined per recipient without hiding its authorized owner's fact  978ms
+   ✓ Independent SEC-001 quarantine durability and provenance QA > source_event_id makes a non-event-key fact eligible for source authorization during migration  1073ms
+   ✓ Independent SEC-001 quarantine durability and provenance QA > explicit source identity overrides a misleading authorized-looking fact key  809ms
+   ✓ Independent SEC-001 quarantine durability and provenance QA > SECURITY REGRESSION: rerunning quarantine must exclude a later memory copied from already-flagged poison  689ms
+   ✓ Independent SEC-001 quarantine durability and provenance QA > SECURITY REGRESSION: a completed migration marker must not authorize subsequently imported source-linked poison  906ms
+   ✓ Independent SEC-001 quarantine durability and provenance QA > dry-run reports are read-only even when they propose additional quarantine  725ms
+   ✓ Independent SEC-001 quarantine durability and provenance QA > a newly inserted suspicion keeps its classification; the known kind defect requires replacement  683ms
+ ✓ packages/agent-core/src/sec001-migration-manager-qa.test.ts (5 tests) 4437ms
+   ✓ Independent migrated SQLite -> actual manager cognition QA > migrated flagged fact and exact-derived memory cannot reach manager cognition, including after restart  1214ms
+   ✓ Independent migrated SQLite -> actual manager cognition QA > SECURITY REGRESSION: unverified legacy non-event poison must not reach actual manager memory  740ms
+   ✓ Independent migrated SQLite -> actual manager cognition QA > SECURITY CONTRACT GAP: paraphrased historical poison must not reach actual manager memory  968ms
+   ✓ Independent migrated SQLite -> actual manager cognition QA > SECURITY REGRESSION: suspicion replacement must not inherit manager observed-fact eligibility  804ms
+   ✓ Independent migrated SQLite -> actual manager cognition QA > correctly flagged poison is absent for the other reader and private memory ownership remains separate  710ms
+ ✓ packages/agent-core/src/untrusted-model-output.test.ts (37 tests) 4470ms
+ ✓ packages/agent-core/src/sec001-migration-qa.test.ts (12 tests) 8392ms
+   ✓ Independent SEC-001 authentic legacy SQLite migration QA > starts without SEC schema; migrates a COPY, preserves audit rows and backs up all historical content  1071ms
+   ✓ Independent SEC-001 authentic legacy SQLite migration QA > keeps authorized private/directed history; flags unauthorized, missing-source and unaudienced public facts  896ms
+   ✓ Independent SEC-001 authentic legacy SQLite migration QA > persists flags, source references, deliveries and audit contents across two reopen/migration passes  1048ms
+   ✓ Independent SEC-001 authentic legacy SQLite migration QA > SECURITY REGRESSION: unverified non-event observed facts require quarantine rather than automatic trust  829ms
+   ✓ Independent SEC-001 authentic legacy SQLite migration QA > SECURITY CONTRACT GAP: provenance-free paraphrased poisoned memories must not remain model-eligible  675ms
+   ✓ Independent SEC-001 authentic legacy SQLite migration QA > SECURITY REGRESSION: same-key suspicion replacement must update trust classification  863ms
+   ✓ Independent SEC-001 authentic legacy SQLite migration QA > SECURITY CONTRACT GAP: an authorized historical source key cannot authenticate unrelated secret fact content  712ms
+   ✓ Independent SEC-001 authentic legacy SQLite migration QA > cannot shed quarantine by overwriting a flagged key with a fresh ID  632ms
+   ✓ Independent SEC-001 authentic legacy SQLite migration QA > preserves public announcements, directed speech and explicit cross-community sharing without widening the source  546ms
+   ✓ Independent SEC-001 authentic legacy SQLite migration QA > membership removal flags community-derived facts but preserves private and directed historical knowledge  402ms
+   ✓ Independent SEC-001 authentic legacy SQLite migration QA > records authorized speech as an attributed conversation (not proof of the speaker's claim)  357ms
+   ✓ Independent SEC-001 authentic legacy SQLite migration QA > SECURITY CONTRACT GAP: a reported claim needs a trust classification distinct from an undifferentiated observed fact  360ms
+ ✓ packages/agent-core/src/sec001-independent-review.test.ts (74 tests) 5828ms
+   ✓ community membership timing reaches the model-facing context > a citizen who joins after an announcement never receives it  328ms
+   ✓ audience, class and observer boundaries through the real manager > another citizen's model reasoning, goals and refused actions stay out of cognition  311ms
+   ✓ audience, class and observer boundaries through the real manager > speech reaches only citizens within hearing, attributed to the real speaker, never over server chat  310ms
+
+ Test Files  21 passed (21)
+      Tests  358 passed (358)
+   Start at  10:41:05
+   Duration  9.87s (transform 2.69s, setup 2.28s, collect 24.75s, tests 49.86s, environment 4ms, prepare 5.55s)
+

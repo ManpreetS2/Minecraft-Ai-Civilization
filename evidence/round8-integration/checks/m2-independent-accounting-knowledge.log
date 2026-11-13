@@ -1,0 +1,24 @@
+
+ RUN  v3.2.7 C:/Users/sh1ft/codex-round8-integration/qa/round5-security
+
+ ✓ test/knowledge-141.test.ts (10 tests) 1899ms
+ ✓ test/receipts-156.test.ts (13 tests) 20301ms
+   ✓ abandoned home transfer: physical receipts are complete on every abandonment signal (conservation) > personal withdraw / deadline: receipts == (moved ? 1 : 0), the receipt's deltas equal the physical movement, no terminal event  1672ms
+   ✓ abandoned home transfer: physical receipts are complete on every abandonment signal (conservation) > personal withdraw / caller-abort: receipts == (moved ? 1 : 0), the receipt's deltas equal the physical movement, no terminal event  1657ms
+   ✓ abandoned home transfer: physical receipts are complete on every abandonment signal (conservation) > personal withdraw / pre-abort: receipts == (moved ? 1 : 0), the receipt's deltas equal the physical movement, no terminal event  1317ms
+   ✓ abandoned home transfer: physical receipts are complete on every abandonment signal (conservation) > personal deposit / deadline: receipts == (moved ? 1 : 0), the receipt's deltas equal the physical movement, no terminal event  1645ms
+   ✓ abandoned home transfer: physical receipts are complete on every abandonment signal (conservation) > personal deposit / caller-abort: receipts == (moved ? 1 : 0), the receipt's deltas equal the physical movement, no terminal event  1660ms
+   ✓ abandoned home transfer: physical receipts are complete on every abandonment signal (conservation) > personal deposit / pre-abort: receipts == (moved ? 1 : 0), the receipt's deltas equal the physical movement, no terminal event  1319ms
+   ✓ abandoned home transfer: physical receipts are complete on every abandonment signal (conservation) > household withdraw / deadline: receipts == (moved ? 1 : 0), the receipt's deltas equal the physical movement, no terminal event  1645ms
+   ✓ abandoned home transfer: physical receipts are complete on every abandonment signal (conservation) > household withdraw / caller-abort: receipts == (moved ? 1 : 0), the receipt's deltas equal the physical movement, no terminal event  1660ms
+   ✓ abandoned home transfer: physical receipts are complete on every abandonment signal (conservation) > household withdraw / pre-abort: receipts == (moved ? 1 : 0), the receipt's deltas equal the physical movement, no terminal event  1318ms
+   ✓ abandoned home transfer: physical receipts are complete on every abandonment signal (conservation) > household deposit / deadline: receipts == (moved ? 1 : 0), the receipt's deltas equal the physical movement, no terminal event  1644ms
+   ✓ abandoned home transfer: physical receipts are complete on every abandonment signal (conservation) > household deposit / caller-abort: receipts == (moved ? 1 : 0), the receipt's deltas equal the physical movement, no terminal event  1662ms
+   ✓ abandoned home transfer: physical receipts are complete on every abandonment signal (conservation) > household deposit / pre-abort: receipts == (moved ? 1 : 0), the receipt's deltas equal the physical movement, no terminal event  1317ms
+   ✓ abandoned home transfer: physical receipts are complete on every abandonment signal (conservation) > overlapping same-citizen generations (the offline fake lets BOTH frames move items; a real client has one container window per bot, NOT proven here): exactly one record per physical movement, stale frame never gets a terminal event  1783ms
+
+ Test Files  2 passed (2)
+      Tests  23 passed (23)
+   Start at  10:47:21
+   Duration  23.53s (transform 1.53s, setup 169ms, collect 5.09s, tests 22.20s, environment 0ms, prepare 508ms)
+

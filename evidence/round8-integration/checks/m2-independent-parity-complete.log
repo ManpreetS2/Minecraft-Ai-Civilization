@@ -1,0 +1,15 @@
+
+ RUN  v3.2.7 C:/Users/sh1ft/codex-round8-integration/qa/round5-security
+
+ ✓ defects/receipt-suppression.test.ts (1 test) 1130ms
+   ✓ QA154-M1: a withdraw whose container+inventory sync lags the confirmation and is abandoned at confirmation time must still leave a physical receipt (or the transfer must not happen)  1129ms
+ ✓ defects/abandoned-observations.test.ts (3 tests) 6612ms
+   ✓ pending observations for ONE abandoned physical transfer > QA141-L1 withdraw: at most one PENDING reconciliation record per physical transfer (a reconciler cannot otherwise tell three records are one movement)  1675ms
+   ✓ pending observations for ONE abandoned physical transfer > QA141-L1 deposit: at most one PENDING reconciliation record per physical transfer (a reconciler cannot otherwise tell three records are one movement)  1644ms
+   ✓ pending observations for ONE abandoned physical transfer > QA141-L2: the abandoned WITHDRAW observation carries the same fields as the abandoned DEPOSIT observation (count, position, access, contents)  3292ms
+
+ Test Files  2 passed (2)
+      Tests  4 passed (4)
+   Start at  10:49:40
+   Duration  10.45s (transform 1.30s, setup 132ms, collect 6.52s, tests 7.74s, environment 0ms, prepare 423ms)
+

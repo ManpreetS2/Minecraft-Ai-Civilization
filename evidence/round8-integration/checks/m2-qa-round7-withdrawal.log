@@ -1,0 +1,18 @@
+
+ RUN  v3.2.7 C:/Users/sh1ft/codex-round8-integration/qa/round7-withdrawal
+
+ ✓ unresolved.test.ts (9 tests) 18211ms
+   ✓ resolved withdrawal late-sync: one pending receipt without late success or rollback  305ms
+   ✓ resolved withdrawal unresolved: one pending receipt without late success or rollback  2542ms
+   ✓ resolved withdrawal death: one pending receipt without late success or rollback  2544ms
+   ✓ resolved withdrawal disconnect: one pending receipt without late success or rollback  2544ms
+   ✓ resolved withdrawal shutdown: one pending receipt without late success or rollback  2539ms
+   ✓ resolved withdrawal repeated-abort: one pending receipt without late success or rollback  2542ms
+   ✓ resolved withdrawal unavailable-view: one pending receipt without late success or rollback  2544ms
+   ✓ an unresolved stale action cannot release a newer same-citizen acquisition  2541ms
+
+ Test Files  1 passed (1)
+      Tests  9 passed (9)
+   Start at  10:45:05
+   Duration  21.94s (transform 1.27s, setup 68ms, collect 3.17s, tests 18.21s, environment 0ms, prepare 190ms)
+

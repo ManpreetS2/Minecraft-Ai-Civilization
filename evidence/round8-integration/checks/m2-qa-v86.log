@@ -1,0 +1,28 @@
+
+ RUN  v3.2.7 C:/Users/sh1ft/codex-round8-integration/qa/v86
+
+stdout | test/adv86-performance.test.ts > binding cost > 2000 tick rows + the rich action set validate in < 3000 ms and remain real_minecraft/VERIFIED
+PERF rows=2020 ms=100 mode=real_minecraft status=VERIFIED
+
+ ✓ test/adv86-scenarios.test.ts (18 tests) 87ms
+ ✓ test/adv86-controls.test.ts (27 tests) 281ms
+stdout | test/adv86-performance.test.ts > binding cost > 10000 tick rows + the rich action set validate in < 20000 ms and remain real_minecraft/VERIFIED
+PERF rows=10020 ms=296 mode=real_minecraft status=VERIFIED
+
+ ✓ test/adv86-performance.test.ts (2 tests) 465ms
+   ✓ binding cost > 10000 tick rows + the rich action set validate in < 20000 ms and remain real_minecraft/VERIFIED  350ms
+stdout | test/canonical-binding.test.ts > every populated parsed row field except derived root hashes is bound, without changing authenticated action results
+{ boundFieldMutations: 638 }
+
+ ✓ test/canonical-binding.test.ts (7 tests) 2192ms
+   ✓ every populated parsed row field except derived root hashes is bound, without changing authenticated action results  2133ms
+ ✓ test/adv86-replay.test.ts (24 tests) 3157ms
+   ✓ QA75-L5 replay: CLI headline (real CLI processes) > journal-only run on the simulated sample: NOT_PROVEN, offline_simulated, a report really exists  1034ms
+   ✓ QA75-L5 replay: CLI headline (real CLI processes) > run WITH manifest, facts, inventories and events on the simulated sample: NOT_PROVEN (headline capped), with the verified-action count intact and the markdown saying so  930ms
+   ✓ QA75-L5 replay: CLI headline (real CLI processes) > the cap does not hide REAL violations: a corrupted journal through the CLI is not downgraded to NOT_PROVEN  902ms
+
+ Test Files  5 passed (5)
+      Tests  78 passed (78)
+   Start at  10:46:09
+   Duration  3.99s (transform 297ms, setup 304ms, collect 1.51s, tests 6.18s, environment 1ms, prepare 1.10s)
+

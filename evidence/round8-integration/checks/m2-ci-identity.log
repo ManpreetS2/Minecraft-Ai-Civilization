@@ -1,0 +1,17 @@
+
+ RUN  v3.2.7 C:/Users/sh1ft/codex-round8-integration
+
+ ✓ tools/ci/offline-acceptance.test.ts (25 tests) 751ms
+ ✓ tools/ci/journal-execution.test.ts (2 tests) 3205ms
+   ✓ executes the real journal CLI and its forged/missing controls without mutating original artifacts  1634ms
+   ✓ refuses to report verification success when the real journal CLI rejects the input  1570ms
+ ✓ tools/ci/evidence-hardening.test.ts (66 tests) 6802ms
+   ✓ PR #72 tamper matrix on real bundles > every class the original audit found accepted (13 of 26) is now rejected on both real bundles  826ms
+   ✓ per-scenario journal CLI controls on the committed real bundles (real subprocesses) > 1v1: 2 citizens / 6 attempts / 6 observations: positive, missing-evidence and forged-evidence controls  1538ms
+   ✓ per-scenario journal CLI controls on the committed real bundles (real subprocesses) > 2v2: 4 citizens / 12 attempts / 12 observations: positive, missing-evidence and forged-evidence controls  1559ms
+
+ Test Files  3 passed (3)
+      Tests  93 passed (93)
+   Start at  10:46:29
+   Duration  7.72s (transform 267ms, setup 279ms, collect 481ms, tests 10.76s, environment 1ms, prepare 841ms)
+

@@ -1,0 +1,49 @@
+
+> minecraft-ai-civilization@0.1.0 lint C:\Users\sh1ft\codex-round8-integration
+> eslint .
+
+
+C:\Users\sh1ft\codex-round8-integration\qa\round5-security\defects\abandoned-observations.test.ts
+  1:1  warning  Unused eslint-disable directive (no problems were reported from '@typescript-eslint/no-explicit-any' or '@typescript-eslint/no-unused-vars')
+
+C:\Users\sh1ft\codex-round8-integration\qa\round5-security\defects\echo-denylist.test.ts
+  1:1  warning  Unused eslint-disable directive (no problems were reported from '@typescript-eslint/no-explicit-any' or '@typescript-eslint/no-unused-vars')
+
+C:\Users\sh1ft\codex-round8-integration\qa\round5-security\scripts\run-qualified.mjs
+  3:11   error  'setTimeout' is not defined    no-undef
+  3:30   error  'console' is not defined       no-undef
+  3:68   error  'process' is not defined       no-undef
+  4:52   error  'process' is not defined       no-undef
+  7:1    error  'console' is not defined       no-undef
+  7:37   error  'process' is not defined       no-undef
+  7:113  error  'clearTimeout' is not defined  no-undef
+  7:148  error  'process' is not defined       no-undef
+
+C:\Users\sh1ft\codex-round8-integration\qa\round5-security\test\combined-141.test.ts
+  1:1  warning  Unused eslint-disable directive (no problems were reported from '@typescript-eslint/no-unused-vars')
+
+C:\Users\sh1ft\codex-round8-integration\qa\round5-security\test\knowledge-141.test.ts
+  1:1  warning  Unused eslint-disable directive (no problems were reported from '@typescript-eslint/no-explicit-any')
+
+C:\Users\sh1ft\codex-round8-integration\qa\round5-security\test\receipts-156.test.ts
+  1:1  warning  Unused eslint-disable directive (no problems were reported from '@typescript-eslint/no-unused-vars')
+
+C:\Users\sh1ft\codex-round8-integration\qa\round5-security\test\validator-boundary.test.ts
+  1:1  warning  Unused eslint-disable directive (no problems were reported from '@typescript-eslint/no-explicit-any' or '@typescript-eslint/no-unused-vars')
+
+C:\Users\sh1ft\codex-round8-integration\qa\round5-security\test\validator-echo.test.ts
+  1:1  warning  Unused eslint-disable directive (no problems were reported from '@typescript-eslint/no-explicit-any' or '@typescript-eslint/no-unused-vars')
+
+C:\Users\sh1ft\codex-round8-integration\qa\round5-security\test\validator-malformed.test.ts
+  1:1  warning  Unused eslint-disable directive (no problems were reported from '@typescript-eslint/no-explicit-any' or '@typescript-eslint/no-unused-vars')
+
+C:\Users\sh1ft\codex-round8-integration\qa\round5-security\vitest.config.ts
+  1:1  warning  Unused eslint-disable directive (no problems were reported from '@typescript-eslint/no-explicit-any' or '@typescript-eslint/no-unused-vars')
+
+C:\Users\sh1ft\codex-round8-integration\qa\round5-security\vitest.defects.config.ts
+  1:1  warning  Unused eslint-disable directive (no problems were reported from '@typescript-eslint/no-explicit-any' or '@typescript-eslint/no-unused-vars')
+
+✖ 18 problems (8 errors, 10 warnings)
+  0 errors and 10 warnings potentially fixable with the `--fix` option.
+
+ ELIFECYCLE  Command failed with exit code 1.

@@ -1,0 +1,711 @@
+[
+  {
+    "label": "m2-workspace",
+    "command": [
+      "pnpm",
+      "test"
+    ],
+    "sourceSha": "5bf64334faf32cfe0d7ec82f3aab138568afdfc5",
+    "dirtyPaths": "",
+    "exitCode": 0,
+    "expectedExitCode": 0,
+    "counts": {
+      "passed": 2648,
+      "skipped": 2
+    },
+    "elapsedSeconds": 56.74,
+    "log": "m2-workspace.log",
+    "sha256": "9a725a1fe8151fcbe9b43629a24ee1ffcd7484ddbdf75a682a47389851ba438a",
+    "environment": {}
+  },
+  {
+    "label": "m2-ai",
+    "command": [
+      "pnpm",
+      "test:ai"
+    ],
+    "sourceSha": "5bf64334faf32cfe0d7ec82f3aab138568afdfc5",
+    "dirtyPaths": "",
+    "exitCode": 0,
+    "expectedExitCode": 0,
+    "counts": {
+      "passed": 514
+    },
+    "elapsedSeconds": 46.51,
+    "log": "m2-ai.log",
+    "sha256": "88517918572ca67ef4e51ea0371aa925dc194136244026192f5c1a43b50d9482",
+    "environment": {}
+  },
+  {
+    "label": "m2-security",
+    "command": [
+      "pnpm",
+      "test:security"
+    ],
+    "sourceSha": "5bf64334faf32cfe0d7ec82f3aab138568afdfc5",
+    "dirtyPaths": "",
+    "exitCode": 0,
+    "expectedExitCode": 0,
+    "counts": {
+      "passed": 358
+    },
+    "elapsedSeconds": 11.18,
+    "log": "m2-security.log",
+    "sha256": "a452ad42cd2a58ea2324a5b059dc64d11b9d212dd94ad1c4efd09de2f6487773",
+    "environment": {}
+  },
+  {
+    "label": "m2-v1",
+    "command": [
+      "pnpm",
+      "test:v1"
+    ],
+    "sourceSha": "5bf64334faf32cfe0d7ec82f3aab138568afdfc5",
+    "dirtyPaths": "",
+    "exitCode": 0,
+    "expectedExitCode": 0,
+    "counts": {
+      "passed": 228
+    },
+    "elapsedSeconds": 28.85,
+    "log": "m2-v1.log",
+    "sha256": "af09af37eb877371b75dfd5ceaf69c651b07bdce38a580b58f38c853904d3edb",
+    "environment": {}
+  },
+  {
+    "label": "m2-validator",
+    "command": [
+      "pnpm",
+      "test:evidence-validator"
+    ],
+    "sourceSha": "5bf64334faf32cfe0d7ec82f3aab138568afdfc5",
+    "dirtyPaths": "",
+    "exitCode": 0,
+    "expectedExitCode": 0,
+    "counts": {
+      "passed": 167
+    },
+    "elapsedSeconds": 3.16,
+    "log": "m2-validator.log",
+    "sha256": "aa4cb00850ff3994496ec4daa1fe8972ca6f4ff5e27937a137ee3f759d3393da",
+    "environment": {}
+  },
+  {
+    "label": "m2-types",
+    "command": [
+      "pnpm",
+      "typecheck"
+    ],
+    "sourceSha": "5bf64334faf32cfe0d7ec82f3aab138568afdfc5",
+    "dirtyPaths": "",
+    "exitCode": 0,
+    "expectedExitCode": 0,
+    "counts": {},
+    "elapsedSeconds": 19.36,
+    "log": "m2-types.log",
+    "sha256": "f9dea52bcdbe2a9b42535f4002efdc4e12f281d334878023fccdeff8a8e458f7",
+    "environment": {}
+  },
+  {
+    "label": "m2-tools-types",
+    "command": [
+      "pnpm",
+      "typecheck:tools"
+    ],
+    "sourceSha": "5bf64334faf32cfe0d7ec82f3aab138568afdfc5",
+    "dirtyPaths": "",
+    "exitCode": 0,
+    "expectedExitCode": 0,
+    "counts": {},
+    "elapsedSeconds": 4.47,
+    "log": "m2-tools-types.log",
+    "sha256": "a9a8755777eeec9332ab5efb4a9dbbfaa5ca9731801421d0398ec84f9e32a06b",
+    "environment": {}
+  },
+  {
+    "label": "m2-validator-types",
+    "command": [
+      "pnpm",
+      "typecheck:evidence-validator"
+    ],
+    "sourceSha": "5bf64334faf32cfe0d7ec82f3aab138568afdfc5",
+    "dirtyPaths": "",
+    "exitCode": 0,
+    "expectedExitCode": 0,
+    "counts": {},
+    "elapsedSeconds": 2.14,
+    "log": "m2-validator-types.log",
+    "sha256": "4f5597561a7c85a3277f0e44a6fbd43469b5d7e6fe8ef4471ece1183d3053200",
+    "environment": {}
+  },
+  {
+    "label": "m2-lint",
+    "command": [
+      "pnpm",
+      "lint"
+    ],
+    "sourceSha": "5bf64334faf32cfe0d7ec82f3aab138568afdfc5",
+    "dirtyPaths": "",
+    "exitCode": 0,
+    "expectedExitCode": 0,
+    "counts": {},
+    "elapsedSeconds": 12.58,
+    "log": "m2-lint.log",
+    "sha256": "96c475905a2ad9d5cd5d221a77884e168bff8a3318960daf6baa248904b83fca",
+    "environment": {}
+  },
+  {
+    "label": "m2-build",
+    "command": [
+      "pnpm",
+      "build"
+    ],
+    "sourceSha": "5bf64334faf32cfe0d7ec82f3aab138568afdfc5",
+    "dirtyPaths": "",
+    "exitCode": 0,
+    "expectedExitCode": 0,
+    "counts": {},
+    "elapsedSeconds": 21.91,
+    "log": "m2-build.log",
+    "sha256": "bb976f241cf47c62003d4e4895ba3786a8f7a01242e8734f07aa4125ce33adee",
+    "environment": {}
+  },
+  {
+    "label": "m2-offline-2",
+    "command": [
+      "pnpm",
+      "v1:offline",
+      "2",
+      "artifacts/v1/round8-assembly/scenario-2"
+    ],
+    "sourceSha": "5bf64334faf32cfe0d7ec82f3aab138568afdfc5",
+    "dirtyPaths": "",
+    "exitCode": 0,
+    "expectedExitCode": 0,
+    "counts": {},
+    "elapsedSeconds": 9.99,
+    "log": "m2-offline-2.log",
+    "sha256": "b5600fc27c879b61c977d6ca529182c5e0a85ecd9a66566cc65f6df36254ce8c",
+    "environment": {}
+  },
+  {
+    "label": "m2-offline-4",
+    "command": [
+      "pnpm",
+      "v1:offline",
+      "4",
+      "artifacts/v1/round8-assembly/scenario-4"
+    ],
+    "sourceSha": "5bf64334faf32cfe0d7ec82f3aab138568afdfc5",
+    "dirtyPaths": "",
+    "exitCode": 0,
+    "expectedExitCode": 0,
+    "counts": {},
+    "elapsedSeconds": 15.59,
+    "log": "m2-offline-4.log",
+    "sha256": "2ae5e7f7c595a476cb63f0f093bf1a4376739e1fdcdb5f31b2fbe6e6ec84d398",
+    "environment": {}
+  },
+  {
+    "label": "m2-qa-round7-withdrawal",
+    "command": [
+      "pnpm",
+      "exec",
+      "vitest",
+      "run",
+      "-c",
+      "qa/round7-withdrawal/vitest.config.ts"
+    ],
+    "sourceSha": "5bf64334faf32cfe0d7ec82f3aab138568afdfc5",
+    "dirtyPaths": "",
+    "exitCode": 0,
+    "expectedExitCode": 0,
+    "counts": {
+      "passed": 9
+    },
+    "elapsedSeconds": 23.01,
+    "log": "m2-qa-round7-withdrawal.log",
+    "sha256": "5c09b0a57e79efd0c84ed96e66564df3ec965c4c47c5fbaf8be2a324f4f791e4",
+    "environment": {
+      "QA67_ART": "C:/Users/sh1ft/codex-round8-integration/artifacts/v1/round8-assembly",
+      "QA67_BASE_ART": "C:/Users/sh1ft/codex-round8-integration/artifacts/v1/round8-assembly"
+    }
+  },
+  {
+    "label": "m2-qa-round7-contract",
+    "command": [
+      "pnpm",
+      "exec",
+      "vitest",
+      "run",
+      "-c",
+      "qa/round7-contract/vitest.config.ts"
+    ],
+    "sourceSha": "5bf64334faf32cfe0d7ec82f3aab138568afdfc5",
+    "dirtyPaths": "",
+    "exitCode": 0,
+    "expectedExitCode": 0,
+    "counts": {
+      "passed": 10
+    },
+    "elapsedSeconds": 16.24,
+    "log": "m2-qa-round7-contract.log",
+    "sha256": "c3803d4057cb9f3f587371dd93a2a6b1b32c304cb12b466549ef8f56cd03b997",
+    "environment": {
+      "QA67_ART": "C:/Users/sh1ft/codex-round8-integration/artifacts/v1/round8-assembly",
+      "QA67_BASE_ART": "C:/Users/sh1ft/codex-round8-integration/artifacts/v1/round8-assembly"
+    }
+  },
+  {
+    "label": "m2-qa-round6-contract",
+    "command": [
+      "pnpm",
+      "exec",
+      "vitest",
+      "run",
+      "-c",
+      "qa/round6-contract/vitest.config.ts"
+    ],
+    "sourceSha": "5bf64334faf32cfe0d7ec82f3aab138568afdfc5",
+    "dirtyPaths": "",
+    "exitCode": 1,
+    "expectedExitCode": 0,
+    "counts": {},
+    "elapsedSeconds": 1.16,
+    "log": "m2-qa-round6-contract.log",
+    "sha256": "fd03c5c0b463b183d0bec456856ea424efb471fcf5c02bf47f099973abb568b6",
+    "environment": {
+      "QA67_ART": "C:/Users/sh1ft/codex-round8-integration/artifacts/v1/round8-assembly",
+      "QA67_BASE_ART": "C:/Users/sh1ft/codex-round8-integration/artifacts/v1/round8-assembly"
+    }
+  },
+  {
+    "label": "m2-qa-p0-isolation",
+    "command": [
+      "pnpm",
+      "exec",
+      "vitest",
+      "run",
+      "-c",
+      "qa/p0-isolation/vitest.config.ts"
+    ],
+    "sourceSha": "5bf64334faf32cfe0d7ec82f3aab138568afdfc5",
+    "dirtyPaths": "",
+    "exitCode": 0,
+    "expectedExitCode": 0,
+    "counts": {
+      "passed": 49
+    },
+    "elapsedSeconds": 14.61,
+    "log": "m2-qa-p0-isolation.log",
+    "sha256": "205a01c80ab3ad55ad73a1020d130bc34812f37e30687858676708474a1156cb",
+    "environment": {
+      "QA67_ART": "C:/Users/sh1ft/codex-round8-integration/artifacts/v1/round8-assembly",
+      "QA67_BASE_ART": "C:/Users/sh1ft/codex-round8-integration/artifacts/v1/round8-assembly"
+    }
+  },
+  {
+    "label": "m2-qa-v94",
+    "command": [
+      "pnpm",
+      "exec",
+      "vitest",
+      "run",
+      "-c",
+      "qa/v94/vitest.config.ts"
+    ],
+    "sourceSha": "5bf64334faf32cfe0d7ec82f3aab138568afdfc5",
+    "dirtyPaths": "",
+    "exitCode": 0,
+    "expectedExitCode": 0,
+    "counts": {
+      "passed": 27
+    },
+    "elapsedSeconds": 8.05,
+    "log": "m2-qa-v94.log",
+    "sha256": "41233c1ab437cddda064816f2d6545ca5718c69c2df1e87ceaf0c53b381dc254",
+    "environment": {
+      "QA67_ART": "C:/Users/sh1ft/codex-round8-integration/artifacts/v1/round8-assembly",
+      "QA67_BASE_ART": "C:/Users/sh1ft/codex-round8-integration/artifacts/v1/round8-assembly"
+    }
+  },
+  {
+    "label": "m2-qa-v86",
+    "command": [
+      "pnpm",
+      "exec",
+      "vitest",
+      "run",
+      "-c",
+      "qa/v86/vitest.config.ts"
+    ],
+    "sourceSha": "5bf64334faf32cfe0d7ec82f3aab138568afdfc5",
+    "dirtyPaths": "",
+    "exitCode": 0,
+    "expectedExitCode": 0,
+    "counts": {
+      "passed": 78
+    },
+    "elapsedSeconds": 5.26,
+    "log": "m2-qa-v86.log",
+    "sha256": "71e051a71a2cb39e60320e0973e56975ebb3d02b319695d24548ccb8bb80127f",
+    "environment": {
+      "QA67_ART": "C:/Users/sh1ft/codex-round8-integration/artifacts/v1/round8-assembly",
+      "QA67_BASE_ART": "C:/Users/sh1ft/codex-round8-integration/artifacts/v1/round8-assembly"
+    }
+  },
+  {
+    "label": "m2-qa-v67",
+    "command": [
+      "pnpm",
+      "exec",
+      "vitest",
+      "run",
+      "-c",
+      "qa/v67/vitest.config.ts"
+    ],
+    "sourceSha": "5bf64334faf32cfe0d7ec82f3aab138568afdfc5",
+    "dirtyPaths": "",
+    "exitCode": 0,
+    "expectedExitCode": 0,
+    "counts": {
+      "passed": 150
+    },
+    "elapsedSeconds": 6.2,
+    "log": "m2-qa-v67.log",
+    "sha256": "a4147794e5f3000ec3ac61537342ed0e31def601fd3493ace6a74aaf12f108b0",
+    "environment": {
+      "QA67_ART": "C:/Users/sh1ft/codex-round8-integration/artifacts/v1/round8-assembly",
+      "QA67_BASE_ART": "C:/Users/sh1ft/codex-round8-integration/artifacts/v1/round8-assembly"
+    }
+  },
+  {
+    "label": "m2-qa-v75",
+    "command": [
+      "pnpm",
+      "exec",
+      "vitest",
+      "run",
+      "-c",
+      "qa/v75/vitest.config.ts"
+    ],
+    "sourceSha": "5bf64334faf32cfe0d7ec82f3aab138568afdfc5",
+    "dirtyPaths": "",
+    "exitCode": 0,
+    "expectedExitCode": 0,
+    "counts": {
+      "passed": 51
+    },
+    "elapsedSeconds": 5.09,
+    "log": "m2-qa-v75.log",
+    "sha256": "70b2d6d91b69a72b12e7b2b80e82259fb414b3c51e96e524c7d630eaa2f09a88",
+    "environment": {
+      "QA67_ART": "C:/Users/sh1ft/codex-round8-integration/artifacts/v1/round8-assembly",
+      "QA67_BASE_ART": "C:/Users/sh1ft/codex-round8-integration/artifacts/v1/round8-assembly"
+    }
+  },
+  {
+    "label": "m2-qa-provenance-controls",
+    "command": [
+      "pnpm",
+      "exec",
+      "vitest",
+      "run",
+      "-c",
+      "qa/provenance-controls/vitest.config.ts"
+    ],
+    "sourceSha": "5bf64334faf32cfe0d7ec82f3aab138568afdfc5",
+    "dirtyPaths": "?? qa/round6-contract/",
+    "exitCode": 1,
+    "expectedExitCode": 0,
+    "counts": {
+      "failed": 2,
+      "passed": 24
+    },
+    "elapsedSeconds": 2.63,
+    "log": "m2-qa-provenance-controls.log",
+    "sha256": "e7a235c25c05c0f25e9987ecd9006f69a14bbff4b840db3d94cbe21cd8abcac9",
+    "environment": {
+      "QA67_ART": "C:/Users/sh1ft/codex-round8-integration/artifacts/v1/round8-assembly",
+      "QA67_BASE_ART": "C:/Users/sh1ft/codex-round8-integration/artifacts/v1/round8-assembly"
+    }
+  },
+  {
+    "label": "m2-ci-identity",
+    "command": [
+      "pnpm",
+      "exec",
+      "vitest",
+      "run",
+      "-c",
+      "tools/vitest.config.ts",
+      "tools/ci"
+    ],
+    "sourceSha": "5bf64334faf32cfe0d7ec82f3aab138568afdfc5",
+    "dirtyPaths": "?? qa/round6-contract/",
+    "exitCode": 0,
+    "expectedExitCode": 0,
+    "counts": {
+      "passed": 93
+    },
+    "elapsedSeconds": 9.14,
+    "log": "m2-ci-identity.log",
+    "sha256": "70f503655dec1800ef6006f0c106eee539bc76c943d82d15b2092bc9f0d5a708",
+    "environment": {
+      "QA67_ART": "C:/Users/sh1ft/codex-round8-integration/artifacts/v1/round8-assembly",
+      "QA67_BASE_ART": "C:/Users/sh1ft/codex-round8-integration/artifacts/v1/round8-assembly"
+    }
+  },
+  {
+    "label": "m2-ci-bundles",
+    "command": [
+      "pnpm",
+      "exec",
+      "tsx",
+      "tools/ci/verify-offline-acceptance.ts",
+      "--scenario2",
+      "artifacts/v1/round8-assembly/scenario-2",
+      "--scenario4",
+      "artifacts/v1/round8-assembly/scenario-4",
+      "--sha",
+      "5bf64334faf32cfe0d7ec82f3aab138568afdfc5",
+      "--output",
+      "artifacts/v1/round8-assembly"
+    ],
+    "sourceSha": "5bf64334faf32cfe0d7ec82f3aab138568afdfc5",
+    "dirtyPaths": "?? qa/round6-contract/",
+    "exitCode": 0,
+    "expectedExitCode": 0,
+    "counts": {},
+    "elapsedSeconds": 4.4,
+    "log": "m2-ci-bundles.log",
+    "sha256": "52882abc0cc0e84ade48800a41b71cfa12ac57e762d4a4f8131fb9f1f838a110",
+    "environment": {
+      "QA67_ART": "C:/Users/sh1ft/codex-round8-integration/artifacts/v1/round8-assembly",
+      "QA67_BASE_ART": "C:/Users/sh1ft/codex-round8-integration/artifacts/v1/round8-assembly"
+    }
+  },
+  {
+    "label": "m2-round6-contract-overlay",
+    "command": [
+      "pnpm",
+      "exec",
+      "vitest",
+      "run",
+      "-c",
+      "qa/round6-contract/vitest.config.ts"
+    ],
+    "sourceSha": "5bf64334faf32cfe0d7ec82f3aab138568afdfc5",
+    "dirtyPaths": "?? qa/round6-contract/",
+    "exitCode": 0,
+    "expectedExitCode": 0,
+    "counts": {
+      "passed": 6
+    },
+    "elapsedSeconds": 20.74,
+    "log": "m2-round6-contract-overlay.log",
+    "sha256": "a8748cd1d45d09492449c2f601a333c43504afe628ff6c5983137159b6f3563c",
+    "environment": {
+      "QA67_ART": "C:/Users/sh1ft/codex-round8-integration/artifacts/v1/round8-assembly",
+      "QA67_BASE_ART": "C:/Users/sh1ft/codex-round8-integration/artifacts/v1/round8-assembly"
+    }
+  },
+  {
+    "label": "m2-qa94fc-qualified",
+    "command": [
+      "pnpm",
+      "exec",
+      "vitest",
+      "run",
+      "-c",
+      "qa/v94fc/vitest.config.ts",
+      "--pool=threads",
+      "--poolOptions.threads.singleThread"
+    ],
+    "sourceSha": "5bf64334faf32cfe0d7ec82f3aab138568afdfc5",
+    "dirtyPaths": "?? qa/round6-contract/",
+    "exitCode": 0,
+    "expectedExitCode": 0,
+    "counts": {
+      "passed": 41
+    },
+    "elapsedSeconds": 3.57,
+    "log": "m2-qa94fc-qualified.log",
+    "sha256": "782a2771b5abc76a4eed8fe5138e43aba246795cc838d44ac9a625dacc8692b9",
+    "environment": {
+      "QA67_ART": "C:/Users/sh1ft/codex-round8-integration/artifacts/v1/round8-assembly",
+      "QA67_BASE_ART": "C:/Users/sh1ft/codex-round8-integration/artifacts/v1/round8-assembly"
+    }
+  },
+  {
+    "label": "m2-independent-accounting-knowledge",
+    "command": [
+      "pnpm",
+      "exec",
+      "vitest",
+      "run",
+      "-c",
+      "qa/round5-security/vitest.config.ts",
+      "receipts-156",
+      "knowledge-141"
+    ],
+    "sourceSha": "5bf64334faf32cfe0d7ec82f3aab138568afdfc5",
+    "dirtyPaths": "?? qa/round5-security/\n?? qa/round6-contract/",
+    "exitCode": 0,
+    "expectedExitCode": 0,
+    "counts": {
+      "passed": 23
+    },
+    "elapsedSeconds": 24.6,
+    "log": "m2-independent-accounting-knowledge.log",
+    "sha256": "d5c570e8fa15dabbccb0142839b0df75d150c0f74a063fa0f596bb33b8f6c4e9",
+    "environment": {}
+  },
+  {
+    "label": "m2-independent-receipt-parity",
+    "command": [
+      "pnpm",
+      "exec",
+      "vitest",
+      "run",
+      "-c",
+      "qa/round5-security/vitest.defects.config.ts",
+      "receipt-suppression"
+    ],
+    "sourceSha": "5bf64334faf32cfe0d7ec82f3aab138568afdfc5",
+    "dirtyPaths": "?? qa/round5-security/\n?? qa/round6-contract/",
+    "exitCode": 0,
+    "expectedExitCode": 0,
+    "counts": {
+      "passed": 1
+    },
+    "elapsedSeconds": 6.26,
+    "log": "m2-independent-receipt-parity.log",
+    "sha256": "c8c7e1e7d478cf1af3da918362876e4ab57e383add8dc0ac84d199edbd97ccce",
+    "environment": {}
+  },
+  {
+    "label": "m2-provenance-desired",
+    "command": [
+      "pnpm",
+      "exec",
+      "vitest",
+      "run",
+      "-c",
+      "qa/provenance-controls/vitest.defects.config.ts"
+    ],
+    "sourceSha": "5bf64334faf32cfe0d7ec82f3aab138568afdfc5",
+    "dirtyPaths": "?? qa/round5-security/\n?? qa/round6-contract/",
+    "exitCode": 1,
+    "expectedExitCode": 1,
+    "counts": {
+      "failed": 7,
+      "passed": 2
+    },
+    "elapsedSeconds": 2.36,
+    "log": "m2-provenance-desired.log",
+    "sha256": "df015361bc3c1c99025bd848ee282b4b2dc621e1bf88e0eb1b0aaa3a674be94f",
+    "environment": {}
+  },
+  {
+    "label": "m2-lint-qa-overlays",
+    "command": [
+      "pnpm",
+      "lint"
+    ],
+    "sourceSha": "5bf64334faf32cfe0d7ec82f3aab138568afdfc5",
+    "dirtyPaths": "?? qa/round5-security/\n?? qa/round6-contract/",
+    "exitCode": 1,
+    "expectedExitCode": 0,
+    "counts": {},
+    "elapsedSeconds": 9.2,
+    "log": "m2-lint-qa-overlays.log",
+    "sha256": "07571b45212d60a5e987ca32605ac01abdd9c1c9673fd3add4659422c254f53c",
+    "environment": {}
+  },
+  {
+    "label": "m2-ci-adversarial",
+    "command": [
+      "pnpm",
+      "exec",
+      "vitest",
+      "run",
+      "-c",
+      "qa/verify-ci-verifier/vitest.config.ts",
+      "--maxWorkers=1",
+      "--no-file-parallelism"
+    ],
+    "sourceSha": "5bf64334faf32cfe0d7ec82f3aab138568afdfc5",
+    "dirtyPaths": "?? qa/round6-contract/",
+    "exitCode": 0,
+    "expectedExitCode": 0,
+    "counts": {
+      "passed": 100
+    },
+    "elapsedSeconds": 74.98,
+    "log": "m2-ci-adversarial.log",
+    "sha256": "823596f3355e36577fc23eb40a16222c7cc747ee0cad0295263047d1f884f7c4",
+    "environment": {
+      "CI_QA_BUNDLE_ROOT": "C:/Users/sh1ft/codex-round8-integration/artifacts/v1/round8-assembly",
+      "CI_QA_SHA": "5bf64334faf32cfe0d7ec82f3aab138568afdfc5",
+      "QA67_ART": "C:/Users/sh1ft/codex-round8-integration/artifacts/v1/round8-assembly",
+      "QA67_BASE_ART": "C:/Users/sh1ft/codex-round8-integration/artifacts/v1/round8-assembly"
+    }
+  },
+  {
+    "label": "m2-independent-parity-complete",
+    "command": [
+      "pnpm",
+      "exec",
+      "vitest",
+      "run",
+      "-c",
+      "qa/round5-security/vitest.defects.config.ts",
+      "abandoned-observations",
+      "receipt-suppression"
+    ],
+    "sourceSha": "5bf64334faf32cfe0d7ec82f3aab138568afdfc5",
+    "dirtyPaths": "?? qa/round5-security/\n?? qa/round6-contract/",
+    "exitCode": 0,
+    "expectedExitCode": 0,
+    "counts": {
+      "passed": 4
+    },
+    "elapsedSeconds": 11.83,
+    "log": "m2-independent-parity-complete.log",
+    "sha256": "cb85cdb7f144b237e79c3d6f3fe8f8e69204df375a423dc8cc3642e9248d7195",
+    "environment": {}
+  },
+  {
+    "label": "m2-lint-qa-corrected",
+    "command": [
+      "pnpm",
+      "lint"
+    ],
+    "sourceSha": "5bf64334faf32cfe0d7ec82f3aab138568afdfc5",
+    "dirtyPaths": "?? qa/round5-security/\n?? qa/round6-contract/",
+    "exitCode": 1,
+    "expectedExitCode": 0,
+    "counts": {},
+    "elapsedSeconds": 10.95,
+    "log": "m2-lint-qa-corrected.log",
+    "sha256": "e92204ef8b9aa281c5a84b83fc1b84153ebe685129a0cba1950c60bdf1e8b971",
+    "environment": {}
+  },
+  {
+    "label": "m2-lint-final-overlays",
+    "command": [
+      "pnpm",
+      "lint"
+    ],
+    "sourceSha": "5bf64334faf32cfe0d7ec82f3aab138568afdfc5",
+    "dirtyPaths": "?? qa/round5-security/\n?? qa/round6-contract/",
+    "exitCode": 0,
+    "expectedExitCode": 0,
+    "counts": {},
+    "elapsedSeconds": 8.83,
+    "log": "m2-lint-final-overlays.log",
+    "sha256": "96c475905a2ad9d5cd5d221a77884e168bff8a3318960daf6baa248904b83fca",
+    "environment": {}
+  }
+]

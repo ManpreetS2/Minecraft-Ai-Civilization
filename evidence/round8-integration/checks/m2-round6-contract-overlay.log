@@ -1,0 +1,15 @@
+
+ RUN  v3.2.7 C:/Users/sh1ft/codex-round8-integration/qa/round6-contract
+
+ ✓ replacements.test.ts (6 tests) 15166ms
+   ✓ proposed replacement QA103 deadline deposit_personal: one physical pending receipt, no late success, conservation and no storage projection  3582ms
+   ✓ proposed replacement QA103 deadline withdraw_personal: one physical pending receipt, no late success, conservation and no storage projection  3551ms
+   ✓ proposed replacement QA103 deadline deposit_household: one physical pending receipt, no late success, conservation and no storage projection  3551ms
+   ✓ proposed QA103-I1 replacement: one pending observation, no cancellation wrapper counted as another movement  3551ms
+   ✓ proposed QA78 replacement: cancelled withdrawal retains physical gain and one pending receipt  651ms
+
+ Test Files  1 passed (1)
+      Tests  6 passed (6)
+   Start at  10:46:26
+   Duration  19.75s (transform 1.67s, setup 85ms, collect 3.78s, tests 15.17s, environment 0ms, prepare 287ms)
+

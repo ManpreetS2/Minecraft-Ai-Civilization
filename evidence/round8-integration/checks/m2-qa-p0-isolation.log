@@ -1,0 +1,23 @@
+
+ RUN  v3.2.7 C:/Users/sh1ft/codex-round8-integration/qa/p0-isolation
+
+ ✓ test/p0-knowledge-isolation.test.ts (49 tests) 9155ms
+   ✓ P0-2 undisclosed rival coordinates never enter another community's prompt or site list > coordinates in a south community announcement reach south only; north prompts stay clean  307ms
+   ✓ P0-2 undisclosed rival coordinates never enter another community's prompt or site list > sharing ONE bulletin line with ada discloses only a line cal actually chose, never his other announcement  498ms
+   ✓ P0-3 private messages reach only the recipients actually reached > a partial whisper (client delivered to ada only) gives bea no conversation event, fact or prompt line  305ms
+   ✓ P0-3 private messages reach only the recipients actually reached > a private say to a rival is not heard by either speaker's or hearer's teammate  311ms
+   ✓ P0-4 speech allegations are never promoted into verified facts > the same allegation repeated by two different speakers is still only heard claims (repetition is not corroboration)  313ms
+   ✓ P0-5 another citizen's memory, narrative and summary do not cross citizens or reopened sessions > reopening the database as a fresh manager gives ada none of bea's facts  304ms
+   ✓ P0-6 restart does not expose operator or rival knowledge > operator-only and unlabeled events never appear in any citizen prompt, before or after a restart  552ms
+   ✓ P0-6 restart does not expose operator or rival knowledge > south's community announcement stays out of north prompts after a restart with: COMMUNITIES_JSON dropped  357ms
+   ✓ P0-6 restart does not expose operator or rival knowledge > south's community announcement stays out of north prompts after a restart with: COMMUNITIES_JSON empty array  358ms
+   ✓ P0-6 restart does not expose operator or rival knowledge > south's community announcement stays out of north prompts after a restart with: COMMUNITIES_JSON invalid JSON  354ms
+   ✓ P0-6 restart does not expose operator or rival knowledge > south's community announcement stays out of north prompts after a restart with: ada claimed by the rival (conflict)  357ms
+   ✓ P0-6 restart does not expose operator or rival knowledge > south's community announcement stays out of north prompts after a restart with: rival community renamed  358ms
+   ✓ P0-6 restart does not expose operator or rival knowledge > south's community announcement stays out of north prompts after a restart with: everyone placed in one new community  374ms
+
+ Test Files  1 passed (1)
+      Tests  49 passed (49)
+   Start at  10:45:46
+   Duration  13.27s (transform 1.45s, setup 77ms, collect 3.51s, tests 9.15s, environment 0ms, prepare 189ms)
+

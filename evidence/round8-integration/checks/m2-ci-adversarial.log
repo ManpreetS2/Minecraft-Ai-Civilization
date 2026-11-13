@@ -1,0 +1,36 @@
+
+ RUN  v3.2.7 C:/Users/sh1ft/codex-round8-integration/qa/verify-ci-verifier
+
+ ✓ test/integration-and-honesty.test.ts (24 tests) 63418ms
+   ✓ journal CLI integration: independent real-subprocess controls PER scenario > 1v1 (2 citizens, 6 original attempts and observations) > positive, missing-evidence and forged-evidence controls all execute and behave on an untouched real bundle  1427ms
+   ✓ journal CLI integration: independent real-subprocess controls PER scenario > 1v1 (2 citizens, 6 original attempts and observations) > the control result records the citizen and original attempt/observation counts read from the journal itself  1389ms
+   ✓ journal CLI integration: independent real-subprocess controls PER scenario > 1v1 (2 citizens, 6 original attempts and observations) > a forged receipt makes the helper report FAILED (never READY)  1443ms
+   ✓ journal CLI integration: independent real-subprocess controls PER scenario > 1v1 (2 citizens, 6 original attempts and observations) > a journal with the wrong original attempt count makes the helper report FAILED  1431ms
+   ✓ journal CLI integration: independent real-subprocess controls PER scenario > 2v2 (4 citizens, 12 original attempts and observations) > positive, missing-evidence and forged-evidence controls all execute and behave on an untouched real bundle  1594ms
+   ✓ journal CLI integration: independent real-subprocess controls PER scenario > 2v2 (4 citizens, 12 original attempts and observations) > the control result records the citizen and original attempt/observation counts read from the journal itself  1525ms
+   ✓ journal CLI integration: independent real-subprocess controls PER scenario > 2v2 (4 citizens, 12 original attempts and observations) > a forged receipt makes the helper report FAILED (never READY)  1505ms
+   ✓ journal CLI integration: independent real-subprocess controls PER scenario > 2v2 (4 citizens, 12 original attempts and observations) > a journal with the wrong original attempt count makes the helper report FAILED  1605ms
+   ✓ journal CLI integration: independent real-subprocess controls PER scenario > both scenarios are cross-checked independently by the wrapper and both are recorded  3984ms
+   ✓ journal CLI integration: independent real-subprocess controls PER scenario > a failed required check produces a NONZERO exit: forged 1v1 only (2v2 stays READY, independently)  3837ms
+   ✓ journal CLI integration: independent real-subprocess controls PER scenario > a failed required check produces a NONZERO exit: forged 2v2 only (1v1 stays READY, independently)  4214ms
+   ✓ journal CLI integration: independent real-subprocess controls PER scenario > a stub CLI that always says 'consistent' (exit 0) can never earn the forgery claim  1419ms
+   ✓ process exit codes and honest top-level status > untouched real bundles: exit 0, status OFFLINE_STRUCTURAL_PASS, Paper execution NOT PROVEN  4575ms
+   ✓ process exit codes and honest top-level status > the headline never reads as live acceptance for synthetic evidence  4119ms
+   ✓ process exit codes and honest top-level status > the report separates the four states explicitly  3909ms
+   ✓ process exit codes and honest top-level status > criteria that remain NOT MEASURABLE are reported, with the failing criteria named  3781ms
+   ✓ process exit codes and honest top-level status > contradictory evidence is REJECTED with its own status, headline and nonzero exit (acceptance.json claims live 37/37)  3894ms
+   ✓ process exit codes and honest top-level status > an unprovable/incomplete verification is reported as INCOMPLETE with a nonzero exit (2v2 evidence missing)  2461ms
+   ✓ process exit codes and honest top-level status > removing an action everywhere is rejected as CONTRADICTORY: the unedited validator report still lists it  3825ms
+   ✓ process exit codes and honest top-level status > a pinned receipt file that is missing is an ordinary structural VERIFICATION_FAILED, nonzero (not called contradictory)  3232ms
+   ✓ process exit codes and honest top-level status > a journal edited without recomputing its hash chain is rejected, nonzero (the real CLI also rejects it, so it is CONTRADICTORY)  3885ms
+   ✓ process exit codes and honest top-level status > the Paper / live-model gaps are listed as NOT PROVEN and live execution is never claimed  4088ms
+ ✓ test/workflow-facts.test.ts (12 tests) 9ms
+ ✓ test/tamper-matrix.test.ts (64 tests) 9252ms
+   ✓ T05 [4v] manifest + receipt citizenIds swapped between two actions (journal untouched) > L2: PR #68's journal cross-check rejects it  311ms
+   ✓ T13 [4v] one action removed everywhere (manifest + journal pair) > L2: PR #68's journal cross-check rejects it  358ms
+
+ Test Files  3 passed (3)
+      Tests  100 passed (100)
+   Start at  10:46:51
+   Duration  73.92s (transform 115ms, setup 143ms, collect 168ms, tests 72.68s, environment 0ms, prepare 410ms)
+

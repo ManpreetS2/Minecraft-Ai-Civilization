@@ -1,0 +1,54 @@
+
+ RUN  v3.2.7 C:/Users/sh1ft/codex-round8-integration/qa/provenance-controls
+
+ ❯ defects/provenance-desired.test.ts (9 tests | 7 failed) 98ms
+   × desired behaviour for unimplemented defenses (red = not yet implemented) > G1 plausible fabricated physical journal written by the harness (50 consistent actions, no server witness): must not be authentic 37ms
+     → expected true to be false // Object.is equality
+   × desired behaviour for unimplemented defenses (red = not yet implemented) > G2 a genuine attestation replayed as a second run (no used-session registry): must not be authentic 13ms
+     → expected true to be false // Object.is equality
+   × desired behaviour for unimplemented defenses (red = not yet implemented) > G2 attestation session id differs from the provisioned session: the caller cannot even state the expected session (ValidatorInput has no such field): must not be authentic 8ms
+     → expected true to be false // Object.is equality
+   × desired behaviour for unimplemented defenses (red = not yet implemented) > G3 correct key and digest, journal declares a DIFFERENT world (start-row world fingerprint contradicts the manifest world seed): must not be authentic 7ms
+     → expected true to be false // Object.is equality
+   × desired behaviour for unimplemented defenses (red = not yet implemented) > G4 no session_seal / shutdown row: a crash-truncated journal re-signed at its digest: must not be authentic 7ms
+     → expected true to be false // Object.is equality
+   × desired behaviour for unimplemented defenses (red = not yet implemented) > G4 a single end-of-run signature: no periodic checkpoints exist or are required for a 60-minute run: must not be authentic 6ms
+     → expected true to be false // Object.is equality
+   × desired behaviour for unimplemented defenses (red = not yet implemented) > G6 every decision claims decisionSource 'model' but there are no provider receipts anywhere: must not be authentic 6ms
+     → expected true to be false // Object.is equality
+   ✓ desired behaviour for unimplemented defenses (red = not yet implemented) > G8 two citizens joined under the SAME Minecraft UUID (join rows are not a concept the validator knows): must not be authentic 6ms
+   ✓ desired behaviour for unimplemented defenses (red = not yet implemented) > G8 citizen ids swapped against their join UUIDs (atlas acts under maya's UUID): must not be authentic 7ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 7 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  defects/provenance-desired.test.ts > desired behaviour for unimplemented defenses (red = not yet implemented) > G1 plausible fabricated physical journal written by the harness (50 consistent actions, no server witness): must not be authentic
+ FAIL  defects/provenance-desired.test.ts > desired behaviour for unimplemented defenses (red = not yet implemented) > G2 a genuine attestation replayed as a second run (no used-session registry): must not be authentic
+ FAIL  defects/provenance-desired.test.ts > desired behaviour for unimplemented defenses (red = not yet implemented) > G2 attestation session id differs from the provisioned session: the caller cannot even state the expected session (ValidatorInput has no such field): must not be authentic
+ FAIL  defects/provenance-desired.test.ts > desired behaviour for unimplemented defenses (red = not yet implemented) > G3 correct key and digest, journal declares a DIFFERENT world (start-row world fingerprint contradicts the manifest world seed): must not be authentic
+ FAIL  defects/provenance-desired.test.ts > desired behaviour for unimplemented defenses (red = not yet implemented) > G4 no session_seal / shutdown row: a crash-truncated journal re-signed at its digest: must not be authentic
+ FAIL  defects/provenance-desired.test.ts > desired behaviour for unimplemented defenses (red = not yet implemented) > G4 a single end-of-run signature: no periodic checkpoints exist or are required for a 60-minute run: must not be authentic
+ FAIL  defects/provenance-desired.test.ts > desired behaviour for unimplemented defenses (red = not yet implemented) > G6 every decision claims decisionSource 'model' but there are no provider receipts anywhere: must not be authentic
+AssertionError: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ defects/provenance-desired.test.ts:11:77
+      9|     it(`${s.gap} ${s.name}: must not be authentic`, () => {
+     10|       const r = s.run();
+     11|       expect(r.mode === "real_minecraft" && r.overallStatus === "VERIF…
+       |                                                                             ^
+     12|     });
+     13|   }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/7]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  7 failed | 2 passed (9)
+   Start at  10:47:52
+   Duration  1.02s (transform 200ms, setup 75ms, collect 337ms, tests 98ms, environment 0ms, prepare 204ms)
+

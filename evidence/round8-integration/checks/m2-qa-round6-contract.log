@@ -1,0 +1,23 @@
+X [ERROR] Could not resolve "C:\\Users\\sh1ft\\codex-round8-integration\\qa\\round6-contract\\vitest.config.ts"
+
+failed to load config from C:\Users\sh1ft\codex-round8-integration\qa\round6-contract\vitest.config.ts
+
+⎯⎯⎯⎯⎯⎯⎯ Startup Error ⎯⎯⎯⎯⎯⎯⎯⎯
+Error: Build failed with 1 error:
+error: Could not resolve "C:\\Users\\sh1ft\\codex-round8-integration\\qa\\round6-contract\\vitest.config.ts"
+    at failureErrorWithLog (C:\Users\sh1ft\codex-round8-integration\node_modules\.pnpm\esbuild@0.28.2\node_modules\esbuild\lib\main.js:1752:15)
+    at C:\Users\sh1ft\codex-round8-integration\node_modules\.pnpm\esbuild@0.28.2\node_modules\esbuild\lib\main.js:1211:25
+    at runOnEndCallbacks (C:\Users\sh1ft\codex-round8-integration\node_modules\.pnpm\esbuild@0.28.2\node_modules\esbuild\lib\main.js:1592:45)
+    at buildResponseToResult (C:\Users\sh1ft\codex-round8-integration\node_modules\.pnpm\esbuild@0.28.2\node_modules\esbuild\lib\main.js:1209:7)
+    at C:\Users\sh1ft\codex-round8-integration\node_modules\.pnpm\esbuild@0.28.2\node_modules\esbuild\lib\main.js:1236:16
+    at responseCallbacks.<computed> (C:\Users\sh1ft\codex-round8-integration\node_modules\.pnpm\esbuild@0.28.2\node_modules\esbuild\lib\main.js:886:9)
+    at handleIncomingPacket (C:\Users\sh1ft\codex-round8-integration\node_modules\.pnpm\esbuild@0.28.2\node_modules\esbuild\lib\main.js:941:12)
+    at Socket.readFromStdout (C:\Users\sh1ft\codex-round8-integration\node_modules\.pnpm\esbuild@0.28.2\node_modules\esbuild\lib\main.js:864:7)
+    at Socket.emit (node:events:518:28)
+    at addChunk (node:internal/streams/readable:561:12) {
+  errors: [Getter/Setter],
+  warnings: [Getter/Setter]
+}
+
+
+

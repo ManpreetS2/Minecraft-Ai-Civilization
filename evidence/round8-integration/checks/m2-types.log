@@ -1,0 +1,31 @@
+
+> minecraft-ai-civilization@0.1.0 typecheck C:\Users\sh1ft\codex-round8-integration
+> pnpm -r --if-present typecheck
+
+Scope: 14 of 15 workspace projects
+packages/session-isolation typecheck$ tsc -p tsconfig.json --noEmit
+experiments/evidence-validator typecheck$ tsc -p tsconfig.json --noEmit
+packages/shared typecheck$ tsc -p tsconfig.json --noEmit
+packages/session-isolation typecheck: Done
+packages/shared typecheck: Done
+experiments/evidence-validator typecheck: Done
+packages/memory typecheck$ tsc -p tsconfig.json --noEmit
+packages/minecraft-adapter typecheck$ tsc -p tsconfig.json --noEmit
+packages/minecraft-knowledge typecheck$ tsc -p tsconfig.json --noEmit
+packages/society typecheck$ tsc -p tsconfig.json --noEmit
+packages/society typecheck: Done
+packages/memory typecheck: Done
+packages/minecraft-knowledge typecheck: Done
+packages/minecraft-adapter typecheck: Done
+packages/psychology typecheck$ tsc -p tsconfig.json --noEmit
+packages/skills typecheck$ tsc -p tsconfig.json --noEmit
+packages/psychology typecheck: Done
+packages/skills typecheck: Done
+packages/cognition typecheck$ tsc -p tsconfig.json --noEmit
+packages/cognition typecheck: Done
+packages/agent-core typecheck$ tsc -p tsconfig.json --noEmit
+packages/agent-core typecheck: Done
+apps/orchestrator typecheck$ tsc -p tsconfig.json --noEmit
+experiments/gate-a-provider-readiness typecheck$ tsc -p tsconfig.json --noEmit
+experiments/gate-a-provider-readiness typecheck: Done
+apps/orchestrator typecheck: Done

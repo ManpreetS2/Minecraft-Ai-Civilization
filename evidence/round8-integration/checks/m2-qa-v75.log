@@ -1,0 +1,54 @@
+
+ RUN  v3.2.7 C:/Users/sh1ft/codex-round8-integration/qa/v75
+
+stdout | test/adv75-residuals.test.ts > A. legitimate evidence must still be accepted (regression hunt) > recorder pre-roll: a journal that starts before the signed capture window — characterised at 4 s, 30 s and 90 s
+PREROLL accepted: {"4s":true,"30s":false,"90s":false}
+
+ ✓ test/adv75-scenarios.test.ts (10 tests) 15ms
+stdout | test/adv75-residuals.test.ts > B. KNOWN LIMIT introduced by two-way reconciliation: a legitimate loss is indistinguishable from a forged gather > 3 verified gathers, 2 logs legitimately deposited in a chest (no journal row can express it): hard UNEXPLAINED_LOSS violation, run fails
+LEGIT_DEPOSIT status= VIOLATIONS_DETECTED codes= INVENTORY_CONTINUITY_DISRUPTION,UNEXPLAINED_LOSS mode= offline_simulated
+
+stdout | test/adv75-residuals.test.ts > C. residual bypass probes (signed, genuine raw lines; caller-controlled parsed rows / windows) > [QA75-M1] a signed window shifted 30 minutes later than the journal (overlapping only its second half) must not be proven
+WINDOW_SHIFT_30MIN mode= offline_simulated status= VIOLATIONS_DETECTED
+
+stdout | test/adv75-residuals.test.ts > C. residual bypass probes (signed, genuine raw lines; caller-controlled parsed rows / windows) > [QA75-M1] a signed window that overlaps only the journal's final second (starts 3599 s late) must not be proven
+WINDOW_LAST_SECOND mode= offline_simulated
+
+stdout | test/adv75-residuals.test.ts > C. residual bypass probes (signed, genuine raw lines; caller-controlled parsed rows / windows) > [QA75-M2] journalRows that OMIT genuinely-signed rows (a ghost citizen's action) must be rejected as not matching the signed raw lines
+OMIT_ROWS full= PHANTOM_CITIZEN_ACTION,PHANTOM_CITIZEN_ACTION,PHANTOM_CITIZEN_ACTION | omitted: status= VIOLATIONS_DETECTED mode= offline_simulated codes= RAW_JOURNAL_ROW_MISMATCH,RAW_JOURNAL_ROW_MISMATCH,RAW_JOURNAL_ROW_MISMATCH,RAW_JOURNAL_ROW_MISMATCH,PHANTOM_CITIZEN_ACTION,PHANTOM_CITIZEN_ACTION,PHANTOM_CITIZEN_ACTION
+
+stdout | test/adv75-residuals.test.ts > C. residual bypass probes (signed, genuine raw lines; caller-controlled parsed rows / windows) > [QA75-M3] smoothing a genuine tick regression in the parsed rows (raw lines untouched and signed) must be detected
+SMOOTH_TICKS honest.mode= offline_simulated forged.mode= offline_simulated forged.status= VIOLATIONS_DETECTED codes= RAW_JOURNAL_ROW_MISMATCH,DURATION_EVIDENCE_DEFICIT
+
+stdout | test/adv75-residuals.test.ts > C. residual bypass probes (signed, genuine raw lines; caller-controlled parsed rows / windows) > rewriting an attempt's citizenId is explicitly rejected by the raw-row binding
+REWRITE_CITIZEN status= VIOLATIONS_DETECTED codes= RAW_JOURNAL_ROW_MISMATCH,RAW_JOURNAL_ROW_MISMATCH,PHANTOM_CITIZEN_ACTION,PHANTOM_CITIZEN_ACTION,PHANTOM_CITIZEN_ACTION
+
+stdout | test/adv75-residuals.test.ts > C. residual bypass probes (signed, genuine raw lines; caller-controlled parsed rows / windows) > [QA75-M3] a failed 'move' (raw ending position 40 blocks from the target) cannot be turned into a VERIFIED move by editing the parsed position
+FORGED_MOVE honest.verified= 0 forged.verified= 0 codes= RAW_JOURNAL_ROW_MISMATCH,UNVERIFIED_ACTION_CLAIM
+
+stdout | test/adv75-residuals.test.ts > C. residual bypass probes (signed, genuine raw lines; caller-controlled parsed rows / windows) > [QA75-L1] a forged FIRST observation whose before-inventory is non-empty (40→41) while the physical final inventory is 1 must be flagged
+FORGED_FIRST_OBS status= VIOLATIONS_DETECTED codes= INVENTORY_CONTINUITY_DISRUPTION mode= offline_simulated
+
+stdout | test/adv75-residuals.test.ts > C. residual bypass probes (signed, genuine raw lines; caller-controlled parsed rows / windows) > [QA75-L2] mode must not read real_minecraft while the same report carries ERROR violations
+MODE_VS_VIOLATIONS mode= offline_simulated status= VIOLATIONS_DETECTED codes= ROSTER_CONFLICT,ROSTER_CONFLICT,ROSTER_CONFLICT
+
+stdout | test/adv75-crypto.test.ts > small-order and non-canonical public keys (independently enumerated) > enumerated 14 encodings of the 8 torsion points (canonical, sign-flipped, non-canonical y+p): every one is rejected as a trust root via hex, base64, PEM and KeyObject
+TORSION_ENCODINGS 14 ACCEPTED 0 
+
+ ✓ test/adv75-crypto.test.ts (13 tests) 771ms
+stdout | test/adv75-residuals.test.ts > C. residual bypass probes (signed, genuine raw lines; caller-controlled parsed rows / windows) > validation cost at 20,000 rows is measured (binding is O(n^2); 20k rows < 10 s)
+PERF_20K_ROWS ms= 544
+
+stdout | test/adv75-residuals.test.ts > E. CLI headline for simulated journals > [QA75-L5] CLI run WITH a manifest on the simulated sample fixture must not headline VERIFIED
+CLI_WITH_MANIFEST {"s":"NOT_PROVEN","m":"offline_simulated"}
+
+ ✓ test/adv75-residuals.test.ts (28 tests) 2913ms
+   ✓ C. residual bypass probes (signed, genuine raw lines; caller-controlled parsed rows / windows) > validation cost at 20,000 rows is measured (binding is O(n^2); 20k rows < 10 s)  752ms
+   ✓ E. CLI headline for simulated journals > journal-only CLI run on the simulated sample stays NOT_PROVEN and a report was really produced  1025ms
+   ✓ E. CLI headline for simulated journals > [QA75-L5] CLI run WITH a manifest on the simulated sample fixture must not headline VERIFIED  924ms
+
+ Test Files  3 passed (3)
+      Tests  51 passed (51)
+   Start at  10:46:21
+   Duration  3.80s (transform 279ms, setup 232ms, collect 1.01s, tests 3.70s, environment 1ms, prepare 628ms)
+

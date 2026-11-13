@@ -1,0 +1,37 @@
+
+> minecraft-ai-civilization@0.1.0 lint C:\Users\sh1ft\codex-round8-integration
+> eslint .
+
+
+C:\Users\sh1ft\codex-round8-integration\qa\round5-security\defects\receipt-suppression.test.ts
+  5:33  error  'describe' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+C:\Users\sh1ft\codex-round8-integration\qa\round5-security\scripts\run-qualified.mjs
+  3:11   error  'setTimeout' is not defined    no-undef
+  3:30   error  'console' is not defined       no-undef
+  3:68   error  'process' is not defined       no-undef
+  4:52   error  'process' is not defined       no-undef
+  7:1    error  'console' is not defined       no-undef
+  7:37   error  'process' is not defined       no-undef
+  7:113  error  'clearTimeout' is not defined  no-undef
+  7:148  error  'process' is not defined       no-undef
+
+C:\Users\sh1ft\codex-round8-integration\qa\round5-security\test\knowledge-141.test.ts
+   1:1   warning  Unused eslint-disable directive (no problems were reported from '@typescript-eslint/no-explicit-any')
+  13:10  error    'CitizenMind' is defined but never used. Allowed unused vars must match /^_/u                          @typescript-eslint/no-unused-vars
+  14:10  error    'CognitiveStore' is defined but never used. Allowed unused vars must match /^_/u                       @typescript-eslint/no-unused-vars
+  14:26  error    'itemReceivedEvent' is defined but never used. Allowed unused vars must match /^_/u                    @typescript-eslint/no-unused-vars
+  14:45  error    'observersForEvent' is defined but never used. Allowed unused vars must match /^_/u                    @typescript-eslint/no-unused-vars
+  14:64  error    'tryAdaptSimEvent' is defined but never used. Allowed unused vars must match /^_/u                     @typescript-eslint/no-unused-vars
+  15:10  error    'createCommunityDirectory' is defined but never used. Allowed unused vars must match /^_/u             @typescript-eslint/no-unused-vars
+  17:10  error    'hearersOf' is defined but never used. Allowed unused vars must match /^_/u                            @typescript-eslint/no-unused-vars
+  17:21  error    'scopeSettlementForCitizen' is defined but never used. Allowed unused vars must match /^_/u            @typescript-eslint/no-unused-vars
+  17:48  error    'sitesKnownTo' is defined but never used. Allowed unused vars must match /^_/u                         @typescript-eslint/no-unused-vars
+  17:62  error    'speakNearby' is defined but never used. Allowed unused vars must match /^_/u                          @typescript-eslint/no-unused-vars
+  19:10  error    'listDiscoveredSites' is defined but never used. Allowed unused vars must match /^_/u                  @typescript-eslint/no-unused-vars
+  19:31  error    'rememberDiscoveredSite' is defined but never used. Allowed unused vars must match /^_/u               @typescript-eslint/no-unused-vars
+
+✖ 22 problems (21 errors, 1 warning)
+  0 errors and 1 warning potentially fixable with the `--fix` option.
+
+ ELIFECYCLE  Command failed with exit code 1.

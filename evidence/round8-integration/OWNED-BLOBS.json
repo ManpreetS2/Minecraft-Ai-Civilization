@@ -1,0 +1,38 @@
+[
+  {
+    "path": "packages/skills/src/inventory-service.ts",
+    "source": "e16e07e38137bacc97fc4e578aca5ecec02d16f4",
+    "sourceBlob": "6ce5b94af3954691556993d27f213da8e1fd7a23",
+    "candidateBlob": "6ce5b94af3954691556993d27f213da8e1fd7a23"
+  },
+  {
+    "path": "packages/skills/src/context.ts",
+    "source": "e16e07e38137bacc97fc4e578aca5ecec02d16f4",
+    "sourceBlob": "0e6a54f4e51742e9fa5fdfc05383a91627f0793c",
+    "candidateBlob": "0e6a54f4e51742e9fa5fdfc05383a91627f0793c"
+  },
+  {
+    "path": "packages/agent-core/src/executor.ts",
+    "source": "e16e07e38137bacc97fc4e578aca5ecec02d16f4",
+    "sourceBlob": "ee1b4a7367a4d91c61f82ab73a12e83441d4bcb7",
+    "candidateBlob": "ee1b4a7367a4d91c61f82ab73a12e83441d4bcb7"
+  },
+  {
+    "path": "packages/agent-core/src/home-ops.ts",
+    "source": "e16e07e38137bacc97fc4e578aca5ecec02d16f4",
+    "sourceBlob": "454a5f3bb2f311518b8c7f705b9b88a38426bfae",
+    "candidateBlob": "454a5f3bb2f311518b8c7f705b9b88a38426bfae"
+  },
+  {
+    "path": "packages/agent-core/src/manager.ts",
+    "source": "e16e07e38137bacc97fc4e578aca5ecec02d16f4",
+    "sourceBlob": "96277ae8f7cb1a5be7205d957851af3c0f41b4e3",
+    "candidateBlob": "96277ae8f7cb1a5be7205d957851af3c0f41b4e3"
+  },
+  {
+    "path": "experiments/evidence-validator/src/hash-chain-verifier.ts",
+    "source": "e31bcb4ec055bace24e29bb4d0346bc932057930",
+    "sourceBlob": "5f42b3131ca51997b4aff76a2ab1b77459424b41",
+    "candidateBlob": "5f42b3131ca51997b4aff76a2ab1b77459424b41"
+  }
+]

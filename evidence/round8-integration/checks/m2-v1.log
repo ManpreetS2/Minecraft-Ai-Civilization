@@ -1,0 +1,47 @@
+
+> minecraft-ai-civilization@0.1.0 test:v1 C:\Users\sh1ft\codex-round8-integration
+> vitest run --config tools/vitest.config.ts
+
+
+ RUN  v3.2.7 C:/Users/sh1ft/codex-round8-integration
+
+ ✓ tools/v1-integration/branches.test.ts (2 tests) 5ms
+ ✓ tools/v1-integration/manifest.test.ts (13 tests) 11ms
+ ✓ tools/v1-acceptance/engine.test.ts (9 tests) 64ms
+ ✓ tools/v1-integration/validator-adapter.test.ts (6 tests) 6ms
+ ✓ tools/v1-integration/evidence-contract.test.ts (50 tests) 305ms
+ ✓ tools/v1-integration/journal-cross-check.test.ts (27 tests) 437ms
+ ✓ tools/v1-integration/regressions.test.ts (5 tests) 4ms
+ ✓ tools/ci/offline-acceptance.test.ts (25 tests) 1089ms
+ ✓ tools/v1-integration/preflight.test.ts (10 tests) 2698ms
+   ✓ read-only preflight blocks unsafe startup > accepts matching offline configuration and records binary versions  478ms
+   ✓ read-only preflight blocks unsafe startup > refuses port before startup callback  309ms
+   ✓ read-only preflight blocks unsafe startup > refuses host before startup callback  322ms
+ ✓ tools/v1-integration/integrated-chest-adapter.test.ts (1 test) 176ms
+ ✓ tools/v1-integration/experiment-identity.test.ts (4 tests) 39ms
+ ✓ tools/ci/journal-execution.test.ts (2 tests) 3652ms
+   ✓ executes the real journal CLI and its forged/missing controls without mutating original artifacts  1974ms
+   ✓ refuses to report verification success when the real journal CLI rejects the input  1677ms
+ ✓ tools/ci/evidence-hardening.test.ts (66 tests) 7329ms
+   ✓ PR #72 tamper matrix on real bundles > every class the original audit found accepted (13 of 26) is now rejected on both real bundles  921ms
+   ✓ per-scenario journal CLI controls on the committed real bundles (real subprocesses) > 1v1: 2 citizens / 6 attempts / 6 observations: positive, missing-evidence and forged-evidence controls  1528ms
+   ✓ per-scenario journal CLI controls on the committed real bundles (real subprocesses) > 2v2: 4 citizens / 12 attempts / 12 observations: positive, missing-evidence and forged-evidence controls  1677ms
+stderr | tools/v1-integration/combined-cancellation.test.ts > discards actual delayed provider replies after citizen death and manager shutdown while preserving memory
+[shutdown] drain incomplete: attempted=4 remaining=2 timedOut=true
+
+ ✓ tools/v1-integration/combined-cancellation.test.ts (2 tests) 11768ms
+   ✓ reopens partial construction after cancellation during delayed navigation without late placement  572ms
+   ✓ discards actual delayed provider replies after citizen death and manager shutdown while preserving memory  11194ms
+ ✓ tools/v1-integration/combined-journal.test.ts (2 tests) 20962ms
+   ✓ cross-checks 2 citizens' actual recorded actions without replacing IDs  7516ms
+   ✓ cross-checks 4 citizens' actual recorded actions without replacing IDs  13445ms
+ ✓ tools/v1-integration/scenario.test.ts (4 tests) 23933ms
+   ✓ offline composition scenario > routes 2 citizens through scripted models and preserves private memory after reopening disposable SQLite  7485ms
+   ✓ offline composition scenario > routes 4 citizens through scripted models and preserves private memory after reopening disposable SQLite  13376ms
+   ✓ offline composition scenario > exposes the lower composition root createBody trust boundary without network access  3070ms
+
+ Test Files  16 passed (16)
+      Tests  228 passed (228)
+   Start at  10:41:17
+   Duration  27.83s (transform 3.03s, setup 1.43s, collect 18.05s, tests 72.48s, environment 3ms, prepare 4.95s)
+

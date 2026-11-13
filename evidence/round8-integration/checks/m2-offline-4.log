@@ -1,0 +1,5 @@
+
+> minecraft-ai-civilization@0.1.0 v1:offline C:\Users\sh1ft\codex-round8-integration
+> tsx tools/v1-integration/cli.ts "4" "artifacts/v1/round8-assembly/scenario-4"
+
+Offline 4-citizen scripted rehearsal at 5bf64334faf32cfe0d7ec82f3aab138568afdfc5. Bundle: C:\Users\sh1ft\codex-round8-integration\artifacts\v1\round8-assembly\scenario-4. Journal: C:\Users\sh1ft\codex-round8-integration\artifacts\v1\round8-assembly\scenario-4\operator.jsonl. Journal: JOURNAL CONSISTENT. Live authenticity: NOT PROVEN. Gemini: NOT_PROVEN.
