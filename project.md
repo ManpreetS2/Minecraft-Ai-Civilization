@@ -2,6 +2,16 @@
 
 > **Status:** Long-term design and active engineering plan. Features described below are goals unless explicitly labeled verified. Current locked first-demo direction: October 31, 2026 — 2v2 emergent rival civilizations. Dated checkpoints below are historical snapshots, not continuously verified status.
 
+## 🚨 PRIMARY PLATFORM POLICY — WINDOWS FIRST (OWNER-LOCKED NOVEMBER 13, 2026)
+
+**WINDOWS HAS ALWAYS BEEN THE PRIMARY DEVELOPMENT, INTEGRATION, TESTING, AND MINECRAFT PAPER EXECUTION PLATFORM FOR THIS PROJECT. macOS IS ONLY A SECONDARY DEVELOPMENT / EXPERIMENTAL TEST GROUND — NOT THE REQUIRED TEST HOST.**
+
+**Binding requirements:** The primary acceptance path, including Gate A disposable-world Paper smoke and subsequent real 1v1/2v2 verification, must work on the owner's Windows machine. macOS may be used for supplementary development, isolated experiments, and cross-platform checks; macOS-only tooling or QA is **not** a substitute for Windows acceptance and must **never** silently turn into a mandatory gate. Any older macOS-only operator package is a temporary limitation to be repaired for Windows, **not** a change of project platform.
+
+**Safety stays mandatory on Windows:** Port process ownership, working-directory / `session.lock` verification, disposable-world isolation, evidence provenance, credential/budget safeguards, and fail-closed refusal behavior to an independently reviewed Windows-native implementation. **Do not bypass or weaken security checks to make the smoke run.** No real Paper execution, paid inference, protected-world changes, or protected merges are authorized solely by this platform decision; retain the normal explicit authorization and evidence gates.
+
+**Precedence:** This owner-locked Windows-first policy overrides any conflicting platform assumptions in earlier agent prompts, macOS-focused smoke instructions, draft PRs, or archived plans. Do not require the owner to switch to a Mac to test the project.
+
 **Core question:** What happens when independent persistent AI citizens, with different dispositions, survival needs and limited knowledge, must live together in a physically consequential Minecraft world long enough to create (or fail to create) a society?
 
 **Full design history:** [Master design migrated from Google Docs](docs/master-design-google-doc-mirror.md). The archive includes the full source plan, older proposals, implementation notes and references. **This shorter charter governs newer decisions where the historical plan disagrees.**
