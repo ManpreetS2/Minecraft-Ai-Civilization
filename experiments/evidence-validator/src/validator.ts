@@ -1,4 +1,6 @@
-import { journalAttemptSchema } from "./schemas.js";
+import { adapterBinding } from "./recorder-adapter.js";
+import { createHash } from "node:crypto";
+import { journalAttemptSchema, journalRowSchema, projectKnownFields } from "./schemas.js";
 import { verifyHashChain } from "./hash-chain-verifier.js";
 import { verifySingleAction } from "./action-verifier.js";
 import { auditInformationBoundaries, buildDirectory } from "./information-verifier.js";
@@ -83,6 +85,18 @@ export type ValidatorInput = {
 };
 
 export function validateExperimentEvidence(input: ValidatorInput): ValidationReport {
+  try {
+    return validateEvidence(input);
+  } catch {
+    const report = validateEvidence({});
+    report.violations.push({ code: "VALIDATOR_INTERNAL_ERROR", description: "Malformed evidence could not be safely processed", severity: "ERROR" });
+    report.mode = "offline_simulated";
+    report.overallStatus = "VIOLATIONS_DETECTED";
+    return report;
+  }
+}
+
+function validateEvidence(input: ValidatorInput): ValidationReport {
   const violations: Array<{
     code: string;
     citizenId?: string;
@@ -139,46 +153,97 @@ export function validateExperimentEvidence(input: ValidatorInput): ValidationRep
     }
   }
 
-  // QA67-M4 / QA75-M2 / QA75-M3: caller-supplied journalRows vs rawJournalLines bidirectional binding
+  // Validate authenticated known fields before any consumer sees them. Unknown kinds
+  // remain in the authenticated byte stream but never become semantic evidence.
   if (rawParsed.length > 0) {
-    if (journalRows.length !== rawParsed.length) {
-      violations.push({
-        code: "RAW_JOURNAL_ROW_MISMATCH",
-        description: `journalRows count (${journalRows.length}) does not match rawJournalLines count (${rawParsed.length}). Signed rows must not be omitted or injected.`,
-        severity: "ERROR",
-      });
-    }
-
-    for (let i = 0; i < rawParsed.length; i++) {
-      const raw = rawParsed[i]!;
-      const row = journalRows[i];
-      if (!row) {
-        violations.push({
-          code: "RAW_JOURNAL_ROW_MISMATCH",
-          citizenId: raw.citizenId as string | undefined,
-          description: `Raw journal line seq ${raw.seq} (${raw.kind}) is omitted from journalRows.`,
-          severity: "ERROR",
-        });
+    const validRows: JournalRow[] = [];
+    const bindingRows: Array<Record<string, unknown>> = [];
+    const rowExtraKeys: Set<string>[] = [];
+    const bindingRaw: Array<Record<string, unknown>> = [];
+    const extras = new Map<string, number>();
+    for (const raw of rawParsed) {
+      if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+        violations.push({ code: "RAW_JOURNAL_SCHEMA_VIOLATION", description: "Raw journal row must be an object", severity: "ERROR" });
         continue;
       }
-
-      const rowAny = row as unknown as Record<string, unknown>;
-
-      // Bind the complete row, including identity, roster, optional and future fields.
-      const diverges = !sameJournalRow(raw, rowAny);
-
-      if (diverges) {
-        violations.push({
-          code: "RAW_JOURNAL_ROW_MISMATCH",
-          citizenId: (raw.citizenId as string) ?? (rowAny.citizenId as string),
-          description: `journalRow seq ${row.seq} (${row.kind}) diverges from signed rawJournalLines evidence.`,
-          severity: "ERROR",
-        });
+      if (typeof raw.kind !== "string" || raw.kind.length === 0) {
+        violations.push({ code: "RAW_JOURNAL_SCHEMA_VIOLATION", description: `Raw journal seq ${raw.seq} has malformed kind`, severity: "ERROR" });
+        continue;
       }
+      const projected = projectKnownFields(raw.kind, raw);
+      if (!projected) {
+        notProven.push({ code: "UNKNOWN_ROW_KIND", description: `Unknown authenticated row kind '${String(raw.kind)}'`, missingFields: ["known_kind"] });
+        continue;
+      }
+      const unknownKeys = Object.keys(raw).filter((key) => !Object.hasOwn(projected, key));
+      let bounded = unknownKeys.length <= 32;
+      let bytes = 2; // Serialized metadata object delimiters.
+      for (const [index, key] of unknownKeys.entries()) {
+        extras.set(key, (extras.get(key) ?? 0) + 1);
+        bytes += Buffer.byteLength(JSON.stringify(key)) + 1 + (index > 0 ? 1 : 0);
+        const stack: Array<{ value: unknown; depth: number }> = [{ value: raw[key], depth: 1 }];
+        while (bounded && stack.length) {
+          const { value, depth } = stack.pop()!;
+          if (depth > 8) { bounded = false; break; }
+          if (value !== null && typeof value === "object") {
+            const entries = Object.entries(value);
+            bytes += 2 + Math.max(0, entries.length - 1);
+            for (const [nestedKey, entry] of entries) {
+              if (!Array.isArray(value)) bytes += Buffer.byteLength(JSON.stringify(nestedKey)) + 1;
+              if (bytes > 4096) { bounded = false; break; }
+              stack.push({ value: entry, depth: depth + 1 });
+            }
+          } else bytes += Buffer.byteLength(JSON.stringify(value));
+          if (bytes > 4096) bounded = false;
+        }
+        if (!bounded) break;
+      }
+      if (!bounded) violations.push({ code: "RAW_JOURNAL_RESOURCE_LIMIT", description: `Raw journal seq ${raw.seq} metadata exceeds key, byte or depth limit`, severity: "ERROR" });
+      const result = journalRowSchema.safeParse(projected);
+      // Bind even malformed known rows when the library supplies them. Adapter
+      // quarantine cannot convert invalid signed evidence into a clean run.
+      bindingRows.push(projected);
+      bindingRaw.push(raw);
+      rowExtraKeys.push(new Set(unknownKeys));
+      if (!result.success) {
+        violations.push({ code: "RAW_JOURNAL_SCHEMA_VIOLATION", description: `Raw journal seq ${raw.seq} (${raw.kind}) violates known schema`, severity: "ERROR" });
+        if (raw.kind === "action_attempt" && !journalAttemptSchema.shape.decisionSource.safeParse(raw.decisionSource).success)
+          violations.push({ code: "INVALID_ACTION_DECISION_SOURCE", description: "Signed action_attempt has an unsupported decisionSource.", severity: "ERROR" });
+        continue;
+      }
+      validRows.push(result.data);
     }
-
-    // Downstream decisions use authenticated raw values, never a divergent caller copy.
-    journalRows = rawParsed as unknown as JournalRow[];
+    for (const [key, count] of extras) {
+      // Unrecognized provenance claims remain inert. Fingerprint their names so
+      // audits can detect changes without echoing untrusted authority claims.
+      const label = /provider|genuine|auth|model|provenance/i.test(key)
+        ? `claim-sha256:${createHash("sha256").update(key).digest("hex")}`
+        : key;
+      notProven.push({ code: "UNKNOWN_SIGNED_FIELD", description: `Authenticated inert field '${label}' occurs ${count} time(s)`, missingFields: [label] });
+    }
+    if (journalRows.length !== bindingRows.length) violations.push({ code: "RAW_JOURNAL_ROW_MISMATCH", description: "Known signed row count differs from caller rows", severity: "ERROR" });
+    for (let i = 0; i < bindingRows.length; i++) {
+      const supplied = journalRows[i] as unknown as Record<string, unknown> | undefined;
+      const original = supplied && typeof supplied === "object" ? adapterBinding(supplied) : undefined;
+      const parsed = original && supplied
+        ? Object.fromEntries([...Object.entries(original).filter(([key]) => rowExtraKeys[i]!.has(key)), ...Object.entries(supplied)])
+        : supplied;
+      // Library callers may supply authenticated extras too; strip only extras
+      // actually present in the raw row. Caller-injected fields still fail.
+      let comparable = parsed;
+      if (parsed && typeof parsed === "object") {
+        comparable = Object.fromEntries(Object.entries(parsed).filter(([key]) =>
+          !rowExtraKeys[i]!.has(key)));
+      }
+      const metadataMatches = [...rowExtraKeys[i]!].every((key) => {
+        try { return Object.hasOwn(parsed!, key) && JSON.stringify(canonicalJson(parsed![key])) === JSON.stringify(canonicalJson(bindingRaw[i]![key])); }
+        catch { return false; }
+      });
+      if (!metadataMatches || !comparable || !sameJournalRow(bindingRows[i]!, comparable)) violations.push({ code: "RAW_JOURNAL_ROW_MISMATCH", description: `Known signed row ${i + 1} diverges from caller rows`, severity: "ERROR" });
+    }
+    journalRows = validRows;
+    // Only validated projections participate in identity and observation logic.
+    rawParsed.splice(0, rawParsed.length, ...validRows);
   }
 
   // Start rows for identity resolution
@@ -304,7 +369,7 @@ export function validateExperimentEvidence(input: ValidatorInput): ValidationRep
     ? input.manifest.citizens.map((c: { id: string }) => c.id)
     : undefined;
   const startRoster =
-    startRow?.citizens && startRow.citizens.length > 0 ? startRow.citizens : undefined;
+    Array.isArray(startRow?.citizens) && startRow.citizens.length > 0 ? startRow.citizens : undefined;
   const callerRoster = input.citizens && input.citizens.length > 0 ? input.citizens : undefined;
 
   if (startRoster && callerRoster) {
@@ -749,7 +814,7 @@ export function validateExperimentEvidence(input: ValidatorInput): ValidationRep
   let overallStatus: OverallValidationStatus;
   if (violations.length > 0) {
     overallStatus = "VIOLATIONS_DETECTED";
-  } else if (notProven.length > 0 || actionVerifications.length === 0 || !hashChainAudit.valid) {
+  } else if (notProven.some((item) => item.code !== "UNKNOWN_SIGNED_FIELD") || actionVerifications.length === 0 || !hashChainAudit.valid) {
     overallStatus = "NOT_PROVEN";
   } else {
     overallStatus = "VERIFIED";

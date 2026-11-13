@@ -178,7 +178,7 @@ export function verifySingleAction(
     } else {
       const itemConsumed =
         getCount(observation.beforeInventory, item) > getCount(observation.afterInventory, item);
-      const matchingWorldChange = observation.worldChanges.some(
+      const matchingWorldChange = Array.isArray(observation.worldChanges) && observation.worldChanges.some(
         (change) =>
           change.after === item &&
           change.before !== change.after &&

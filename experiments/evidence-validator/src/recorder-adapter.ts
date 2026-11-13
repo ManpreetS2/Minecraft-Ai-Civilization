@@ -31,7 +31,7 @@
  */
 
 import { createHash } from "node:crypto";
-import { journalRowSchema } from "./schemas.js";
+import { journalRowSchema, projectKnownFields } from "./schemas.js";
 import type { JournalRow, PersistentFactItem } from "./schemas.js";
 import type { MissingEvidenceItem } from "./types.js";
 
@@ -78,165 +78,28 @@ export function adaptRecorderJournal(rawLines: readonly string[]): RecorderAdapt
       continue;
     }
 
-    const kind = parsed.kind as string | undefined;
-
-    // Strip fields that do not exist in the validator schema (e.g., future recorder additions)
-    // but KEEP all validator-schema fields.  We rebuild a clean object so .strict() doesn't
-    // reject unknown keys from the recorder.
-    if (kind === "action_attempt") {
-      if (!("originPosition" in parsed) || parsed.originPosition === undefined) {
-        missingOriginPosition = true;
-      }
-      // Construct a clean attempt record (no extra fields beyond the schema)
-      const clean: Record<string, unknown> = {
-        kind: "action_attempt",
-        experimentId: parsed.experimentId,
-        seq: parsed.seq,
-        at: parsed.at,
-        previousHash: parsed.previousHash,
-        hash: parsed.hash,
-        citizenId: parsed.citizenId,
-        attemptId: parsed.attemptId,
-        action: parsed.action,
-        decisionSource: parsed.decisionSource,
-        decisionEventId: parsed.decisionEventId,
-      };
-      if (parsed.expectedItem !== undefined) clean.expectedItem = parsed.expectedItem;
-      if (parsed.target !== undefined) clean.target = parsed.target;
-      if (parsed.range !== undefined) clean.range = parsed.range;
-      if (parsed.originPosition !== undefined) clean.originPosition = parsed.originPosition;
-
-      const result = journalRowSchema.safeParse(clean);
-      if (result.success) {
-        journalRows.push(result.data);
-        outputLines.push(trimmed); // Preserve original line for hash-chain integrity
-      } else {
-        notProven.push({
-          code: "RECORDER_SCHEMA_MISMATCH_ATTEMPT",
-          description: `action_attempt row failed validator schema: ${result.error.message.slice(0, 128)}`,
-          missingFields: result.error.issues.map((i) => i.path.join(".")),
-        });
-      }
-    } else if (kind === "action_observation") {
-      if (!("toolDurabilityBefore" in parsed) || parsed.toolDurabilityBefore === undefined) {
-        missingToolDurability = true;
-      }
-      const clean: Record<string, unknown> = {
-        kind: "action_observation",
-        experimentId: parsed.experimentId,
-        seq: parsed.seq,
-        at: parsed.at,
-        previousHash: parsed.previousHash,
-        hash: parsed.hash,
-        citizenId: parsed.citizenId,
-        attemptId: parsed.attemptId,
-        verified: parsed.verified,
-        successReported: parsed.successReported,
-        beforeInventory: parsed.beforeInventory ?? {},
-        afterInventory: parsed.afterInventory ?? {},
-        worldChanges: parsed.worldChanges ?? [],
-      };
-      if (parsed.position !== undefined) clean.position = parsed.position;
-      if (parsed.hungerBefore !== undefined) clean.hungerBefore = parsed.hungerBefore;
-      if (parsed.hungerAfter !== undefined) clean.hungerAfter = parsed.hungerAfter;
-      if (parsed.healthBefore !== undefined) clean.healthBefore = parsed.healthBefore;
-      if (parsed.healthAfter !== undefined) clean.healthAfter = parsed.healthAfter;
-      if (parsed.authorizedRecipients !== undefined)
-        clean.authorizedRecipients = parsed.authorizedRecipients;
-      if (parsed.failureCode !== undefined) clean.failureCode = parsed.failureCode;
-      if (parsed.toolDurabilityBefore !== undefined)
-        clean.toolDurabilityBefore = parsed.toolDurabilityBefore;
-      if (parsed.toolDurabilityAfter !== undefined)
-        clean.toolDurabilityAfter = parsed.toolDurabilityAfter;
-
-      const result = journalRowSchema.safeParse(clean);
-      if (result.success) {
-        journalRows.push(result.data);
-        outputLines.push(trimmed); // Preserve original line for hash-chain integrity
-      } else {
-        notProven.push({
-          code: "RECORDER_SCHEMA_MISMATCH_OBSERVATION",
-          description: `action_observation row failed validator schema: ${result.error.message.slice(0, 128)}`,
-          missingFields: result.error.issues.map((i) => i.path.join(".")),
-        });
-      }
-    } else if (kind === "tick") {
-      if (
-        !("serverGameTick" in parsed) ||
-        parsed.serverGameTick === undefined ||
-        parsed.serverGameTick === null
-      ) {
-        missingServerGameTick = true;
-      }
-      const clean: Record<string, unknown> = {
-        kind: "tick",
-        experimentId: parsed.experimentId,
-        seq: parsed.seq,
-        at: parsed.at,
-        previousHash: parsed.previousHash,
-        hash: parsed.hash,
-        durationMs: parsed.durationMs,
-      };
-      if (parsed.measuredTps !== undefined) clean.measuredTps = parsed.measuredTps;
-      if (parsed.serverGameTick !== undefined) clean.serverGameTick = parsed.serverGameTick;
-      if (parsed.simulatedStep !== undefined) clean.simulatedStep = parsed.simulatedStep;
-      if (parsed.tickProvenance !== undefined) clean.tickProvenance = parsed.tickProvenance;
-
-      const result = journalRowSchema.safeParse(clean);
-      if (result.success) {
-        journalRows.push(result.data);
-        outputLines.push(trimmed); // Preserve original line for hash-chain integrity
-      } else {
-        notProven.push({
-          code: "RECORDER_SCHEMA_MISMATCH_TICK",
-          description: `tick row failed validator schema: ${result.error.message.slice(0, 128)}`,
-          missingFields: result.error.issues.map((i) => i.path.join(".")),
-        });
-      }
-    } else if (kind === "start") {
-      const clean: Record<string, unknown> = {
-        kind: "start",
-        experimentId: parsed.experimentId,
-        seq: parsed.seq,
-        at: parsed.at,
-        previousHash: parsed.previousHash,
-        hash: parsed.hash,
-        recordingAudience: parsed.recordingAudience,
-        mode: parsed.mode,
-      };
-      if (parsed.decisionTransport !== undefined)
-        clean.decisionTransport = parsed.decisionTransport;
-      if (parsed.sourceSha !== undefined) clean.sourceSha = parsed.sourceSha;
-      if (parsed.runId !== undefined) clean.runId = parsed.runId;
-      if (parsed.citizens !== undefined) clean.citizens = parsed.citizens;
-
-      const result = journalRowSchema.safeParse(clean);
-      if (result.success) {
-        journalRows.push(result.data);
-        outputLines.push(trimmed); // Preserve original line for hash-chain integrity
-      } else {
-        notProven.push({
-          code: "RECORDER_SCHEMA_MISMATCH_START",
-          description: `start row failed validator schema: ${result.error.message.slice(0, 128)}`,
-          missingFields: result.error.issues.map((i) => i.path.join(".")),
-        });
-      }
-    } else {
-      // Pass through all other known kinds (start, shutdown, death, respawn, etc.)
-      // after stripping any extra unknown fields via schema parse.
-      const result = journalRowSchema.safeParse(parsed);
-      if (result.success) {
-        journalRows.push(result.data);
-        outputLines.push(trimmed); // Preserve original line for hash-chain integrity
-      } else {
-        // Try without strict extras — pick known fields for the kind
-        notProven.push({
-          code: "RECORDER_UNKNOWN_ROW_KIND",
-          description: `Row with kind='${String(kind)}' could not be parsed: ${result.error.message.slice(0, 128)}`,
-          missingFields: result.error.issues.map((i) => i.path.join(".")),
-        });
-      }
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      notProven.push({ code: "INVALID_RECORDER_LINE", description: "Journal row must be an object", missingFields: ["object"] });
+      outputLines.push(trimmed);
+      continue;
     }
+    const kind = parsed.kind;
+    if (kind === "action_attempt" && parsed.originPosition === undefined) missingOriginPosition = true;
+    if (kind === "action_observation" && parsed.toolDurabilityBefore === undefined) missingToolDurability = true;
+    if (kind === "tick" && parsed.serverGameTick == null) missingServerGameTick = true;
+    const clean = projectKnownFields(kind, parsed);
+    const result = journalRowSchema.safeParse(clean);
+    // Preserve every raw line, including quarantined and unknown rows, for authentication.
+    outputLines.push(trimmed);
+    if (result.success) {
+      adapterBindings.set(result.data, parsed);
+      journalRows.push(result.data);
+    }
+    else notProven.push({
+      code: clean ? `RECORDER_SCHEMA_MISMATCH_${kind === "action_observation" ? "OBSERVATION" : kind === "action_attempt" ? "ATTEMPT" : String(kind).toUpperCase()}` : "RECORDER_UNKNOWN_ROW_KIND",
+      description: `Row kind '${String(kind)}' quarantined by adapter`,
+      missingFields: result.error.issues.map((issue) => issue.path.join(".")),
+    });
   }
 
   // Aggregate gap reports
@@ -372,4 +235,10 @@ export function rehashJournalLines(
   }
 
   return lines;
+}
+
+// Preserve raw binding privately while keeping the public semantic projection strict.
+const adapterBindings = new WeakMap<object, Record<string, unknown>>();
+export function adapterBinding(row: object): Record<string, unknown> | undefined {
+  return adapterBindings.get(row);
 }

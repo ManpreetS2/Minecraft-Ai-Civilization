@@ -52,7 +52,7 @@ export const journalAttemptSchema = z
     hash: z.string(),
     citizenId: z.string(),
     attemptId: z.string(),
-    action: z.enum(["gather", "craft", "place", "eat", "move", "speech"]),
+    action: z.enum(["gather", "craft", "place", "eat", "move", "speech", "deposit", "withdraw"]),
     decisionSource: z.enum(["scripted", "model", "planner", "reflex"]),
     decisionEventId: z.string(),
     expectedItem: z.string().optional(),
@@ -177,6 +177,17 @@ export const journalRowSchema = z.discriminatedUnion("kind", [
   journalInterventionSchema,
   journalShutdownSchema,
 ]);
+
+/** Schema-derived allow-list shared by the adapter and authenticated-row validator. */
+export function projectKnownFields(kind: unknown, raw: Record<string, unknown>): Record<string, unknown> | undefined {
+  const schema = journalRowSchema.options.find((option) => option.shape.kind.safeParse(kind).success);
+  if (!schema) return undefined;
+  const projected: Record<string, unknown> = Object.create(null);
+  for (const key of Object.keys(schema.shape)) {
+    if (Object.hasOwn(raw, key)) projected[key] = raw[key];
+  }
+  return projected;
+}
 
 export type JournalRow = z.infer<typeof journalRowSchema>;
 
