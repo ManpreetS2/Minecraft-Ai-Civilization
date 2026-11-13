@@ -681,3 +681,13 @@ it("rejects null manifest metadata without throwing", () => {
     expect(verifyOfflineScenario({ artifactDir: dir, expectedCount: 2, expectedSha: VALID_SHA }).passed).toBe(false);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
+
+it("rejects hostile journal source and run identities without diagnostic coercion", () => {
+  for (const field of ["sourceSha", "runId"]) {
+    const dir = mkdtempSync(join(tmpdir(), "r5-ci-hostile-"));
+    try {
+      buildOfflineArtifactFixture(dir, { alterJournalRows: rows => { rows[0]![field] = { toString: "x" }; } });
+      expect(verifyOfflineScenario({ artifactDir: dir, expectedCount: 2, expectedSha: VALID_SHA }).passed).toBe(false);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  }
+});

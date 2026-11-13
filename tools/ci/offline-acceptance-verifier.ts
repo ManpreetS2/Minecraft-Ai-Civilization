@@ -169,7 +169,9 @@ export function auditJournalHashChain(lines: readonly string[]): {
     const rawLine = nonEmptyLines[i]!;
     let parsed: Record<string, unknown>;
     try {
-      parsed = JSON.parse(rawLine) as Record<string, unknown>;
+      const decoded: unknown = JSON.parse(rawLine);
+      if (decoded === null || typeof decoded !== "object" || Array.isArray(decoded)) throw new Error("Journal row must be an object");
+      parsed = decoded as Record<string, unknown>;
     } catch {
       return {
         valid: false,
@@ -184,7 +186,7 @@ export function auditJournalHashChain(lines: readonly string[]): {
       return {
         valid: false,
         totalRows: nonEmptyLines.length,
-        error: `Row ${expectedSeq} sequence mismatch: expected ${expectedSeq}, got ${String(parsed.seq)}`,
+        error: `Row ${expectedSeq} sequence mismatch: expected ${expectedSeq}, got ${display(parsed.seq)}`,
         rows: parsedRows,
       };
     }
@@ -193,7 +195,7 @@ export function auditJournalHashChain(lines: readonly string[]): {
       return {
         valid: false,
         totalRows: nonEmptyLines.length,
-        error: `Row ${expectedSeq} previousHash mismatch: expected '${priorHash}', got '${String(parsed.previousHash)}'`,
+        error: `Row ${expectedSeq} previousHash mismatch: expected '${priorHash}', got '${display(parsed.previousHash)}'`,
         rows: parsedRows,
       };
     }
@@ -319,22 +321,22 @@ export function verifyOfflineScenario(options: VerifyScenarioOptions): ScenarioV
     }
     manifest = parsed as Record<string, unknown>;
   } catch (err) {
-    errors.push(`Failed to parse manifest.json: ${String(err)}`);
+    errors.push(`Failed to parse manifest.json: ${display(err)}`);
   }
 
   if (manifest.schemaVersion !== 1) {
     errors.push(
-      `manifest schemaVersion mismatch: expected 1, got ${String(manifest.schemaVersion)}`,
+      `manifest schemaVersion mismatch: expected 1, got ${display(manifest.schemaVersion)}`,
     );
   }
 
   if (manifest.mode !== "offline-fixture") {
-    errors.push(`manifest mode must be 'offline-fixture', got '${String(manifest.mode)}'`);
+    errors.push(`manifest mode must be 'offline-fixture', got '${display(manifest.mode)}'`);
   }
 
   if (manifest.repository && manifest.repository !== expectedRepo) {
     errors.push(
-      `manifest repository mismatch: expected '${expectedRepo}', got '${String(manifest.repository)}'`,
+      `manifest repository mismatch: expected '${expectedRepo}', got '${display(manifest.repository)}'`,
     );
   }
 
@@ -365,7 +367,7 @@ export function verifyOfflineScenario(options: VerifyScenarioOptions): ScenarioV
 
       if (citizen.authentication !== "synthetic") {
         errors.push(
-          `Citizen ${citizen.id} authentication must be 'synthetic', got '${String(citizen.authentication)}'`,
+          `Citizen ${citizen.id} authentication must be 'synthetic', got '${display(citizen.authentication)}'`,
         );
       }
     }
@@ -442,18 +444,18 @@ export function verifyOfflineScenario(options: VerifyScenarioOptions): ScenarioV
           };
           if (receipt.attemptId !== a.attemptId) {
             errors.push(
-              `Receipt ${a.receiptId} attemptId mismatch: expected '${a.attemptId}', got '${String(receipt.attemptId)}'`,
+              `Receipt ${a.receiptId} attemptId mismatch: expected '${a.attemptId}', got '${display(receipt.attemptId)}'`,
             );
             allReceiptsValid = false;
           }
           if (receipt.citizenId !== a.citizenId) {
             errors.push(
-              `Receipt ${a.receiptId} citizenId mismatch: expected '${a.citizenId}', got '${String(receipt.citizenId)}'`,
+              `Receipt ${a.receiptId} citizenId mismatch: expected '${a.citizenId}', got '${display(receipt.citizenId)}'`,
             );
             allReceiptsValid = false;
           }
         } catch (err) {
-          errors.push(`Failed to parse receipt ${a.receiptId}.json: ${String(err)}`);
+          errors.push(`Failed to parse receipt ${a.receiptId}.json: ${display(err)}`);
           allReceiptsValid = false;
         }
       }
@@ -479,25 +481,25 @@ export function verifyOfflineScenario(options: VerifyScenarioOptions): ScenarioV
   if (rows.length > 0) {
     const startRow = rows[0]!;
     if (startRow.kind !== "start") {
-      errors.push(`First journal row kind must be 'start', got '${String(startRow.kind)}'`);
+      errors.push(`First journal row kind must be 'start', got '${display(startRow.kind)}'`);
     } else {
       if (startRow.sourceSha !== testedSha) {
         errors.push(
-          `Journal start row sourceSha mismatch: expected '${testedSha}', got '${String(startRow.sourceSha)}'`,
+          `Journal start row sourceSha mismatch: expected '${testedSha}', got '${display(startRow.sourceSha)}'`,
         );
       }
       if (startRow.runId !== runId) {
         errors.push(
-          `Journal start row runId mismatch: expected '${runId}', got '${String(startRow.runId)}'`,
+          `Journal start row runId mismatch: expected '${runId}', got '${display(startRow.runId)}'`,
         );
       }
       if (startRow.decisionTransport !== "scripted-in-process") {
         errors.push(
-          `Journal start row decisionTransport must be 'scripted-in-process', got '${String(startRow.decisionTransport)}'`,
+          `Journal start row decisionTransport must be 'scripted-in-process', got '${display(startRow.decisionTransport)}'`,
         );
       }
       if (startRow.mode !== "offline") {
-        errors.push(`Journal start row mode must be 'offline', got '${String(startRow.mode)}'`);
+        errors.push(`Journal start row mode must be 'offline', got '${display(startRow.mode)}'`);
       }
     }
 
@@ -679,7 +681,7 @@ export function verifyOfflineScenario(options: VerifyScenarioOptions): ScenarioV
       );
     }
   } catch (err) {
-    errors.push(`Failed to parse verdict.json: ${String(err)}`);
+    errors.push(`Failed to parse verdict.json: ${display(err)}`);
   }
 
   // 5. Validate gemini-validator-report.json
@@ -720,13 +722,13 @@ export function verifyOfflineScenario(options: VerifyScenarioOptions): ScenarioV
       );
     } else if (report.overallStatus !== "NOT_PROVEN") {
       errors.push(
-        `gemini-validator-report overallStatus is '${String(report.overallStatus)}', expected 'NOT_PROVEN'`,
+        `gemini-validator-report overallStatus is '${display(report.overallStatus)}', expected 'NOT_PROVEN'`,
       );
     }
 
     if (report.sourceSha !== testedSha) {
       errors.push(
-        `gemini-validator-report sourceSha mismatch: expected '${testedSha}', got '${String(report.sourceSha)}'`,
+        `gemini-validator-report sourceSha mismatch: expected '${testedSha}', got '${display(report.sourceSha)}'`,
       );
     }
 
@@ -750,7 +752,7 @@ export function verifyOfflineScenario(options: VerifyScenarioOptions): ScenarioV
     const summary = report.summary ?? {};
     if (summary.totalAttemptedActions !== expectedActionsCount) {
       errors.push(
-        `gemini-validator-report attempted actions mismatch: expected ${expectedActionsCount}, got ${String(summary.totalAttemptedActions)}`,
+        `gemini-validator-report attempted actions mismatch: expected ${expectedActionsCount}, got ${display(summary.totalAttemptedActions)}`,
       );
     }
 
@@ -803,7 +805,7 @@ export function verifyOfflineScenario(options: VerifyScenarioOptions): ScenarioV
 
     // A missing UNPROVEN_PAPER_AUTHENTICITY gap code is rejected as a contradiction by crossCheckEvidence below (absence is not proof).
   } catch (err) {
-    errors.push(`Failed to parse gemini-validator-report.json: ${String(err)}`);
+    errors.push(`Failed to parse gemini-validator-report.json: ${display(err)}`);
   }
 
   details.countsMatch =
@@ -1044,7 +1046,7 @@ export function checkJournalCliIntegration(
       status: "FAILED",
       executed: true,
       command: "pnpm v1:journal",
-      details: `Journal CLI execution failed: ${String(error)}`,
+      details: `Journal CLI execution failed: ${display(error)}`,
       forgedReceiptTestPassed: false,
     };
   } finally {
@@ -1171,4 +1173,11 @@ export function formatMarkdownSummary(report: OverallAcceptanceReport): string {
   lines.push("---");
   lines.push("*Generated by Minecraft AI Civilization Offline Acceptance CI Verifier.*");
   return lines.join("\n");
+}
+
+// Diagnostic rendering must never invoke attacker-controlled coercion hooks.
+function display(value: unknown): string {
+  if (typeof value === "string") return value;
+  try { return JSON.stringify(value) ?? typeof value; }
+  catch { return "<malformed>"; }
 }
