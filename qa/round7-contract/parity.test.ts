@@ -29,6 +29,8 @@ for (const direction of ["deposit", "withdraw"] as const) for (const measurement
     expect(Object.keys(payload).sort()).toEqual(required);
     expect(payload.runId).toBe("trusted-runtime-run"); expect(payload.citizenId).toBe(h.r.id);
     expect(payload.actionId).toMatch(/^[a-f0-9-]{36}$/); expect(payload.transferId).toMatch(/^[a-f0-9-]{36}$/);
+    const started = h.r.store.recentEvents().find(e => e.type === "ActionStarted")!;
+    expect(started.payload.actionId).toBe(payload.actionId); expect(started.payload.runId).toBe(payload.runId);
     expect(payload.actionId).not.toBe(payload.transferId); expect(payload.correlationComplete).toBe(true);
     expect(payload.access).toBe("personal"); expect(payload.authoritativeStorageUpdated).toBe(false);
     expect(payload.count).toBe(measurement === "confirmed" ? direction === "deposit" ? 4 : 1 : null);

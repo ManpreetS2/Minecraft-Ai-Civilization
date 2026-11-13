@@ -278,6 +278,7 @@ async function executeOwnedPlan(
     "ActionStarted",
     {
       action: gated.action,
+      actionId: ctx.actionId ?? null, runId: ctx.runId ?? null,
       task: gated.task,
       source: gated.source,
       reason: gated.reason,
@@ -617,6 +618,7 @@ async function executeOwnedPlan(
       result.success ? "ActionCompleted" : "ActionFailed",
       {
         action: gated.action,
+        actionId: ctx.actionId ?? null, runId: ctx.runId ?? null,
         task: gated.task,
         goal: gated.goal,
         source: gated.source,
