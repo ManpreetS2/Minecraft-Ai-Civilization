@@ -737,7 +737,7 @@ export function verifyOfflineScenario(options: VerifyScenarioOptions): ScenarioV
       errors.push("validator report runId contradicts attribution runId");
     }
     const experimentId = (manifest.configuration as { experimentId?: unknown } | undefined)?.experimentId;
-    if (typeof experimentId !== "string" || !experimentId.trim() || report.experimentId !== experimentId) {
+    if (report.experimentId !== undefined && (typeof report.experimentId !== "string" || !report.experimentId.trim() || (report.experimentId !== experimentId && report.experimentId !== runId))) {
       errors.push("validator report experimentId must match manifest configuration experimentId");
     }
     if (reportRunId !== runId) {

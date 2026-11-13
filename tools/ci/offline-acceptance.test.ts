@@ -653,3 +653,22 @@ describe("Offline Acceptance Artifact Verifier", () => {
     expect(md).toContain("Fail-Closed Policy");
   });
 });
+
+ describe("Round 5 identity types", () => {
+  for (const value of [null, 7, {}, [], "", " "]) {
+    it(`rejects malformed runId ${JSON.stringify(value)}`, () => {
+      const dir = mkdtempSync(join(tmpdir(), "r5-ci-"));
+      try {
+        buildOfflineArtifactFixture(dir, { alterManifest: m => { m.runId = value; } });
+        expect(verifyOfflineScenario({ artifactDir: dir, expectedCount: 2, expectedSha: VALID_SHA }).passed).toBe(false);
+      } finally { rmSync(dir, { recursive: true, force: true }); }
+    });
+  }
+  it("rejects contradictory report identities", () => {
+    const dir = mkdtempSync(join(tmpdir(), "r5-ci-"));
+    try {
+      buildOfflineArtifactFixture(dir, { alterReport: r => { r.attribution = { runId: "foreign" }; } });
+      expect(verifyOfflineScenario({ artifactDir: dir, expectedCount: 2, expectedSha: VALID_SHA }).passed).toBe(false);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+ });
