@@ -183,7 +183,7 @@ function storageActionCurrent(ctx: SkillContext): boolean {
   return !ctx.signal?.aborted && ctx.isActionCurrent?.() !== false;
 }
 function abandonedStorage(ctx: SkillContext, events: EventBus, action: string, result: ActionResult): ActionResult {
-  events.emit(createEvent("SystemIncident", {
+  if (result.success) events.emit(createEvent("SystemIncident", {
     kind: "AbandonedActionObservation", action, reconciliation: "PENDING",
     observedResult: result, authoritativeStorageUpdated: false,
   }, ctx.citizenId));
