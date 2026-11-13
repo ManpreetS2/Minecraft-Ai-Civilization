@@ -592,9 +592,11 @@ export async function depositItem(
       return cancelledResult(started, "deposit cancelled before moving items");
     }
     await chest.deposit(stack.type, null, Math.min(want, stack.count));
+    // Confirmation can precede both slot views. Observe their bounded sync before
+    // deciding whether a completed operation had any physical effect.
+    const citizenAfter = await waitForCount(ctx, name, (value) => value < citizenBefore && (containerCounts(chest)[name] ?? 0) > containerBefore);
     const containerAfter = containerCounts(chest)[name] ?? 0;
     chest.close();
-    const citizenAfter = await waitForCount(ctx, name, (value) => value < citizenBefore);
     const depositedCitizen = citizenBefore - citizenAfter;
     const depositedContainer = containerAfter - containerBefore;
     if (depositedCitizen <= 0 || depositedContainer <= 0) {
@@ -602,7 +604,7 @@ export async function depositItem(
     }
     ctx.events?.emit(
       createEvent((ctx.signal?.aborted || ctx.isActionCurrent?.() === false) ? "SystemIncident" : "ItemDeposited", {
-        ...((ctx.signal?.aborted || ctx.isActionCurrent?.() === false) ? { kind: "AbandonedTransferObservation", reconciliation: "PENDING", direction: "deposit" } : {}),
+        ...((ctx.signal?.aborted || ctx.isActionCurrent?.() === false) ? { kind: "AbandonedTransferObservation", reconciliation: "PENDING", direction: "deposit", authoritativeStorageUpdated: false } : {}),
         item: name, count: depositedCitizen, citizenBefore, citizenAfter, containerBefore, containerAfter,
           position: found.data.position, access: ctx.storageAccess,
           contents: { [name]: containerAfter },
@@ -664,14 +666,16 @@ export async function withdrawItem(
       return cancelledResult(started, "withdraw cancelled before moving items");
     }
     await chest.withdraw(stack.type, null, Math.min(count, stack.count));
-    const containerAfter = containerCounts(chest)[name] ?? 0;
     if ((ctx.signal?.aborted || ctx.isActionCurrent?.() === false)) {
-      const citizenAfter = countItem(ctx, name);
+      const citizenAfter = await waitForCount(ctx, name, (value) => value > citizenBefore && (containerCounts(chest)[name] ?? 0) < containerBefore);
+      const containerAfter = containerCounts(chest)[name] ?? 0;
       const gained = citizenAfter - citizenBefore;
       chest.close();
       if (gained !== 0 || containerAfter !== containerBefore) ctx.events?.emit(createEvent("SystemIncident", {
-        kind: "AbandonedTransferObservation", reconciliation: "PENDING", direction: "withdraw",
-        item: name, citizenBefore, citizenAfter, containerBefore, containerAfter,
+        kind: "AbandonedTransferObservation", reconciliation: "PENDING", direction: "withdraw", authoritativeStorageUpdated: false,
+        item: name, count: Math.max(0, gained), citizenBefore, citizenAfter, containerBefore, containerAfter,
+        position: found.data.position, access: ctx.storageAccess,
+        contents: { [name]: containerAfter },
       }, ctx.citizenId));
       // Items that already moved are reported on the result. Do not emit ItemWithdrawn once the signal has
       // aborted: the boundary may already have recorded TIMEOUT, and a later success event would contradict it.
@@ -680,15 +684,16 @@ export async function withdrawItem(
       }
       return cancelledResult(started, "withdraw cancelled during the transfer");
     }
+    const citizenAfter = await waitForCount(ctx, name, (value) => value > citizenBefore && (containerCounts(chest)[name] ?? 0) < containerBefore);
+    const containerAfter = containerCounts(chest)[name] ?? 0;
     chest.close();
-    const citizenAfter = await waitForCount(ctx, name, (value) => value > citizenBefore);
     const gained = citizenAfter - citizenBefore;
     const removed = containerBefore - containerAfter;
     if (gained <= 0 || removed <= 0) {
       return fail("VERIFY_FAILED", `Withdraw of ${name} did not move items`, Date.now() - started, true);
     }
     ctx.events?.emit(createEvent((ctx.signal?.aborted || ctx.isActionCurrent?.() === false) ? "SystemIncident" : "ItemWithdrawn", {
-      ...((ctx.signal?.aborted || ctx.isActionCurrent?.() === false) ? { kind: "AbandonedTransferObservation", reconciliation: "PENDING", direction: "withdraw" } : {}),
+      ...((ctx.signal?.aborted || ctx.isActionCurrent?.() === false) ? { kind: "AbandonedTransferObservation", reconciliation: "PENDING", direction: "withdraw", authoritativeStorageUpdated: false } : {}),
       item: name, count: gained, citizenBefore, citizenAfter, containerBefore, containerAfter,
       position: found.data.position, access: ctx.storageAccess,
       contents: { [name]: containerAfter },

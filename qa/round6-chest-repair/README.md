@@ -1,0 +1,9 @@
+# Reproduced slot-sync receipt repair — independent re-review required
+
+Frozen #154/#156 are not rewritten. Claude 2 #167 (7b63079a56ee613f8ed0a3afe97d2d52f965a914) reproduces QA154-M1: withdraw confirmation resolves before container/inventory slot views update; #154 samples too early and suppresses its only receipt. Its QA141-L2 also requires deposit/withdraw payload parity, and selector migration is conditional on authoritativeStorageUpdated:false.
+
+The unchanged independent receipt-suppression and abandoned-observation tests were temporarily overlaid from #167: before repair, 2 fail / 2 pass; after repair, 4/4 pass. They are not edited or committed here. This branch adds separate typed regressions for delayed slot views in both directions, normal completion, cancellation, and a confirmed no-effect operation. No-effect tests wait beyond the observation window and verify claim release. Tests route receipts through the real manager/SQLite path and require persisted payload parity.
+
+The operation now uses the existing bounded 2500 ms slot-sync wait before judging movement, reads container state after that wait, and leaves exactly one physical receipt. Abandoned receipts carry count, position, access, contents, both deltas and authoritativeStorageUpdated:false. Commands remain cancelled and storage projections remain unchanged. No inventory rollback, new claim release mechanism, generation bypass or terminal success after cancellation is introduced.
+
+This is an offline timing reproduction, not proof of real Paper slot ordering. Movement later than the bounded observation window remains unproven. This is not a durable exactly-once reconciliation service. Waiting observes an already issued operation; it does not authorize further writes after cancellation. Original independent QA103/QA78 selectors remain unchanged pending fresh Claude 2 adjudication.
