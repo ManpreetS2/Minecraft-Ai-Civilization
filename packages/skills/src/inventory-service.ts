@@ -666,27 +666,32 @@ export async function withdrawItem(
       return cancelledResult(started, "withdraw cancelled before moving items");
     }
     await chest.withdraw(stack.type, null, Math.min(count, stack.count));
-    if ((ctx.signal?.aborted || ctx.isActionCurrent?.() === false)) {
-      const citizenAfter = await waitForCount(ctx, name, (value) => value > citizenBefore && (containerCounts(chest)[name] ?? 0) < containerBefore);
-      const containerAfter = containerCounts(chest)[name] ?? 0;
-      const gained = citizenAfter - citizenBefore;
-      chest.close();
-      if (gained !== 0 || containerAfter !== containerBefore) ctx.events?.emit(createEvent("SystemIncident", {
+    // A resolved operation may precede slot synchronization. Failure to observe a
+    // delta within this bounded wait is uncertainty, not proof of zero movement.
+    let citizenAfter: number | null = null;
+    let containerAfter: number | null = null;
+    try {
+      citizenAfter = await waitForCount(ctx, name, (value) => value > citizenBefore && (containerCounts(chest)[name] ?? 0) < containerBefore);
+    } catch { /* disconnected or unavailable view: preserve an unknown observation */ }
+    try { containerAfter = containerCounts(chest)[name] ?? 0; } catch { /* unavailable */ }
+    const abandoned = ctx.signal?.aborted || ctx.isActionCurrent?.() === false;
+    if (abandoned) {
+      const gained = citizenAfter === null ? null : citizenAfter - citizenBefore;
+      const removed = containerAfter === null ? null : containerBefore - containerAfter;
+      const confirmed = gained !== null && gained > 0 && gained === removed;
+      ctx.events?.emit(createEvent("SystemIncident", {
         kind: "AbandonedTransferObservation", reconciliation: "PENDING", direction: "withdraw", authoritativeStorageUpdated: false,
-        item: name, count: Math.max(0, gained), citizenBefore, citizenAfter, containerBefore, containerAfter,
+        item: name, count: confirmed ? gained : null,
+        measurementStatus: confirmed ? "CONFIRMED_MOVEMENT" : gained === 0 && removed === 0 ? "ZERO_OBSERVED" : "UNKNOWN",
+        citizenBefore, citizenAfter, containerBefore, containerAfter,
         position: found.data.position, access: ctx.storageAccess,
-        contents: { [name]: containerAfter },
+        ...(containerAfter === null ? {} : { contents: { [name]: containerAfter } }),
       }, ctx.citizenId));
-      // Items that already moved are reported on the result. Do not emit ItemWithdrawn once the signal has
-      // aborted: the boundary may already have recorded TIMEOUT, and a later success event would contradict it.
-      if (gained > 0) {
-        return ok({ item: name, count: gained, citizenAfter, containerAfter }, Date.now() - started);
-      }
-      return cancelledResult(started, "withdraw cancelled during the transfer");
+      try { chest.close(); } catch { /* receipt already retained; cleanup cannot erase it */ }
+      return cancelledResult(started, "withdraw cancelled; physical observation pending reconciliation");
     }
-    const citizenAfter = await waitForCount(ctx, name, (value) => value > citizenBefore && (containerCounts(chest)[name] ?? 0) < containerBefore);
-    const containerAfter = containerCounts(chest)[name] ?? 0;
     chest.close();
+    if (citizenAfter === null || containerAfter === null) return fail("VERIFY_FAILED", "Withdrawal measurement unavailable", Date.now() - started, true);
     const gained = citizenAfter - citizenBefore;
     const removed = containerBefore - containerAfter;
     if (gained <= 0 || removed <= 0) {

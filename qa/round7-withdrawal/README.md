@@ -1,0 +1,9 @@
+# Round 7 resolved-but-unobserved withdrawal repair
+
+Descendant of #170 2e7e860ee1d54db086e5d9c1008c754176d0f628; no frozen branch is rewritten. #170's 150 ms synchronization fix is retained instead of duplicated. The unchanged #167 QA154-M1 test was rerun against exact frozen #154 3ddc5cdda6e7c309ddccac082cda4bbde6be5dc5 and failed: physical movement with no receipt.
+
+New requirement: a resolved operation followed by no observed delta after the bounded wait is not confirmed zero movement. The new tests reproduce 7 failures / 2 controls on #170 and pass 9/9 after this extension. Pre-issue cancellation remains no receipt. Resolved abandoned operations always leave one pending physical observation, even if a view is unavailable. Confirmed paired movement has an observed count; unchanged views are ZERO_OBSERVED with count null; missing or inconsistent views are UNKNOWN with count null. No successful terminal ItemWithdrawn is emitted after cancellation. Receipt retention precedes cleanup so cleanup failure cannot erase it.
+
+Controls include 150 ms late sync, resolved/no-delta, unavailable views, abort signals labelled death/disconnect/shutdown, repeated abort, pre-issue no-op, conservation and protection of a newer same-citizen claim. Lifecycle dispatch itself is also covered by existing manager/action-boundary suites; these new signal labels alone are not a live lifecycle proof.
+
+The old authored Round 6 test expecting no pending receipt after a resolved no-effect window is now a contract disagreement, not a reason to suppress uncertainty. It is preserved rather than silently rewritten. Zero observed is not confirmed zero, and no automatic reconciler or exactly-once delivery service is claimed. Measurements beyond the bounded window remain unknown. Offline only / NOT_PROVEN; Claude 2 independent approval required.
