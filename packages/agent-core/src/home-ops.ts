@@ -183,7 +183,8 @@ function storageActionCurrent(ctx: SkillContext): boolean {
   return !ctx.signal?.aborted && ctx.isActionCurrent?.() !== false;
 }
 function abandonedStorage(ctx: SkillContext, events: EventBus, action: string, result: ActionResult): ActionResult {
-  if (result.success) events.emit(createEvent("SystemIncident", {
+  // The physical skill already emits its pending receipt through ctx.events.
+  if (result.success && !ctx.events) events.emit(createEvent("SystemIncident", {
     kind: "AbandonedActionObservation", action, reconciliation: "PENDING",
     observedResult: result, authoritativeStorageUpdated: false,
   }, ctx.citizenId));
