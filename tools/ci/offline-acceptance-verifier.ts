@@ -313,10 +313,11 @@ export function verifyOfflineScenario(options: VerifyScenarioOptions): ScenarioV
   // 2. Validate manifest.json
   let manifest: Record<string, unknown> = {};
   try {
-    manifest = JSON.parse(readFileSync(join(artifactDir, "manifest.json"), "utf8")) as Record<
-      string,
-      unknown
-    >;
+    const parsed: unknown = JSON.parse(readFileSync(join(artifactDir, "manifest.json"), "utf8"));
+    if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+      throw new Error("manifest must be a JSON object");
+    }
+    manifest = parsed as Record<string, unknown>;
   } catch (err) {
     errors.push(`Failed to parse manifest.json: ${String(err)}`);
   }

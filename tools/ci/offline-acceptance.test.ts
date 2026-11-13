@@ -672,3 +672,12 @@ describe("Offline Acceptance Artifact Verifier", () => {
     } finally { rmSync(dir, { recursive: true, force: true }); }
   });
  });
+
+it("rejects null manifest metadata without throwing", () => {
+  const dir = mkdtempSync(join(tmpdir(), "r5-ci-null-"));
+  try {
+    buildOfflineArtifactFixture(dir);
+    writeFileSync(join(dir, "manifest.json"), "null");
+    expect(verifyOfflineScenario({ artifactDir: dir, expectedCount: 2, expectedSha: VALID_SHA }).passed).toBe(false);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
