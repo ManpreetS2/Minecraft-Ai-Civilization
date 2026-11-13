@@ -8,7 +8,7 @@ NOT_PROVEN / offline_simulated. No acceptance-ledger upgrade. No live Paper, inf
 | Lease #133 | 3a9f744b09f332f9720ff71c418c5901ce3ae0d3 | Independent provisional support in #142; inherited via staging |
 | Chest #135 | 20c57b0f35693ae2079a51bb3d0c2d026ba34424 | Independent provisional support in #142; inherited via staging |
 | New chest #154 | 3ddc5cdda6e7c309ddccac082cda4bbde6be5dc5 | UNREVIEWED; provisionally rehearsed, explicit QA103 contract migration |
-| CI #155 | 70245025c84481535aa889f3fee1261e856c5d43 | UNREVIEWED; 91 local verifier tests pass |
+| CI #155 | 3278bac2e947bcaf0829088d05e6cc703f75234d | UNREVIEWED; 91 local verifier tests pass |
 | Validator #150 | e31bcb4ec055bace24e29bb4d0346bc932057930 | EXCLUDED pending fresh Claude 2 exact-source QA |
 | Paper chain | 8164ab12e1d18a2ca12b9213eedda5ddd79b3e00 | PROVISIONAL; excluded |
 | Gemini #148 | f1a213075c41e502954106b755211aa0c9e34c01 | EXCLUDED; no Claude 1 exact-source PASS observed |
