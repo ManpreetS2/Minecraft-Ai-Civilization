@@ -1,0 +1,97 @@
+[
+    {
+        "label":  "m3-interface",
+        "command":  [
+                        "pnpm",
+                        "exec",
+                        "vitest",
+                        "run",
+                        "-c",
+                        "qa/round8-interface/vitest.config.ts"
+                    ],
+        "sourceSha":  "5bf64334faf32cfe0d7ec82f3aab138568afdfc5",
+        "dirtyPaths":  "?? qa/round8-interface/",
+        "exitCode":  1,
+        "expectedExitCode":  0,
+        "counts":  {
+                       "failed":  1,
+                       "passed":  6
+                   },
+        "elapsedSeconds":  16.91,
+        "log":  "m3-interface.log",
+        "sha256":  "2e38caf6906df14b365e536ad054e9d4f132e86ddfc88cf585eddaf3d5891323",
+        "environment":  {
+
+                        }
+    },
+    {
+        "label":  "m3-interface-corrected",
+        "command":  [
+                        "pnpm",
+                        "exec",
+                        "vitest",
+                        "run",
+                        "-c",
+                        "qa/round8-interface/vitest.config.ts"
+                    ],
+        "sourceSha":  "5bf64334faf32cfe0d7ec82f3aab138568afdfc5",
+        "dirtyPaths":  "?? qa/round8-interface/",
+        "exitCode":  0,
+        "expectedExitCode":  0,
+        "counts":  {
+                       "passed":  7
+                   },
+        "elapsedSeconds":  16.92,
+        "log":  "m3-interface-corrected.log",
+        "sha256":  "d40c036cd888c88908996d1cfa1d6c272e9f4ac5c580b2cc06016bf8493dcf81",
+        "environment":  {
+
+                        }
+    },
+    {
+        "label":  "m3-desired-conflicts",
+        "command":  [
+                        "pnpm",
+                        "exec",
+                        "vitest",
+                        "run",
+                        "-c",
+                        "qa/round8-interface/vitest.desired.config.ts"
+                    ],
+        "sourceSha":  "5bf64334faf32cfe0d7ec82f3aab138568afdfc5",
+        "dirtyPaths":  "?? qa/round8-interface/",
+        "exitCode":  1,
+        "expectedExitCode":  1,
+        "counts":  {
+                       "failed":  4
+                   },
+        "elapsedSeconds":  11.75,
+        "log":  "m3-desired-conflicts.log",
+        "sha256":  "856954f9a41af451614012a5eb54ec2ba57af3ca38f4c5e2df9164b7829bc631",
+        "environment":  {
+
+                        }
+    },
+    {
+        "label":  "m3-lint",
+        "command":  [
+                        "pnpm",
+                        "exec",
+                        "eslint",
+                        "qa/round8-interface"
+                    ],
+        "sourceSha":  "5bf64334faf32cfe0d7ec82f3aab138568afdfc5",
+        "dirtyPaths":  "?? qa/round8-interface/",
+        "exitCode":  0,
+        "expectedExitCode":  0,
+        "counts":  {
+
+                   },
+        "elapsedSeconds":  6.59,
+        "log":  "m3-lint.log",
+        "sha256":  "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "environment":  {
+
+                        }
+    }
+]

@@ -1,0 +1,46 @@
+
+ RUN  v3.2.7 C:/Users/sh1ft/codex-round8-interface/qa/round8-interface
+
+stdout | contracts.test.ts > 2 citizens: manager, cognition and physical dispatch share runtime identities and private observations
+{"mode":"offline_simulated","acceptance":"NOT_PROVEN","transport":"simulated_mock","actualPaidRequestsSent":0,"actualPaidSpendUsd":0,"simulatedDecisions":6,"simulatedActionDispatches":6,"runId":"offline-run"}
+
+stdout | contracts.test.ts > 4 citizens: manager, cognition and physical dispatch share runtime identities and private observations
+{"mode":"offline_simulated","acceptance":"NOT_PROVEN","transport":"simulated_mock","actualPaidRequestsSent":0,"actualPaidSpendUsd":0,"simulatedDecisions":12,"simulatedActionDispatches":12,"runId":"offline-run"}
+
+ ❯ contracts.test.ts (7 tests | 1 failed) 12094ms
+   ✓ 2 citizens: manager, cognition and physical dispatch share runtime identities and private observations  6112ms
+   ✓ 4 citizens: manager, cognition and physical dispatch share runtime identities and private observations  5967ms
+   ✓ same-run restart retains session identity and simulated usage; foreign citizen prompts fail before dispatch 4ms
+   ✓ gpt-a: unknown usage retains a hold and closes admissions across restart 2ms
+   ✓ claude-a: unknown usage retains a hold and closes admissions across restart 1ms
+   ✓ cancelled in-flight inference preserves usage uncertainty and closeAll prevents subsequent mock sends 1ms
+   × owner gate itself denies after revoke; it is not claimed to be wired to the inherited registry 5ms
+     → expected 'CIV_APPROVE_PAID_RUN does not name th…' to be undefined
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  contracts.test.ts > owner gate itself denies after revoke; it is not claimed to be wired to the inherited registry
+AssertionError: expected 'CIV_APPROVE_PAID_RUN does not name th…' to be undefined
+
+- Expected: 
+undefined
+
++ Received: 
+"CIV_APPROVE_PAID_RUN does not name this run"
+
+ ❯ contracts.test.ts:82:23
+     80| it("owner gate itself denies after revoke; it is not claimed to be wir…
+     81|   const gate = PaidRequestGate.fromApproval({ ownerApprovalReference: …
+     82|   expect(gate.take()).toBeUndefined(); gate.revoke("test-stop"); expec…
+       |                       ^
+     83|   expect(gate.snapshot.requestsTaken).toBe(1);
+     84| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 6 passed (7)
+   Start at  10:43:30
+   Duration  16.01s (transform 1.60s, setup 70ms, collect 3.41s, tests 12.09s, environment 0ms, prepare 187ms)
+

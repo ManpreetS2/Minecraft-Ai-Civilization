@@ -1,0 +1,18 @@
+
+ RUN  v3.2.7 C:/Users/sh1ft/codex-round8-interface/qa/round8-interface
+
+stdout | contracts.test.ts > 2 citizens: manager, cognition and physical dispatch share runtime identities and private observations
+{"mode":"offline_simulated","acceptance":"NOT_PROVEN","transport":"simulated_mock","actualPaidRequestsSent":0,"actualPaidSpendUsd":0,"simulatedDecisions":6,"simulatedActionDispatches":6,"runId":"offline-run"}
+
+stdout | contracts.test.ts > 4 citizens: manager, cognition and physical dispatch share runtime identities and private observations
+{"mode":"offline_simulated","acceptance":"NOT_PROVEN","transport":"simulated_mock","actualPaidRequestsSent":0,"actualPaidSpendUsd":0,"simulatedDecisions":12,"simulatedActionDispatches":12,"runId":"offline-run"}
+
+ ✓ contracts.test.ts (7 tests) 12076ms
+   ✓ 2 citizens: manager, cognition and physical dispatch share runtime identities and private observations  6096ms
+   ✓ 4 citizens: manager, cognition and physical dispatch share runtime identities and private observations  5969ms
+
+ Test Files  1 passed (1)
+      Tests  7 passed (7)
+   Start at  10:45:30
+   Duration  15.83s (transform 1.28s, setup 69ms, collect 3.18s, tests 12.08s, environment 0ms, prepare 177ms)
+

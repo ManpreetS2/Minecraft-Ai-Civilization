@@ -1,0 +1,84 @@
+
+ RUN  v3.2.7 C:/Users/sh1ft/codex-round8-interface/qa/round8-interface
+
+ ❯ desired.test.ts (4 tests | 4 failed) 6133ms
+   × gpt-a: proposed shared owner gate revocation stops subsequent dispatch 20ms
+     → promise resolved "{ goal: 'gather_food', …(2) }" instead of rejecting
+   × claude-a: proposed shared owner gate revocation stops subsequent dispatch 2ms
+     → promise resolved "{ goal: 'gather_food', …(2) }" instead of rejecting
+   × model-derived dispatch carries its actual provider decision correlation rather than only citizen/time 6098ms
+     → expected false to be true // Object.is equality
+   × normal physical success joins its exact dispatch as pending receipts already do 13ms
+     → expected undefined to be '5ba037b8-9bba-4c72-a8b1-1eb73a92d596' // Object.is equality
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  desired.test.ts > gpt-a: proposed shared owner gate revocation stops subsequent dispatch
+ FAIL  desired.test.ts > claude-a: proposed shared owner gate revocation stops subsequent dispatch
+AssertionError: promise resolved "{ goal: 'gather_food', …(2) }" instead of rejecting
+
+- Expected
++ Received
+
+- Error {
+-   "message": "rejected promise",
++ {
++   "goal": "gather_food",
++   "priority": 0.5,
++   "reason": "decision for a gpt citizen",
+  }
+
+ ❯ desired.test.ts:14:61
+     12|   const f = offlineRegistry({ gate, allowPaidRequests: true } as unkno…
+     13|   gate.revoke("fixture-owner-stop");
+     14|   await expect(f.registry.providerFor(id).decide(prompt(id))).rejects.…
+       |                                                             ^
+     15| });
+     16| it("model-derived dispatch carries its actual provider decision correl…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯
+
+ FAIL  desired.test.ts > model-derived dispatch carries its actual provider decision correlation rather than only citizen/time
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ desired.test.ts:21:187
+     19|   const started = w.store.listAllEventsForObserver().filter(e => e.typ…
+     20|   expect(started.length).toBeGreaterThan(0);
+     21|   for (const event of started) expect(decisions.some(d => d.correlatio…
+       |                                                                                                                                                                                           ^
+     22| });
+     23| it("normal physical success joins its exact dispatch as pending receip…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/4]⎯
+
+ FAIL  desired.test.ts > normal physical success joins its exact dispatch as pending receipts already do
+AssertionError: expected undefined to be '5ba037b8-9bba-4c72-a8b1-1eb73a92d596' // Object.is equality
+
+- Expected: 
+"5ba037b8-9bba-4c72-a8b1-1eb73a92d596"
+
++ Received: 
+undefined
+
+ ❯ desired.test.ts:30:31
+     28|     const start = h.seen.find(e => e.type === "ActionStarted")!.payloa…
+     29|     const physical = h.seen.find(e => e.type === "ItemDeposited")!.pay…
+     30|     expect(physical.actionId).toBe(start.actionId);
+       |                               ^
+     31|     expect(physical.transferId).toMatch(/^[a-f0-9-]{36}$/);
+     32|   } finally { restore(); }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/4]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  4 failed (4)
+   Start at  10:45:48
+   Duration  10.32s (transform 1.49s, setup 81ms, collect 3.53s, tests 6.13s, environment 0ms, prepare 190ms)
+
