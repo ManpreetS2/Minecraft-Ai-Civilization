@@ -816,10 +816,16 @@ export function verifyOfflineScenario(options: VerifyScenarioOptions): ScenarioV
   let acceptance: AcceptanceSummary | undefined;
   let crossContradictions: string[] = [];
   if (details.hashChainValid && manifest && Object.keys(manifest).length > 0) {
-    const cross = crossCheckEvidence({ artifactDir, expectedCount: count, testedSha, runId, manifest, rows: hashChainAudit.rows });
-    errors.push(...cross.errors, ...cross.contradictions);
-    crossContradictions = cross.contradictions;
-    acceptance = cross.acceptance;
+    try {
+      const cross = crossCheckEvidence({ artifactDir, expectedCount: count, testedSha, runId, manifest, rows: hashChainAudit.rows });
+      errors.push(...cross.errors, ...cross.contradictions);
+      crossContradictions = cross.contradictions;
+      acceptance = cross.acceptance;
+    } catch {
+      // Malformed JSON identities can shadow toString in diagnostic paths.
+      // A failed consistency audit must fail closed, never escape or pass.
+      errors.push("Malformed cross-source metadata could not be verified");
+    }
   }
   const contradictions = [...legacyContradictions, ...crossContradictions];
 
