@@ -669,7 +669,7 @@ export async function withdrawItem(
       const citizenAfter = countItem(ctx, name);
       const gained = citizenAfter - citizenBefore;
       chest.close();
-      ctx.events?.emit(createEvent("SystemIncident", {
+      if (gained !== 0 || containerAfter !== containerBefore) ctx.events?.emit(createEvent("SystemIncident", {
         kind: "AbandonedTransferObservation", reconciliation: "PENDING", direction: "withdraw",
         item: name, citizenBefore, citizenAfter, containerBefore, containerAfter,
       }, ctx.citizenId));
