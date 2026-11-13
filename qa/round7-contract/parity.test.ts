@@ -48,3 +48,11 @@ it("missing run context is explicit null, never a fabricated identifier", async 
   expect(receipt.runId).toBe(null); expect(receipt.correlationComplete).toBe(false);
   expect(receipt.actionId).toMatch(/^[a-f0-9-]{36}$/);
 });
+it("executePlan's runtime event bus retains the receipt when optional ctx.events is absent", async () => {
+  const h = homeRig({ purpose: "personal", item: "cobblestone", type: 4, carry: 0, chestStock: 4, windowMs: 150 });
+  const ac = new AbortController(); setTimeout(() => ac.abort(), 50);
+  await executePlan({ body: h.r.body, bot: h.r.bot, citizenId: h.r.id, signal: ac.signal, runId: "trusted-runtime-run" } as never,
+    { action: "withdrawItems", task: "withdraw_personal", source: "planner", reason: "test", item: "cobblestone", count: 1 } as never,
+    h.r.store, h.bus, h.runtime);
+  expect(h.seen.filter(e => (e.payload as Record<string, unknown>)?.kind === "AbandonedTransferObservation")).toHaveLength(1);
+});

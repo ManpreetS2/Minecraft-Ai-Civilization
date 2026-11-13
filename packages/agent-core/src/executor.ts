@@ -245,7 +245,7 @@ export async function executePlan(
   try {
     return await executionScope.run(
       isActionCurrent,
-      () => executeOwnedPlan({ ...ctx, isActionCurrent, actionId: randomUUID() }, plan, store, events, baseRuntime),
+      () => executeOwnedPlan({ ...ctx, events, isActionCurrent, actionId: randomUUID() }, plan, store, events, baseRuntime),
     );
   } finally {
     active = false;
