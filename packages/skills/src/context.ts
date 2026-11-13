@@ -13,6 +13,9 @@ export type SkillContext = {
   /** Authorized caller context for physical chest observations; never inferred from a model. */
   storageAccess?: "personal" | "household" | "communal";
   citizenId?: string;
+  /** Trusted runtime correlation, never copied from a model plan. */
+  runId?: string;
+  actionId?: string;
   timeoutMs?: number;
   skipBlock?: (position: { x: number; y: number; z: number }) => boolean;
   reservations?: ItemReservationBook;

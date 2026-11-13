@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import {
   classifyIncompleteTransfer,
   compactCarriedFacts,
@@ -260,6 +261,29 @@ async function syncInventory(bot: Bot): Promise<void> {
     // 1.21.11 may not answer a dummy click
   }
 }
+
+/** One non-countable-until-confirmed physical observation; command wrappers never add a transfer. */
+function pendingTransfer(
+  ctx: SkillContext, direction: "deposit" | "withdraw", item: string, transferId: string,
+  citizenBefore: number, citizenAfter: number | null, containerBefore: number,
+  containerAfter: number | null, position: Vec3,
+): void {
+  const citizenDelta = citizenAfter === null ? null : direction === "withdraw" ? citizenAfter - citizenBefore : citizenBefore - citizenAfter;
+  const containerDelta = containerAfter === null ? null : direction === "withdraw" ? containerBefore - containerAfter : containerAfter - containerBefore;
+  const confirmed = citizenDelta !== null && citizenDelta > 0 && citizenDelta === containerDelta;
+  const runId = ctx.runId || null, actionId = ctx.actionId || null, citizenId = ctx.citizenId || null;
+  ctx.events?.emit(createEvent("SystemIncident", {
+    kind: "AbandonedTransferObservation", reconciliation: "PENDING", authoritativeStorageUpdated: false,
+    direction, item, transferId, actionId, runId, citizenId,
+    correlationComplete: Boolean(runId && actionId && citizenId),
+    count: confirmed ? citizenDelta : null,
+    measurementStatus: confirmed ? "CONFIRMED_MOVEMENT" : citizenDelta === 0 && containerDelta === 0 ? "ZERO_OBSERVED" : "UNKNOWN",
+    citizenBefore, citizenAfter, containerBefore, containerAfter,
+    position, access: ctx.storageAccess ?? null,
+    contents: containerAfter === null ? null : { [item]: containerAfter },
+  }, ctx.citizenId));
+}
+
 async function waitForCount(
   ctx: SkillContext,
   name: string,
@@ -591,20 +615,26 @@ export async function depositItem(
       chest.close();
       return cancelledResult(started, "deposit cancelled before moving items");
     }
+    const transferId = randomUUID();
     await chest.deposit(stack.type, null, Math.min(want, stack.count));
-    // Confirmation can precede both slot views. Observe their bounded sync before
-    // deciding whether a completed operation had any physical effect.
-    const citizenAfter = await waitForCount(ctx, name, (value) => value < citizenBefore && (containerCounts(chest)[name] ?? 0) > containerBefore);
-    const containerAfter = containerCounts(chest)[name] ?? 0;
+    let citizenAfter: number | null = null, containerAfter: number | null = null;
+    try { citizenAfter = await waitForCount(ctx, name, value => value < citizenBefore && (containerCounts(chest)[name] ?? 0) > containerBefore); } catch { /* unavailable */ }
+    try { citizenAfter = countItem(ctx, name); } catch { citizenAfter = null; }
+    try { containerAfter = containerCounts(chest)[name] ?? 0; } catch { /* unavailable */ }
+    if (ctx.signal?.aborted || ctx.isActionCurrent?.() === false) {
+      pendingTransfer(ctx, "deposit", name, transferId, citizenBefore, citizenAfter, containerBefore, containerAfter, found.data.position);
+      try { chest.close(); } catch { /* receipt retained */ }
+      return cancelledResult(started, "deposit cancelled; physical observation pending reconciliation");
+    }
     chest.close();
+    if (citizenAfter === null || containerAfter === null) return fail("DEPOSIT_FAILED", "Deposit measurement unavailable", Date.now() - started, true);
     const depositedCitizen = citizenBefore - citizenAfter;
     const depositedContainer = containerAfter - containerBefore;
     if (depositedCitizen <= 0 || depositedContainer <= 0) {
       return fail("DEPOSIT_FAILED", `Deposit of ${name} did not move items (citizen ${citizenBefore}->${citizenAfter}, chest ${containerBefore}->${containerAfter})`, Date.now() - started, true);
     }
     ctx.events?.emit(
-      createEvent((ctx.signal?.aborted || ctx.isActionCurrent?.() === false) ? "SystemIncident" : "ItemDeposited", {
-        ...((ctx.signal?.aborted || ctx.isActionCurrent?.() === false) ? { kind: "AbandonedTransferObservation", reconciliation: "PENDING", direction: "deposit", authoritativeStorageUpdated: false } : {}),
+      createEvent("ItemDeposited", {
         item: name, count: depositedCitizen, citizenBefore, citizenAfter, containerBefore, containerAfter,
           position: found.data.position, access: ctx.storageAccess,
           contents: { [name]: containerAfter },
@@ -665,6 +695,7 @@ export async function withdrawItem(
       chest.close();
       return cancelledResult(started, "withdraw cancelled before moving items");
     }
+    const transferId = randomUUID();
     await chest.withdraw(stack.type, null, Math.min(count, stack.count));
     // A resolved operation may precede slot synchronization. Failure to observe a
     // delta within this bounded wait is uncertainty, not proof of zero movement.
@@ -673,20 +704,11 @@ export async function withdrawItem(
     try {
       citizenAfter = await waitForCount(ctx, name, (value) => value > citizenBefore && (containerCounts(chest)[name] ?? 0) < containerBefore);
     } catch { /* disconnected or unavailable view: preserve an unknown observation */ }
+    try { citizenAfter = countItem(ctx, name); } catch { citizenAfter = null; }
     try { containerAfter = containerCounts(chest)[name] ?? 0; } catch { /* unavailable */ }
     const abandoned = ctx.signal?.aborted || ctx.isActionCurrent?.() === false;
     if (abandoned) {
-      const gained = citizenAfter === null ? null : citizenAfter - citizenBefore;
-      const removed = containerAfter === null ? null : containerBefore - containerAfter;
-      const confirmed = gained !== null && gained > 0 && gained === removed;
-      ctx.events?.emit(createEvent("SystemIncident", {
-        kind: "AbandonedTransferObservation", reconciliation: "PENDING", direction: "withdraw", authoritativeStorageUpdated: false,
-        item: name, count: confirmed ? gained : null,
-        measurementStatus: confirmed ? "CONFIRMED_MOVEMENT" : gained === 0 && removed === 0 ? "ZERO_OBSERVED" : "UNKNOWN",
-        citizenBefore, citizenAfter, containerBefore, containerAfter,
-        position: found.data.position, access: ctx.storageAccess,
-        ...(containerAfter === null ? {} : { contents: { [name]: containerAfter } }),
-      }, ctx.citizenId));
+      pendingTransfer(ctx, "withdraw", name, transferId, citizenBefore, citizenAfter, containerBefore, containerAfter, found.data.position);
       try { chest.close(); } catch { /* receipt already retained; cleanup cannot erase it */ }
       return cancelledResult(started, "withdraw cancelled; physical observation pending reconciliation");
     }
@@ -697,8 +719,7 @@ export async function withdrawItem(
     if (gained <= 0 || removed <= 0) {
       return fail("VERIFY_FAILED", `Withdraw of ${name} did not move items`, Date.now() - started, true);
     }
-    ctx.events?.emit(createEvent((ctx.signal?.aborted || ctx.isActionCurrent?.() === false) ? "SystemIncident" : "ItemWithdrawn", {
-      ...((ctx.signal?.aborted || ctx.isActionCurrent?.() === false) ? { kind: "AbandonedTransferObservation", reconciliation: "PENDING", direction: "withdraw", authoritativeStorageUpdated: false } : {}),
+    ctx.events?.emit(createEvent("ItemWithdrawn", {
       item: name, count: gained, citizenBefore, citizenAfter, containerBefore, containerAfter,
       position: found.data.position, access: ctx.storageAccess,
       contents: { [name]: containerAfter },

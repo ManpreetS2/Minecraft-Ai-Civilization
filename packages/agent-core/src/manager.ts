@@ -736,6 +736,7 @@ export class AgentManager {
 
     const ctx = bodyContext(citizen.body, undefined, this.events, citizen.record.id);
     if (!ctx) return;
+    ctx.runId = this.runId || undefined;
 
     citizen.busy = true;
     citizen.actionLive = true;

@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { captureActionOwnership } from "./action-boundary.js";
 import type { MinecraftBody } from "@civ/minecraft-adapter";
@@ -244,7 +245,7 @@ export async function executePlan(
   try {
     return await executionScope.run(
       isActionCurrent,
-      () => executeOwnedPlan({ ...ctx, isActionCurrent }, plan, store, events, baseRuntime),
+      () => executeOwnedPlan({ ...ctx, isActionCurrent, actionId: randomUUID() }, plan, store, events, baseRuntime),
     );
   } finally {
     active = false;
