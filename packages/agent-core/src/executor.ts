@@ -224,7 +224,9 @@ function executionIsCurrent(ctx: SkillContext): boolean {
   return !ctx.signal?.aborted && (executionScope.getStore()?.() ?? true);
 }
 function abandonedObservation(ctx: SkillContext, events: EventBus, action: string, result: ActionResult): ActionResult {
-  events.emit(createEvent("SystemIncident", {
+  // Chest skills own physical transfer observations, including abandoned transfers.
+  // Failed/no-effect actions do not introduce a second reconciliation receipt.
+  if (result.success && action !== "depositItems" && action !== "withdrawItems") events.emit(createEvent("SystemIncident", {
     kind: "AbandonedActionObservation", action, reconciliation: "PENDING",
     observedResult: result, authoritativeStorageUpdated: false,
   }, ctx.citizenId));
