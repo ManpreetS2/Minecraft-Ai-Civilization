@@ -337,8 +337,11 @@ export function verifyOfflineScenario(options: VerifyScenarioOptions): ScenarioV
     );
   }
 
-  runId = String(manifest.runId ?? "unknown");
-  testedSha = String(manifest.sourceSha ?? "unknown");
+  if (typeof manifest.runId !== "string" || manifest.runId.trim().length === 0) {
+    errors.push("manifest runId must be a nonempty string");
+  }
+  runId = typeof manifest.runId === "string" ? manifest.runId : "";
+  testedSha = typeof manifest.sourceSha === "string" ? manifest.sourceSha : "";
 
   if (!/^[a-f0-9]{40}$/.test(testedSha)) {
     errors.push(`manifest sourceSha is not a valid 40-character hex SHA: '${testedSha}'`);
@@ -726,7 +729,17 @@ export function verifyOfflineScenario(options: VerifyScenarioOptions): ScenarioV
       );
     }
 
-    const reportRunId = String(report.runId ?? report.attribution?.runId ?? report.experimentId ?? "");
+    const reportRunId = report.runId ?? report.attribution?.runId;
+    if (typeof reportRunId !== "string" || reportRunId.trim().length === 0) {
+      errors.push("validator report runId must be a nonempty string");
+    }
+    if (report.runId !== undefined && report.attribution?.runId !== undefined && report.runId !== report.attribution.runId) {
+      errors.push("validator report runId contradicts attribution runId");
+    }
+    const experimentId = (manifest.configuration as { experimentId?: unknown } | undefined)?.experimentId;
+    if (typeof experimentId !== "string" || !experimentId.trim() || report.experimentId !== experimentId) {
+      errors.push("validator report experimentId must match manifest configuration experimentId");
+    }
     if (reportRunId !== runId) {
       errors.push(
         `gemini-validator-report runId mismatch: expected '${runId}', got '${reportRunId}'`,
